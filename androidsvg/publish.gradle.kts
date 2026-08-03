@@ -1,8 +1,11 @@
 // Handles the upload to Sonatype.
 
+import jdk.internal.net.http.common.TimeSource.source
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.plugins.signing.SigningExtension
+import java.io.File
+import java.util.Collections.emptyList
 
 apply(plugin = "maven-publish")
 apply(plugin = "signing")
@@ -15,7 +18,7 @@ val libraryDescription = "SVG rendering library for Android."
 
 val artifactIdAAR = "androidsvg"
 val artifactIdJAR = "androidsvg-jar"
-val libraryGroup = "com.caverock"
+val libraryGroup = "hu.oandras"
 
 val developerId = "BigBadaboom"
 val developerName = "Paul LeBeau"
