@@ -74,4 +74,30 @@ class MaskTest {
         // Right half (outside mask region 5-10) should be TRANSPARENT
         assertEquals("Pixel at (7, 5) should be TRANSPARENT", Color.TRANSPARENT, bitmap.getPixel(7, 5))
     }
+
+    @Test
+    fun maskRegionUserSpaceOnUse() {
+        val svg = SVG.getFromString(
+            """
+            <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <mask id="mask" maskUnits="userSpaceOnUse" x="5" y="5" width="10" height="10">
+                  <rect width="20" height="20" fill="white"/>
+                </mask>
+              </defs>
+              <rect width="20" height="20" fill="#ff0000" mask="url(#mask)"/>
+            </svg>
+            """.trimIndent()
+        )
+        val bitmap = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888)
+
+        svg.renderToCanvas(Canvas(bitmap))
+
+        // Center (5,5 to 15,15) should be RED
+        assertEquals("Pixel at (10, 10) should be RED", Color.RED, bitmap.getPixel(10, 10))
+        // Top-left (2,2) should be TRANSPARENT
+        assertEquals("Pixel at (2, 2) should be TRANSPARENT", Color.TRANSPARENT, bitmap.getPixel(2, 2))
+        // Bottom-right (18,18) should be TRANSPARENT
+        assertEquals("Pixel at (18, 18) should be TRANSPARENT", Color.TRANSPARENT, bitmap.getPixel(18, 18))
+    }
 }

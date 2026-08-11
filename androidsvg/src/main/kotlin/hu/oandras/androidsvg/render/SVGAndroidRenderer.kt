@@ -14,11 +14,12 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+@file:Suppress("UsePropertyAccessSyntax")
+
 package hu.oandras.androidsvg.render
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.Color
@@ -39,10 +40,10 @@ import android.graphics.RectF
 import android.graphics.Shader.TileMode
 import android.graphics.Typeface
 import android.os.Build
-import android.util.Base64
 import android.util.Log
 import androidx.annotation.ColorInt
 import androidx.annotation.RequiresApi
+import androidx.collection.ArrayMap
 import hu.oandras.androidsvg.BuildConfig
 import hu.oandras.androidsvg.PreserveAspectRatio
 import hu.oandras.androidsvg.RenderOptions
@@ -54,8 +55,10 @@ import hu.oandras.androidsvg.css.CSSParser
 import hu.oandras.androidsvg.css.CSSParser.RuleMatchContext
 import hu.oandras.androidsvg.dom.Box
 import hu.oandras.androidsvg.dom.Box.Companion.fromLimits
+import hu.oandras.androidsvg.dom.COLOR_BLACK
 import hu.oandras.androidsvg.dom.ColorValue
 import hu.oandras.androidsvg.dom.CurrentColor
+import hu.oandras.androidsvg.dom.HasTransform
 import hu.oandras.androidsvg.dom.NotDirectlyRendered
 import hu.oandras.androidsvg.dom.PaintReference
 import hu.oandras.androidsvg.dom.PathDefinition
@@ -78,6 +81,25 @@ import hu.oandras.androidsvg.dom.SvgObject
 import hu.oandras.androidsvg.dom.SvgObject.Circle
 import hu.oandras.androidsvg.dom.SvgObject.ClipPath
 import hu.oandras.androidsvg.dom.SvgObject.Ellipse
+import hu.oandras.androidsvg.dom.SvgObject.FeBlend
+import hu.oandras.androidsvg.dom.SvgObject.FeColorMatrix
+import hu.oandras.androidsvg.dom.SvgObject.FeComponentTransfer
+import hu.oandras.androidsvg.dom.SvgObject.FeComposite
+import hu.oandras.androidsvg.dom.SvgObject.FeConvolveMatrix
+import hu.oandras.androidsvg.dom.SvgObject.FeDiffuseLighting
+import hu.oandras.androidsvg.dom.SvgObject.FeDisplacementMap
+import hu.oandras.androidsvg.dom.SvgObject.FeFlood
+import hu.oandras.androidsvg.dom.SvgObject.FeGaussianBlur
+import hu.oandras.androidsvg.dom.SvgObject.FeImage
+import hu.oandras.androidsvg.dom.SvgObject.FeMerge
+import hu.oandras.androidsvg.dom.SvgObject.FeMergeNode
+import hu.oandras.androidsvg.dom.SvgObject.FeMorphology
+import hu.oandras.androidsvg.dom.SvgObject.FeOffset
+import hu.oandras.androidsvg.dom.SvgObject.FeSpecularLighting
+import hu.oandras.androidsvg.dom.SvgObject.FeTile
+import hu.oandras.androidsvg.dom.SvgObject.FeTurbulence
+import hu.oandras.androidsvg.dom.SvgObject.Filter
+import hu.oandras.androidsvg.dom.SvgObject.FilterPrimitive
 import hu.oandras.androidsvg.dom.SvgObject.GradientElement
 import hu.oandras.androidsvg.dom.SvgObject.GraphicsElement
 import hu.oandras.androidsvg.dom.SvgObject.Group
@@ -106,21 +128,49 @@ import hu.oandras.androidsvg.dom.SvgObject.TextSequence
 import hu.oandras.androidsvg.dom.SvgObject.Use
 import hu.oandras.androidsvg.dom.SvgObject.View
 import hu.oandras.androidsvg.dom.SvgPaint
+import hu.oandras.androidsvg.render.filters.doFeBlendFilter
+import hu.oandras.androidsvg.render.filters.doFeColorMatrixFilter
+import hu.oandras.androidsvg.render.filters.doFeComponentTransferFilter
+import hu.oandras.androidsvg.render.filters.doFeCompositeFilter
+import hu.oandras.androidsvg.render.filters.doFeConvolveMatrixFilter
+import hu.oandras.androidsvg.render.filters.doFeDiffuseLightingFilter
+import hu.oandras.androidsvg.render.filters.doFeDisplacementMapFilter
+import hu.oandras.androidsvg.render.filters.doFeGaussianBlurFilter
+import hu.oandras.androidsvg.render.filters.doFeImageFilter
+import hu.oandras.androidsvg.render.filters.doFeMorphologyFilter
+import hu.oandras.androidsvg.render.filters.doFeOffsetFilter
+import hu.oandras.androidsvg.render.filters.doFeSpecularLightingFilter
+import hu.oandras.androidsvg.render.filters.doFeTileFilter
+import hu.oandras.androidsvg.render.filters.doFeTurbulenceFilter
+import hu.oandras.androidsvg.render.filters.getFilterInput
 import hu.oandras.androidsvg.utils.GradientSpread
+import hu.oandras.androidsvg.utils.ceilToInt
+import hu.oandras.androidsvg.utils.checkForImageDataURL
+import hu.oandras.androidsvg.utils.clamp255
 import hu.oandras.androidsvg.utils.colorWithOpacity
+import hu.oandras.androidsvg.utils.createBitmap
+import hu.oandras.androidsvg.utils.createBitmapSameAs
+import hu.oandras.androidsvg.utils.extractAlpha
 import hu.oandras.androidsvg.utils.forEachElement
+import hu.oandras.androidsvg.utils.forEachKeyValue
 import hu.oandras.androidsvg.utils.isSpaceLike
 import hu.oandras.androidsvg.utils.removeDoubleSpaces
 import hu.oandras.androidsvg.utils.removeTabsAndLineBreaks
 import hu.oandras.androidsvg.utils.toDegrees
+import hu.oandras.androidsvg.utils.withAlpha
 import java.util.Locale
 import java.util.Stack
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sqrt
+
+
+internal val SUPPORTS_BLEND_MODE: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q // Android 10
+private val SUPPORTS_PAINT_WORD_SPACING: Boolean  = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q // Android 10
+private val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean  = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S // Android 12
 
 /*
  * The rendering part of AndroidSVG.
@@ -129,7 +179,7 @@ import kotlin.math.sqrt
 @Suppress("LocalVariableName")
 internal class SVGAndroidRenderer internal constructor(
     private val document: SVGImpl,
-    private val canvas: Canvas,
+    private var canvas: Canvas,
     // dots per inch. Needed for accurate conversion of length values that have real world units, such as "cm".
     override val dPI: Float,
     private val externalFileResolver: SVGExternalFileResolver?
@@ -261,13 +311,7 @@ internal class SVGAndroidRenderer internal constructor(
             spacePreserve = copy.spacePreserve,
             fontFeatureSet = CSSFontFeatureSettings(copy.fontFeatureSet),
             fontVariationSet = CSSFontVariationSettings(copy.fontVariationSet),
-            style = try {
-                copy.style.clone() as Style
-            } catch (e: CloneNotSupportedException) {
-                // Should never happen
-                Log.e(TAG, "Unexpected clone error", e)
-                Style.getDefaultStyle()
-            }
+            style = copy.style.copy()
         )
 
         override fun toString(): String {
@@ -453,7 +497,8 @@ internal class SVGAndroidRenderer internal constructor(
     }
 
     //==============================================================================
-    private fun statePush(isRootContext: Boolean = false, saveCanvas: Boolean = true): RendererState {
+    @JvmSynthetic
+    internal fun statePush(isRootContext: Boolean = false, saveCanvas: Boolean = true): RendererState {
         val savedCount = if (saveCanvas) {
             if (isRootContext) {
                 // Root SVG context should be transparent. So we need to saveLayer
@@ -473,7 +518,8 @@ internal class SVGAndroidRenderer internal constructor(
         return newState
     }
 
-    private fun statePop() {
+    @JvmSynthetic
+    internal fun statePop() {
         val poppedState = stateStack.pop()
         if (poppedState.canvasSaveCount != -1) {
             canvas.restoreToCount(poppedState.canvasSaveCount)
@@ -666,6 +712,9 @@ internal class SVGAndroidRenderer internal constructor(
         return Box(_x, _y, _w, _h)
     }
 
+    private fun concatTransform(canvas: Canvas, obj: HasTransform) {
+        obj.getTransform()?.let { canvas.concat(it) }
+    }
 
     //==============================================================================
     // Render <g> and <a> elements
@@ -677,7 +726,7 @@ internal class SVGAndroidRenderer internal constructor(
 
         if (!display()) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         checkForClipPath(obj)
 
@@ -759,6 +808,54 @@ internal class SVGAndroidRenderer internal constructor(
         opacityAdjustment: Float = 1f,
         r: (RendererState) -> Unit
     ) {
+        val filterId = state.style.filter
+        if (filterId != null) {
+            val filter = document.resolveIRI(filterId) as? Filter
+            if (filter != null) {
+                val boundingBox = obj.boundingBox ?: calculatePathBounds(objectToPath(obj, true) ?: Path()).also { obj.boundingBox = it }
+                val region = calculateFilterRegion(filter, boundingBox)
+                if (region.width() > 0f && region.height() > 0f) {
+                    val oldCanvas = canvas
+                    val matrix = Matrix()
+                    @Suppress("DEPRECATION")
+                    oldCanvas.getMatrix(matrix)
+
+                    val deviceRegion = RectF()
+                    matrix.mapRect(deviceRegion, region)
+
+                    val bitmap = createBitmap(
+                        deviceRegion.width().ceilToInt(),
+                        deviceRegion.height().ceilToInt(),
+                    )
+                    
+                    canvas = Canvas(bitmap)
+                    val newMatrix = Matrix(matrix)
+                    newMatrix.postTranslate(-deviceRegion.left, -deviceRegion.top)
+                    canvas.setMatrix(newMatrix)
+
+                    val m = FloatArray(9)
+                    matrix.getValues(m)
+                    val sx = hypot(m[Matrix.MSCALE_X], m[Matrix.MSKEW_Y])
+                    val sy = hypot(m[Matrix.MSCALE_Y], m[Matrix.MSKEW_X])
+
+                    try {
+                        r.invoke(state)
+                    } finally {
+                        canvas = oldCanvas
+                    }
+                    applyFilter(
+                        bitmap = bitmap,
+                        region = deviceRegion,
+                        sx = sx,
+                        sy = sy,
+                        filter = filter,
+                        originalObjBBox = boundingBox
+                    )
+                    return
+                }
+            }
+        }
+
         val stateStackState = if (BuildConfig.DEBUG) {
             stateStack.size
         } else {
@@ -785,6 +882,46 @@ internal class SVGAndroidRenderer internal constructor(
         opacityAdjustment: Float = 1f,
         r: (RendererState) -> Unit
     ) {
+        val filterId = state.style.filter
+        if (filterId != null) {
+            val filter = document.resolveIRI(filterId) as? Filter
+            if (filter != null) {
+                val region = calculateFilterRegion(filter, originalObjBBox)
+                if (region.width() > 0f && region.height() > 0f) {
+                    val oldCanvas = canvas
+                    val matrix = Matrix()
+                    @Suppress("DEPRECATION")
+                    oldCanvas.getMatrix(matrix)
+
+                    val deviceRegion = RectF()
+                    matrix.mapRect(deviceRegion, region)
+
+                    val bitmap = createBitmap(
+                        deviceRegion.width().ceilToInt(),
+                        deviceRegion.height().ceilToInt(),
+                    )
+
+                    canvas = Canvas(bitmap)
+                    val newMatrix = Matrix(matrix)
+                    newMatrix.postTranslate(-deviceRegion.left, -deviceRegion.top)
+                    canvas.setMatrix(newMatrix)
+
+                    val m = FloatArray(9)
+                    matrix.getValues(m)
+                    val sx = hypot(m[Matrix.MSCALE_X], m[Matrix.MSKEW_Y])
+                    val sy = hypot(m[Matrix.MSCALE_Y], m[Matrix.MSKEW_X])
+
+                    try {
+                        r.invoke(state)
+                    } finally {
+                        canvas = oldCanvas
+                    }
+                    applyFilter(bitmap, deviceRegion, sx, sy, filter, originalObjBBox)
+                    return
+                }
+            }
+        }
+
         val stateStackState = if (BuildConfig.DEBUG) {
             stateStack.size
         } else {
@@ -817,7 +954,8 @@ internal class SVGAndroidRenderer internal constructor(
 
         // Custom version of statePush() that also saves the layer
         val savePaint = Paint()
-        savePaint.setAlpha(clamp255(oldState.style.opacity * opacityAdjustment))
+        savePaint.alpha = clamp255(oldState.style.opacity * opacityAdjustment * 255f)
+
         if (SUPPORTS_BLEND_MODE && oldState.style.mixBlendMode != CSSBlendMode.normal) {
             setBlendMode(oldState, savePaint)
         }
@@ -851,7 +989,8 @@ internal class SVGAndroidRenderer internal constructor(
      * @param obj The object we are compositing. Compositing happens if the obj is not fully opaque, or if it has a mask.
      * @param originalObjBBox Normally equal to obj.boundingBox. However, if obj is a mask, then this is the bounding box of the original object to which the mask was applied.
      */
-    private fun popLayer(obj: SvgElement, originalObjBBox: Box = obj.boundingBox!!) {
+    @JvmSynthetic
+    internal fun popLayer(obj: SvgElement, originalObjBBox: Box = obj.boundingBox!!) {
         // If this is masked content, apply the mask now
         val mask = state.style.mask
         if (mask != null) {
@@ -867,7 +1006,7 @@ internal class SVGAndroidRenderer internal constructor(
 
             val maskPaintCombined = Paint()
             maskPaintCombined.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-            val layer1Count = canvas.saveLayer(null, maskPaintCombined)
+            val layer1Count = canvas.saveLayer(originalObjBBox.toRectF(), maskPaintCombined)
 
             if (maskType == MaskType.luminance) {
                 // Step 1: convert the mask luminance to alpha.
@@ -881,13 +1020,13 @@ internal class SVGAndroidRenderer internal constructor(
                     )
                 )
                 maskPaint1.setColorFilter(ColorMatrixColorFilter(luminanceToAlpha))
-                val layer2Count = canvas.saveLayer(null, maskPaint1) // TODO use real mask bounds
+                val layer2Count = canvas.saveLayer(originalObjBBox.toRectF(), maskPaint1)
                 renderMask(ref, obj, originalObjBBox)
                 canvas.restoreToCount(layer2Count)
                 // Step 2: multiply the luminance alpha by the source alpha.
                 val maskPaint2 = Paint()
                 maskPaint2.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-                val layer3Count = canvas.saveLayer(null, maskPaint2)
+                val layer3Count = canvas.saveLayer(originalObjBBox.toRectF(), maskPaint2)
                 renderMask(ref, obj, originalObjBBox)
                 canvas.restoreToCount(layer3Count)
             } else {
@@ -902,13 +1041,307 @@ internal class SVGAndroidRenderer internal constructor(
         statePop()
     }
 
+    private fun calculateMaskRegion(mask: Mask, originalObjBBox: Box): RectF {
+        val maskUnitsAreUser = mask.maskUnitsAreUser == true
+
+        // Default values are -10%, -10%, 120%, 120%
+        val x: Float
+        val y: Float
+        val w: Float
+        val h: Float
+
+        if (maskUnitsAreUser) {
+            x = mask.x?.floatValueX(this) ?: (originalObjBBox.minX - 0.1f * originalObjBBox.width)
+            y = mask.y?.floatValueY(this) ?: (originalObjBBox.minY - 0.1f * originalObjBBox.height)
+            w = mask.width?.floatValueX(this) ?: (1.2f * originalObjBBox.width)
+            h = mask.height?.floatValueY(this) ?: (1.2f * originalObjBBox.height)
+        } else {
+            val _x = mask.x?.floatValue(this, 1f) ?: -0.1f
+            val _y = mask.y?.floatValue(this, 1f) ?: -0.1f
+            val _w = mask.width?.floatValue(this, 1f) ?: 1.2f
+            val _h = mask.height?.floatValue(this, 1f) ?: 1.2f
+            x = originalObjBBox.minX + _x * originalObjBBox.width
+            y = originalObjBBox.minY + _y * originalObjBBox.height
+            w = _w * originalObjBBox.width
+            h = _h * originalObjBBox.height
+        }
+
+        return RectF(x, y, x + w, y + h)
+    }
+
+    private fun calculateFilterRegion(filter: Filter, originalObjBBox: Box): RectF {
+        val filterUnitsAreUser = filter.filterUnitsAreUser == true
+
+        // Default values are -10%, -10%, 120%, 120%
+        val x: Float
+        val y: Float
+        val w: Float
+        val h: Float
+
+        if (filterUnitsAreUser) {
+            x = filter.x?.floatValueX(this) ?: (originalObjBBox.minX - 0.1f * originalObjBBox.width)
+            y = filter.y?.floatValueY(this) ?: (originalObjBBox.minY - 0.1f * originalObjBBox.height)
+            w = filter.width?.floatValueX(this) ?: (1.2f * originalObjBBox.width)
+            h = filter.height?.floatValueY(this) ?: (1.2f * originalObjBBox.height)
+        } else {
+            val _x = filter.x?.floatValue(this, 1f) ?: -0.1f
+            val _y = filter.y?.floatValue(this, 1f) ?: -0.1f
+            val _w = filter.width?.floatValue(this, 1f) ?: 1.2f
+            val _h = filter.height?.floatValue(this, 1f) ?: 1.2f
+            x = originalObjBBox.minX + _x * originalObjBBox.width
+            y = originalObjBBox.minY + _y * originalObjBBox.height
+            w = _w * originalObjBBox.width
+            h = _h * originalObjBBox.height
+        }
+
+        return RectF(x, y, x + w, y + h)
+    }
+
+    private fun applyFilter(
+        bitmap: Bitmap,
+        region: RectF,
+        sx: Float,
+        sy: Float,
+        filter: Filter,
+        originalObjBBox: Box,
+    ) {
+        val results = ArrayMap<String, Bitmap>()
+        results["SourceGraphic"] = bitmap
+        results["SourceAlpha"] = extractAlpha(bitmap)
+
+        var lastResult: Bitmap? = bitmap
+        val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
+        val primitiveScaleX = if (primitiveUnitsAreUser) sx else originalObjBBox.width * sx
+        val primitiveScaleY = if (primitiveUnitsAreUser) sy else originalObjBBox.height * sy
+
+        filter.getChildren().forEachElement { child ->
+            val res = when (child) {
+                is FilterPrimitive -> {
+                    val r = applyPrimitive(
+                        primitive = child,
+                        results = results,
+                        lastResult = lastResult,
+                        primitiveScaleX = primitiveScaleX,
+                        primitiveScaleY = primitiveScaleY,
+                        canvasScaleX = sx,
+                        canvasScaleY = sy,
+                        primitiveUnitsAreUser = primitiveUnitsAreUser,
+                    )
+                    if (r != null) {
+                        child.result?.let { results[it] = r }
+                    }
+                    r
+                }
+
+                is FeMerge -> {
+                    val r = applyFeMerge(child, results, lastResult, region)
+                    child.result?.let { results[it] = r }
+                    r
+                }
+
+                else -> null
+            }
+            if (res != null) {
+                lastResult = res
+            }
+        }
+
+        if (lastResult != null) {
+            val canvas = canvas
+            canvas.save()
+            canvas.setMatrix(null)
+            canvas.drawBitmap(lastResult, region.left, region.top, null)
+            canvas.restore()
+        }
+
+        results.forEachKeyValue { _, b ->
+            if (b !== bitmap) {
+                b.recycle()
+            }
+        }
+    }
+
+    private fun applyPrimitive(
+        primitive: FilterPrimitive,
+        results: Map<String, Bitmap>,
+        lastResult: Bitmap?,
+        primitiveScaleX: Float,
+        primitiveScaleY: Float,
+        canvasScaleX: Float,
+        canvasScaleY: Float,
+        primitiveUnitsAreUser: Boolean,
+    ): Bitmap? {
+        val input = getFilterInput(
+            name = primitive.`in`,
+            results = results,
+            lastResult = lastResult
+        )
+
+        if (primitive is FeTurbulence) {
+            return doFeTurbulenceFilter(
+                primitive = primitive,
+                input = input,
+                lastResult = lastResult,
+                results = results,
+                canvasScaleX = canvasScaleX,
+                canvasScaleY = canvasScaleY,
+            )
+        }
+
+        val inputBitmap = input ?: return null
+
+        return when (primitive) {
+
+            is FeOffset -> doFeOffsetFilter(
+                renderContext = this,
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+                primitiveUnitsAreUser = primitiveUnitsAreUser,
+                primitiveScaleX = primitiveScaleX,
+                primitiveScaleY = primitiveScaleY,
+                canvasScaleX = canvasScaleX,
+                canvasScaleY = canvasScaleY,
+            )
+
+            is FeColorMatrix -> doFeColorMatrixFilter(primitive, inputBitmap)
+
+            is FeConvolveMatrix -> doFeConvolveMatrixFilter(primitive, inputBitmap)
+
+            is FeDisplacementMap -> doFeDisplacementMapFilter(
+                primitive,
+                inputBitmap,
+                results,
+                lastResult
+            )
+
+            is FeDiffuseLighting -> doFeDiffuseLightingFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+                canvasScaleX = canvasScaleX,
+                canvasScaleY = canvasScaleY,
+            )
+
+            is FeSpecularLighting -> doFeSpecularLightingFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+                canvasScaleX = canvasScaleX,
+                canvasScaleY = canvasScaleY,
+            )
+
+            is FeFlood -> doFeFloodFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+            )
+
+            is FeComposite -> doFeCompositeFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+                results = results,
+                lastResult = lastResult,
+            )
+
+            is FeComponentTransfer -> doFeComponentTransferFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+            )
+
+            is FeBlend -> doFeBlendFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+                results = results,
+                lastResult = lastResult,
+            )
+
+            is FeGaussianBlur -> doFeGaussianBlurFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+                primitiveScaleX = primitiveScaleX,
+                primitiveScaleY = primitiveScaleY,
+            )
+
+            is FeImage -> doFeImageFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+                externalFileResolver = externalFileResolver,
+            )
+
+            is FeMorphology -> doFeMorphologyFilter(
+                primitive = primitive,
+                inputBitmap = inputBitmap,
+                primitiveScaleX = primitiveScaleX,
+                primitiveScaleY = primitiveScaleY,
+            )
+
+            is FeTile -> doFeTileFilter(inputBitmap)
+
+            else -> {
+                val res = createBitmapSameAs(input)
+                val c = Canvas(res)
+                c.drawBitmap(input, 0f, 0f, null)
+                res
+            }
+        }
+    }
+
+    internal fun doFeFloodFilter(
+        primitive: FeFlood,
+        inputBitmap: Bitmap,
+    ): Bitmap {
+        val color = withNewState { state ->
+            updateStyleForElement(state, primitive)
+            val floodColor = state.style.floodColor
+            val floodOpacity = state.style.floodOpacity ?: 1f
+            val colorInt = when (floodColor) {
+                is ColorValue -> floodColor.value
+                is CurrentColor -> state.style.color?.value ?: COLOR_BLACK
+                else -> COLOR_BLACK
+            }
+            val alpha = clamp255(floodOpacity * 255f)
+            if (alpha == 0) 0 else colorInt.withAlpha(alpha)
+        }
+
+        val res = createBitmapSameAs(inputBitmap)
+        Canvas(res).drawColor(color, PorterDuff.Mode.SRC)
+        return res
+    }
+
+    private fun applyFeMerge(
+        merge: FeMerge,
+        results: Map<String, Bitmap>,
+        lastResult: Bitmap?,
+        region: RectF
+    ): Bitmap {
+        val res = createBitmap(
+            width = region.width().ceilToInt(),
+            height = region.height().ceilToInt(),
+        )
+        val c = Canvas(res)
+        var isFirst = true
+        merge.getChildren().forEachElement { child ->
+            if (child is FeMergeNode) {
+                val input = if (child.`in` == null) {
+                    if (isFirst) {
+                        results["SourceGraphic"]
+                    } else {
+                        lastResult
+                    }
+                } else {
+                    results[child.`in`]
+                }
+                if (input != null) {
+                    c.drawBitmap(input, 0f, 0f, null)
+                }
+                isFirst = false
+            }
+        }
+        return res
+    }
 
     private fun requiresCompositing(): Boolean {
         val s = state
         val style = s.style
-        return style.opacity < 1.0f || style.mask != null || style.isolation == Isolation.isolate || SUPPORTS_BLEND_MODE && style.mixBlendMode != CSSBlendMode.normal
+        return style.opacity < 1.0f || style.mask != null || style.filter != null || style.isolation == Isolation.isolate || SUPPORTS_BLEND_MODE && style.mixBlendMode != CSSBlendMode.normal
     }
-
 
     //==============================================================================
     /*
@@ -922,7 +1355,7 @@ internal class SVGAndroidRenderer internal constructor(
 
         if (!display()) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         checkForClipPath(obj)
 
@@ -936,7 +1369,10 @@ internal class SVGAndroidRenderer internal constructor(
     private fun renderSwitchChild(obj: Switch) {
         val deviceLanguage = Locale.getDefault().language
 
-        for (child in obj.getChildren()) {
+        val children = obj.getChildren()
+        for (i in children.indices) {
+            val child = children[i]
+
             // Ignore any objects that don't belong in a <switch>
             if (child !is SvgConditional) {
                 continue
@@ -1041,7 +1477,7 @@ internal class SVGAndroidRenderer internal constructor(
             return
         }
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         // Handle the x,y attributes
         val _x = obj.x?.floatValueX(this) ?: 0f
@@ -1106,7 +1542,7 @@ internal class SVGAndroidRenderer internal constructor(
         if (!visible()) return
         if (!s.hasStroke && !s.hasFill) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         val path = PathConverter(pathDefinition).path
 
@@ -1146,7 +1582,7 @@ internal class SVGAndroidRenderer internal constructor(
         if (!display()) return
         if (!visible()) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         val path = makePathAndBoundingBox(obj)
         updateParentBoundingBox(obj)
@@ -1173,7 +1609,7 @@ internal class SVGAndroidRenderer internal constructor(
         if (!display()) return
         if (!visible()) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         val path = makePathAndBoundingBox(obj)
         updateParentBoundingBox(obj)
@@ -1200,7 +1636,7 @@ internal class SVGAndroidRenderer internal constructor(
         if (!display()) return
         if (!visible()) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         val path = makePathAndBoundingBox(obj)
         updateParentBoundingBox(obj)
@@ -1226,7 +1662,7 @@ internal class SVGAndroidRenderer internal constructor(
         if (!visible()) return
         if (!s.hasStroke) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         val path = makePathAndBoundingBox(obj)
         updateParentBoundingBox(obj)
@@ -1263,7 +1699,7 @@ internal class SVGAndroidRenderer internal constructor(
         if (!visible()) return
         if (!s.hasStroke && !s.hasFill) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         val numPoints = obj.points?.size ?: 0
         if (
@@ -1345,7 +1781,7 @@ internal class SVGAndroidRenderer internal constructor(
         if (!visible()) return
         if (!s.hasStroke && !s.hasFill) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         val numPoints = obj.points?.size ?: 0
         if (numPoints < 2) return
@@ -1375,7 +1811,7 @@ internal class SVGAndroidRenderer internal constructor(
 
         selectTypefaceAndFontStyling()
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         // Get the first coordinate pair from the lists in the x and y properties.
         var x = obj.x?.firstOrNull()?.floatValueX(this) ?: 0f
@@ -1942,7 +2378,7 @@ internal class SVGAndroidRenderer internal constructor(
         if (!display()) return
         if (!visible()) return
 
-        obj.transform?.let { canvas.concat(it) }
+        concatTransform(canvas, obj)
 
         val _x = obj.x?.floatValueX(this) ?: 0f
         val _y = obj.y?.floatValueY(this) ?: 0f
@@ -2433,7 +2869,13 @@ internal class SVGAndroidRenderer internal constructor(
             targetStyle.letterSpacing = letterSpacing
             // Note: Paint.setLetterSpacing() takes a value in ems.
 
-            val spacing = letterSpacing.floatValue(this) / this.currentFontSize
+            var spacing = letterSpacing.floatValue(this)
+            if (spacing > 0) {
+                val currentFontSize = currentFontSize
+                if (currentFontSize > 0) {
+                    spacing /= currentFontSize
+                }
+            }
             state.fillPaint.letterSpacing = spacing
             state.strokePaint.letterSpacing = spacing
         }
@@ -2446,6 +2888,18 @@ internal class SVGAndroidRenderer internal constructor(
                 state.fillPaint.wordSpacing = spacing
                 state.strokePaint.wordSpacing = spacing
             }
+        }
+
+        if (sourceStyle.isSpecified(Style.SPECIFIED_FILTER)) {
+            targetStyle.filter = sourceStyle.filter
+        }
+
+        if (sourceStyle.isSpecified(Style.SPECIFIED_FLOOD_COLOR)) {
+            targetStyle.floodColor = sourceStyle.floodColor
+        }
+
+        if (sourceStyle.isSpecified(Style.SPECIFIED_FLOOD_OPACITY)) {
+            targetStyle.floodOpacity = sourceStyle.floodOpacity
         }
     }
 
@@ -2497,7 +2951,7 @@ internal class SVGAndroidRenderer internal constructor(
 
         val viewportFillOpacity = style.viewportFillOpacity
         if (viewportFillOpacity != null) {
-            col = colorWithOpacity(col, viewportFillOpacity)
+            col = col.colorWithOpacity(viewportFillOpacity)
         }
 
         canvas.drawColor(col)
@@ -2598,10 +3052,10 @@ internal class SVGAndroidRenderer internal constructor(
 
         init {
             // normalise direction vector
-            val len = sqrt((dx * dx + dy * dy).toDouble())
-            if (len != 0.0) {
-                this.dx = (dx / len).toFloat()
-                this.dy = (dy / len).toFloat()
+            val len = hypot(dx, dy)
+            if (len != 0f) {
+                this.dx = dx / len
+                this.dy = dy / len
             }
         }
 
@@ -2611,10 +3065,10 @@ internal class SVGAndroidRenderer internal constructor(
             // all the same length, the angles will work out correctly.
             var dx = x - this.x
             var dy = y - this.y
-            val len = sqrt((dx * dx + dy * dy).toDouble())
-            if (len != 0.0) {
-                dx = (dx / len).toFloat()
-                dy = (dy / len).toFloat()
+            val len = hypot(dx, dy)
+            if (len != 0f) {
+                dx /= len
+                dy /= len
             }
             // Check for degenerate result where the two unit vectors canceled each other out
             if (dx == -this.dx && dy == -this.dy) {
@@ -2898,14 +3352,22 @@ internal class SVGAndroidRenderer internal constructor(
                 var xOffset = 0f
                 var yOffset = 0f
                 when (positioning.alignment) {
-                    PreserveAspectRatio.Alignment.xMidYMin, PreserveAspectRatio.Alignment.xMidYMid, PreserveAspectRatio.Alignment.xMidYMax -> xOffset -= (_markerWidth - imageW) / 2
-                    PreserveAspectRatio.Alignment.xMaxYMin, PreserveAspectRatio.Alignment.xMaxYMid, PreserveAspectRatio.Alignment.xMaxYMax -> xOffset -= _markerWidth - imageW
+                    PreserveAspectRatio.Alignment.xMidYMin,
+                    PreserveAspectRatio.Alignment.xMidYMid,
+                    PreserveAspectRatio.Alignment.xMidYMax -> xOffset -= (_markerWidth - imageW) / 2
+                    PreserveAspectRatio.Alignment.xMaxYMin,
+                    PreserveAspectRatio.Alignment.xMaxYMid,
+                    PreserveAspectRatio.Alignment.xMaxYMax -> xOffset -= _markerWidth - imageW
                     else -> {}
                 }
                 // Determine final Y position
                 when (positioning.alignment) {
-                    PreserveAspectRatio.Alignment.xMinYMid, PreserveAspectRatio.Alignment.xMidYMid, PreserveAspectRatio.Alignment.xMaxYMid -> yOffset -= (_markerHeight - imageH) / 2
-                    PreserveAspectRatio.Alignment.xMinYMax, PreserveAspectRatio.Alignment.xMidYMax, PreserveAspectRatio.Alignment.xMaxYMax -> yOffset -= _markerHeight - imageH
+                    PreserveAspectRatio.Alignment.xMinYMid,
+                    PreserveAspectRatio.Alignment.xMidYMid,
+                    PreserveAspectRatio.Alignment.xMaxYMid -> yOffset -= (_markerHeight - imageH) / 2
+                    PreserveAspectRatio.Alignment.xMinYMax,
+                    PreserveAspectRatio.Alignment.xMidYMax,
+                    PreserveAspectRatio.Alignment.xMaxYMax -> yOffset -= _markerHeight - imageH
                     else -> {}
                 }
 
@@ -2955,8 +3417,7 @@ internal class SVGAndroidRenderer internal constructor(
             if (obj is SvgElementBase) {
                 ancestors.add(0, obj)
             }
-            val parent = obj.parent ?: break
-            obj = parent as SvgObject
+            obj = obj.parent ?: break
         }
 
 
@@ -3112,7 +3573,7 @@ internal class SVGAndroidRenderer internal constructor(
                 updateStyleForElement(state, stop)
                 val style = state.style
                 val col = style.stopColor as ColorValue? ?: ColorValue.BLACK
-                colors[i] = colorWithOpacity(col.value, style.stopOpacity!!)
+                colors[i] = col.value.colorWithOpacity(style.stopOpacity!!)
             }
         }
 
@@ -3144,7 +3605,7 @@ internal class SVGAndroidRenderer internal constructor(
         val gr = LinearGradient(_x1, _y1, _x2, _y2, colors, positions, tileMode)
         gr.setLocalMatrix(m)
         paint.setShader(gr)
-        paint.setAlpha(clamp255(state.style.fillOpacity!!))
+        paint.alpha = clamp255(state.style.fillOpacity!! * 255f)
     }
 
     private sealed class GradientColorArray {
@@ -3279,8 +3740,7 @@ internal class SVGAndroidRenderer internal constructor(
                 updateStyleForElement(st5, stop)
                 val style = st5.style
                 val col = style.stopColor as ColorValue? ?: ColorValue.BLACK
-                val color = colorWithOpacity(col.value, style.stopOpacity!!)
-                colors[i] = color
+                colors[i] = col.value.colorWithOpacity(style.stopOpacity!!)
             }
         }
 
@@ -3333,7 +3793,7 @@ internal class SVGAndroidRenderer internal constructor(
         }
         gr.setLocalMatrix(m)
         paint.setShader(gr)
-        paint.setAlpha(clamp255(state.style.fillOpacity!!))
+        paint.alpha = clamp255(state.style.fillOpacity!! * 255f)
     }
 
     /*
@@ -3440,6 +3900,10 @@ internal class SVGAndroidRenderer internal constructor(
                 }
                 m.preTranslate(boundingBox.minX, boundingBox.minY)
                 m.preScale(boundingBox.width, boundingBox.height)
+
+                // Set the viewport to 1x1 so that percentages are resolved correctly
+                state.viewPort = Box(0f, 0f, 1f, 1f)
+                state.viewBox = null
             }
             clipPath.transform?.let { m.preConcat(it) }
 
@@ -3544,6 +4008,8 @@ internal class SVGAndroidRenderer internal constructor(
                         is PolyLine -> {
                             path = makePathAndBoundingBox(obj)
                         }
+
+                        else -> {}
                     }
 
                     if (path == null) return null
@@ -3564,6 +4030,19 @@ internal class SVGAndroidRenderer internal constructor(
                     textElem.transform?.let { path.transform(it) }
 
                     path.fillType = state.clipRule
+                }
+
+                is Group -> {
+                    val combined = Path()
+                    obj.getChildren().forEachElement { child ->
+                        if (child is SvgElement) {
+                            val part = objectToPath(child, allowUse)
+                            if (part != null) {
+                                combined.op(part, Path.Op.UNION)
+                            }
+                        }
+                    }
+                    path = combined
                 }
 
                 else -> {
@@ -3965,6 +4444,10 @@ internal class SVGAndroidRenderer internal constructor(
                                 if (!patternContentUnitsAreUser) {
                                     val boundingBox = obj.boundingBox!!
                                     canvas.scale(boundingBox.width, boundingBox.height)
+
+                                    // Set the viewport to 1x1 so that percentages are resolved correctly
+                                    st6.viewPort = Box(0f, 0f, 1f, 1f)
+                                    st6.viewBox = null
                                 }
                             }
 
@@ -3993,27 +4476,8 @@ internal class SVGAndroidRenderer internal constructor(
             "Mask render"
         }
 
-        val maskUnitsAreUser = mask.maskUnitsAreUser == true
-        var w: Float
-        var h: Float
-
-        if (maskUnitsAreUser) {
-            w = mask.width?.floatValueX(this) ?: originalObjBBox.width
-            h = mask.height?.floatValueY(this) ?: originalObjBBox.height
-            //x = (mask.x != null) ? mask.x.floatValueX(this): (float)(obj.boundingBox.minX - 0.1 * obj.boundingBox.width);
-            //y = (mask.y != null) ? mask.y.floatValueY(this): (float)(obj.boundingBox.minY - 0.1 * obj.boundingBox.height);
-        } else {
-            // Convert objectBoundingBox space to user space.
-            //x = (mask.x != null) ? mask.x.floatValue(this, 1f): -0.1f;
-            //y = (mask.y != null) ? mask.y.floatValue(this, 1f): -0.1f;
-            w = mask.width?.floatValue(this, 1f) ?: 1.2f
-            h = mask.height?.floatValue(this, 1f) ?: 1.2f
-            //x = originalObjBBox.minX + x * originalObjBBox.width;
-            //y = originalObjBBox.minY + y * originalObjBBox.height;
-            w *= originalObjBBox.width
-            h *= originalObjBBox.height
-        }
-        if (w == 0f || h == 0f) return
+        val maskRegion = calculateMaskRegion(mask, originalObjBBox)
+        if (maskRegion.width() <= 0f || maskRegion.height() <= 0f) return
 
         withNewState {
             state = findInheritFromAncestorState(mask)
@@ -4023,6 +4487,9 @@ internal class SVGAndroidRenderer internal constructor(
 
             //state.style.filter = null;
 
+            canvas.save()
+            canvas.clipRect(maskRegion)
+
             withNewRenderLayer(obj, originalObjBBox) {
                 // Save the current transform matrix, as we need to undo the following transform straight away
                 val savePoint = canvas.save()
@@ -4031,6 +4498,10 @@ internal class SVGAndroidRenderer internal constructor(
                 if (!maskContentUnitsAreUser) {
                     canvas.translate(originalObjBBox.minX, originalObjBBox.minY)
                     canvas.scale(originalObjBBox.width, originalObjBBox.height)
+
+                    // Set the viewport to 1x1 so that percentages are resolved correctly
+                    state.viewPort = Box(0f, 0f, 1f, 1f)
+                    state.viewBox = null
                 }
 
                 // Render the mask
@@ -4039,18 +4510,13 @@ internal class SVGAndroidRenderer internal constructor(
                 // Restore the matrix so that, if this mask has a mask, it is not affected by the objectBoundingBox transform
                 canvas.restoreToCount(savePoint)
             }
+
+            canvas.restore()
         }
     }
 
     companion object {
         private const val TAG = "SVGAndroidRenderer"
-
-        private val SUPPORTS_BLEND_MODE =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q // Android 10
-        private val SUPPORTS_PAINT_WORD_SPACING =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q // Android 10
-        private val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S // Android 12
 
         @Suppress("FloatingPointLiteralPrecision")
         private const val BEZIER_ARC_FACTOR: Float = 0.5522847498f
@@ -4108,7 +4574,7 @@ internal class SVGAndroidRenderer internal constructor(
                 }
             }
 
-            col = colorWithOpacity(col, paintOpacity)
+            col = col.colorWithOpacity(paintOpacity)
 
             if (isFill) {
                 state.fillPaint
@@ -4192,45 +4658,6 @@ internal class SVGAndroidRenderer internal constructor(
             path.computeBounds(pathBounds, true)
             return Box(pathBounds)
         }
-
-
-        //==============================================================================
-        /*
-        * Check for and decode an image encoded in a data URL.
-        * We don't handle all permutations of data URLs. Only base64 ones.
-        */
-        private fun checkForImageDataURL(url: String): Bitmap? {
-            if (!url.startsWith("data:")) {
-                return null
-            }
-
-            if (url.length < 14) {
-                return null
-            }
-
-            val comma = url.indexOf(',')
-
-            if (comma < 12) {
-                // "< 12"  test also covers not found (-1) case
-                return null
-            }
-
-            if (";base64" != url.substring(comma - 7, comma)) {
-                return null
-            }
-
-            try {
-                val imageData = Base64.decode(
-                    url.substring(comma + 1),
-                    Base64.DEFAULT
-                ) // throws IllegalArgumentException for bad data
-                return BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
-            } catch (e: Exception) {
-                Log.e(TAG, "Could not decode bad Data URL", e)
-                return null
-            }
-        }
-
 
         @RequiresApi(Build.VERSION_CODES.Q)
         private fun setBlendMode(state: RendererState, paint: Paint) {
@@ -4471,10 +4898,5 @@ internal class SVGAndroidRenderer internal constructor(
             }
         }
 
-        // Convert a float in range 0..1 to an int in range 0..255.
-        private fun clamp255(value: Float): Int {
-            val i = (value * 256f).toInt()
-            return if (i < 0) 0 else min(i, 255)
-        }
     }
 }

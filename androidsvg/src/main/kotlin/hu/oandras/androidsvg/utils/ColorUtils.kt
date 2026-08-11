@@ -17,9 +17,9 @@
 
 package hu.oandras.androidsvg.utils
 
+import androidx.annotation.ColorInt
+import androidx.annotation.IntRange
 import hu.oandras.androidsvg.dom.COLOR_BLACK
-import kotlin.math.min
-import kotlin.math.roundToInt
 
 internal fun pack3Hex(threeHex: Int): Int {
     val h1 = threeHex and 0xf00 // r
@@ -89,9 +89,43 @@ private fun hueToRgb(t1: Float, t2: Float, hue: Float): Float {
     }
 }
 
-internal fun colorWithOpacity(color: Int, opacity: Float): Int {
-    var alpha = color shr 24 and 0xff
-    alpha = (alpha * opacity).roundToInt()
-    alpha = if (alpha < 0) 0 else min(alpha, 255)
-    return alpha shl 24 or (color and 0xffffff)
+@ColorInt
+internal fun Int.colorWithOpacity(opacity: Float): Int {
+    return withAlpha(clamp255(alpha * opacity))
 }
+
+@ColorInt
+internal fun @receiver:ColorInt Int.withAlpha(@IntRange(from = 0L, to = 255L) alpha: Int): Int {
+    return (alpha shl 24) or (this and 0x00FFFFFF)
+}
+
+@ColorInt
+internal fun rgb(
+    @IntRange(from = 0, to = 255) red: Int,
+    @IntRange(from = 0, to = 255) green: Int,
+    @IntRange(from = 0, to = 255) blue: Int,
+): Int {
+    return -0x1000000 or (red shl 16) or (green shl 8) or blue
+}
+
+@ColorInt
+internal fun argb(
+    @IntRange(from = 0, to = 255) alpha: Int,
+    @IntRange(from = 0, to = 255) red: Int,
+    @IntRange(from = 0, to = 255) green: Int,
+    @IntRange(from = 0, to = 255) blue: Int,
+): Int {
+    return (alpha shl 24) or (red shl 16) or (green shl 8) or blue
+}
+
+internal inline val @receiver:ColorInt Int.alpha: Int
+    get() = (this shr 24) and 0xff
+
+internal inline val @receiver:ColorInt Int.red: Int
+    get() = (this shr 16) and 0xff
+
+internal inline val @receiver:ColorInt Int.green: Int
+    get() = (this shr 8) and 0xff
+
+internal inline val @receiver:ColorInt Int.blue: Int
+    get() = this and 0xff

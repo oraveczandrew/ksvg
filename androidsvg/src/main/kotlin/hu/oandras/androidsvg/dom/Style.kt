@@ -50,7 +50,217 @@ import hu.oandras.androidsvg.parser.SVGParserImpl.Companion.parseTextDirection
 import hu.oandras.androidsvg.parser.SVGParserImpl.Companion.parseVectorEffect
 
 @Suppress("EnumEntryName")
-internal class Style : Cloneable {
+internal class Style private constructor(
+    // Which properties have been explicitly specified by this element
+    @SpecifiedFlags
+    private var specifiedFlags: Long,
+
+    @JvmField
+    var fill: SvgPaint?,
+    @JvmField
+    var fillRule: FillRule?,
+    @JvmField
+    var fillOpacity: Float?,
+
+    @JvmField
+    var stroke: SvgPaint?,
+    @JvmField
+    var strokeOpacity: Float?,
+    @JvmField
+    var strokeWidth: CSSLength?,
+    @JvmField
+    var strokeLineCap: LineCap?,
+    @JvmField
+    var strokeLineJoin: LineJoin?,
+    @JvmField
+    var strokeMiterLimit: Float?,
+    @JvmField
+    var strokeDashArray: Array<CSSLength>?,
+    @JvmField
+    var strokeDashOffset: CSSLength?,
+
+    @JvmField
+    var opacity: Float, // master opacity of both stroke and fill
+
+    @JvmField
+    var color: ColorValue?,
+
+    @JvmField
+    var fontFamily: List<String>?,
+    @JvmField
+    var fontSize: CSSLength?,
+    @JvmField
+    var fontWeight: Float?,
+    @JvmField
+    var fontStyle: FontStyle?,
+    @JvmField
+    var fontWidth: Float?,
+    @JvmField
+    var textDecoration: TextDecoration?,
+    @JvmField
+    var direction: TextDirection?,
+
+    @JvmField
+    var textAnchor: TextAnchor?,
+
+    @JvmField
+    var overflow: Boolean?, // true if overflow visible
+    @JvmField
+    var clip: CSSClipRect?,
+
+    @JvmField
+    var markerStart: String?,
+    @JvmField
+    var markerMid: String?,
+    @JvmField
+    var markerEnd: String?,
+
+    @JvmField
+    var display: Boolean?, // true if we should display
+    @JvmField
+    var visibility: Boolean?, // true if visible
+
+    @JvmField
+    var stopColor: SvgColor?,
+    @JvmField
+    var stopOpacity: Float?,
+
+    @JvmField
+    var clipPath: String?,
+    @JvmField
+    var clipRule: FillRule?,
+
+    @JvmField
+    var mask: String?,
+
+    @JvmField
+    var maskType: MaskType?,
+
+    @JvmField
+    var filter: String?,
+
+    @JvmField
+    var floodColor: SvgColor?,
+
+    @JvmField
+    var floodOpacity: Float?,
+
+    @JvmField
+    var solidColor: SvgColor?,
+    @JvmField
+    var solidOpacity: Float?,
+
+    @JvmField
+    var viewportFill: SvgPaint?,
+    @JvmField
+    var viewportFillOpacity: Float?,
+
+    @JvmField
+    var vectorEffect: VectorEffect?,
+
+    @JvmField
+    var imageRendering: RenderQuality?,
+
+    @JvmField
+    var isolation: Isolation?,
+    @JvmField
+    var mixBlendMode: CSSBlendMode?,
+
+    @JvmField
+    var fontKerning: FontKerning?,
+
+    @JvmField
+    var fontVariantLigatures: CSSFontFeatureSettings?,
+
+    @JvmField
+    var fontVariantPosition: CSSFontFeatureSettings?,
+
+    @JvmField
+    var fontVariantCaps: CSSFontFeatureSettings?,
+
+    @JvmField
+    var fontVariantNumeric: CSSFontFeatureSettings?,
+
+    @JvmField
+    var fontVariantEastAsian: CSSFontFeatureSettings?,
+    @JvmField
+    var fontFeatureSettings: CSSFontFeatureSettings?,
+    @JvmField
+    var fontVariationSettings: CSSFontVariationSettings,
+    @JvmField
+    var writingMode: WritingMode?,
+    @JvmField
+    var glyphOrientationVertical: GlypOrientationVertical?,
+    @JvmField
+    var textOrientation: TextOrientation?,
+
+    @JvmField
+    var letterSpacing: CSSLength?,
+    @JvmField
+    var wordSpacing: CSSLength?,
+) : Cloneable {
+
+    constructor(): this(
+        specifiedFlags = 0,
+        fill = null,
+        fillRule = null,
+        fillOpacity = null,
+        stroke = null,
+        strokeOpacity = null,
+        strokeWidth = null,
+        strokeLineCap = null,
+        strokeLineJoin = null,
+        strokeMiterLimit = null,
+        strokeDashArray = null,
+        strokeDashOffset = null,
+        opacity = 1f,
+        color = null,
+        fontFamily = null,
+        fontSize = null,
+        fontWeight = null,
+        fontStyle = null,
+        fontWidth = null,
+        textDecoration = null,
+        direction = null,
+        textAnchor = null,
+        overflow = null,
+        clip = null,
+        markerStart = null,
+        markerMid = null,
+        markerEnd = null,
+        display = null,
+        visibility = null,
+        stopColor = null,
+        stopOpacity = null,
+        clipPath = null,
+        clipRule = null,
+        mask = null,
+        maskType = null,
+        filter = null,
+        floodColor = null,
+        floodOpacity = null,
+        solidColor = null,
+        solidOpacity = null,
+        viewportFill = null,
+        viewportFillOpacity = null,
+        vectorEffect = null,
+        imageRendering = null,
+        isolation = null,
+        mixBlendMode = null,
+        fontKerning = null,
+        fontVariantLigatures = null,
+        fontVariantPosition = null,
+        fontVariantCaps = null,
+        fontVariantNumeric = null,
+        fontVariantEastAsian = null,
+        fontFeatureSettings = null,
+        fontVariationSettings = CSSFontVariationSettings(),
+        writingMode = null,
+        glyphOrientationVertical = null,
+        textOrientation = null,
+        letterSpacing = null,
+        wordSpacing = null,
+    )
 
     @Retention(AnnotationRetention.SOURCE)
     @LongDef(
@@ -110,149 +320,13 @@ internal class Style : Cloneable {
             SPECIFIED_FONT_VARIATION_SETTINGS,
             SPECIFIED_FONT_WIDTH,
             SPECIFIED_LETTER_SPACING,
-            SPECIFIED_WORD_SPACING
+            SPECIFIED_WORD_SPACING,
+            SPECIFIED_FILTER,
+            SPECIFIED_FLOOD_COLOR,
+            SPECIFIED_FLOOD_OPACITY
         ]
     )
     annotation class SpecifiedFlags
-
-    // Which properties have been explicitly specified by this element
-    @SpecifiedFlags
-    private var specifiedFlags: Long = 0
-
-    @JvmField
-    var fill: SvgPaint? = null
-    @JvmField
-    var fillRule: FillRule? = null
-    @JvmField
-    var fillOpacity: Float? = null
-
-    @JvmField
-    var stroke: SvgPaint? = null
-    @JvmField
-    var strokeOpacity: Float? = null
-    @JvmField
-    var strokeWidth: CSSLength? = null
-    @JvmField
-    var strokeLineCap: LineCap? = null
-    @JvmField
-    var strokeLineJoin: LineJoin? = null
-    @JvmField
-    var strokeMiterLimit: Float? = null
-    @JvmField
-    var strokeDashArray: Array<CSSLength>? = null
-    @JvmField
-    var strokeDashOffset: CSSLength? = null
-
-    @JvmField
-    var opacity: Float = 1f // master opacity of both stroke and fill
-
-    @JvmField
-    var color: ColorValue? = null
-
-    @JvmField
-    var fontFamily: List<String>? = null
-    @JvmField
-    var fontSize: CSSLength? = null
-    @JvmField
-    var fontWeight: Float? = null
-    @JvmField
-    var fontStyle: FontStyle? = null
-    @JvmField
-    var fontWidth: Float? = null
-    @JvmField
-    var textDecoration: TextDecoration? = null
-    @JvmField
-    var direction: TextDirection? = null
-
-    @JvmField
-    var textAnchor: TextAnchor? = null
-
-    @JvmField
-    var overflow: Boolean? = null // true if overflow visible
-    @JvmField
-    var clip: CSSClipRect? = null
-
-    @JvmField
-    var markerStart: String? = null
-    @JvmField
-    var markerMid: String? = null
-    @JvmField
-    var markerEnd: String? = null
-
-    @JvmField
-    var display: Boolean? = null // true if we should display
-    @JvmField
-    var visibility: Boolean? = null // true if visible
-
-    @JvmField
-    var stopColor: SvgPaint? = null
-    @JvmField
-    var stopOpacity: Float? = null
-
-    @JvmField
-    var clipPath: String? = null
-    @JvmField
-    var clipRule: FillRule? = null
-
-    @JvmField
-    var mask: String? = null
-
-    @JvmField
-    var maskType: MaskType? = null
-
-    @JvmField
-    var solidColor: SvgPaint? = null
-    @JvmField
-    var solidOpacity: Float? = null
-
-    @JvmField
-    var viewportFill: SvgPaint? = null
-    @JvmField
-    var viewportFillOpacity: Float? = null
-
-    @JvmField
-    var vectorEffect: VectorEffect? = null
-
-    @JvmField
-    var imageRendering: RenderQuality? = null
-
-    @JvmField
-    var isolation: Isolation? = null
-    @JvmField
-    var mixBlendMode: CSSBlendMode? = null
-
-    @JvmField
-    var fontKerning: FontKerning? = null
-
-    @JvmField
-    var fontVariantLigatures: CSSFontFeatureSettings? = null
-
-    @JvmField
-    var fontVariantPosition: CSSFontFeatureSettings? = null
-
-    @JvmField
-    var fontVariantCaps: CSSFontFeatureSettings? = null
-
-    @JvmField
-    var fontVariantNumeric: CSSFontFeatureSettings? = null
-
-    @JvmField
-    var fontVariantEastAsian: CSSFontFeatureSettings? = null
-    @JvmField
-    var fontFeatureSettings: CSSFontFeatureSettings? = null
-    @JvmField
-    var fontVariationSettings: CSSFontVariationSettings = CSSFontVariationSettings()
-    @JvmField
-    var writingMode: WritingMode? = null
-    @JvmField
-    var glyphOrientationVertical: GlypOrientationVertical? = null
-    @JvmField
-    var textOrientation: TextOrientation? = null
-
-    @JvmField
-    var letterSpacing: CSSLength? = null
-    @JvmField
-    var wordSpacing: CSSLength? = null
 
     fun isSpecified(@SpecifiedFlags flag: Long): Boolean = (specifiedFlags and flag) != 0L
 
@@ -425,6 +499,9 @@ internal class Style : Cloneable {
         this.stopOpacity = 1f
         this.mask = null
         this.maskType = MaskType.luminance
+        this.filter = null
+        this.floodColor = ColorValue.BLACK
+        this.floodOpacity = 1f
         this.solidColor = null
         this.solidOpacity = 1f
         this.viewportFill = null
@@ -434,20 +511,68 @@ internal class Style : Cloneable {
         this.mixBlendMode = CSSBlendMode.normal
     }
 
-
-    @Throws(CloneNotSupportedException::class)
-    public override fun clone(): Any {
-        val obj = super.clone() as Style
-        val strokeDashArray = strokeDashArray
-        if (strokeDashArray != null) {
-            obj.strokeDashArray = strokeDashArray.clone()
-        }
-        val fontFamily = fontFamily
-        if (fontFamily != null) {
-            obj.fontFamily = ArrayList(fontFamily)
-        }
-        obj.fontVariationSettings = CSSFontVariationSettings(fontVariationSettings)
-        return obj
+    fun copy(): Style {
+       return Style(
+            specifiedFlags = specifiedFlags,
+            fill = fill,
+            fillRule = fillRule,
+            fillOpacity = fillOpacity,
+            stroke = stroke,
+            strokeOpacity = strokeOpacity,
+            strokeWidth = strokeWidth,
+            strokeLineCap = strokeLineCap,
+            strokeLineJoin = strokeLineJoin,
+            strokeMiterLimit = strokeMiterLimit,
+            strokeDashArray = strokeDashArray?.clone(),
+            strokeDashOffset = strokeDashOffset,
+            opacity = opacity,
+            color = color,
+            fontFamily = fontFamily,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            fontStyle = fontStyle,
+            fontWidth = fontWidth,
+            textDecoration = textDecoration,
+            direction = direction,
+            textAnchor = textAnchor,
+            overflow = overflow,
+            clip = clip,
+            markerStart = markerStart,
+            markerMid = markerMid,
+            markerEnd = markerEnd,
+            display = display,
+            visibility = visibility,
+            stopColor = stopColor,
+            stopOpacity = stopOpacity,
+            clipPath = clipPath,
+            clipRule = clipRule,
+            mask = mask,
+            maskType = maskType,
+            filter = filter,
+            floodColor = floodColor,
+            floodOpacity = floodOpacity,
+            solidColor = solidColor,
+            solidOpacity = solidOpacity,
+            viewportFill = viewportFill,
+            viewportFillOpacity = viewportFillOpacity,
+            vectorEffect = vectorEffect,
+            imageRendering = imageRendering,
+            isolation = isolation,
+            mixBlendMode = mixBlendMode,
+            fontKerning = fontKerning,
+            fontVariantLigatures = fontVariantLigatures,
+            fontVariantPosition = fontVariantPosition,
+            fontVariantCaps = fontVariantCaps,
+            fontVariantNumeric = fontVariantNumeric,
+            fontVariantEastAsian = fontVariantEastAsian,
+            fontFeatureSettings = fontFeatureSettings,
+            fontVariationSettings = CSSFontVariationSettings(fontVariationSettings),
+            writingMode = writingMode,
+            glyphOrientationVertical = glyphOrientationVertical,
+            textOrientation = textOrientation,
+            letterSpacing = letterSpacing,
+            wordSpacing = wordSpacing,
+        )
     }
 
     override fun toString(): String {
@@ -520,6 +645,14 @@ internal class Style : Cloneable {
             append(clipRule)
             append(", mask=")
             append(mask)
+            append(", maskType=")
+            append(maskType)
+            append(", filter=")
+            append(filter)
+            append(", floodColor=")
+            append(floodColor)
+            append(", floodOpacity=")
+            append(floodOpacity)
             append(", solidColor=")
             append(solidColor)
             append(", solidOpacity=")
@@ -633,6 +766,9 @@ internal class Style : Cloneable {
         const val SPECIFIED_FONT_WIDTH: Long = 1L shl 51
         const val SPECIFIED_LETTER_SPACING: Long = 1L shl 52
         const val SPECIFIED_WORD_SPACING: Long = 1L shl 53
+        const val SPECIFIED_FILTER: Long = 1L shl 55
+        const val SPECIFIED_FLOOD_COLOR: Long = 1L shl 56
+        const val SPECIFIED_FLOOD_OPACITY: Long = 1L shl 57
 
         // Flags for the settings that are applied to reset the root style
         private const val SPECIFIED_RESET: Long = -1L
@@ -679,6 +815,9 @@ internal class Style : Cloneable {
             def.clipRule = FillRule.NonZero
             def.mask = null
             def.maskType = MaskType.luminance
+            def.filter = null
+            def.floodColor = ColorValue.BLACK
+            def.floodOpacity = 1f
             def.solidColor = null
             def.solidOpacity = 1f
             def.viewportFill = null
@@ -994,6 +1133,24 @@ internal class Style : Cloneable {
                     val maskType = MaskType.fromString(value)
                     style.maskType = maskType
                     if (maskType != null) style.addSpecifiedFlag(SPECIFIED_MASK_TYPE)
+                }
+
+                SVGAttr.filter -> {
+                    val filter = parseFunctionalIRI(value, localName)
+                    style.filter = filter
+                    if (filter != null) style.addSpecifiedFlag(SPECIFIED_FILTER)
+                }
+
+                SVGAttr.flood_color -> {
+                    val floodColor = if (value == SVGParserImpl.CURRENT_COLOR) CurrentColor else parseColor(value)
+                    style.floodColor = floodColor
+                    style.addSpecifiedFlag(SPECIFIED_FLOOD_COLOR)
+                }
+
+                SVGAttr.flood_opacity -> {
+                    val floodOpacity = parseOpacity(value)
+                    style.floodOpacity = floodOpacity
+                    style.addSpecifiedFlag(SPECIFIED_FLOOD_OPACITY)
                 }
 
                 SVGAttr.solid_color -> {

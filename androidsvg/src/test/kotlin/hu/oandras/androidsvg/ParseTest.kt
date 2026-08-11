@@ -179,7 +179,7 @@ class ParseTest {
         val ops: List<String> = mock.getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals(
-            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
             ops[4]
         )
     }
@@ -205,7 +205,7 @@ class ParseTest {
         val ops: List<String> = mock.getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals(
-            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
             ops[4]
         )
     }

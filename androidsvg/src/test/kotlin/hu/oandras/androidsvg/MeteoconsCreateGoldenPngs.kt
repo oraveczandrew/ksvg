@@ -15,6 +15,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlin.collections.toList
 
 @Ignore("x")
 @RunWith(ParameterizedRobolectricTestRunner::class)
@@ -40,13 +41,14 @@ class MeteoconsCreateGoldenPngs(
         runBlocking(converterDispatcher) {
             svgs.map { svg ->
                 async {
-                    val outputFile = File(targetSubFolder, svg.nameWithoutExtension + ".png")
+                    val svgFileName = svg.name
+                    val outputFile = File(targetSubFolder, svgFileName.replace(".svg", ".png"))
                     val rsvgResult = runRsvgConvert(svg, outputFile)
 
                     if (rsvgResult != 0) {
-                        println("Error: rsvg-convert failed for ${svg.name} with code $rsvgResult")
+                        println("Error: rsvg-convert failed for $svgFileName with code $rsvgResult")
                     } else {
-                        println("Converted ${svg.name} to ${outputFile.name}")
+                        println("Converted $svgFileName to ${outputFile.name}")
                     }
                 }
             }.forEach {
@@ -105,7 +107,9 @@ class MeteoconsCreateGoldenPngs(
             return root
                 .listDirectories()
                 .flatMap {
-                    it.listDirectories()
+                    it
+                        .listDirectories()
+                        .toList()
                 }.map {
                     arrayOf(it.toRelativeString(root), it)
                 }
@@ -113,16 +117,16 @@ class MeteoconsCreateGoldenPngs(
     }
 }
 
-internal fun File.listDirectories(): List<File> {
+internal fun File.listDirectories(): Array<File> {
     return listFiles {
         it.isDirectory
-    }!!.toList()
+    }!!
 }
 
-internal fun File.listSvgs(): List<File> {
+internal fun File.listSvgs(): Array<File> {
     return listFiles {
-        it.extension == "svg"
-    }!!.toList()
+        it.path.endsWith(".svg")
+    }!!
 }
 
 fun hasRsvgConvert(): Boolean {

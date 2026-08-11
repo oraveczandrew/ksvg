@@ -44,7 +44,7 @@ class RenderToCanvasTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals("concat(Matrix(1 0 0 1 0 50))", ops[1])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
             ops[3]
         )
     }
@@ -66,7 +66,7 @@ class RenderToCanvasTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals("concat(Matrix(0.5 0 0 0.5 50 75))", ops[1])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
             ops[3]
         )
     }
@@ -128,7 +128,7 @@ class RenderToCanvasTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals("concat(Matrix(0.5 0 0 0.5 100 100))", ops[1])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
             ops[3]
         )
     }

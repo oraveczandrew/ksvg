@@ -17,16 +17,21 @@
 
 package hu.oandras.androidsvg
 
+import android.graphics.BlendMode
+import android.graphics.ColorFilter
+import android.graphics.MaskFilter
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PathEffect
+import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.graphics.Xfermode
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
 import org.robolectric.shadows.ShadowPaint
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.util.LinkedList
 
 /**
  * Created by Paul on 10/07/2017.
@@ -115,6 +120,12 @@ class MockPaint: ShadowPaint() {
     }
 
     @Implementation
+    fun setStrokeMiter(miter: Float) {
+        settings.remove(STROKEMITER)
+        settings[STROKEMITER] = "miter:" + num(miter)
+    }
+
+    @Implementation
     override fun setStyle(style: Paint.Style?) {
         settings.remove(STYLE)
         settings[STYLE] = "s:$style"
@@ -124,6 +135,18 @@ class MockPaint: ShadowPaint() {
     override fun setTextSize(textSize: Float) {
         settings.remove(TEXTSIZE)
         settings[TEXTSIZE] = "ts:" + num(textSize)
+    }
+
+    @Implementation
+    override fun setLetterSpacing(letterSpacing: Float) {
+        settings.remove(LETTERSPACING)
+        settings[LETTERSPACING] = "ls:" + num(letterSpacing)
+    }
+
+    @Implementation
+    override fun setWordSpacing(wordSpacing: Float) {
+        settings.remove(WORDSPACING)
+        settings[WORDSPACING] = "ws:" + num(wordSpacing)
     }
 
     @Implementation
@@ -152,6 +175,59 @@ class MockPaint: ShadowPaint() {
         return true
     }
 
+    @Implementation
+    fun setXfermode(xfermode: Xfermode?): Xfermode? {
+        settings.remove(XFERMODE)
+        settings[XFERMODE] = "xfer:$xfermode"
+        return xfermode
+    }
+
+    @Implementation
+    fun setBlendMode(blendMode: BlendMode?) {
+        settings.remove(BLENDMODE)
+        settings[BLENDMODE] = "blend:$blendMode"
+    }
+
+    @Implementation
+    override fun setColorFilter(colorFilter: ColorFilter?): ColorFilter? {
+        settings.remove(COLORFILTER)
+        settings[COLORFILTER] = "cf:$colorFilter"
+        return colorFilter
+    }
+
+    @Implementation
+    override fun setFilterBitmap(filterBitmap: Boolean) {
+        settings.remove(FILTERBITMAP)
+        if (filterBitmap) settings[FILTERBITMAP] = "filter:ON"
+    }
+
+    @Implementation
+    fun getTextWidths(text: String, widths: FloatArray): Int {
+        // Mock: just fill with some value
+        for (i in text.indices) {
+            widths[i] = 10f
+        }
+        return text.length
+    }
+
+    @Implementation
+    fun getTextBounds(text: String, start: Int, end: Int, bounds: Rect) {
+        // Mock: set dummy bounds
+        bounds.set(0, 0, (end - start) * 10, 20)
+    }
+
+    @Implementation
+    fun getTextPath(text: String, start: Int, end: Int, x: Float, y: Float, path: Path) {
+        path.asShadow().moveTo(x, y)
+        path.asShadow().lineTo(x + (end - start) * 10, y)
+    }
+
+    @Implementation
+    fun setMaskFilter(maskFilter: MaskFilter?): MaskFilter? {
+        settings.remove(MASK_FILTER)
+        settings[MASK_FILTER] = "mf:$maskFilter"
+        return maskFilter
+    }
 
     val description: String
         //-----------------------------------------------------------------------------------------------
@@ -165,7 +241,7 @@ class MockPaint: ShadowPaint() {
         }
 
     private fun genFlagsVal(flags: Int): String {
-        val f: LinkedList<String> = LinkedList()
+        val f: ArrayList<String> = ArrayList(flags.countOneBits())
         for (b in 0..31) {
             val m = 1 shl b
             if ((flags and m) != 0) {
@@ -191,6 +267,7 @@ class MockPaint: ShadowPaint() {
         private const val STRIKETHRU = "strikeThruText"
         private const val STROKECAP = "strokeCap"
         private const val STROKEJOIN = "strokeJoin"
+        private const val STROKEMITER = "strokeMiter"
         private const val STROKEWIDTH = "strokeWidth"
         private const val STYLE = "style"
         private const val TEXTSIZE = "textSize"
@@ -198,6 +275,13 @@ class MockPaint: ShadowPaint() {
         private const val UNDERLINETEXT = "underlineText"
         private const val FONTFEATURES = "fontFeatures"
         private const val FONTVARIATION = "fontVariation"
+        private const val MASK_FILTER = "maskFilter"
+        private const val XFERMODE = "xfermode"
+        private const val BLENDMODE = "blendMode"
+        private const val COLORFILTER = "colorFilter"
+        private const val FILTERBITMAP = "filterBitmap"
+        private const val LETTERSPACING = "letterSpacing"
+        private const val WORDSPACING = "wordSpacing"
 
         private fun num(f: Float): String {
             return if (f == f.toLong().toFloat()) {

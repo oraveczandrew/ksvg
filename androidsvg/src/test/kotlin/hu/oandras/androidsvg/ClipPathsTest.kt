@@ -230,4 +230,82 @@ class ClipPathsTest {
             ops[3]
         )
     }
+
+    @Test
+    @Throws(SVGParseException::class)
+    fun clipPathObjectBoundingBoxPercentages() {
+        val test = "<svg width=\"100\" height=\"100\">" +
+                "  <defs>" +
+                "    <clipPath id=\"clip\" clipPathUnits=\"objectBoundingBox\">" +
+                "      <rect x=\"10%\" y=\"10%\" width=\"80%\" height=\"80%\"/>" +
+                "    </clipPath>" +
+                "  </defs>" +
+                "  <rect width=\"100\" height=\"100\" fill=\"green\" clip-path=\"url(#clip)\"/>" +
+                "</svg>"
+        val svg: SVG = SVG.getFromString(test)
+
+        val newBM: Bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(newBM)
+        svg.renderToCanvas(canvas)
+
+        val ops: List<String> = canvas.asShadow().getOperations()
+        assertEquals(
+            "clipPath(M 0.1 0.1 L 0.9 0.1 L 0.9 0.9 L 0.1 0.9 L 0.1 0.1 Z \u00d7 [100, 0, 0, 100, 0, 0])",
+            ops[3]
+        )
+    }
+
+    @Test
+    @Throws(SVGParseException::class)
+    fun nestedClipPathWithObjectBoundingBox() {
+        val test = "<svg width=\"100\" height=\"100\">" +
+                "  <defs>" +
+                "    <clipPath id=\"cp1\" clipPathUnits=\"objectBoundingBox\">" +
+                "      <rect x=\"0\" y=\"0\" width=\"1\" height=\"1\" clip-path=\"url(#cp2)\"/>" +
+                "    </clipPath>" +
+                "    <clipPath id=\"cp2\" clipPathUnits=\"objectBoundingBox\">" +
+                "      <rect x=\"0.1\" y=\"0.1\" width=\"0.8\" height=\"0.8\"/>" +
+                "    </clipPath>" +
+                "  </defs>" +
+                "  <rect width=\"100\" height=\"100\" fill=\"green\" clip-path=\"url(#cp1)\"/>" +
+                "</svg>"
+        val svg: SVG = SVG.getFromString(test)
+
+        val newBM: Bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(newBM)
+        svg.renderToCanvas(canvas)
+
+        val ops: List<String> = canvas.asShadow().getOperations()
+        assertEquals(
+            "clipPath(( M 0 0 L 1 0 L 1 1 L 0 1 L 0 0 Z \u2229 M 0.1 0.1 L 0.9 0.1 L 0.9 0.9 L 0.1 0.9 L 0.1 0.1 Z ) \u00d7 [100, 0, 0, 100, 0, 0])",
+            ops[3]
+        )
+    }
+
+    @Test
+    @Throws(SVGParseException::class)
+    fun clipPathWithGroup() {
+        val test = "<svg width=\"100\" height=\"100\">" +
+                "  <defs>" +
+                "    <clipPath id=\"clip\">" +
+                "      <g>" +
+                "        <rect x=\"10\" y=\"10\" width=\"40\" height=\"80\"/>" +
+                "        <rect x=\"50\" y=\"10\" width=\"40\" height=\"80\"/>" +
+                "      </g>" +
+                "    </clipPath>" +
+                "  </defs>" +
+                "  <rect width=\"100\" height=\"100\" fill=\"green\" clip-path=\"url(#clip)\"/>" +
+                "</svg>"
+        val svg: SVG = SVG.getFromString(test)
+
+        val newBM: Bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(newBM)
+        svg.renderToCanvas(canvas)
+
+        val ops: List<String> = canvas.asShadow().getOperations()
+        assertEquals(
+            "clipPath(( M 10 10 L 50 10 L 50 90 L 10 90 L 10 10 Z \u222a M 50 10 L 90 10 L 90 90 L 50 90 L 50 10 Z ))",
+            ops[3]
+        )
+    }
 }

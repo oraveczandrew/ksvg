@@ -40,7 +40,16 @@ import hu.oandras.androidsvg.dom.Box
 import hu.oandras.androidsvg.dom.COLOR_BLACK
 import hu.oandras.androidsvg.dom.CSSClipRect
 import hu.oandras.androidsvg.dom.ColorValue
+import hu.oandras.androidsvg.dom.ConvolveMatrixEdgeMode
 import hu.oandras.androidsvg.dom.CurrentColor
+import hu.oandras.androidsvg.dom.FeBlendMode
+import hu.oandras.androidsvg.dom.FeChannelSelector
+import hu.oandras.androidsvg.dom.FeColorMatrixType
+import hu.oandras.androidsvg.dom.FeCompositeOperator
+import hu.oandras.androidsvg.dom.FeFuncType
+import hu.oandras.androidsvg.dom.FeMorphologyOperator
+import hu.oandras.androidsvg.dom.FeStitchTiles
+import hu.oandras.androidsvg.dom.FeTurbulenceType
 import hu.oandras.androidsvg.dom.HasTransform
 import hu.oandras.androidsvg.dom.PaintReference
 import hu.oandras.androidsvg.dom.PathDefinition
@@ -58,6 +67,7 @@ import hu.oandras.androidsvg.dom.Style.TextAnchor
 import hu.oandras.androidsvg.dom.Style.TextDecoration
 import hu.oandras.androidsvg.dom.Style.TextDirection
 import hu.oandras.androidsvg.dom.Style.VectorEffect
+import hu.oandras.androidsvg.dom.SvgColor
 import hu.oandras.androidsvg.dom.SvgObject
 import hu.oandras.androidsvg.dom.SvgObject.*
 import hu.oandras.androidsvg.dom.SvgPaint
@@ -74,6 +84,7 @@ import hu.oandras.androidsvg.utils.pack4Hex
 import hu.oandras.androidsvg.utils.pack8Hex
 import hu.oandras.androidsvg.utils.packHsla
 import hu.oandras.androidsvg.utils.packRgba
+import hu.oandras.androidsvg.utils.toFloatArray
 import hu.oandras.androidsvg.utils.toRadians
 import hu.oandras.androidsvg.utils.trimLowerThanSpace
 import org.xml.sax.Attributes
@@ -166,7 +177,9 @@ internal class SVGParserImpl : SVGParser {
                 if (preamble.contains("<!ENTITY ") || preamble.contains("<!ATTLIST ")) {
                     // Found something that looks like an entity definition.
                     // So we'll use the SAX parser which supports them.
-                    debug("Switching to SAX parser to process entities")
+                    debug {
+                        "Switching to SAX parser to process entities"
+                    }
                     parseUsingSAX(input)
                     return checkNotNull(svgDocument) { "svgDocument is null after SAX parse" }
                 }
@@ -453,12 +466,37 @@ internal class SVGParserImpl : SVGParser {
             SVGElem.text -> text(attributes)
             SVGElem.tspan -> tspan(attributes)
             SVGElem.tref -> tref(attributes)
-            SVGElem.switch -> zwitch(attributes)
+            SVGElem.switch -> switch(attributes)
             SVGElem.symbol -> symbol(attributes)
             SVGElem.marker -> marker(attributes)
             SVGElem.linearGradient -> linearGradient(attributes)
             SVGElem.radialGradient -> radialGradient(attributes)
             SVGElem.stop -> stop(attributes)
+            SVGElem.filter -> filter(attributes)
+            SVGElem.feBlend -> feBlend(attributes)
+            SVGElem.feColorMatrix -> feColorMatrix(attributes)
+            SVGElem.feComponentTransfer -> feComponentTransfer(attributes)
+            SVGElem.feFuncA -> feFunc(attributes, FeFunc.Channel.A)
+            SVGElem.feFuncB -> feFunc(attributes, FeFunc.Channel.B)
+            SVGElem.feFuncG -> feFunc(attributes, FeFunc.Channel.G)
+            SVGElem.feFuncR -> feFunc(attributes, FeFunc.Channel.R)
+            SVGElem.feConvolveMatrix -> feConvolveMatrix(attributes)
+            SVGElem.feComposite -> feComposite(attributes)
+            SVGElem.feDiffuseLighting -> feDiffuseLighting(attributes)
+            SVGElem.feDisplacementMap -> feDisplacementMap(attributes)
+            SVGElem.feDistantLight -> feDistantLight(attributes)
+            SVGElem.fePointLight -> fePointLight(attributes)
+            SVGElem.feSpecularLighting -> feSpecularLighting(attributes)
+            SVGElem.feSpotLight -> feSpotLight(attributes)
+            SVGElem.feFlood -> feFlood(attributes)
+            SVGElem.feGaussianBlur -> feGaussianBlur(attributes)
+            SVGElem.feImage -> feImage(attributes)
+            SVGElem.feMerge -> feMerge(attributes)
+            SVGElem.feMergeNode -> feMergeNode(attributes)
+            SVGElem.feMorphology -> feMorphology(attributes)
+            SVGElem.feOffset -> feOffset(attributes)
+            SVGElem.feTurbulence -> feTurbulence(attributes)
+            SVGElem.feTile -> feTile(attributes)
             SVGElem.title, SVGElem.desc -> {
                 inMetadataElement = true
                 metadataTag = elem
@@ -560,7 +598,7 @@ internal class SVGParserImpl : SVGParser {
                 inMetadataElement = false
                 val metadataElementContents = metadataElementContents
                 if (metadataElementContents != null) {
-                    val svgDocument = svgDocument!!
+                    val svgDocument = requireSvgDocument()
                     when (metadataTag) {
                         SVGElem.title -> {
                             svgDocument.setTitle(metadataElementContents.toString())
@@ -590,11 +628,49 @@ internal class SVGParserImpl : SVGParser {
             SVGElem.svg,
             SVGElem.g,
             SVGElem.defs,
-            SVGElem.a, SVGElem.use, SVGElem.image, SVGElem.text, SVGElem.tspan,
-            SVGElem.switch, SVGElem.symbol, SVGElem.marker, SVGElem.linearGradient,
-            SVGElem.radialGradient, SVGElem.stop, SVGElem.clipPath, SVGElem.textPath,
-            SVGElem.pattern, SVGElem.view, SVGElem.mask, SVGElem.solidColor -> {
-                if (currentElement == null) {
+            SVGElem.a,
+            SVGElem.use,
+            SVGElem.image,
+            SVGElem.text,
+            SVGElem.tspan,
+            SVGElem.switch,
+            SVGElem.symbol,
+            SVGElem.marker,
+            SVGElem.linearGradient,
+            SVGElem.radialGradient,
+            SVGElem.stop,
+            SVGElem.clipPath,
+            SVGElem.textPath,
+            SVGElem.pattern,
+            SVGElem.view,
+            SVGElem.mask,
+            SVGElem.solidColor,
+            SVGElem.filter,
+            SVGElem.feBlend,
+            SVGElem.feColorMatrix,
+            SVGElem.feComponentTransfer,
+            SVGElem.feFuncA,
+            SVGElem.feFuncB,
+            SVGElem.feFuncG,
+            SVGElem.feFuncR,
+            SVGElem.feConvolveMatrix,
+            SVGElem.feComposite,
+            SVGElem.feDiffuseLighting,
+            SVGElem.feDisplacementMap,
+            SVGElem.feDistantLight,
+            SVGElem.fePointLight,
+            SVGElem.feSpecularLighting,
+            SVGElem.feSpotLight,
+            SVGElem.feFlood,
+            SVGElem.feGaussianBlur,
+            SVGElem.feMerge,
+            SVGElem.feMergeNode,
+            SVGElem.feMorphology,
+            SVGElem.feOffset,
+            SVGElem.feTurbulence,
+            SVGElem.feTile -> {
+                val elem = currentElement
+                checkState(elem != null) {
                     // This situation has been reported by a user. But I am unable to reproduce this fault.
                     // If you can get this error please add your SVG file to https://github.com/BigBadaboom/androidsvg/issues/177
                     // For now we'll return a parse exception for consistency (instead of NPE).
@@ -605,17 +681,21 @@ internal class SVGParserImpl : SVGParser {
                         )
                     )
                 }
-                currentElement = (currentElement as SvgObject).parent
+                currentElement = elem.parent
             }
 
-            else -> {}
+            else -> {
+                // do nothing
+            }
         }
     }
 
 
     private fun endDocument() {
         // Dump document
-        if (BuildConfig.DEBUG) dumpNode(svgDocument!!.rootElement, "")
+        if (BuildConfig.DEBUG) {
+            dumpNode(requireSvgDocument().rootElement, "")
+        }
     }
 
     private fun handleProcessingInstruction(
@@ -675,8 +755,10 @@ internal class SVGParserImpl : SVGParser {
         }
     }
 
-    private fun debug(format: String, vararg args: Any?) {
-        if (BuildConfig.DEBUG) Log.d(TAG, String.format(format, *args))
+    private inline fun debug(lazyMessage: () -> String) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, lazyMessage())
+        }
     }
 
     //=========================================================================
@@ -685,7 +767,7 @@ internal class SVGParserImpl : SVGParser {
     // <svg> element
     @Throws(SVGParseException::class)
     private fun svg(attributes: Attributes) {
-        debug("<svg>")
+        debug { "<svg>" }
 
         val currentElement = currentElement
         val obj = Svg()
@@ -751,7 +833,7 @@ internal class SVGParserImpl : SVGParser {
     // <g> group element
     @Throws(SVGParseException::class)
     private fun g(attributes: Attributes) {
-        debug("<g>")
+        debug { "<g>" }
 
         val currentElement = requireCurrentElement()
         val obj = Group()
@@ -770,7 +852,7 @@ internal class SVGParserImpl : SVGParser {
     // <defs> group element
     @Throws(SVGParseException::class)
     private fun defs(attributes: Attributes) {
-        debug("<defs>")
+        debug { "<defs>" }
 
         val currentElement = requireCurrentElement()
         val obj = Defs()
@@ -788,7 +870,7 @@ internal class SVGParserImpl : SVGParser {
     // <a> element
     @Throws(SVGParseException::class)
     private fun a(attributes: Attributes) {
-        debug("<a>")
+        debug { "<a>" }
 
         val currentElement = requireCurrentElement()
         val obj = A()
@@ -824,7 +906,7 @@ internal class SVGParserImpl : SVGParser {
     // <use> element
     @Throws(SVGParseException::class)
     private fun use(attributes: Attributes) {
-        debug("<use>")
+        debug { "<use>" }
 
         val currentElement = requireCurrentElement()
         val obj = Use()
@@ -877,7 +959,7 @@ internal class SVGParserImpl : SVGParser {
     // <image> element
     @Throws(SVGParseException::class)
     private fun image(attributes: Attributes) {
-        debug("<image>")
+        debug { "<image>" }
 
         val currentElement = requireCurrentElement()
         val obj = Image()
@@ -939,7 +1021,7 @@ internal class SVGParserImpl : SVGParser {
     // <path> element
     @Throws(SVGParseException::class)
     private fun path(attributes: Attributes) {
-        debug("<path>")
+        debug { "<path>" }
 
         val currentElement = requireCurrentElement()
         val obj = Path()
@@ -974,7 +1056,7 @@ internal class SVGParserImpl : SVGParser {
     // <rect> element
     @Throws(SVGParseException::class)
     private fun rect(attributes: Attributes) {
-        debug("<rect>")
+        debug { "<rect>" }
 
         val currentElement = requireCurrentElement()
         val obj = Rect()
@@ -1033,7 +1115,7 @@ internal class SVGParserImpl : SVGParser {
     // <circle> element
     @Throws(SVGParseException::class)
     private fun circle(attributes: Attributes) {
-        debug("<circle>")
+        debug { "<circle>" }
 
         val currentElement = requireCurrentElement()
         val obj = Circle()
@@ -1069,7 +1151,7 @@ internal class SVGParserImpl : SVGParser {
     // <ellipse> element
     @Throws(SVGParseException::class)
     private fun ellipse(attributes: Attributes) {
-        debug("<ellipse>")
+        debug { "<ellipse>" }
 
         val currentElement = requireCurrentElement()
         val obj = Ellipse()
@@ -1114,7 +1196,7 @@ internal class SVGParserImpl : SVGParser {
     // <line> element
     @Throws(SVGParseException::class)
     private fun line(attributes: Attributes) {
-        debug("<line>")
+        debug { "<line>" }
 
         val currentElement = requireCurrentElement()
         val obj = Line()
@@ -1147,7 +1229,7 @@ internal class SVGParserImpl : SVGParser {
     // <polyline> element
     @Throws(SVGParseException::class)
     private fun polyline(attributes: Attributes) {
-        debug("<polyline>")
+        debug { "<polyline>" }
 
         val currentElement = requireCurrentElement()
         val obj = PolyLine()
@@ -1185,9 +1267,7 @@ internal class SVGParserImpl : SVGParser {
                         points.add(y)
                     }
 
-                    obj.points = FloatArray(points.size) {
-                        points[it]
-                    }
+                    obj.points = points.toFloatArray()
                 }
 
                 else -> {}
@@ -1200,7 +1280,7 @@ internal class SVGParserImpl : SVGParser {
     // <polygon> element
     @Throws(SVGParseException::class)
     private fun polygon(attributes: Attributes) {
-        debug("<polygon>")
+        debug { "<polygon>" }
 
         val currentElement = requireCurrentElement()
         val obj = Polygon()
@@ -1219,7 +1299,7 @@ internal class SVGParserImpl : SVGParser {
     // <text> element
     @Throws(SVGParseException::class)
     private fun text(attributes: Attributes) {
-        debug("<text>")
+        debug { "<text>" }
 
         val currentElement = requireCurrentElement()
         val obj = Text()
@@ -1253,7 +1333,7 @@ internal class SVGParserImpl : SVGParser {
     // <tspan> element
     @Throws(SVGParseException::class)
     private fun tspan(attributes: Attributes) {
-        debug("<tspan>")
+        debug { "<tspan>" }
 
         val currentElement = requireCurrentElement()
         checkState(currentElement is TextContainer) { "Invalid document. <tspan> elements are only valid inside <text> or other <tspan> elements." }
@@ -1278,7 +1358,7 @@ internal class SVGParserImpl : SVGParser {
     // <tref> element
     @Throws(SVGParseException::class)
     private fun tref(attributes: Attributes) {
-        debug("<tref>")
+        debug { "<tref>" }
 
         val currentElement = requireCurrentElement()
         checkState(currentElement is TextContainer) { "Invalid document. <tref> elements are only valid inside <text> or <tspan> elements." }
@@ -1317,8 +1397,8 @@ internal class SVGParserImpl : SVGParser {
     //=========================================================================
     // <switch> element
     @Throws(SVGParseException::class)
-    private fun zwitch(attributes: Attributes) {
-        debug("<switch>")
+    private fun switch(attributes: Attributes) {
+        debug { "<switch>" }
 
         val currentElement = requireCurrentElement()
         val obj = Switch()
@@ -1359,7 +1439,7 @@ internal class SVGParserImpl : SVGParser {
     // <symbol> element
     @Throws(SVGParseException::class)
     private fun symbol(attributes: Attributes) {
-        debug("<symbol>")
+        debug { "<symbol>" }
 
         val currentElement = requireCurrentElement()
         val obj = Symbol()
@@ -1378,7 +1458,7 @@ internal class SVGParserImpl : SVGParser {
     // <marker> element
     @Throws(SVGParseException::class)
     private fun marker(attributes: Attributes) {
-        debug("<marker>")
+        debug { "<marker>" }
 
         val currentElement = requireCurrentElement()
         val obj = Marker()
@@ -1444,7 +1524,7 @@ internal class SVGParserImpl : SVGParser {
     // <linearGradient> element
     @Throws(SVGParseException::class)
     private fun linearGradient(attributes: Attributes) {
-        debug("<linearGradient>")
+        debug { "<linearGradient>" }
 
         val currentElement = requireCurrentElement()
         val obj = SvgLinearGradient()
@@ -1507,7 +1587,7 @@ internal class SVGParserImpl : SVGParser {
     // <radialGradient> element
     @Throws(SVGParseException::class)
     private fun radialGradient(attributes: Attributes) {
-        debug("<radialGradient>")
+        debug { "<radialGradient>" }
 
         val currentElement = requireCurrentElement()
         val obj = SvgRadialGradient()
@@ -1550,7 +1630,7 @@ internal class SVGParserImpl : SVGParser {
     // Gradient <stop> element
     @Throws(SVGParseException::class)
     private fun stop(attributes: Attributes) {
-        debug("<stop>")
+        debug { "<stop>" }
 
         val currentElement = requireCurrentElement()
 
@@ -1607,7 +1687,7 @@ internal class SVGParserImpl : SVGParser {
     // <solidColor> element
     @Throws(SVGParseException::class)
     private fun solidColor(attributes: Attributes) {
-        debug("<solidColor>")
+        debug { "<solidColor>" }
 
         val currentElement = requireCurrentElement()
         val obj = SolidColor()
@@ -1624,7 +1704,7 @@ internal class SVGParserImpl : SVGParser {
     // <clipPath> element
     @Throws(SVGParseException::class)
     private fun clipPath(attributes: Attributes) {
-        debug("<clipPath>")
+        debug { "<clipPath>" }
 
         val currentElement = requireCurrentElement()
         val obj = ClipPath()
@@ -1660,7 +1740,7 @@ internal class SVGParserImpl : SVGParser {
     // <textPath> element
     @Throws(SVGParseException::class)
     private fun textPath(attributes: Attributes) {
-        debug("<textPath>")
+        debug { "<textPath>" }
 
         val currentElement = requireCurrentElement()
         val obj = TextPath()
@@ -1702,7 +1782,7 @@ internal class SVGParserImpl : SVGParser {
     // <pattern> element
     @Throws(SVGParseException::class)
     private fun pattern(attributes: Attributes) {
-        debug("<pattern>")
+        debug { "<pattern>" }
 
         val currentElement = requireCurrentElement()
         val obj = Pattern()
@@ -1764,7 +1844,7 @@ internal class SVGParserImpl : SVGParser {
     // <view> element
     @Throws(SVGParseException::class)
     private fun view(attributes: Attributes) {
-        debug("<view>")
+        debug { "<view>" }
 
         val currentElement = requireCurrentElement()
         val obj = View()
@@ -1782,7 +1862,7 @@ internal class SVGParserImpl : SVGParser {
     // <mask> element
     @Throws(SVGParseException::class)
     private fun mask(attributes: Attributes) {
-        debug("<mask>")
+        debug { "<mask>" }
 
         val currentElement = requireCurrentElement()
         val obj = Mask()
@@ -1840,22 +1920,28 @@ internal class SVGParserImpl : SVGParser {
     //=========================================================================
     @Throws(SVGParseException::class)
     private fun parseAttributesCore(obj: SvgElementBase, attributes: Attributes) {
+        var k = 0
         for (i in 0..<attributes.length) {
-            when (attributes.getQName(i)) {
-                "id",
-                "xml:id" -> {
+            when (SVGAttr.fromString(attributes.getQName(i))) {
+                SVGAttr.id, -> {
                     obj.id = attributes.getTrimmedValue(i)
-                    break
+                    k++
                 }
 
-                "xml:space" -> {
+                SVGAttr.space -> {
                     obj.spacePreserve = when (val value = attributes.getTrimmedValue(i)) {
                         "default" -> false
                         "preserve" -> true
                         else -> throw SVGParseException("Invalid value for \"xml:space\" attribute: $value")
                     }
-                    break
+                    k++
                 }
+
+                else -> {}
+            }
+
+            if (k>= 2) {
+                break
             }
         }
     }
@@ -1879,10 +1965,10 @@ internal class SVGParserImpl : SVGParser {
                         obj.baseStyle = it
                     }
                     Style.processStyleProperty(
-                        baseStyle,
-                        localName,
-                        value,
-                        true
+                        style = baseStyle,
+                        localName = localName,
+                        value = value,
+                        isFromAttribute = true
                     )
                 }
             }
@@ -1917,10 +2003,10 @@ internal class SVGParserImpl : SVGParser {
                     obj.style = it
                 }
                 Style.processStyleProperty(
-                    style,
-                    propertyName,
-                    propertyValue,
-                    false
+                    style = style,
+                    localName = propertyName,
+                    value = propertyValue,
+                    isFromAttribute = false
                 )
                 scan.skipWhitespace()
             }
@@ -2030,7 +2116,7 @@ internal class SVGParserImpl : SVGParser {
 
                     checkState(!ang.isNaN() && scan.consume(')')) { "Invalid transform list: $value" }
 
-                    matrix.preSkew(tan(ang.toRadians()).toFloat(), 0f)
+                    matrix.preSkew(tan(ang.toRadians()), 0f)
                 }
 
                 "skewY" -> {
@@ -2040,7 +2126,7 @@ internal class SVGParserImpl : SVGParser {
 
                     checkState(!ang.isNaN() && scan.consume(')')) { "Invalid transform list: $value" }
 
-                    matrix.preSkew(0f, tan(ang.toRadians()).toFloat())
+                    matrix.preSkew(0f, tan(ang.toRadians()))
                 }
 
                 else -> throw SVGParseException("Invalid transform list fn: $cmd)")
@@ -2059,7 +2145,7 @@ internal class SVGParserImpl : SVGParser {
     //=========================================================================
     @Throws(SVGParseException::class)
     private fun style(attributes: Attributes) {
-        debug("<style>")
+        debug { "<style>" }
 
         requireCurrentElement()
 
@@ -2090,7 +2176,581 @@ internal class SVGParserImpl : SVGParser {
             source = CSSParser.Source.Document,
             externalFileResolver = externalFileResolver
         )
-        svgDocument!!.addCSSRules(ruleset = parser.parse(sheet))
+        requireSvgDocument().addCSSRules(ruleset = parser.parse(sheet))
+    }
+
+    //=========================================================================
+    // <filter> element
+    @Throws(SVGParseException::class)
+    private fun filter(attributes: Attributes) {
+        debug { "<filter>" }
+
+        val currentElement = requireCurrentElement()
+        val obj = Filter()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilter(obj, attributes)
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    private fun parseAttributesFilter(obj: Filter, attributes: Attributes) {
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.filterUnits -> obj.filterUnitsAreUser = value == "userSpaceOnUse"
+                SVGAttr.primitiveUnits -> obj.primitiveUnitsAreUser = value == "userSpaceOnUse"
+                SVGAttr.x -> obj.x = parseLength(value)
+                SVGAttr.y -> obj.y = parseLength(value)
+                SVGAttr.width -> obj.width = parseLength(value)
+                SVGAttr.height -> obj.height = parseLength(value)
+                else -> {}
+            }
+        }
+    }
+
+    private fun parseAttributesFilterPrimitive(obj: FilterPrimitive, attributes: Attributes) {
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.x -> obj.x = parseLength(value)
+                SVGAttr.y -> obj.y = parseLength(value)
+                SVGAttr.width -> obj.width = parseLength(value)
+                SVGAttr.height -> obj.height = parseLength(value)
+                SVGAttr.result -> obj.result = value
+                SVGAttr.`in` -> obj.`in` = value
+                else -> {}
+            }
+        }
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feBlend(attributes: Attributes) {
+        debug { "<feBlend>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeBlend()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.in2 -> obj.in2 = value
+                SVGAttr.mode -> obj.mode = if (value.isEmpty()) FeBlendMode.normal else try {
+                    FeBlendMode.valueOf(value.lowercase())
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid blend mode: $value")
+                }
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feColorMatrix(attributes: Attributes) {
+        debug { "<feColorMatrix>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeColorMatrix()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.type -> obj.type = if (value.isEmpty()) FeColorMatrixType.matrix else try {
+                    FeColorMatrixType.valueOf(value.lowercase())
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid matrix type: $value")
+                }
+                SVGAttr.values -> obj.values = parseFloatList(value)
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feComponentTransfer(attributes: Attributes) {
+        debug { "<feComponentTransfer>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeComponentTransfer()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feFunc(attributes: Attributes, channel: FeFunc.Channel) {
+        debug { "<feFunc${channel.name}>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeFunc()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        obj.channel = channel
+        parseAttributesCore(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.type -> obj.type = if (value.isEmpty()) FeFuncType.identity else try {
+                    FeFuncType.valueOf(value)
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid feFunc type: $value")
+                }
+                SVGAttr.tableValues -> obj.tableValues = parseFloatList(value)
+                SVGAttr.slope -> obj.slope = parseFloat(value)
+                SVGAttr.intercept -> obj.intercept = parseFloat(value)
+                SVGAttr.amplitude -> obj.amplitude = parseFloat(value)
+                SVGAttr.exponent -> obj.exponent = parseFloat(value)
+                SVGAttr.offset -> obj.offset = parseFloat(value)
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feConvolveMatrix(attributes: Attributes) {
+        debug { "<feConvolveMatrix>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeConvolveMatrix()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.order -> {
+                    val values = parseFloatList(value)
+                    obj.orderX = values.getOrNull(0)?.toInt() ?: 3
+                    obj.orderY = values.getOrNull(1)?.toInt() ?: obj.orderX
+                }
+                SVGAttr.kernelMatrix -> obj.kernelMatrix = parseFloatList(value)
+                SVGAttr.divisor -> obj.divisor = parseFloat(value)
+                SVGAttr.bias -> obj.bias = parseFloat(value)
+                SVGAttr.targetX -> obj.targetX = parseFloat(value).toInt()
+                SVGAttr.targetY -> obj.targetY = parseFloat(value).toInt()
+                SVGAttr.edgeMode -> obj.edgeMode = if (value.isEmpty()) ConvolveMatrixEdgeMode.duplicate else try {
+                    ConvolveMatrixEdgeMode.valueOf(value.lowercase())
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid matrix edge mode: $value")
+                }
+                SVGAttr.preserveAlpha -> obj.preserveAlpha = value.equals("true", ignoreCase = true)
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feComposite(attributes: Attributes) {
+        debug { "<feComposite>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeComposite()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.in2 -> obj.in2 = value
+                SVGAttr.operator -> obj.operator = if (value.isEmpty()) FeCompositeOperator.over else try {
+                    FeCompositeOperator.valueOf(value.lowercase())
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid FeComposite operator: $value")
+                }
+                SVGAttr.k1 -> obj.k1 = parseFloat(value)
+                SVGAttr.k2 -> obj.k2 = parseFloat(value)
+                SVGAttr.k3 -> obj.k3 = parseFloat(value)
+                SVGAttr.k4 -> obj.k4 = parseFloat(value)
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feDisplacementMap(attributes: Attributes) {
+        debug { "<feDisplacementMap>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeDisplacementMap()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.in2 -> obj.in2 = value
+                SVGAttr.scale -> obj.scale = parseFloat(value)
+                SVGAttr.xChannelSelector -> obj.xChannelSelector = if (value.isEmpty()) FeChannelSelector.A else try {
+                    FeChannelSelector.valueOf(value.uppercase())
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid xChannelSelector attribute: $value")
+                }
+                SVGAttr.yChannelSelector -> obj.yChannelSelector = if (value.isEmpty()) FeChannelSelector.A else try {
+                    FeChannelSelector.valueOf(value.uppercase())
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid yChannelSelector attribute: $value")
+                }
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feDiffuseLighting(attributes: Attributes) {
+        debug { "<feDiffuseLighting>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeDiffuseLighting()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.surfaceScale -> obj.surfaceScale = parseFloat(value)
+                SVGAttr.diffuseConstant -> obj.diffuseConstant = parseFloat(value)
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feDistantLight(attributes: Attributes) {
+        debug { "<feDistantLight>" }
+        val currentElement = requireCurrentElement()
+        if (currentElement !is FeDiffuseLighting && currentElement !is FeSpecularLighting) {
+            return
+        }
+        val obj = FeDistantLight()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.azimuth -> obj.azimuth = parseFloat(value)
+                SVGAttr.elevation -> obj.elevation = parseFloat(value)
+                else -> {}
+            }
+        }
+        when (currentElement) {
+            is FeDiffuseLighting -> currentElement.light = obj
+            is FeSpecularLighting -> currentElement.light = obj
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun fePointLight(attributes: Attributes) {
+        debug { "<fePointLight>" }
+        val currentElement = requireCurrentElement()
+        if (currentElement !is FeDiffuseLighting && currentElement !is FeSpecularLighting) {
+            return
+        }
+        val obj = FePointLight()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.x -> obj.x = parseFloat(value)
+                SVGAttr.y -> obj.y = parseFloat(value)
+                SVGAttr.z -> obj.z = parseFloat(value)
+                else -> {}
+            }
+        }
+        when (currentElement) {
+            is FeDiffuseLighting -> currentElement.light = obj
+            is FeSpecularLighting -> currentElement.light = obj
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feSpecularLighting(attributes: Attributes) {
+        debug { "<feSpecularLighting>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeSpecularLighting()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.surfaceScale -> obj.surfaceScale = parseFloat(value)
+                SVGAttr.specularConstant -> obj.specularConstant = parseFloat(value)
+                SVGAttr.specularExponent -> obj.specularExponent = parseFloat(value)
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feSpotLight(attributes: Attributes) {
+        debug { "<feSpotLight>" }
+        val currentElement = requireCurrentElement()
+        if (currentElement !is FeDiffuseLighting && currentElement !is FeSpecularLighting) {
+            return
+        }
+        val obj = FeSpotLight()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.x -> obj.x = parseFloat(value)
+                SVGAttr.y -> obj.y = parseFloat(value)
+                SVGAttr.z -> obj.z = parseFloat(value)
+                SVGAttr.pointsAtX -> obj.pointsAtX = parseFloat(value)
+                SVGAttr.pointsAtY -> obj.pointsAtY = parseFloat(value)
+                SVGAttr.pointsAtZ -> obj.pointsAtZ = parseFloat(value)
+                SVGAttr.limitingConeAngle -> obj.limitingConeAngle = parseFloat(value)
+                else -> {}
+            }
+        }
+        when (currentElement) {
+            is FeDiffuseLighting -> currentElement.light = obj
+            is FeSpecularLighting -> currentElement.light = obj
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feFlood(attributes: Attributes) {
+        debug { "<feFlood>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeFlood()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feGaussianBlur(attributes: Attributes) {
+        debug { "<feGaussianBlur>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeGaussianBlur()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.stdDeviation -> {
+                    val values = parseFloatList(value)
+                    obj.stdDeviationX = values.getOrNull(0) ?: 0f
+                    obj.stdDeviationY = values.getOrNull(1) ?: obj.stdDeviationX
+                }
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feImage(attributes: Attributes) {
+        debug { "<feImage>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeImage()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { i, attr, value ->
+            when (attr) {
+                SVGAttr.href -> {
+                    val uri = attributes.getURI(i)
+                    if (uri == "" || uri == XLINK_NAMESPACE) {
+                        obj.href = value
+                    }
+                }
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feMerge(attributes: Attributes) {
+        debug { "<feMerge>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeMerge()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.result -> obj.result = value
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feMergeNode(attributes: Attributes) {
+        debug { "<feMergeNode>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeMergeNode()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.`in` -> obj.`in` = value
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feOffset(attributes: Attributes) {
+        debug { "<feOffset>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeOffset()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.dx -> obj.dx = parseLength(value)
+                SVGAttr.dy -> obj.dy = parseLength(value)
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feTurbulence(attributes: Attributes) {
+        debug { "<feTurbulence>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeTurbulence()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.baseFrequency -> {
+                    val values = parseFloatList(value)
+                    obj.baseFrequencyX = values.getOrNull(0) ?: 0f
+                    obj.baseFrequencyY = values.getOrNull(1) ?: obj.baseFrequencyX
+                }
+                SVGAttr.numOctaves -> obj.numOctaves = value.toIntOrNull() ?: 1
+                SVGAttr.seed -> obj.seed = parseFloat(value)
+                SVGAttr.stitchTiles -> obj.stitchTiles = if (value.isEmpty()) FeStitchTiles.noStitch else try {
+                    FeStitchTiles.valueOf(value)
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid stitchTiles attribute: $value")
+                }
+                SVGAttr.type -> obj.type = if (value.isEmpty()) FeTurbulenceType.turbulence else try {
+                    FeTurbulenceType.valueOf(value)
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid feTurbulence type: $value")
+                }
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feMorphology(attributes: Attributes) {
+        debug { "<feMorphology>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeMorphology()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        attributes.forEachKeyValue { _, attr, value ->
+            when (attr) {
+                SVGAttr.operator -> obj.operator = if (value.isEmpty()) FeMorphologyOperator.erode else try {
+                    FeMorphologyOperator.valueOf(value)
+                } catch (_: IllegalArgumentException) {
+                    throw SVGParseException("Invalid feMorphology operator: $value")
+                }
+                SVGAttr.radius -> {
+                    val values = parseFloatList(value)
+                    obj.radiusX = values.getOrNull(0) ?: 0f
+                    obj.radiusY = values.getOrNull(1) ?: obj.radiusX
+                }
+                else -> {}
+            }
+        }
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @Throws(SVGParseException::class)
+    private fun feTile(attributes: Attributes) {
+        debug { "<feTile>" }
+        val currentElement = requireCurrentElement()
+        val obj = FeTile()
+        obj.document = requireSvgDocument()
+        obj.parent = currentElement
+        parseAttributesCore(obj, attributes)
+        parseAttributesStyle(obj, attributes)
+        parseAttributesFilterPrimitive(obj, attributes)
+        currentElement.addChild(obj)
+        this.currentElement = obj
+    }
+
+    @JvmSynthetic
+    internal fun parseFloatList(value: String): FloatArray {
+        val scanner = TextScanner(value)
+        val list = MutableFloatList()
+        while (!scanner.empty()) {
+            val f = scanner.nextFloat()
+            if (!f.isNaN()) {
+                list.add(f)
+            }
+            scanner.skipCommaWhitespace()
+        }
+        return list.toFloatArray()
     }
 
     companion object {
@@ -2303,14 +2963,13 @@ internal class SVGParserImpl : SVGParser {
             }
         }
 
-        private fun parseColorSpecifier(value: String): SvgPaint {
+        private fun parseColorSpecifier(value: String): SvgColor {
             return when (value) {
                 NONE -> ColorValue.TRANSPARENT
                 CURRENT_COLOR -> CurrentColor
                 else -> parseColor(value)
             }
         }
-
 
         /*
         * Parse a color definition.
@@ -2773,7 +3432,7 @@ internal class SVGParserImpl : SVGParser {
 
             scan.skipWhitespace()
             return if (!scan.consume(')') && !scan.empty()) {
-                // Be forgibing. Allow missing ')'.
+                // Be forgiving. Allow missing ')'.
                 null
             } else {
                 CSSClipRect(top, right, bottom, left)

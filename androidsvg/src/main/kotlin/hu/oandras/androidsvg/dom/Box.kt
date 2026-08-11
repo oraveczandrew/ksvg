@@ -19,8 +19,6 @@ package hu.oandras.androidsvg.dom
 
 import android.graphics.RectF
 
-//===============================================================================
-// Object sub-types used in the SVG object tree
 public data class Box(
     @JvmField
     var minX: Float,

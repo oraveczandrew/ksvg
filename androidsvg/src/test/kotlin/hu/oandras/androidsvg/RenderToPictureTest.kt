@@ -45,7 +45,7 @@ class RenderToPictureTest {
         assertEquals(512, picture.getHeight())
         assertEquals("concat(Matrix(2.56 0 0 2.56 0 128))", ops[1])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
             ops[3]
         )
     }
@@ -98,7 +98,7 @@ class RenderToPictureTest {
         assertEquals(400, picture.getHeight())
         assertEquals("concat(Matrix(2 0 0 2 0 100))", ops[1])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
             ops[3]
         )
     }
@@ -139,7 +139,7 @@ class RenderToPictureTest {
         assertEquals(400, picture.getHeight())
         assertEquals("concat(Matrix(1 0 0 1 100 200))", ops[1])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
             ops[3]
         )
     }

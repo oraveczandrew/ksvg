@@ -21,12 +21,15 @@ package hu.oandras.androidsvg.dom
 
 // Supported SVG attributes
 internal enum class SVGAttr {
+    id,
+    space,
     `class`,
     clip,
     clip_path,
     clipPathUnits,
     clip_rule,
     color,
+    color_interpolation_filters,
     cx, cy,
     direction,
     dx, dy,
@@ -36,6 +39,10 @@ internal enum class SVGAttr {
     fill,
     fill_rule,
     fill_opacity,
+    filter,
+    filterUnits,
+    flood_color,
+    flood_opacity,
     font,
     font_family,
     font_feature_settings,
@@ -59,10 +66,14 @@ internal enum class SVGAttr {
     gradientUnits,
     height,
     href,
+    `in`,
+    in2,
+    intercept,
 
     // id,
     image_rendering,
     isolation,  // @since 1.5
+    k1, k2, k3, k4,
     letter_spacing,  // @since 1.5
     marker,
     marker_start, marker_mid, marker_end,
@@ -70,22 +81,55 @@ internal enum class SVGAttr {
     mask, mask_type, maskContentUnits, maskUnits,
     media,
     mix_blend_mode,  // @since 1.5
+    mode,
     offset,
     opacity,
+    operator,
     orient,
     overflow,
     pathLength,
     patternContentUnits, patternTransform, patternUnits,
     points,
     preserveAspectRatio,
+    primitiveUnits,
+    baseFrequency,
+    azimuth,
+    elevation,
+    diffuseConstant,
+    specularConstant,
+    specularExponent,
+    surfaceScale,
+    lighting_color,
+    pointsAtX,
+    pointsAtY,
+    pointsAtZ,
+    limitingConeAngle,
+    numOctaves,
+    order,
+    kernelMatrix,
+    divisor,
+    bias,
+    targetX,
+    targetY,
+    edgeMode,
+    preserveAlpha,
+    scale,
+    seed,
+    stitchTiles,
+    xChannelSelector,
+    yChannelSelector,
     r,
+    radius,
     refX,
     refY,
     requiredFeatures, requiredExtensions, requiredFormats, requiredFonts,
+    result,
     rx, ry,
+    slope,
     solid_color, solid_opacity,
     spreadMethod,
     startOffset,
+    stdDeviation,
     stop_color, stop_opacity,
     stroke,
     stroke_dasharray,
@@ -102,6 +146,10 @@ internal enum class SVGAttr {
     text_orientation,  // @since 1.5
     transform,
     type,
+    values,
+    tableValues,
+    amplitude,
+    exponent,
     vector_effect,
     version,
     viewBox,
@@ -111,6 +159,7 @@ internal enum class SVGAttr {
     x, y,
     x1, y1,
     x2, y2,
+    z,
     viewport_fill, viewport_fill_opacity,
     visibility,
     UNSUPPORTED;
@@ -118,12 +167,17 @@ internal enum class SVGAttr {
     companion object {
         @JvmStatic
         fun fromString(str: String?): SVGAttr = when (str) {
+            "id",
+            "xml:id" -> id
+            "space",
+            "xml:space" -> space
             "class" -> `class`
             "clip" -> clip
             "clip-path" -> clip_path
             "clipPathUnits" -> clipPathUnits
             "clip-rule" -> clip_rule
             "color" -> color
+            "color-interpolation-filters" -> color_interpolation_filters
             "cx" -> cx
             "cy" -> cy
             "direction" -> direction
@@ -137,6 +191,10 @@ internal enum class SVGAttr {
             "fill" -> fill
             "fill-rule" -> fill_rule
             "fill-opacity" -> fill_opacity
+            "filter" -> filter
+            "filterUnits" -> filterUnits
+            "flood-color" -> flood_color
+            "flood-opacity" -> flood_opacity
             "font" -> font
             "font-family" -> font_family
             "font-feature-settings" -> font_feature_settings
@@ -158,8 +216,15 @@ internal enum class SVGAttr {
             "gradientUnits" -> gradientUnits
             "height" -> height
             "href" -> href
+            "in" -> `in`
+            "in2" -> in2
+            "intercept" -> intercept
             "image-rendering" -> image_rendering
             "isolation" -> isolation
+            "k1" -> k1
+            "k2" -> k2
+            "k3" -> k3
+            "k4" -> k4
             "letter-spacing" -> letter_spacing
             "marker" -> marker
             "marker-start" -> marker_start
@@ -174,8 +239,10 @@ internal enum class SVGAttr {
             "maskUnits" -> maskUnits
             "media" -> media
             "mix-blend-mode" -> mix_blend_mode
+            "mode" -> mode
             "offset" -> offset
             "opacity" -> opacity
+            "operator" -> operator
             "orient" -> orient
             "overflow" -> overflow
             "pathLength" -> pathLength
@@ -184,15 +251,45 @@ internal enum class SVGAttr {
             "patternUnits" -> patternUnits
             "points" -> points
             "preserveAspectRatio" -> preserveAspectRatio
+            "primitiveUnits" -> primitiveUnits
+            "baseFrequency" -> baseFrequency
+            "azimuth" -> azimuth
+            "elevation" -> elevation
+            "diffuseConstant" -> diffuseConstant
+            "specularConstant" -> specularConstant
+            "specularExponent" -> specularExponent
+            "surfaceScale" -> surfaceScale
+            "lighting-color" -> lighting_color
+            "pointsAtX" -> pointsAtX
+            "pointsAtY" -> pointsAtY
+            "pointsAtZ" -> pointsAtZ
+            "limitingConeAngle" -> limitingConeAngle
+            "numOctaves" -> numOctaves
+            "order" -> order
+            "kernelMatrix" -> kernelMatrix
+            "divisor" -> divisor
+            "bias" -> bias
+            "targetX" -> targetX
+            "targetY" -> targetY
+            "edgeMode" -> edgeMode
+            "preserveAlpha" -> preserveAlpha
+            "scale" -> scale
+            "seed" -> seed
+            "stitchTiles" -> stitchTiles
+            "xChannelSelector" -> xChannelSelector
+            "yChannelSelector" -> yChannelSelector
             "r" -> r
+            "radius" -> radius
             "refX" -> refX
             "refY" -> refY
             "requiredFeatures" -> requiredFeatures
             "requiredExtensions" -> requiredExtensions
             "requiredFormats" -> requiredFormats
             "requiredFonts" -> requiredFonts
+            "result" -> result
             "rx" -> rx
             "ry" -> ry
+            "slope" -> slope
             "solid-color" -> solid_color
             "solid-opacity" -> solid_opacity
             "spreadMethod" -> spreadMethod
@@ -214,6 +311,10 @@ internal enum class SVGAttr {
             "text-orientation" -> text_orientation
             "transform" -> transform
             "type" -> type
+            "values" -> values
+            "tableValues" -> tableValues
+            "amplitude" -> amplitude
+            "exponent" -> exponent
             "vector-effect" -> vector_effect
             "version" -> version
             "viewBox" -> viewBox
@@ -226,9 +327,11 @@ internal enum class SVGAttr {
             "y1" -> y1
             "x2" -> x2
             "y2" -> y2
+            "z" -> z
             "viewport-fill" -> viewport_fill
             "viewport-fill-opacity" -> viewport_fill_opacity
             "visibility" -> visibility
+            "stdDeviation" -> stdDeviation
             else -> UNSUPPORTED
         }
     }

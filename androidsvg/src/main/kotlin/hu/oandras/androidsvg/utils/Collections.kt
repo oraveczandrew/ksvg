@@ -16,8 +16,10 @@
 
 package hu.oandras.androidsvg.utils
 
+import androidx.collection.FloatList
 import androidx.collection.MutableObjectFloatMap
 import androidx.collection.MutableObjectIntMap
+import androidx.collection.SimpleArrayMap
 
 internal inline fun <T> List<T>.forEachElement(r: (T) -> Unit) {
     for (i in indices) {
@@ -42,5 +44,17 @@ internal fun <T> MutableObjectFloatMap<T>?.copyIfNotEmpty(): MutableObjectFloatM
         MutableObjectFloatMap<T>(this.size).also {
             it.putAll(this)
         }
+    }
+}
+
+internal inline fun<K, V> SimpleArrayMap<K, V>.forEachKeyValue(r: (K, V) -> Unit) {
+    for (i in 0 until size()) {
+        r(keyAt(i), valueAt(i))
+    }
+}
+
+internal fun FloatList.toFloatArray(): FloatArray {
+    return FloatArray(size) {
+        get(it)
     }
 }

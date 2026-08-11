@@ -1,5 +1,4 @@
 /*
- *    Copyright 2013-2020 Paul LeBeau, Cave Rock Software Ltd.
  *    Copyright 2026 András Oravecz <info@oandras.hu>
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +16,9 @@
 
 package hu.oandras.androidsvg.dom
 
-// No imports needed for SvgPaint as it is in the same package
-
-// Special version of Color that indicates use of 'currentColor' keyword
-internal object CurrentColor : SvgPaint()
+internal enum class FeChannelSelector {
+    R,
+    G,
+    B,
+    A
+}

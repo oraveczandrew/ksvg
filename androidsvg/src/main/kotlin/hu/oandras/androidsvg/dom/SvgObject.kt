@@ -22,6 +22,7 @@ import android.graphics.Matrix
 import hu.oandras.androidsvg.PreserveAspectRatio
 import hu.oandras.androidsvg.SVGParseException
 import hu.oandras.androidsvg.css.CSSLength
+import hu.oandras.androidsvg.parser.checkState
 import hu.oandras.androidsvg.utils.GradientSpread
 
 //===============================================================================
@@ -31,6 +32,7 @@ import hu.oandras.androidsvg.utils.GradientSpread
 internal interface SvgObject {
     val document: SVGImpl
     val parent: SvgContainer?
+    var id: String?
 
     fun getNodeName(): String
 
@@ -39,6 +41,7 @@ internal interface SvgObject {
     //===============================================================================
     // Any object that can be part of the tree
     open class SvgObjectImpl: SvgObject {
+        override var id: String? = null
         override lateinit var document: SVGImpl
         override var parent: SvgContainer? = null
         override fun getNodeName(): String = ""
@@ -46,8 +49,6 @@ internal interface SvgObject {
 
     // Any object in the tree that corresponds to an SVG element
     abstract class SvgElementBase : SvgObjectImpl() {
-        var id: String? = null
-
         @JvmField
         var spacePreserve: Boolean? = null
 
@@ -90,8 +91,7 @@ internal interface SvgObject {
         }
     }
 
-    // An SVG element that can contain other elements.
-    open class Group : SvgConditionalContainer(), HasTransform {
+    abstract class SvgTransformingConditionalContainer : SvgConditionalContainer(), HasTransform {
         @JvmField
         var transform: Matrix? = null
 
@@ -102,6 +102,10 @@ internal interface SvgObject {
         override fun getTransform(): Matrix? {
             return transform
         }
+    }
+
+    // An SVG element that can contain other elements.
+    open class Group : SvgTransformingConditionalContainer() {
 
         override fun getNodeName(): String {
             return "group"
@@ -115,7 +119,7 @@ internal interface SvgObject {
         var boundingBox: Box? = null
     }
 
-    interface SvgContainer {
+    interface SvgDomParent {
         fun getChildren(): List<SvgObject>
 
         @Throws(SVGParseException::class)
@@ -126,19 +130,21 @@ internal interface SvgObject {
         fun childCount(): Int
     }
 
-    abstract class SvgContainerImpl : SvgElementBase(), SvgContainer {
-        private var _children: ArrayList<SvgObject>? = null
+    interface SvgContainer: SvgObject, SvgDomParent
 
-        final override fun childCount(): Int = _children?.size ?: 0
+    private class SvgChildrenStore: SvgDomParent {
+        private var children: ArrayList<SvgObject>? = null
 
-        protected fun ensureChildList(): ArrayList<SvgObject> {
-            return _children ?: ArrayList<SvgObject>().also {
-                _children = it
+        override fun childCount(): Int = children?.size ?: 0
+
+        private fun ensureChildList(): ArrayList<SvgObject> {
+            return children ?: ArrayList<SvgObject>().also {
+                children = it
             }
         }
 
-        final override fun getChildren(): List<SvgObject> {
-            return _children ?: emptyList()
+        override fun getChildren(): List<SvgObject> {
+            return children ?: emptyList()
         }
 
         override fun addAll(list: List<SvgObject>) {
@@ -150,6 +156,8 @@ internal interface SvgObject {
             ensureChildList().add(elem)
         }
     }
+
+    abstract class SvgContainerImpl : SvgElementBase(), SvgContainer, SvgDomParent by SvgChildrenStore()
 
     // Any element that can appear inside a <switch> element.
     interface SvgConditional {
@@ -169,35 +177,12 @@ internal interface SvgObject {
         override var requiredFonts: Set<String>? = null
     }
 
-    abstract class SvgConditionalContainer : SvgElement(), SvgContainer, SvgConditional {
-
+    abstract class SvgConditionalContainer : SvgElement(), SvgContainer, SvgConditional, SvgDomParent by SvgChildrenStore() {
         override var requiredFeatures: Set<String>? = null
         override var requiredExtensions: String? = null
         override var systemLanguage: Set<String>? = null
         override var requiredFormats: Set<String>? = null
         override var requiredFonts: Set<String>? = null
-
-        private var _children: ArrayList<SvgObject>? = null
-
-        final override fun childCount(): Int = _children?.size ?: 0
-
-        protected fun ensureChildList(): ArrayList<SvgObject> {
-            return _children ?: ArrayList<SvgObject>().also {
-                _children = it
-            }
-        }
-
-        final override fun getChildren(): List<SvgObject> {
-            return _children ?: emptyList()
-        }
-
-        override fun addChild(elem: SvgObject) {
-            ensureChildList().add(elem)
-        }
-
-        override fun addAll(list: List<SvgObject>) {
-            ensureChildList().addAll(list)
-        }
     }
 
     // A <defs> object contains objects that are not rendered directly, but are instead
@@ -208,10 +193,7 @@ internal interface SvgObject {
         }
     }
 
-
-    // One of the element types that can cause graphics to be drawn onto the target canvas.
-    // Specifically: 'circle', 'ellipse', 'image', 'line', 'path', 'polygon', 'polyline', 'rect', 'text' and 'use'.
-    abstract class GraphicsElement : SvgConditionalElement(), HasTransform {
+    sealed class SvgTransformingConditionalElement : SvgConditionalElement(), HasTransform {
         @JvmField
         var transform: Matrix? = null
 
@@ -224,6 +206,9 @@ internal interface SvgObject {
         }
     }
 
+    // One of the element types that can cause graphics to be drawn onto the target canvas.
+    // Specifically: 'circle', 'ellipse', 'image', 'line', 'path', 'polygon', 'polyline', 'rect', 'text' and 'use'.
+    sealed class GraphicsElement : SvgTransformingConditionalElement()
 
     // A linking element (we don't currently do anything with this. It is basically just treated like a Group.)
     class A : Group() {
@@ -255,7 +240,6 @@ internal interface SvgObject {
             return "use"
         }
     }
-
 
     class Path : GraphicsElement() {
         @JvmField
@@ -368,8 +352,10 @@ internal interface SvgObject {
     abstract class TextContainer : SvgConditionalContainer() {
         @Throws(SVGParseException::class)
         override fun addChild(elem: SvgObject) {
-            if (elem is TextChild) ensureChildList().add(elem)
-            else throw SVGParseException("Text content elements cannot contain $elem elements.")
+            checkState(elem is TextChild) {
+                "Text content elements cannot contain $elem elements."
+            }
+            super.addChild(elem)
         }
     }
 
@@ -486,7 +472,7 @@ internal interface SvgObject {
     }
 
 
-    abstract class GradientElement : SvgContainerImpl(), SvgContainer {
+    abstract class GradientElement : SvgContainerImpl() {
 
         @JvmField
         var gradientUnitsAreUser: Boolean? = null
@@ -511,7 +497,7 @@ internal interface SvgObject {
     }
 
 
-    class Stop : SvgContainerImpl(), SvgContainer {
+    class Stop : SvgContainerImpl() {
         @JvmField
         var offset: Float? = null
 
@@ -685,12 +671,391 @@ internal interface SvgObject {
     }
 
 
-    class SolidColor : SvgContainerImpl(), SvgContainer {
+    class SolidColor : SvgContainerImpl() {
         // Not needed right now. Color is set in this.baseStyle.
         //public Length  solidColor;
         //public Length  solidOpacity;
         // Dummy container methods. Stop is officially a container, but we
         // are not interested in any of its possible child elements.
 
+    }
+
+    class Filter : SvgConditionalContainer() {
+        @JvmField
+        var filterUnitsAreUser: Boolean? = null
+
+        @JvmField
+        var primitiveUnitsAreUser: Boolean? = null
+
+        @JvmField
+        var x: CSSLength? = null
+
+        @JvmField
+        var y: CSSLength? = null
+
+        @JvmField
+        var width: CSSLength? = null
+
+        @JvmField
+        var height: CSSLength? = null
+
+        override fun getNodeName(): String {
+            return "filter"
+        }
+    }
+
+    abstract class FilterPrimitive : SvgContainerImpl() {
+        @JvmField
+        var x: CSSLength? = null
+
+        @JvmField
+        var y: CSSLength? = null
+
+        @JvmField
+        var width: CSSLength? = null
+
+        @JvmField
+        var height: CSSLength? = null
+
+        @JvmField
+        var result: String? = null
+
+        @JvmField
+        var `in`: String? = null
+    }
+
+    class FeBlend : FilterPrimitive() {
+        @JvmField
+        var in2: String? = null
+
+        @JvmField
+        var mode: FeBlendMode = FeBlendMode.normal
+
+        override fun getNodeName(): String {
+            return "feBlend"
+        }
+    }
+
+    class FeColorMatrix : FilterPrimitive() {
+        @JvmField
+        var type: FeColorMatrixType = FeColorMatrixType.matrix
+
+        @JvmField
+        var values: FloatArray? = null
+
+        override fun getNodeName(): String {
+            return "feColorMatrix"
+        }
+    }
+
+    class FeComponentTransfer : FilterPrimitive() {
+        override fun getNodeName(): String {
+            return "feComponentTransfer"
+        }
+    }
+
+    class FeFunc : SvgContainerImpl() {
+        enum class Channel { R, G, B, A }
+
+        @JvmField
+        var channel: Channel = Channel.R
+
+        @JvmField
+        var type: FeFuncType = FeFuncType.identity
+
+        @JvmField
+        var tableValues: FloatArray? = null
+
+        @JvmField
+        var slope: Float = 1f
+
+        @JvmField
+        var intercept: Float = 0f
+
+        @JvmField
+        var amplitude: Float = 1f
+
+        @JvmField
+        var exponent: Float = 1f
+
+        @JvmField
+        var offset: Float = 0f
+
+        override fun getNodeName(): String {
+            return when (channel) {
+                Channel.R -> "feFuncR"
+                Channel.G -> "feFuncG"
+                Channel.B -> "feFuncB"
+                Channel.A -> "feFuncA"
+            }
+        }
+    }
+
+    class FeComposite : FilterPrimitive() {
+        @JvmField
+        var in2: String? = null
+
+        @JvmField
+        var operator: FeCompositeOperator = FeCompositeOperator.over
+
+        @JvmField
+        var k1: Float = 0f
+
+        @JvmField
+        var k2: Float = 0f
+
+        @JvmField
+        var k3: Float = 0f
+
+        @JvmField
+        var k4: Float = 0f
+
+        override fun getNodeName(): String {
+            return "feComposite"
+        }
+    }
+
+    class FeConvolveMatrix : FilterPrimitive() {
+        @JvmField
+        var orderX: Int = 3
+
+        @JvmField
+        var orderY: Int = 3
+
+        @JvmField
+        var kernelMatrix: FloatArray? = null
+
+        @JvmField
+        var divisor: Float = 0f
+
+        @JvmField
+        var bias: Float = 0f
+
+        @JvmField
+        var targetX: Int? = null
+
+        @JvmField
+        var targetY: Int? = null
+
+        @JvmField
+        var edgeMode: ConvolveMatrixEdgeMode = ConvolveMatrixEdgeMode.duplicate
+
+        @JvmField
+        var preserveAlpha: Boolean = false
+
+        override fun getNodeName(): String {
+            return "feConvolveMatrix"
+        }
+    }
+
+    class FeDiffuseLighting : FilterPrimitive() {
+        @JvmField
+        var surfaceScale: Float = 1f
+
+        @JvmField
+        var diffuseConstant: Float = 1f
+
+        @JvmField
+        var light: SvgLight? = null
+
+        override fun getNodeName(): String {
+            return "feDiffuseLighting"
+        }
+    }
+
+    class FeSpecularLighting : FilterPrimitive() {
+        @JvmField
+        var surfaceScale: Float = 1f
+
+        @JvmField
+        var specularConstant: Float = 1f
+
+        @JvmField
+        var specularExponent: Float = 1f
+
+        @JvmField
+        var light: SvgLight? = null
+
+        override fun getNodeName(): String {
+            return "feSpecularLighting"
+        }
+    }
+
+    sealed class SvgLight : SvgContainerImpl()
+
+    class FeDistantLight : SvgLight() {
+        @JvmField
+        var azimuth: Float = 0f
+
+        @JvmField
+        var elevation: Float = 0f
+
+        override fun getNodeName(): String {
+            return "feDistantLight"
+        }
+    }
+
+    class FePointLight : SvgLight() {
+        @JvmField
+        var x: Float = 0f
+
+        @JvmField
+        var y: Float = 0f
+
+        @JvmField
+        var z: Float = 0f
+
+        override fun getNodeName(): String {
+            return "fePointLight"
+        }
+    }
+
+    class FeSpotLight : SvgLight() {
+        @JvmField
+        var x: Float = 0f
+
+        @JvmField
+        var y: Float = 0f
+
+        @JvmField
+        var z: Float = 0f
+
+        @JvmField
+        var pointsAtX: Float = 0f
+
+        @JvmField
+        var pointsAtY: Float = 0f
+
+        @JvmField
+        var pointsAtZ: Float = 0f
+
+        @JvmField
+        var limitingConeAngle: Float? = null
+
+        override fun getNodeName(): String {
+            return "feSpotLight"
+        }
+    }
+
+    class FeDisplacementMap : FilterPrimitive() {
+        @JvmField
+        var in2: String? = null
+
+        @JvmField
+        var scale: Float = 0f
+
+        @JvmField
+        var xChannelSelector: FeChannelSelector = FeChannelSelector.A
+
+        @JvmField
+        var yChannelSelector: FeChannelSelector = FeChannelSelector.A
+
+        override fun getNodeName(): String {
+            return "feDisplacementMap"
+        }
+    }
+
+    class FeFlood : FilterPrimitive() {
+        // Properties flood-color and flood-opacity are in the style
+
+        override fun getNodeName(): String {
+            return "feFlood"
+        }
+    }
+
+    class FeGaussianBlur : FilterPrimitive() {
+        @JvmField
+        var stdDeviationX: Float = 0f
+
+        @JvmField
+        var stdDeviationY: Float = 0f
+
+        override fun getNodeName(): String {
+            return "feGaussianBlur"
+        }
+    }
+
+    class FeImage : FilterPrimitive() {
+        @JvmField
+        var href: String? = null
+
+        override fun getNodeName(): String {
+            return "feImage"
+        }
+    }
+
+    class FeMerge : SvgConditionalContainer() {
+        @JvmField
+        var result: String? = null
+
+        override fun getNodeName(): String {
+            return "feMerge"
+        }
+    }
+
+    class FeMergeNode : SvgContainerImpl() {
+        @JvmField
+        var `in`: String? = null
+
+        override fun getNodeName(): String {
+            return "feMergeNode"
+        }
+    }
+
+    class FeOffset : FilterPrimitive() {
+        @JvmField
+        var dx: CSSLength? = null
+
+        @JvmField
+        var dy: CSSLength? = null
+
+        override fun getNodeName(): String {
+            return "feOffset"
+        }
+    }
+
+    class FeTurbulence : FilterPrimitive() {
+        @JvmField
+        var baseFrequencyX: Float = 0f
+
+        @JvmField
+        var baseFrequencyY: Float = 0f
+
+        @JvmField
+        var numOctaves: Int = 1
+
+        @JvmField
+        var seed: Float = 0f
+
+        @JvmField
+        var stitchTiles: FeStitchTiles = FeStitchTiles.noStitch
+
+        @JvmField
+        var type: FeTurbulenceType = FeTurbulenceType.turbulence
+
+        override fun getNodeName(): String {
+            return "feTurbulence"
+        }
+    }
+
+    class FeMorphology : FilterPrimitive() {
+        @JvmField
+        var operator: FeMorphologyOperator = FeMorphologyOperator.erode
+
+        @JvmField
+        var radiusX: Float = 0f
+
+        @JvmField
+        var radiusY: Float = 0f
+
+        override fun getNodeName(): String {
+            return "feMorphology"
+        }
+    }
+
+    class FeTile : FilterPrimitive() {
+        override fun getNodeName(): String {
+            return "feTile"
+        }
     }
 }

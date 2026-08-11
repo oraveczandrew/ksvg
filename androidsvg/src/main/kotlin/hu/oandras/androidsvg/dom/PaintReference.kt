@@ -17,8 +17,6 @@
 
 package hu.oandras.androidsvg.dom
 
-// No imports needed for SvgPaint as it is in the same package
-
 internal class PaintReference(
     @JvmField val href: String,
     @JvmField val fallback: SvgPaint?

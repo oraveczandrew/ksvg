@@ -21,6 +21,7 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.RectF
 import androidx.collection.ArrayMap
@@ -63,19 +64,29 @@ class MockCanvas {
 
 
     @Implementation
-    fun clipRect(left: Int, top: Int, right: Int, bottom: Int): Boolean {
-        this.clipRect.set(left, top, right, bottom)
+    fun clipRect(left: Float, top: Float, right: Float, bottom: Float): Boolean {
+        this.clipRect.set(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
         this.operations.add(
             String.format(
                 Locale.US,
-                "clipRect(%d, %d, %d, %d)",
-                left,
-                top,
-                right,
-                bottom
+                "clipRect(%s, %s, %s, %s)",
+                num(left),
+                num(top),
+                num(right),
+                num(bottom)
             )
         )
         return right > left && bottom > top
+    }
+
+    @Implementation
+    fun clipRect(rect: RectF): Boolean {
+        return clipRect(rect.left, rect.top, rect.right, rect.bottom)
+    }
+
+    @Implementation
+    fun clipRect(rect: Rect): Boolean {
+        return clipRect(rect.left.toFloat(), rect.top.toFloat(), rect.right.toFloat(), rect.bottom.toFloat())
     }
 
     @Implementation
@@ -127,7 +138,12 @@ class MockCanvas {
 
     @Implementation
     fun drawColor(color: Int) {
-        operations.add(String.format(Locale.US, "drawColor(#%06x)", color))
+        operations.add(String.format(Locale.US, "drawColor(#%08x)", color))
+    }
+
+    @Implementation
+    fun drawColor(color: Int, mode: PorterDuff.Mode) {
+        operations.add(String.format(Locale.US, "drawColor(#%08x, %s)", color, mode))
     }
 
     @Implementation
@@ -180,6 +196,11 @@ class MockCanvas {
     fun getMatrix(): Matrix {
         //this.operations.add("getMatrix()");
         return Matrix(this.matrix)
+    }
+
+    @Implementation
+    fun getMatrix(matrix: Matrix) {
+        matrix.set(this.matrix)
     }
 
     @get:Implementation
@@ -319,10 +340,13 @@ class MockCanvas {
     }
 
     @Implementation
-    fun setMatrix(matrix: Matrix) {
-        this.matrix = matrix
+    fun setMatrix(matrix: Matrix?) {
+        this.matrix = Matrix()
+        if (matrix != null) {
+            this.matrix.set(matrix)
+        }
         val m = FloatArray(9)
-        matrix.getValues(m)
+        this.matrix.getValues(m)
         this.operations.add(
             String.format(
                 Locale.US,

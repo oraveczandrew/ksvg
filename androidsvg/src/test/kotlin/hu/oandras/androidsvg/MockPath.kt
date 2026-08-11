@@ -19,6 +19,7 @@ package hu.oandras.androidsvg
 
 import android.graphics.Matrix
 import android.graphics.Path
+import android.graphics.RectF
 import hu.oandras.androidsvg.utils.forEachElement
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
@@ -34,11 +35,43 @@ import java.util.Locale
 class MockPath {
     private var path: ArrayList<String> = ArrayList()
     private var transforms: ArrayList<Matrix>? = null
+    private var fillType: Path.FillType = Path.FillType.WINDING
 
 
     @Implementation
     fun __constructor__() {
         path.clear()
+        transforms = null
+        fillType = Path.FillType.WINDING
+    }
+
+    @Implementation
+    fun __constructor__(src: Path) {
+        val shadow = src.asShadow()
+        this.path = ArrayList(shadow.path)
+        this.transforms = shadow.transforms?.let { ArrayList(it) }
+        this.fillType = shadow.fillType
+    }
+
+    @Implementation
+    fun reset() {
+        path.clear()
+        transforms = null
+    }
+
+    @Implementation
+    fun isEmpty(): Boolean {
+        return path.isEmpty()
+    }
+
+    @Implementation
+    fun setFillType(ft: Path.FillType) {
+        this.fillType = ft
+    }
+
+    @Implementation
+    fun getFillType(): Path.FillType {
+        return this.fillType
     }
 
     @Implementation
@@ -77,7 +110,26 @@ class MockPath {
         path.add("Z")
     }
 
+    @Implementation
+    fun addPath(src: Path) {
+        path.addAll(src.asShadow().path)
+    }
 
+    @Implementation
+    fun addPath(src: Path, matrix: Matrix) {
+        // For simplicity, we just add the path description and apply a transform to it later if needed.
+        // But for mock purposes, we can just say we added the path.
+        path.add("addPath(" + src.asShadow().pathDescription + ", " + matrix + ")")
+    }
+
+    @Implementation
+    fun computeBounds(bounds: RectF, exact: Boolean) {
+        // Mock implementation: we can't easily compute bounds from string path.
+        // Set some dummy bounds or try to keep them empty.
+        bounds.set(0f, 0f, 0f, 0f)
+    }
+
+    @Suppress("SameReturnValue")
     @Implementation
     fun op(otherPath: Path, op: Path.Op): Boolean {
         val mockOtherPath = otherPath.asShadow()
@@ -92,20 +144,32 @@ class MockPath {
         when (op) {
             Path.Op.UNION -> path.add("\u222a")
             Path.Op.INTERSECT -> path.add("\u2229")
-            else -> {}
+            Path.Op.DIFFERENCE -> path.add("\u2212")
+            Path.Op.REVERSE_DIFFERENCE -> path.add("rev\u2212")
+            Path.Op.XOR -> path.add("\u2295")
         }
         path.addAll(mockOtherPath.path)
         path.add(")")
         return true
     }
 
-
     @Implementation
     fun transform(matrix: Matrix) {
+        if (matrix.isIdentity) return
         val transforms = transforms ?: ArrayList<Matrix>().also {
             transforms = it
         }
-        transforms.add(matrix)
+        transforms.add(Matrix(matrix))
+    }
+
+    @Implementation
+    fun transform(matrix: Matrix, dst: Path?) {
+        val shadow = this
+        val newPath = dst ?: Path()
+        val newShadow = newPath.asShadow()
+        newShadow.path = ArrayList(shadow.path)
+        newShadow.transforms = shadow.transforms?.let { ArrayList(it) }
+        newShadow.transform(matrix)
     }
 
 

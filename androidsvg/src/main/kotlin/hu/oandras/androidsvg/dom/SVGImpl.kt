@@ -48,6 +48,7 @@ import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
 
+internal const val COLOR_WHITE: Int = 0xFFFFFFFF.toInt()
 internal const val COLOR_BLACK: Int = -0x1000000
 
 /**
@@ -125,7 +126,7 @@ internal class SVGImpl internal constructor(
     private val cssRules = Ruleset()
 
     // Map from id attribute to element
-    private val idToElementMap: ArrayMap<String, SvgObject.SvgElementBase?> = ArrayMap()
+    private val idToElementMap: ArrayMap<String, SvgObject> = ArrayMap()
 
     //===============================================================================
     // SVG document rendering to a Picture object (indirect rendering)
@@ -741,7 +742,7 @@ internal class SVGImpl internal constructor(
         this.desc = desc
     }
 
-    internal fun getElementById(id: String?): SvgObject.SvgElementBase? {
+    internal fun getElementById(id: String?): SvgObject? {
         if (id.isNullOrEmpty()) return null
 
         val rootElement = requireRootElement()
@@ -756,9 +757,8 @@ internal class SVGImpl internal constructor(
         }
     }
 
-    private fun getElementById(obj: SvgObject.SvgContainer?, id: String): SvgObject.SvgElementBase? {
-        val elem = obj as SvgObject.SvgElementBase
-        if (id == elem.id) return elem
+    private fun getElementById(obj: SvgObject.SvgContainer, id: String): SvgObject? {
+        if (id == obj.id) return obj
         obj.getChildren().forEachElement { child ->
             if (child !is SvgObject.SvgElementBase) {
                 return@forEachElement
@@ -769,7 +769,7 @@ internal class SVGImpl internal constructor(
             }
 
             if (child is SvgObject.SvgContainer) {
-                val found = getElementById(child as SvgObject.SvgContainer, id)
+                val found = getElementById(child, id)
                 if (found != null) {
                     return found
                 }

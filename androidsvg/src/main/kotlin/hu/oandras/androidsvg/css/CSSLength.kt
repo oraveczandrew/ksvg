@@ -18,7 +18,7 @@
 package hu.oandras.androidsvg.css
 
 import hu.oandras.androidsvg.render.RenderContext
-import kotlin.math.sqrt
+import kotlin.math.hypot
 
 private const val SQRT2 = 1.414213562373095
 
@@ -39,17 +39,17 @@ internal data class CSSLength(
     }
 
     // Convert length to user units for a horizontally-related context.
-    fun floatValueX(renderer: RenderContext): Float {
+    fun floatValueX(renderContext: RenderContext): Float {
         return when (unit) {
-            CssUnit.em -> value * renderer.currentFontSize
-            CssUnit.ex -> value * renderer.currentFontXHeight
-            CssUnit.`in` -> value * renderer.dPI
-            CssUnit.cm -> value * renderer.dPI / 2.54f
-            CssUnit.mm -> value * renderer.dPI / 25.4f
-            CssUnit.pt -> value * renderer.dPI / 72f
-            CssUnit.pc -> value * renderer.dPI / 6f
+            CssUnit.em -> value * renderContext.currentFontSize
+            CssUnit.ex -> value * renderContext.currentFontXHeight
+            CssUnit.`in` -> value * renderContext.dPI
+            CssUnit.cm -> value * renderContext.dPI / 2.54f
+            CssUnit.mm -> value * renderContext.dPI / 25.4f
+            CssUnit.pt -> value * renderContext.dPI / 72f
+            CssUnit.pc -> value * renderContext.dPI / 6f
             CssUnit.percent -> {
-                val viewPortUser = renderer.effectiveViewPortInUserUnits
+                val viewPortUser = renderContext.effectiveViewPortInUserUnits
 
                 value * viewPortUser.width / 100f
             }
@@ -59,41 +59,41 @@ internal data class CSSLength(
     }
 
     // Convert length to user units for a vertically-related context.
-    fun floatValueY(renderer: RenderContext): Float {
+    fun floatValueY(renderContext: RenderContext): Float {
         return if (unit == CssUnit.percent) {
-            val viewPortUser = renderer.effectiveViewPortInUserUnits
+            val viewPortUser = renderContext.effectiveViewPortInUserUnits
 
             value * viewPortUser.height / 100f
         } else {
-            floatValueX(renderer)
+            floatValueX(renderContext)
         }
     }
 
     // Convert length to user units for a context that is not orientation specific.
     // For example, stroke width.
-    fun floatValue(renderer: RenderContext): Float {
+    fun floatValue(renderContext: RenderContext): Float {
         return if (unit == CssUnit.percent) {
-            val viewPortUser = renderer.effectiveViewPortInUserUnits
+            val viewPortUser = renderContext.effectiveViewPortInUserUnits
 
             val w = viewPortUser.width
             val h = viewPortUser.height
             if (w == h) value * w / 100f
             else {
-                val n = (sqrt((w * w + h * h).toDouble()) / SQRT2).toFloat() // see spec section 7.10
+                val n = (hypot(w, h) / SQRT2).toFloat() // see spec section 7.10
                 value * n / 100f
             }
         } else {
-            floatValueX(renderer)
+            floatValueX(renderContext)
         }
     }
 
     // Convert length to user units for a context that is not orientation specific.
     // For percentage values, use the given 'max' parameter to represent the 100% value.
-    fun floatValue(renderer: RenderContext, max: Float): Float {
+    fun floatValue(renderContext: RenderContext, max: Float): Float {
         return if (unit == CssUnit.percent) {
             value * max / 100f
         } else {
-            floatValueX(renderer)
+            floatValueX(renderContext)
         }
     }
 

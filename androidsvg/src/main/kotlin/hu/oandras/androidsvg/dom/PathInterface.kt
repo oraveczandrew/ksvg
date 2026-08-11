@@ -17,8 +17,6 @@
 
 package hu.oandras.androidsvg.dom
 
-//===============================================================================
-// Path definition
 internal interface PathInterface {
     fun moveTo(x: Float, y: Float)
     fun lineTo(x: Float, y: Float)
