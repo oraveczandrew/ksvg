@@ -16,112 +16,27 @@
  */
 package hu.oandras.ksvg.css
 
-import android.util.ArrayMap
 import android.util.Log
 import hu.oandras.ksvg.BuildConfig
-import hu.oandras.ksvg.SVGExternalFileResolver
-import hu.oandras.ksvg.dom.Style
-import hu.oandras.ksvg.dom.SvgObject
-import hu.oandras.ksvg.dom.SvgObject.SvgContainer
-import hu.oandras.ksvg.dom.SvgObject.SvgElementBase
+import hu.oandras.ksvg.ExternalFileResolver
+import hu.oandras.ksvg.dom.core.Container
+import hu.oandras.ksvg.dom.core.ElementBase
+import hu.oandras.ksvg.dom.core.SvgObject
+import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.parser.checkCssState
 import hu.oandras.ksvg.utils.forEachElement
-import java.util.LinkedList
-import java.util.Locale
-import kotlin.math.sign
 
 /**
  * A very simple CSS parser that is not entirely compliant with the CSS spec but
  * hopefully parses almost all the CSS we are likely to strike in an SVG file.
  */
-@Suppress("EnumEntryName")
 internal class CSSParser internal constructor(
     private val deviceMediaType: MediaType = MediaType.screen, // Where these rules came from (Parser or RenderOptions)
     private val source: Source = Source.Document,
-    private val externalFileResolver: SVGExternalFileResolver? = null
+    private val externalFileResolver: ExternalFileResolver? = null
 ) {
 
     private var inMediaRule = false
-
-
-    @Suppress("unused")
-    internal enum class MediaType {
-        all,
-        aural,  // deprecated
-        braille,  // deprecated
-        embossed,  // deprecated
-        handheld,  // deprecated
-        print,
-        projection,  // deprecated
-        screen,
-        speech,
-        tty,  // deprecated
-        tv // deprecated
-    }
-
-    internal enum class Combinator {
-        DESCENDANT,  // E F
-        CHILD,  // E > F
-        FOLLOWS // E + F
-    }
-
-    internal enum class AttribOp {
-        EXISTS,  // *[foo]
-        EQUALS,  // *[foo=bar]
-        INCLUDES,  // *[foo~=bar]
-        DASHMATCH,  // *[foo|=bar]
-    }
-
-    // Supported SVG attributes
-    internal enum class PseudoClassIdentifiers {
-        target,
-        root,
-        nth_child,
-        nth_last_child,
-        nth_of_type,
-        nth_last_of_type,
-        first_child,
-        last_child,
-        first_of_type,
-        last_of_type,
-        only_child,
-        only_of_type,
-        empty,
-        not,
-
-        // Others from  Selectors 3 (and earlier)
-        // Supported but always fail to match.
-        lang,  // might support later
-        link, visited, hover, active, focus, enabled, disabled, checked, indeterminate,  // Added in Selectors 4 spec
-        // Might support these later
-        //matches,
-        //something,  // Not final name(?)
-        //has,
-        //dir,  might support later
-        //target_within,
-        //blank,
-
-        // Operators from Selectors 4
-        // any-link, local-link, scope, focus-visible, focus-within, drop, current, past,
-        // future, playing, paused, read-only, read-write, placeholder-shown, default, valid, invalid,
-        // in-range, out-of-range, required, optional, user-invalid, nth-col, nth-last-col
-        UNSUPPORTED;
-
-        companion object {
-            private val cache: Map<String, PseudoClassIdentifiers> = ArrayMap<String, PseudoClassIdentifiers>(entries.size - 1).apply {
-                for (attr in PseudoClassIdentifiers.entries) {
-                    if (attr != UNSUPPORTED) {
-                        val key = attr.name.replace('_', '-')
-                        this[key] = attr
-                    }
-                }
-            }
-
-            @JvmStatic
-            fun fromString(str: String?): PseudoClassIdentifiers {
-                return cache[str] ?: UNSUPPORTED
-            }
-        }
-    }
 
     internal class Attrib(
         @JvmField
@@ -171,7 +86,7 @@ internal class CSSParser internal constructor(
                         append("+ ")
                     }
 
-                    else -> {}
+                    Combinator.DESCENDANT -> {}
                 }
 
                 append(tag ?: "*")
@@ -182,7 +97,7 @@ internal class CSSParser internal constructor(
                     when (attr.operation) {
                         AttribOp.EQUALS -> append('=').append(attr.value)
                         AttribOp.INCLUDES -> append("~=").append(attr.value)
-                        AttribOp.DASHMATCH -> append("|=").append(attr.value)
+                        AttribOp.DASH_MATCH -> append("|=").append(attr.value)
                         else -> {}
                     }
                     append(']')
@@ -192,73 +107,6 @@ internal class CSSParser internal constructor(
                     append(':').append(pseudo)
                 }
             }
-        }
-    }
-
-    internal class Ruleset {
-
-        private var _rules: MutableList<Rule>? = null
-
-        val rules: List<Rule>
-            get() = _rules ?: emptyList()
-
-        // Add a rule to the ruleset. The position at which it is inserted is determined by its specificity value.
-        fun add(rule: Rule) {
-            val rules = _rules ?: LinkedList<Rule>().also {
-                this._rules = it
-            }
-
-            for (i in rules.indices) {
-                val nextRule = rules[i]
-
-                if (nextRule.selector.specificity > rule.selector.specificity) {
-                    rules.add(i, rule)
-                    return
-                }
-            }
-
-            rules.add(rule)
-        }
-
-        fun addAll(set: Ruleset) {
-            set._rules?.forEachElement { rule ->
-                add(rule)
-            }
-        }
-
-        /**
-         * Remove all rules that were added from a given Source.
-         */
-        fun removeFromSource(sourceToBeRemoved: Source?) {
-            val rules = _rules ?: return
-            for (i in rules.indices.reversed()) {
-                if (rules[i].source == sourceToBeRemoved) {
-                    rules.removeAt(i)
-                }
-            }
-        }
-
-        override fun toString(): String {
-            return _rules?.joinToString("\n").orEmpty()
-        }
-    }
-
-
-    enum class Source {
-        Document,
-        RenderOptions
-    }
-
-    internal class Rule internal constructor(
-        @JvmField
-        val selector: Selector,
-        @JvmField
-        val style: Style,
-        @JvmField
-        val source: Source
-    ) {
-        override fun toString(): String {
-            return "$selector {...} (src=$source)"
         }
     }
 
@@ -317,7 +165,7 @@ internal class CSSParser internal constructor(
 
     internal constructor(
         source: Source,
-        externalFileResolver: SVGExternalFileResolver?
+        externalFileResolver: ExternalFileResolver?
     ) : this(
         deviceMediaType = MediaType.screen,
         source = source,
@@ -325,7 +173,7 @@ internal class CSSParser internal constructor(
     )
 
 
-    internal fun parse(sheet: String): Ruleset {
+    internal fun parse(sheet: String): CSSRuleset {
         val scan = CSSTextScanner(sheet)
         scan.skipWhitespace()
 
@@ -333,13 +181,13 @@ internal class CSSParser internal constructor(
     }
 
     @Throws(CSSParseException::class)
-    private fun parseAtRule(ruleset: Ruleset, scan: CSSTextScanner) {
+    private fun parseAtRule(ruleset: CSSRuleset, scan: CSSTextScanner) {
         val atKeyword = scan.nextIdentifier()
         scan.skipWhitespace()
-        if (atKeyword == null) throw CSSParseException("Invalid '@' rule")
+        checkCssState(atKeyword != null) { "Invalid '@' rule" }
         if (!inMediaRule && atKeyword == "media") {
             val mediaList = parseMediaList(scan)
-            if (!scan.consume('{')) throw CSSParseException("Invalid @media rule: missing rule set")
+            checkCssState(scan.consume('{')) { "Invalid @media rule: missing rule set" }
 
             scan.skipWhitespace()
             if (mediaMatches(mediaList, deviceMediaType)) {
@@ -350,7 +198,7 @@ internal class CSSParser internal constructor(
                 parseRuleset(scan) // parse and ignore accompanying ruleset
             }
 
-            if (!scan.empty() && !scan.consume('}')) throw CSSParseException("Invalid @media rule: expected '}' at end of rule set")
+            if (!scan.empty()) checkCssState(scan.consume('}')) { "Invalid @media rule: expected '}' at end of rule set" }
         } else if (!inMediaRule && atKeyword == "import") {
             val file = scan.nextURL()
                 ?: scan.nextCSSString()
@@ -359,7 +207,7 @@ internal class CSSParser internal constructor(
             scan.skipWhitespace()
             val mediaList = parseMediaList(scan)
 
-            if (!scan.empty() && !scan.consume(';')) throw CSSParseException("Invalid @media rule: expected '}' at end of rule set")
+            if (!scan.empty()) checkCssState(scan.consume(';')) { "Invalid @media rule: expected '}' at end of rule set" }
 
             if (externalFileResolver != null && mediaMatches(mediaList, deviceMediaType)) {
                 val css = externalFileResolver.resolveCSSStyleSheet(file) ?: return
@@ -379,17 +227,19 @@ internal class CSSParser internal constructor(
         var depth = 0
         while (!scan.empty()) {
             val ch = scan.nextChar()
-            if (ch == ';' && depth == 0) return
-            if (ch == '{') depth++
-            else if (ch == '}' && depth > 0) {
-                if (--depth == 0) return
+            when (ch) {
+                ';' -> if (depth == 0) return
+                '{' -> depth++
+                '}' -> if (depth > 0) {
+                    if (--depth == 0) return
+                }
             }
         }
     }
 
 
-    private fun parseRuleset(scan: CSSTextScanner): Ruleset {
-        val ruleset = Ruleset()
+    private fun parseRuleset(scan: CSSTextScanner): CSSRuleset {
+        val ruleset = CSSRuleset()
         try {
             while (!scan.empty()) {
                 if (scan.consume("<!--")) continue
@@ -413,15 +263,15 @@ internal class CSSParser internal constructor(
 
 
     @Throws(CSSParseException::class)
-    private fun parseRule(ruleset: Ruleset, scan: CSSTextScanner): Boolean {
+    private fun parseRule(ruleset: CSSRuleset, scan: CSSTextScanner): Boolean {
         val selectors = scan.nextSelectorGroup()
         return if (!selectors.isNullOrEmpty()) {
-            if (!scan.consume('{')) throw CSSParseException("Malformed rule block: expected '{'")
+            checkCssState(scan.consume('{')) { "Malformed rule block: expected '{'" }
             scan.skipWhitespace()
             val ruleStyle = parseDeclarations(scan)
             scan.skipWhitespace()
             selectors.forEachElement { selector ->
-                ruleset.add(Rule(selector, ruleStyle, source))
+                ruleset.add(CSSRule(selector, ruleStyle, source))
             }
             true
         } else {
@@ -433,29 +283,28 @@ internal class CSSParser internal constructor(
     // Parse a list of CSS declarations
     @Throws(CSSParseException::class)
     private fun parseDeclarations(scan: CSSTextScanner): Style {
-        val ruleStyle = Style()
+        val styleBuilder = Style().toBuilder()
         do {
             val propertyName = scan.nextIdentifier()
             scan.skipWhitespace()
-            if (!scan.consume(':')) throw CSSParseException("Expected ':'")
+            checkCssState(scan.consume(':')) { "Expected ':'" }
             scan.skipWhitespace()
             val propertyValue = scan.nextPropertyValue() ?: throw CSSParseException("Expected property value")
             // Check for !important flag.
             scan.skipWhitespace()
             if (scan.consume('!')) {
                 scan.skipWhitespace()
-                if (!scan.consume("important")) {
-                    throw CSSParseException("Malformed rule set: found unexpected '!'")
-                }
+                checkCssState(scan.consume("important")) { "Malformed rule set: found unexpected '!'" }
                 // We don't do anything with these. We just ignore them. TODO
                 scan.skipWhitespace()
             }
             scan.consume(';')
-            // TODO: support CSS only values such as "inherit"
-            Style.processStyleProperty(ruleStyle, propertyName, propertyValue, false)
+            // 'inherit', 'unset' and 'initial' are handled in Style.processStyleProperty.
+            // TODO: 'revert' could reuse the same early-return (≈ 'unset'); full spec compliance would require origin-aware cascade resolution, which is heavy and rarely needed in SVG.
+            Style.processStyleProperty(styleBuilder, propertyName, propertyValue, false)
             scan.skipWhitespace()
         } while (!scan.empty() && !scan.consume('}'))
-        return ruleStyle
+        return styleBuilder.build()
     }
 
 
@@ -478,199 +327,6 @@ internal class CSSParser internal constructor(
             } else {
                 ""
             }
-        }
-    }
-
-
-    //==============================================================================
-    internal interface PseudoClass {
-        fun matches(ruleMatchContext: RuleMatchContext?, obj: SvgElementBase): Boolean
-    }
-
-    internal class PseudoClassAnPlusB(
-        private val a: Int,
-        private val b: Int,
-        private val isFromStart: Boolean,
-        private val isOfType: Boolean, // The node name for when isOfType is true
-        private val nodeName: String?
-    ) : PseudoClass {
-        override fun matches(ruleMatchContext: RuleMatchContext?, obj: SvgElementBase): Boolean {
-            // If this is a "*-of-type" pseudoclass, and the node name hasn't been specified,
-            // then match true if the element being tested is first of its type
-            val nodeNameToCheck = if (isOfType && nodeName == null) obj.getNodeName() else nodeName
-
-            // Initialize with correct values for root element
-            var childPos = 0
-            var childCount = 1
-
-            // If this is not the root element, then determine
-            // this objects sibling position and total sibling count
-            obj.parent?.let { parent ->
-                childCount = 0
-                parent.getChildren().forEachElement { node ->
-                    val child = node as SvgElementBase // This should be safe. We shouldn't be styling any SvgObject that isn't an element.
-                    if (child === obj) {
-                        childPos = childCount
-                    }
-                    if (nodeNameToCheck == null || child.getNodeName() == nodeNameToCheck) {
-                        childCount++ // this is a child of the right type
-                    }
-                }
-            }
-
-            childPos = if (isFromStart) {
-                childPos + 1 // nth-child positions start at 1, not 0
-            } else {
-                childCount - childPos // for nth-last-child() type pseudo classes
-            }
-
-            // Check if an + b == childPos.  The test is true for any n >= 0.
-            // So rearranging fo n we get: n = (childPos - b) / a
-            if (a == 0) {
-                // a is zero for pseudo classes like: nth-child(b)
-                // So we match if childPos == b
-                return childPos == b
-            }
-            // Otherwise we match if ((childPos - b) / a) is an integer (modulus is 0) and is >= 0
-            val diff = childPos - b
-            return diff % a == 0 && (diff == 0 || diff.sign == a.sign) // Faster equivalent of (diff / a) >= 0;
-        }
-
-        override fun toString(): String {
-            val last = if (isFromStart) "" else "last-"
-            return if (isOfType) String.format(
-                Locale.US,
-                "nth-%schild(%dn%+d of type <%s>)",
-                last,
-                a,
-                b,
-                nodeName
-            ) else String.format(
-                Locale.US, "nth-%schild(%dn%+d)", last, a, b
-            )
-        }
-    }
-
-
-    internal class PseudoClassOnlyChild(
-        private val isOfType: Boolean, // The node name for when isOfType is true
-        private val nodeName: String?
-    ) : PseudoClass {
-        override fun matches(ruleMatchContext: RuleMatchContext?, obj: SvgElementBase): Boolean {
-            // If this is a "*-of-type" pseudoclass, and the node name hasn't been specified,
-            // then match true if the element being tested is first of its type
-            val nodeNameToCheck = if (isOfType && nodeName == null) obj.getNodeName() else nodeName
-
-            // Initialize with correct values for root element
-            var childCount = 1
-
-            // If this is not the root element, then determine
-            // this objects sibling position and total sibling count
-            val parent = obj.parent
-            if (parent != null) {
-                childCount = 0
-                parent.getChildren().forEachElement { node ->
-                    val child = node as SvgElementBase // This should be safe. We shouldn't be styling any SvgObject that isn't an element.
-                    if (nodeNameToCheck == null || child.getNodeName() == nodeNameToCheck) {
-                        childCount++ // this is a child of the right type
-                    }
-                }
-            }
-
-            return childCount == 1
-        }
-
-        override fun toString(): String {
-            return if (isOfType) {
-                String.format("only-of-type <%s>", nodeName)
-            } else {
-                "only-child"
-            }
-        }
-    }
-
-
-    internal class PseudoClassRoot : PseudoClass {
-        override fun matches(ruleMatchContext: RuleMatchContext?, obj: SvgElementBase): Boolean {
-            return obj.parent == null
-        }
-
-        override fun toString(): String {
-            return "root"
-        }
-    }
-
-    internal class PseudoClassEmpty : PseudoClass {
-        override fun matches(ruleMatchContext: RuleMatchContext?, obj: SvgElementBase): Boolean {
-            //return (obj.getChildren().length == 0;
-
-            // temp implementation
-
-            return obj !is SvgContainer || obj.getChildren().isEmpty()
-            // FIXME  all SVG graphics elements can have children, although for now we drop and ignore
-            // them. This will be fixed when implement the DOM.  For now return true.
-        }
-
-        override fun toString(): String {
-            return "empty"
-        }
-    }
-
-
-    internal class PseudoClassNot(
-        private val selectorGroup: List<Selector>
-    ) : PseudoClass {
-
-        override fun matches(ruleMatchContext: RuleMatchContext?, obj: SvgElementBase): Boolean {
-            // If this element matches any of the selectors in the simpleSelectors group
-            // provided to not, then :not fails to match.
-            selectorGroup.forEachElement { selector ->
-                if (ruleMatch(ruleMatchContext, selector, obj)) {
-                    return false
-                }
-            }
-
-            return true
-        }
-
-        val specificity: Int
-            get() {
-                // The specificity of :not is the highest specificity of the selectors in its simpleSelectors parameter list
-                var highest = Int.MIN_VALUE
-
-                selectorGroup.forEachElement { selector ->
-                    if (selector.specificity > highest) {
-                        highest = selector.specificity
-                    }
-                }
-
-                return highest
-            }
-
-        override fun toString(): String {
-            return "not($selectorGroup)"
-        }
-    }
-
-
-    internal class PseudoClassTarget : PseudoClass {
-        override fun matches(ruleMatchContext: RuleMatchContext?, obj: SvgElementBase): Boolean {
-            return ruleMatchContext != null && obj === ruleMatchContext.targetElement
-        }
-
-        override fun toString(): String {
-            return "target"
-        }
-    }
-
-
-    internal class PseudoClassNotSupported(private val clazz: String) : PseudoClass {
-        override fun matches(ruleMatchContext: RuleMatchContext?, obj: SvgElementBase): Boolean {
-            return false
-        }
-
-        override fun toString(): String {
-            return clazz
         }
     }
 
@@ -702,19 +358,6 @@ internal class CSSParser internal constructor(
         }
 
 
-        /*
-       private static void  error(String format, Object... args)
-       {
-          Log.e(TAG, String.format(format, args));
-       }
-
-
-       private static void  debug(String format, Object... args)
-       {
-          if (LibConfig.DEBUG)
-             Log.d(TAG, String.format(format, args));
-       }
-       */
         //==============================================================================
         // Returns true if 'deviceMediaType' matches one of the media types in 'mediaList'
         private fun mediaMatches(
@@ -773,17 +416,18 @@ internal class CSSParser internal constructor(
         /**
          * Used by renderer to check if a CSS rule matches the current element.
          */
-        @JvmStatic
         internal fun ruleMatch(
             ruleMatchContext: RuleMatchContext?,
             selector: Selector,
-            obj: SvgElementBase
+            obj: ElementBase
         ): Boolean {
             // Check the most common case first as a shortcut.
-            if (selector.size() == 1) return selectorMatch(ruleMatchContext, selector.get(0), obj)
+            if (selector.size() == 1) {
+                return selectorMatch(ruleMatchContext, selector.get(0), obj)
+            }
 
             // Build the list of ancestor objects
-            val ancestors: MutableList<SvgContainer> = ArrayList()
+            val ancestors: MutableList<Container> = ArrayList()
             var parent = obj.parent
             while (parent != null) {
                 ancestors.add(parent)
@@ -805,131 +449,157 @@ internal class CSSParser internal constructor(
             )
         }
 
-
         private fun ruleMatch(
             ruleMatchContext: RuleMatchContext?,
             selector: Selector,
             selPartPos: Int,
-            ancestors: MutableList<SvgContainer>,
+            ancestors: MutableList<Container>,
             ancestorsPos: Int,
-            obj: SvgElementBase
+            obj: ElementBase
         ): Boolean {
             // We start at the last part of the simpleSelectors and loop back through the parts
             // Get the next simpleSelectors part
-            var ancestorsPos = ancestorsPos
             val sel = selector.get(selPartPos)
-            if (!selectorMatch(ruleMatchContext, sel, obj)) return false
-
-            // Selector part matched, check its combinator
-            when (sel.combinator) {
+            return selectorMatch(
+                ruleMatchContext = ruleMatchContext,
+                sel = sel,
+                obj = obj
+            ) && when (sel.combinator) {
                 Combinator.DESCENDANT -> {
-                    if (selPartPos == 0) return true
-                    // Search up the ancestors list for a node that matches the next simpleSelectors
-                    while (ancestorsPos >= 0) {
-                        if (ruleMatchOnAncestors(
-                                ruleMatchContext,
-                                selector,
-                                selPartPos - 1,
-                                ancestors,
-                                ancestorsPos
-                            )
-                        ) return true
-                        ancestorsPos--
+                    if (selPartPos == 0) {
+                        true
+                    } else {
+                        var match = false
+                        // Search up the ancestors list for a node that matches the next simpleSelectors
+                        var ancestorsPos = ancestorsPos
+                        while (ancestorsPos >= 0) {
+                            if (ruleMatchOnAncestors(
+                                    ruleMatchContext = ruleMatchContext,
+                                    selector = selector,
+                                    selPartPos = selPartPos - 1,
+                                    ancestors = ancestors,
+                                    ancestorsPos = ancestorsPos
+                                )
+                            ) {
+                                match = true
+                                break
+                            }
+                            ancestorsPos--
+                        }
+                        match
                     }
-                    return false
                 }
 
                 Combinator.CHILD -> {
-                    return ruleMatchOnAncestors(
-                        ruleMatchContext,
-                        selector,
-                        selPartPos - 1,
-                        ancestors,
-                        ancestorsPos
+                    ruleMatchOnAncestors(
+                        ruleMatchContext = ruleMatchContext,
+                        selector = selector,
+                        selPartPos = selPartPos - 1,
+                        ancestors = ancestors,
+                        ancestorsPos = ancestorsPos
                     )
                 }
 
-                else  //if (sel.combinator == Combinator.FOLLOWS)
-                    -> {
-                    val childPos: Int = getChildPosition(ancestors, ancestorsPos, obj)
-                    if (childPos <= 0) return false
-                    val prevSibling = obj.parent!!.getChildren()[childPos - 1] as SvgElementBase
-                    return ruleMatch(
-                        ruleMatchContext,
-                        selector,
-                        selPartPos - 1,
-                        ancestors,
-                        ancestorsPos,
-                        prevSibling
+                Combinator.FOLLOWS -> {
+                    matchPreviousSibling(
+                        ruleMatchContext = ruleMatchContext,
+                        selector = selector,
+                        selPartPos = selPartPos,
+                        ancestors = ancestors,
+                        ancestorsPos = ancestorsPos,
+                        obj = obj
                     )
                 }
             }
         }
-
 
         private fun ruleMatchOnAncestors(
             ruleMatchContext: RuleMatchContext?,
             selector: Selector,
             selPartPos: Int,
-            ancestors: MutableList<SvgContainer>,
+            ancestors: MutableList<Container>,
             ancestorsPos: Int
         ): Boolean {
-            var ancestorsPos = ancestorsPos
             val sel = selector.get(selPartPos)
-            val obj = ancestors[ancestorsPos] as SvgElementBase
+            val obj: ElementBase = ancestors[ancestorsPos] as ElementBase
 
-            if (!selectorMatch(ruleMatchContext, sel, obj)) return false
-
-            // Selector part matched, check its combinator
-            when (sel.combinator) {
+            return selectorMatch(
+                ruleMatchContext = ruleMatchContext,
+                sel = sel,
+                obj = obj
+            ) && when (sel.combinator) {
                 Combinator.DESCENDANT -> {
-                    if (selPartPos == 0) return true
-                    // Search up the ancestors list for a node that matches the next simpleSelectors
-                    while (ancestorsPos > 0) {
-                        if (ruleMatchOnAncestors(
-                                ruleMatchContext,
-                                selector,
-                                selPartPos - 1,
-                                ancestors,
-                                --ancestorsPos
-                            )
-                        ) return true
+                    if (selPartPos == 0) {
+                        true
+                    } else {
+                        // Search up the ancestors list for a node that matches the next simpleSelectors
+                        var match = false
+                        var ancestorsPos = ancestorsPos
+                        while (ancestorsPos > 0) {
+                            if (ruleMatchOnAncestors(
+                                    ruleMatchContext = ruleMatchContext,
+                                    selector = selector,
+                                    selPartPos = selPartPos - 1,
+                                    ancestors = ancestors,
+                                    ancestorsPos = --ancestorsPos
+                                )
+                            ) {
+                                match = true
+                                break
+                            }
+                        }
+                        match
                     }
-                    return false
                 }
 
                 Combinator.CHILD -> {
-                    return ruleMatchOnAncestors(
-                        ruleMatchContext,
-                        selector,
-                        selPartPos - 1,
-                        ancestors,
-                        ancestorsPos - 1
+                    ruleMatchOnAncestors(
+                        ruleMatchContext = ruleMatchContext,
+                        selector = selector,
+                        selPartPos = selPartPos - 1,
+                        ancestors = ancestors,
+                        ancestorsPos = ancestorsPos - 1
                     )
                 }
 
-                else  //if (sel.combinator == Combinator.FOLLOWS)
-                    -> {
-                    val childPos: Int = getChildPosition(ancestors, ancestorsPos, obj)
-                    if (childPos <= 0) return false
-                    val prevSibling = obj.parent!!.getChildren()[childPos - 1] as SvgElementBase
-                    return ruleMatch(
-                        ruleMatchContext,
-                        selector,
-                        selPartPos - 1,
-                        ancestors,
-                        ancestorsPos,
-                        prevSibling
+                Combinator.FOLLOWS -> {
+                    matchPreviousSibling(
+                        ruleMatchContext = ruleMatchContext,
+                        selector = selector,
+                        selPartPos = selPartPos,
+                        ancestors = ancestors,
+                        ancestorsPos = ancestorsPos,
+                        obj = obj
                     )
                 }
             }
         }
 
+        private fun matchPreviousSibling(
+            ruleMatchContext: RuleMatchContext?,
+            selector: Selector,
+            selPartPos: Int,
+            ancestors: MutableList<Container>,
+            ancestorsPos: Int,
+            obj: ElementBase
+        ): Boolean {
+            val childPos = getChildPosition(ancestors, ancestorsPos, obj)
+            if (childPos <= 0) return false
+            val prevSibling = obj.parent!!.getChildren()[childPos - 1] as ElementBase
+            return ruleMatch(
+                ruleMatchContext = ruleMatchContext,
+                selector = selector,
+                selPartPos = selPartPos - 1,
+                ancestors = ancestors,
+                ancestorsPos = ancestorsPos,
+                obj = prevSibling
+            )
+        }
 
         private fun getChildPosition(
-            ancestors: MutableList<SvgContainer>,
+            ancestors: MutableList<Container>,
             ancestorsPos: Int,
-            obj: SvgElementBase
+            obj: ElementBase
         ): Int {
             if (ancestorsPos < 0) {
                 // Has no parent, so must be only child of document
@@ -941,16 +611,17 @@ internal class CSSParser internal constructor(
             }
             val children = obj.parent!!.getChildren()
             for (childPos in children.indices) {
-                if (children[childPos] === obj) return childPos
+                if (children[childPos] === obj) {
+                    return childPos
+                }
             }
             return -1
         }
 
-
         private fun selectorMatch(
             ruleMatchContext: RuleMatchContext?,
             sel: SimpleSelector,
-            obj: SvgElementBase
+            obj: ElementBase
         ): Boolean {
             // Check tag name. tag==null means tag is "*" which matches everything.
             val tag = sel.tag
@@ -977,8 +648,17 @@ internal class CSSParser internal constructor(
                     }
 
                     else -> {
-                        // Other attribute simpleSelectors not yet supported
-                        return false
+                        val value = obj.attributes?.get(attr.name) ?: return false
+                        when (attr.operation) {
+                            AttribOp.EXISTS -> {}
+                            AttribOp.EQUALS -> if (value != attr.value) return false
+                            AttribOp.INCLUDES -> {
+                                if (!value.split(' ').contains(attr.value)) return false
+                            }
+                            AttribOp.DASH_MATCH -> {
+                                if (value != attr.value && !value.startsWith("${attr.value}-")) return false
+                            }
+                        }
                     }
                 }
             }

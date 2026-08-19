@@ -25,10 +25,12 @@ package hu.oandras.ksvg.parser
 internal object IntegerParser {
 
     class Result(
+        @JvmField
         val value: Int,
         /*
          * Return the value of pos after the parse.
          */
+        @JvmField
         val endPos: Int
     )
 

@@ -28,12 +28,12 @@ import java.io.InputStream
 import java.io.Reader
 
 /**
- * A sample implementation of [SVGExternalFileResolver] that retrieves files from
+ * A sample implementation of [ExternalFileResolver] that retrieves files from
  * an application's "assets" folder.
  */
 public class SimpleAssetResolver(
     private val assetManager: AssetManager
-) : SVGExternalFileResolver() {
+) : ExternalFileResolver() {
 
     /**
      * Attempt to find the specified font in the "assets" folder and return a Typeface object.
@@ -149,7 +149,7 @@ public class SimpleAssetResolver(
             // .webp supported in 4.0+ (ICE_CREAM_SANDWICH)
             add("image/webp")
             // .avif supported in 12.0+ (S)
-            if (Build.VERSION.SDK_INT >= 31) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 add("image/avif")
             }
         }

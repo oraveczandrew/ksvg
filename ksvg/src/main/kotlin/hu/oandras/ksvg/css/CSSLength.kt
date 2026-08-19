@@ -39,7 +39,8 @@ internal data class CSSLength(
     }
 
     // Convert length to user units for a horizontally-related context.
-    fun floatValueX(renderContext: RenderContext): Float {
+    context(renderContext: RenderContext)
+    fun floatValueXInContext(): Float {
         return when (unit) {
             CssUnit.em -> value * renderContext.currentFontSize
             CssUnit.ex -> value * renderContext.currentFontXHeight
@@ -59,19 +60,21 @@ internal data class CSSLength(
     }
 
     // Convert length to user units for a vertically-related context.
-    fun floatValueY(renderContext: RenderContext): Float {
+    context(renderContext: RenderContext)
+    fun floatValueYInContext(): Float {
         return if (unit == CssUnit.percent) {
             val viewPortUser = renderContext.effectiveViewPortInUserUnits
 
             value * viewPortUser.height / 100f
         } else {
-            floatValueX(renderContext)
+            floatValueXInContext()
         }
     }
 
-    // Convert length to user units for a context that is not orientation specific.
+    // Convert length to user units for a context that is not orientation-specific.
     // For example, stroke width.
-    fun floatValue(renderContext: RenderContext): Float {
+    context(renderContext: RenderContext)
+    fun floatValueInContext(): Float {
         return if (unit == CssUnit.percent) {
             val viewPortUser = renderContext.effectiveViewPortInUserUnits
 
@@ -83,17 +86,18 @@ internal data class CSSLength(
                 value * n / 100f
             }
         } else {
-            floatValueX(renderContext)
+            floatValueXInContext()
         }
     }
 
-    // Convert length to user units for a context that is not orientation specific.
+    // Convert length to user units for a context that is not orientation-specific.
     // For percentage values, use the given 'max' parameter to represent the 100% value.
-    fun floatValue(renderContext: RenderContext, max: Float): Float {
+    context(renderContext: RenderContext)
+    fun floatValueInContext(max: Float): Float {
         return if (unit == CssUnit.percent) {
             value * max / 100f
         } else {
-            floatValueX(renderContext)
+            floatValueXInContext()
         }
     }
 

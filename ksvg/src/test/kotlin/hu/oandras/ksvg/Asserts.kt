@@ -18,7 +18,9 @@
 
 package hu.oandras.ksvg
 
+import androidx.collection.FloatList
 import org.junit.Assert
+import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
@@ -37,5 +39,27 @@ inline fun <reified T: Any> assertIs(actual: Any?) {
 
     if (actual !is T) {
         fail("Expected instance of ${T::class.java.name} but was ${actual?.javaClass?.name}")
+    }
+}
+
+internal fun assertFloatListEquals(
+    expected: FloatArray,
+    actual: FloatList,
+    delta: Float = 0.001f
+) {
+    assertEquals("FloatList size mismatch", expected.size, actual.size)
+    for (i in expected.indices) {
+        assertEquals("Mismatch at index $i", expected[i], actual[i], delta)
+    }
+}
+
+internal fun assertArrayEquals(
+    expected: FloatArray,
+    actual: FloatArray,
+    delta: Float = 0.001f
+) {
+    assertEquals("FloatArray size mismatch", expected.size, actual.size)
+    for (i in expected.indices) {
+        assertEquals("Mismatch at index $i", expected[i], actual[i], delta)
     }
 }

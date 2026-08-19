@@ -17,18 +17,16 @@
 
 package hu.oandras.ksvg.parser
 
-import androidx.collection.ArrayMap
-import hu.oandras.ksvg.dom.Style
+import hu.oandras.ksvg.dom.style.Style
 
 internal object FontWeightKeywords {
-    private val fontWeightKeywords: Map<String, Float> = ArrayMap<String, Float>(4).apply {
-        this["normal"] = Style.FONT_WEIGHT_NORMAL
-        this["bold"] = Style.FONT_WEIGHT_BOLD
-        this["bolder"] = Style.FONT_WEIGHT_BOLDER
-        this["lighter"] = Style.FONT_WEIGHT_LIGHTER
-    }
-
-    fun get(fontWeight: String?): Float? {
-        return fontWeightKeywords[fontWeight]
+    fun get(fontWeight: String?): Float {
+        return when {
+            fontWeight.equals("normal", ignoreCase = true) -> Style.FONT_WEIGHT_NORMAL
+            fontWeight.equals("bold", ignoreCase = true) -> Style.FONT_WEIGHT_BOLD
+            fontWeight.equals("bolder", ignoreCase = true) -> Style.FONT_WEIGHT_BOLDER
+            fontWeight.equals("lighter", ignoreCase = true) -> Style.FONT_WEIGHT_LIGHTER
+            else -> Float.NaN
+        }
     }
 }

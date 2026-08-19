@@ -1,0 +1,60 @@
+/*
+ *    Copyright 2026 András Oravecz <info@oandras.hu>
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+package hu.oandras.ksvg.showcase
+
+import android.app.Application
+import androidx.core.net.toUri
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.stateIn
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class IconsViewModel(application: Application) : AndroidViewModel(application) {
+
+    val currentCategory = MutableStateFlow(Category.METEOCONS)
+
+    val icons: StateFlow<List<SvgEntry>> = currentCategory.flatMapLatest { category ->
+        flow {
+            val stringBuilder = StringBuilder()
+            val entries = getApplication<Application>().assets.list(category.assetPath)
+                .orEmpty()
+                .filter { it.endsWith(".svg") }
+                .map { fileName ->
+                    val uri = buildStringWith(stringBuilder) {
+                        append("file:///android_asset/")
+                        append(category.assetPath)
+                        append('/')
+                        append(fileName)
+                    }.toUri()
+                    SvgEntry(uri, fileName)
+                }
+            emit(entries)
+        }.flowOn(Dispatchers.IO)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+}

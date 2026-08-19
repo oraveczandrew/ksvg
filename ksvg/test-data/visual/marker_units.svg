@@ -1,0 +1,8 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="m" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" refX="8" refY="8" orient="auto">
+      <circle cx="8" cy="8" r="6" fill="red"/>
+    </marker>
+  </defs>
+  <polyline points="20,20 100,100 180,40 120,170" fill="none" stroke="black" stroke-width="2" marker-start="url(#m)" marker-mid="url(#m)" marker-end="url(#m)"/>
+</svg>

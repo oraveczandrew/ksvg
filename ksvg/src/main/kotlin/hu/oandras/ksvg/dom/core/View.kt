@@ -1,0 +1,60 @@
+/*
+ *    Copyright 2013-2020 Paul LeBeau, Cave Rock Software Ltd.
+ *    Copyright 2026 András Oravecz <info@oandras.hu>
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+package hu.oandras.ksvg.dom.core
+
+import hu.oandras.ksvg.PreserveAspectRatio
+import hu.oandras.ksvg.dom.SVGImpl
+
+internal class View(
+    baseParams: BaseParams,
+    conditionalBundle: Conditional,
+    preserveAspectRatio: PreserveAspectRatio?,
+    viewBox: Box?
+) : ViewBoxContainer(
+    baseParams = baseParams,
+    conditionalBundle = conditionalBundle,
+    preserveAspectRatio = preserveAspectRatio,
+    viewBox = viewBox,
+), NotDirectlyRendered {
+
+    override fun getNodeName(): String {
+        return NODE_NAME
+    }
+
+    class Builder(
+        document: SVGImpl,
+        parent: Container?,
+    ) : ViewBoxContainer.Builder<View>(
+        document = document,
+        parent = parent
+    ) {
+
+        override fun build(): View {
+            return View(
+                baseParams = getBaseParams(),
+                conditionalBundle = getSvgConditionalBundle(),
+                preserveAspectRatio = getPreserveAspectRatio(),
+                viewBox = getViewBox(),
+            )
+        }
+    }
+
+    companion object {
+        const val NODE_NAME: String = "view"
+    }
+}

@@ -1,0 +1,55 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -    You may obtain a copy of the License at
+  -
+  -        http://www.apache.org/licenses/LICENSE-2.0
+  -
+  -    Unless required by applicable law or agreed to in writing, software
+  -    distributed under the License is distributed on an "AS IS" BASIS,
+  -    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  -    See the License for the specific language governing permissions and
+  -    limitations under the License.
+  -->
+
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    /* Specificity 1: Element */
+    rect { fill: gray; stroke: black; }
+
+    /* Specificity 1000: Class */
+    .blue { fill: blue; }
+
+    /* Specificity 1001: Element + Class (Higher than class alone) */
+    rect.green { fill: green; }
+
+    /* Specificity 1000000: ID (Wins over classes) */
+    #red-rect { fill: red; }
+
+    /* Specificity 2000: Two classes */
+    .c1.c2 { fill: purple; }
+
+    /* Presentation attributes vs CSS (CSS wins if specificity > 0) */
+    .forced-orange { fill: orange; }
+  </style>
+
+  <!-- Should be gray (element selector) -->
+  <rect x="10" y="10" width="30" height="30" />
+
+  <!-- Should be blue (class selector) -->
+  <rect x="50" y="10" width="30" height="30" class="blue" />
+
+  <!-- Should be green (element.class > class) -->
+  <rect x="90" y="10" width="30" height="30" class="blue green" />
+
+  <!-- Should be red (ID wins) -->
+  <rect x="130" y="10" width="30" height="30" id="red-rect" class="green" />
+
+  <!-- Should be purple (two classes > one class) -->
+  <rect x="10" y="50" width="30" height="30" class="c1 c2 blue" />
+
+  <!-- Should be orange (CSS wins over fill="yellow") -->
+  <rect x="50" y="50" width="30" height="30" class="forced-orange" fill="yellow" />
+</svg>

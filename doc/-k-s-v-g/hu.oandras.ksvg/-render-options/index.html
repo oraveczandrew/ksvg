@@ -107,9 +107,7 @@
   <div class="breadcrumbs"><a href="../../../index.html">KSVG</a><span class="delimiter">/</span><a href="../index.html">hu.oandras.ksvg</a><span class="delimiter">/</span><span class="current">RenderOptions</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Render</span><wbr></wbr><span><span>Options</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">RenderOptions</a></div><p class="paragraph">A fluent builder interface that creates a render configuration object for the <a href="../-s-v-g/render-to-canvas.html">SVG.renderToCanvas</a> and <a href="../-s-v-g/render-to-picture.html">SVG.renderToPicture</a> methods.</p><p class="paragraph"><h3>Example usage</h3></p><pre class="code-block">
-`RenderOption renderOptions = RenderOptions.create(); renderOptions.viewPort(100f, 100f, 400f, 300f)   // Set the area of the Canvas to render the SVG into              .css("rect { fill: red; }")         // Add some CSS that makes all rectangles red svg.renderToCanvas(canvas, renderOptions); `
-</pre> *</div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">RenderOptions</a></div><p class="paragraph">A fluent builder interface that creates a render configuration object for the <a href="../-s-v-g/render-to-canvas.html">SVG.renderToCanvas</a> method.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -145,7 +143,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="css.html">css</a><span class="token operator">: </span><a href="../../hu.oandras.ksvg.css/-c-s-s/index.html">CSS</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="css.html">css</a><span class="token operator">: </span><a href="../../hu.oandras.ksvg.css/-c-s-s/index.html">CSS</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The parsed CSS rules to apply during render, or <code class="lang-kotlin">null</code> if none were set.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -160,7 +158,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="preserve-aspect-ratio.html">preserveAspectRatio</a><span class="token operator">: </span><a href="../-preserve-aspect-ratio/index.html">PreserveAspectRatio</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="preserve-aspect-ratio.html">preserveAspectRatio</a><span class="token operator">: </span><a href="../-preserve-aspect-ratio/index.html">PreserveAspectRatio</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The aspect ratio handling strategy, or <code class="lang-kotlin">null</code> if not set.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -175,7 +173,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="target-id.html">targetId</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="target-id.html">targetId</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The id of an element to treat as the <code class="lang-kotlin">:target</code> CSS pseudo-class, or <code class="lang-kotlin">null</code> if not set.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -190,7 +188,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="view-box.html">viewBox</a><span class="token operator">: </span><a href="../../hu.oandras.ksvg.dom/-box/index.html">Box</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="view-box.html">viewBox</a><span class="token operator">: </span><a href="../../hu.oandras.ksvg.dom.core/-box/index.html">Box</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">An override for the root <code class="lang-kotlin">viewBox</code> attribute, or <code class="lang-kotlin">null</code> if not set.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -205,7 +203,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="view-id.html">viewId</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="view-id.html">viewId</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The id of a <code class="lang-kotlin">&lt;view&gt;</code> element to render, or <code class="lang-kotlin">null</code> if not set.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -220,7 +218,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="view-port.html">viewPort</a><span class="token operator">: </span><a href="../../hu.oandras.ksvg.dom/-box/index.html">Box</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="view-port.html">viewPort</a><span class="token operator">: </span><a href="../../hu.oandras.ksvg.dom.core/-box/index.html">Box</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The viewport bounds into which the SVG should be rendered, or <code class="lang-kotlin">null</code> if not set.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -229,17 +227,17 @@
       </div>
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="1819536208%2FFunctions%2F444996287" anchor-label="css" id="1819536208%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+        <div class="table"><a data-name="-384470423%2FFunctions%2F444996287" anchor-label="css" id="-384470423%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
           <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="css.html"><span><span>css</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1819536208%2FFunctions%2F444996287"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-384470423%2FFunctions%2F444996287"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="css.html"><span class="token function">css</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">css<span class="token operator">: </span><a href="../../hu.oandras.ksvg.css/-c-s-s/index.html">CSS</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">RenderOptions</a></div><div class="brief "><p class="paragraph">Specifies some already parsed CSS that will be applied during render in addition to any specified in the file itself.</p></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="css.html"><span class="token function">css</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">css<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">externalFileResolver<span class="token operator">: </span><a href="../-s-v-g-external-file-resolver/index.html">SVGExternalFileResolver</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">RenderOptions</a></div><div class="brief "><p class="paragraph">Specifies some additional CSS rules that will be applied during render in addition to any specified in the file itself. CSS will be parsed during SVG render.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="css.html"><span class="token function">css</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">css<span class="token operator">: </span><a href="../../hu.oandras.ksvg.css/-c-s-s/index.html">CSS</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">RenderOptions</a></div><div class="brief "><p class="paragraph">Specifies some already parsed CSS that will be applied during render in addition to any specified in the file itself.</p></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="css.html"><span class="token function">css</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">css<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">RenderOptions</a></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="css.html"><span class="token function">css</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">css<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">externalFileResolver<span class="token operator">: </span><a href="../-external-file-resolver/index.html">ExternalFileResolver</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">RenderOptions</a></div><div class="brief "><p class="paragraph">Specifies some additional CSS rules that will be applied during render in addition to any specified in the file itself. CSS will be parsed during SVG render.</p></div></div></div>
                 </div>
               </div>
             </div>

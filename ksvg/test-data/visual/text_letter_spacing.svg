@@ -1,0 +1,4 @@
+<svg width="200" height="120" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+  <text x="10" y="40" font-size="20" letter-spacing="50%" fill="navy" font-family="sans-serif">Spaced 50 percent</text>
+  <text x="10" y="90" font-size="20" letter-spacing="0.5em" fill="teal" font-family="sans-serif">Spaced em unit</text>
+</svg>

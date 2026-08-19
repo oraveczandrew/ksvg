@@ -18,54 +18,80 @@ package hu.oandras.ksvg.render.filters
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.util.Log
-import hu.oandras.ksvg.SVGExternalFileResolver
-import hu.oandras.ksvg.dom.FeTurbulenceType
-import hu.oandras.ksvg.dom.SvgObject.FeDisplacementMap
-import hu.oandras.ksvg.dom.SvgObject.FeImage
-import hu.oandras.ksvg.dom.SvgObject.FeTurbulence
-import hu.oandras.ksvg.utils.LcgRandom
-import hu.oandras.ksvg.utils.SvgPathNoise
+import android.graphics.RectF
+import hu.oandras.ksvg.dom.filter.FeTurbulenceType
+import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
+import hu.oandras.ksvg.render.FeImageRenderNode
+import hu.oandras.ksvg.render.FeTurbulenceRenderNode
+import hu.oandras.ksvg.render.FilterSourceMap
+import hu.oandras.ksvg.render.RenderContext
+import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.utils.argb
-import hu.oandras.ksvg.utils.channelSelectorValue
-import hu.oandras.ksvg.utils.checkForImageDataURL
 import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.clamp255
-import hu.oandras.ksvg.utils.createBitmap
-import hu.oandras.ksvg.utils.createBitmapSameAs
 import kotlin.math.abs
 import kotlin.math.max
 
 @SuppressLint("UseKtx")
+context(renderContext: RenderContext)
 internal fun doFeTurbulenceFilter(
-    primitive: FeTurbulence,
-    input: Bitmap?,
-    lastResult: Bitmap?,
-    results: Map<String, Bitmap>,
+    primitiveNode: FeTurbulenceRenderNode,
+    inputBitmap: Bitmap,
+    primitiveScaleX: Float,
+    primitiveScaleY: Float,
+    primitiveOriginX: Float,
+    primitiveOriginY: Float,
+    regionLeft: Float,
+    regionTop: Float,
     canvasScaleX: Float,
     canvasScaleY: Float,
-): Bitmap? {
-    val source = input ?: lastResult ?: results["SourceGraphic"] ?: return null
-    val width = source.width
-    val height = source.height
-    val res = createBitmap(width, height)
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+): Bitmap {
+    val primitive = primitiveNode.sourceElement
+    val width = inputBitmap.width
+    val height = inputBitmap.height
+    val res = renderContext.bitmapPool.acquire(
+        width = width,
+        height = height,
+        config = Bitmap.Config.ARGB_8888
+    )
 
-    val baseX = clamp(primitive.baseFrequencyX.toDouble(), 0.0, Double.MAX_VALUE) / canvasScaleX
-    val baseY = clamp(primitive.baseFrequencyY.toDouble(), 0.0, Double.MAX_VALUE) / canvasScaleY
+    val baseX = clamp(primitive.baseFrequencyX.toDouble(), 0.0, Double.MAX_VALUE)
+    val baseY = clamp(primitive.baseFrequencyY.toDouble(), 0.0, Double.MAX_VALUE)
     val octaves = clamp(primitive.numOctaves, 1, 8)
-    val seed = primitive.seed
     val isFractal = primitive.type == FeTurbulenceType.fractalNoise
-    val lcg = LcgRandom(if (seed <= 0) 1 else seed.toInt())
+    val generators = primitiveNode.generators
 
-    val generators = Array(4) {
-        SvgPathNoise(lcg)
-    }
+    val size = width * height
+    val pixels = primitiveNode.pixels.getWithSize(size)
 
-    val pixels = IntArray(width * height)
+    val invCanvasScaleX = 1.0 / canvasScaleX.toDouble()
+    val invCanvasScaleY = 1.0 / canvasScaleY.toDouble()
+    val userLeft = regionLeft.toDouble()
+    val userTop = regionTop.toDouble()
+    val originX = primitiveOriginX.toDouble()
+    val originY = primitiveOriginY.toDouble()
 
-    for (y in 0 until height) {
-        for (x in 0 until width) {
+    // Frequency is cycles per primitive unit.
+    // If primitiveUnits="userSpaceOnUse", 1 unit = 1 user pixel.
+    // If primitiveUnits="objectBoundingBox", 1 unit = BB size.
+    // primitiveScaleX / canvasScaleX is the size of 1 primitive unit in user units.
+    val primitiveUnitSizeX = primitiveScaleX.toDouble() / canvasScaleX.toDouble()
+    val primitiveUnitSizeY = primitiveScaleY.toDouble() / canvasScaleY.toDouble()
+
+    val clipLeft = clamp(((primitiveRegion.left - filterRegion.left)).toInt(), 0, width)
+    val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
+    val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
+    val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
+
+    for (y in clipTop until clipBottom) {
+        val userY = userTop + y.toDouble() * invCanvasScaleY
+        val py0 = ((userY - originY) / primitiveUnitSizeY) * baseY
+        for (x in clipLeft until clipRight) {
+            val userX = userLeft + x.toDouble() * invCanvasScaleX
+            val px0 = ((userX - originX) / primitiveUnitSizeX) * baseX
+
             var r = 0.0
             var g = 0.0
             var b = 0.0
@@ -74,8 +100,8 @@ internal fun doFeTurbulenceFilter(
             for (channel in 0 until 4) {
                 var value = 0.0
                 var ratio = 1.0
-                var px = x * baseX
-                var py = y * baseY
+                var px = px0
+                var py = py0
                 for (_ in 0 until octaves) {
                     val n = generators[channel].noise2(px, py)
                     value += if (isFractal) n / ratio else abs(n) / ratio
@@ -104,12 +130,14 @@ internal fun doFeTurbulenceFilter(
 }
 
 @SuppressLint("UseKtx")
+context(renderContext: RenderContext)
 internal fun doFeDisplacementMapFilter(
-    primitive: FeDisplacementMap,
+    primitiveNode: FeDisplacementMapRenderNode,
     inputBitmap: Bitmap,
-    results: Map<String, Bitmap>,
+    results: FilterSourceMap,
     lastResult: Bitmap?,
 ): Bitmap {
+    val primitive = primitiveNode.sourceElement
     val displacementMap = getFilterInput(primitive.in2, results, lastResult) ?: return inputBitmap
     val scale = primitive.scale
     if (scale == 0f) {
@@ -120,15 +148,17 @@ internal fun doFeDisplacementMapFilter(
     val height = inputBitmap.height
     val mapWidth = displacementMap.width
     val mapHeight = displacementMap.height
-    val res = createBitmapSameAs(inputBitmap)
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
 
-    val inputPixels = IntArray(width * height)
+    val inputSize = width * height
+    val inputPixels = primitiveNode.inputPixels.getWithSize(inputSize)
     inputBitmap.getPixels(inputPixels, 0, width, 0, 0, width, height)
 
-    val mapPixels = IntArray(mapWidth * mapHeight)
+    val mapSize = mapWidth * mapHeight
+    val mapPixels = primitiveNode.mapPixels.getWithSize(mapSize)
     displacementMap.getPixels(mapPixels, 0, mapWidth, 0, 0, mapWidth, mapHeight)
 
-    val outPixels = IntArray(width * height)
+    val outPixels = primitiveNode.outPixels.getWithSize(inputSize)
 
     val widthDivisor = max(width - 1, 1)
     val heightDivisor = max(height - 1, 1)
@@ -153,26 +183,22 @@ internal fun doFeDisplacementMapFilter(
 }
 
 @SuppressLint("UseKtx")
+context(renderContext: RenderContext)
 internal fun doFeImageFilter(
-    primitive: FeImage,
+    primitiveNode: FeImageRenderNode,
     inputBitmap: Bitmap,
-    externalFileResolver: SVGExternalFileResolver?,
 ): Bitmap {
-    val href = primitive.href ?: return inputBitmap
-    val image = checkForImageDataURL(href) ?: externalFileResolver?.resolveImage(href)
+    val image = primitiveNode.image ?: return inputBitmap
 
-    if (image == null) {
-        Log.w("doFeImageFilter", String.format("Could not locate image '%s'", href))
-        return inputBitmap
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
+    renderContext.canvasPool.withPooledObject { c ->
+        c.setBitmap(res)
+        val sx = res.width.toFloat() / image.width.toFloat()
+        val sy = res.height.toFloat() / image.height.toFloat()
+        c.save()
+        c.scale(sx, sy)
+        c.drawBitmap(image, 0f, 0f, null)
+        c.restore()
     }
-
-    val res = createBitmapSameAs(inputBitmap)
-    val c = Canvas(res)
-    val sx = res.width.toFloat() / image.width.toFloat()
-    val sy = res.height.toFloat() / image.height.toFloat()
-    c.save()
-    c.scale(sx, sy)
-    c.drawBitmap(image, 0f, 0f, null)
-    c.restore()
     return res
 }

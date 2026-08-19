@@ -20,6 +20,7 @@ package hu.oandras.ksvg.utils
 import androidx.annotation.ColorInt
 import androidx.annotation.IntRange
 import hu.oandras.ksvg.dom.COLOR_BLACK
+import kotlin.math.pow
 
 internal fun pack3Hex(threeHex: Int): Int {
     val h1 = threeHex and 0xf00 // r
@@ -42,9 +43,9 @@ internal fun pack8Hex(value: Int): Int {
 
 internal fun packRgba(r: Float, g: Float, b: Float, a: Float = Float.NaN): Int {
     return if (a.isNaN()) {
-        COLOR_BLACK or (clamp255(r) shl 16) or (clamp255(g) shl 8) or clamp255(b)
+        rgb(clamp255(r), clamp255(g), clamp255(b))
     } else {
-        (clamp255(a * 256f) shl 24) or (clamp255(r) shl 16) or (clamp255(g) shl 8) or clamp255(b)
+        argb(clamp255(a * 256f), clamp255(r), clamp255(g), clamp255(b))
     }
 }
 
@@ -53,7 +54,7 @@ internal fun packHsla(hue: Float, sat: Float, light: Float, alpha: Float = Float
     return if (alpha.isNaN()) {
         COLOR_BLACK or rgb
     } else {
-        (clamp255(alpha * 256f) shl 24) or rgb
+        argb(clamp255(alpha * 256f), rgb.red, rgb.green, rgb.blue)
     }
 }
 
@@ -129,3 +130,39 @@ internal inline val @receiver:ColorInt Int.green: Int
 
 internal inline val @receiver:ColorInt Int.blue: Int
     get() = this and 0xff
+
+@ColorInt
+internal fun interpolateColor(from: Int, to: Int, progress: Float): Int {
+    return argb(
+        alpha = interpolateColorChannel(from.alpha, to.alpha, progress),
+        red = interpolateColorChannel(from.red, to.red, progress),
+        green = interpolateColorChannel(from.green, to.green, progress),
+        blue = interpolateColorChannel(from.blue, to.blue, progress),
+    )
+}
+
+private fun interpolateColorChannel(from: Int, to: Int, progress: Float): Int {
+    return clamp(
+        n = from + ((to - from) * progress).toInt(),
+        min = 0,
+        max = 255
+    )
+}
+
+internal fun sRgbToLinear(c: Int): Int {
+    val a = c / 255f
+    return if (a <= 0.04045f) {
+        clamp255((a / 12.92f) * 255f)
+    } else {
+        clamp255(((a + 0.055f) / 1.055f).pow(2.4f) * 255f)
+    }
+}
+
+internal fun linearToSRgb(c: Int): Int {
+    val a = c / 255f
+    return if (a <= 0.0031308f) {
+        clamp255((a * 12.92f) * 255f)
+    } else {
+        clamp255((1.055f * a.pow(1f / 2.4f) - 0.055f) * 255f)
+    }
+}

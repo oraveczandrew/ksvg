@@ -16,9 +16,10 @@
 
 package hu.oandras.ksvg.render
 
-import hu.oandras.ksvg.dom.Box
+import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.render.pool.PoolOwner
 
-internal interface RenderContext {
+internal interface RenderContext: PoolOwner {
     val dPI: Float
     val currentFontSize: Float
     val currentFontXHeight: Float

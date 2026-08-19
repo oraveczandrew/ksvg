@@ -1,0 +1,5 @@
+<svg width="200" height="50" viewBox="0 0 200 50" xmlns="http://www.w3.org/2000/svg">
+  <line x1="10" y1="25" x2="190" y2="25" stroke="black" stroke-width="4">
+    <animate attributeName="stroke-dasharray" values="10,5;5,10;10,5" dur="2s" repeatCount="indefinite"/>
+  </line>
+</svg>

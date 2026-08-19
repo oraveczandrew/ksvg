@@ -18,6 +18,11 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.utils.ceilToInt
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -28,9 +33,10 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, shadows = [MockCanvas::class, MockPath::class, MockPaint::class])
 class CSSTest {
+    //TODO support important
     /* !important not supported yet
       @Test
-      public void important() throws SVGParseException
+      public void important() throws KSVGParseException
       {
          //disableLogging();
          String  test = "<svg width=\"100\" height=\"100\">" +
@@ -46,7 +52,7 @@ class CSSTest {
                         "</svg>";
          SVG  svg = SVG.getFromString(test);
    
-         Bitmap newBM = Bitmap.createBitmap((int) Math.ceil(svg.getDocumentWidth()),
+         Bitmap newBM = createBitmap((int) Math.ceil(svg.getDocumentWidth()),
                                             (int) Math.ceil(svg.getDocumentHeight()),
                                             Bitmap.Config.ARGB_8888);
          Canvas canvas = new Canvas(newBM);
@@ -65,7 +71,7 @@ class CSSTest {
       }
    */
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun use() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -79,10 +85,9 @@ class CSSTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
             svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(newBM)
 
@@ -93,13 +98,13 @@ class CSSTest {
 
         //List<String> ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(5, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
     }
 
 
     // Issue 204
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nonAsciiClassNames() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -110,10 +115,9 @@ class CSSTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
             svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(newBM)
 
@@ -124,6 +128,6 @@ class CSSTest {
 
         //List<String> ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
     }
 }

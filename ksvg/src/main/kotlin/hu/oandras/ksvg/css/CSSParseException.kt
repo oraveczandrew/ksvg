@@ -20,7 +20,6 @@ package hu.oandras.ksvg.css
  * Thrown by the CSS parser if a problem is found while parsing a CSS file.
  */
 
-@Suppress("unused")
 internal class CSSParseException : Exception {
     constructor(msg: String?) : super(msg)
     constructor(msg: String?, cause: Exception?) : super(msg, cause)

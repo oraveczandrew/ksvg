@@ -16,9 +16,9 @@
  */
 package hu.oandras.ksvg.parser
 
+import hu.oandras.ksvg.ExternalFileResolver
+import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.SVG
-import hu.oandras.ksvg.SVGExternalFileResolver
-import hu.oandras.ksvg.SVGParseException
 import hu.oandras.ksvg.dom.SVGImpl
 import java.io.InputStream
 
@@ -26,7 +26,7 @@ internal interface SVGParser {
     /**
      * Try to parse the stream contents to an [SVG] instance.
      */
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun parseStream(input: InputStream): SVGImpl
 
     /**
@@ -36,8 +36,13 @@ internal interface SVGParser {
     fun setInternalEntitiesEnabled(enable: Boolean): SVGParser
 
     /**
-     * Register an [SVGExternalFileResolver] instance that the parser should use when resolving
+     * Register an [ExternalFileResolver] instance that the parser should use when resolving
      * external references such as images, fonts, and CSS stylesheets.
      */
-    fun setExternalFileResolver(fileResolver: SVGExternalFileResolver?): SVGParser
+    fun setExternalFileResolver(fileResolver: ExternalFileResolver?): SVGParser
+
+    /**
+     * Enable or disable parsing of animations.
+     */
+    fun setAnimationsEnabled(enable: Boolean): SVGParser
 }

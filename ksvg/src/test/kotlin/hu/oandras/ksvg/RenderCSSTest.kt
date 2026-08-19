@@ -18,6 +18,11 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.utils.ceilToInt
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -33,7 +38,7 @@ class RenderCSSTest {
        * See Issue #50. https://github.com/BigBadaboom/androidsvg/issues/50
        */
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun renderWithCSS() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -41,10 +46,9 @@ class RenderCSSTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
-            svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+        val newBM: Bitmap = createBitmap(
+            width = svg.documentWidth.ceilToInt(),
+            height = svg.documentHeight.ceilToInt(),
         )
         val canvas = Canvas(newBM)
 
@@ -55,7 +59,7 @@ class RenderCSSTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
 
         // Step 2
         mock.clearOperations()
@@ -66,7 +70,7 @@ class RenderCSSTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
 
         // rect should be red now
-        assertEquals("#ffff0000", mock.paintProp(3, "color"))
+        assertEquals("#ffff0000", mock.paintProp(4, "color"))
 
 
         // Step 3: Make sure temp CSS hasn't stuck around
@@ -77,6 +81,6 @@ class RenderCSSTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
 
         // rect should be black again
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
     }
 }

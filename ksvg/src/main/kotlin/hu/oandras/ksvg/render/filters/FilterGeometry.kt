@@ -18,68 +18,84 @@ package hu.oandras.ksvg.render.filters
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.css.CSSLength
-import hu.oandras.ksvg.dom.FeMorphologyOperator
-import hu.oandras.ksvg.dom.SvgObject.FeConvolveMatrix
-import hu.oandras.ksvg.dom.SvgObject.FeGaussianBlur
-import hu.oandras.ksvg.dom.SvgObject.FeMorphology
-import hu.oandras.ksvg.dom.SvgObject.FeOffset
+import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
+import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
+import hu.oandras.ksvg.render.FeMorphologyRenderNode
+import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.RenderContext
+import hu.oandras.ksvg.render.pool.withPooledObject
+import hu.oandras.ksvg.render.withClip
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.clamp255
-import hu.oandras.ksvg.utils.createBitmapSameAs
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.red
-import hu.oandras.ksvg.utils.sampleCoordinate
-import hu.oandras.ksvg.utils.stackBlur
 import kotlin.math.max
 import kotlin.math.min
 
+context(renderContext: RenderContext)
 internal fun doFeOffsetFilter(
-    renderContext: RenderContext,
-    primitive: FeOffset,
+    primitiveNode: FeOffsetRenderNode,
     inputBitmap: Bitmap,
     primitiveUnitsAreUser: Boolean,
     primitiveScaleX: Float,
     primitiveScaleY: Float,
     canvasScaleX: Float,
     canvasScaleY: Float,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
 ): Bitmap {
-    val dx = filterPrimitiveLengthX(renderContext, primitive.dx, primitiveUnitsAreUser, primitiveScaleX, canvasScaleX)
-    val dy = filterPrimitiveLengthY(renderContext, primitive.dy, primitiveUnitsAreUser, primitiveScaleY, canvasScaleY)
-    val res = createBitmapSameAs(inputBitmap)
-    val c = Canvas(res)
-    c.drawBitmap(inputBitmap, dx, dy, null)
+    val sourceElement = primitiveNode.sourceElement
+    val dx = filterPrimitiveLengthX(sourceElement.dx, primitiveUnitsAreUser, primitiveScaleX, canvasScaleX)
+    val dy = filterPrimitiveLengthY(sourceElement.dy, primitiveUnitsAreUser, primitiveScaleY, canvasScaleY)
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
+    renderContext.canvasPool.withPooledObject { c ->
+        c.setBitmap(res)
+        val clipLeft = (primitiveRegion.left - filterRegion.left)
+        val clipTop = (primitiveRegion.top - filterRegion.top)
+        val clipRight = (primitiveRegion.right - filterRegion.left)
+        val clipBottom = (primitiveRegion.bottom - filterRegion.top)
+        c.clipRect(clipLeft, clipTop, clipRight, clipBottom)
+        c.drawBitmap(inputBitmap, dx, dy, null)
+    }
     return res
 }
 
 @SuppressLint("UseKtx")
-internal fun doFeConvolveMatrixFilter(primitive: FeConvolveMatrix, inputBitmap: Bitmap): Bitmap {
-    val orderX = max(primitive.orderX, 1)
-    val orderY = max(primitive.orderY, 1)
-    val kernel = primitive.kernelMatrix
+context(renderContext: RenderContext)
+internal fun doFeConvolveMatrixFilter(
+    primitiveNode: FeConvolveMatrixRenderNode,
+    inputBitmap: Bitmap,
+): Bitmap {
+    val orderX = primitiveNode.orderX
+    val orderY = primitiveNode.orderY
+    val kernel = primitiveNode.kernel
     val kernelSize = orderX * orderY
     if (kernel == null || kernel.size != kernelSize) {
         return inputBitmap
     }
 
-    val targetX = clamp(primitive.targetX ?: (orderX / 2), 0, orderX - 1)
-    val targetY = clamp(primitive.targetY ?: (orderY / 2), 0, orderY - 1)
-    val divisor = if (primitive.divisor != 0f) primitive.divisor else (kernel.sum().takeIf { it != 0f } ?: 1f)
-    val bias = primitive.bias
-    val preserveAlpha = primitive.preserveAlpha
-    val edgeMode = primitive.edgeMode
+    val targetX = primitiveNode.targetX
+    val targetY = primitiveNode.targetY
+    val divisor = primitiveNode.divisor
+    val bias = primitiveNode.bias
+    val preserveAlpha = primitiveNode.preserveAlpha
+    val edgeMode = primitiveNode.edgeMode
 
     val width = inputBitmap.width
     val height = inputBitmap.height
-    val res = createBitmapSameAs(inputBitmap)
-    val srcPixels = IntArray(width * height)
-    val outPixels = IntArray(width * height)
+    val size = width * height
+    val srcPixels = primitiveNode.srcPixels.getWithSize(size)
+    val outPixels = primitiveNode.outPixels.getWithSize(size)
+
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     inputBitmap.getPixels(srcPixels, 0, width, 0, 0, width, height)
 
     for (y in 0 until height) {
@@ -115,71 +131,110 @@ internal fun doFeConvolveMatrixFilter(primitive: FeConvolveMatrix, inputBitmap: 
     return res
 }
 
+context(renderContext: RenderContext)
 internal fun doFeGaussianBlurFilter(
-    primitive: FeGaussianBlur,
+    primitiveNode: FeGaussianBlurRenderNode,
     inputBitmap: Bitmap,
     primitiveScaleX: Float,
     primitiveScaleY: Float,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
 ): Bitmap {
-    val stdDeviationX = primitive.stdDeviationX * primitiveScaleX
-    val stdDeviationY = primitive.stdDeviationY * primitiveScaleY
+    val stdDeviationX = primitiveNode.stdDeviationX * primitiveScaleX
+    val stdDeviationY = primitiveNode.stdDeviationY * primitiveScaleY
 
     if (stdDeviationX <= 0f && stdDeviationY <= 0f) {
         return inputBitmap
     }
 
-    val rx = max((stdDeviationX * 2.5f + 0.5f).toInt(), 0)
-    val ry = max((stdDeviationY * 2.5f + 0.5f).toInt(), 0)
-
     val width = inputBitmap.width
     val height = inputBitmap.height
-    val pixels = IntArray(width * height)
+    val size = width * height
+    val pixels = primitiveNode.pixels.getWithSize(size)
     inputBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
-    if (rx > 0) {
-        stackBlur(pixels, width, height, rx, true)
-    }
-    if (ry > 0) {
-        stackBlur(pixels, width, height, ry, false)
-    }
+    primitiveNode.blurScratch.blur(pixels, width, height, stdDeviationX, stdDeviationY)
 
-    val res = createBitmapSameAs(inputBitmap)
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     res.setPixels(pixels, 0, width, 0, 0, width, height)
+
+    val clipLeft = ((primitiveRegion.left - filterRegion.left)).toInt()
+    val clipTop = ((primitiveRegion.top - filterRegion.top)).toInt()
+    val clipRight = ((primitiveRegion.right - filterRegion.left)).toInt()
+    val clipBottom = ((primitiveRegion.bottom - filterRegion.top)).toInt()
+
+    if (clipLeft > 0 || clipTop > 0 || clipRight < width || clipBottom < height) {
+        val clearPaint = Paint()
+        clearPaint.xfermode = XFerModes.Clear
+        renderContext.canvasPool.withPooledObject { c ->
+            c.setBitmap(res)
+            // Clear top
+            if (clipTop > 0) c.drawRect(0f, 0f, width.toFloat(), clipTop.toFloat(), clearPaint)
+            // Clear bottom
+            if (clipBottom < height) c.drawRect(0f, clipBottom.toFloat(), width.toFloat(), height.toFloat(), clearPaint)
+            // Clear left
+            if (clipLeft > 0) c.drawRect(0f, clipTop.toFloat(), clipLeft.toFloat(), clipBottom.toFloat(), clearPaint)
+            // Clear right
+            if (clipRight < width) c.drawRect(clipRight.toFloat(), clipTop.toFloat(), width.toFloat(), clipBottom.toFloat(), clearPaint)
+        }
+    }
     return res
 }
 
+context(renderContext: RenderContext)
 internal fun doFeMorphologyFilter(
-    primitive: FeMorphology,
+    primitiveNode: FeMorphologyRenderNode,
     inputBitmap: Bitmap,
     primitiveScaleX: Float,
     primitiveScaleY: Float,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
 ): Bitmap {
+    val primitive = primitiveNode.sourceElement
     val radiusX = (primitive.radiusX * primitiveScaleX).ceilToInt()
     val radiusY = (primitive.radiusY * primitiveScaleY).ceilToInt()
-    return applyMorphology(inputBitmap, radiusX, radiusY, primitive.operator == FeMorphologyOperator.erode)
+    return applyMorphology(inputBitmap, radiusX, radiusY, primitiveNode.erode, primitiveNode, primitiveRegion, filterRegion, canvasScaleX, canvasScaleY)
 }
 
+context(renderContext: RenderContext)
 internal fun doFeTileFilter(
     inputBitmap: Bitmap,
-): Bitmap = applyTile(inputBitmap)
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+): Bitmap = applyTile(
+    input = inputBitmap,
+    primitiveRegion = primitiveRegion,
+    filterRegion = filterRegion,
+    canvasScaleX = canvasScaleX,
+    canvasScaleY = canvasScaleY,
+)
 
+context(renderContext: RenderContext)
 private fun filterPrimitiveLengthX(
-    renderContext: RenderContext,
     length: CSSLength?,
     primitiveUnitsAreUser: Boolean,
     primitiveScaleX: Float,
     canvasScaleX: Float,
 ): Float {
-    if (length == null) return 0f
-    return if (primitiveUnitsAreUser) {
-        length.floatValueX(renderContext) * canvasScaleX
-    } else {
-        length.floatValue(renderContext, 1f) * primitiveScaleX
+    return when {
+        length == null -> 0f
+        primitiveUnitsAreUser -> {
+            length.floatValueXInContext() * canvasScaleX
+        }
+        else -> {
+            length.floatValueInContext(1f) * primitiveScaleX
+        }
     }
 }
 
+context(renderContext: RenderContext)
 private fun filterPrimitiveLengthY(
-    renderContext: RenderContext,
     length: CSSLength?,
     primitiveUnitsAreUser: Boolean,
     primitiveScaleY: Float,
@@ -187,30 +242,49 @@ private fun filterPrimitiveLengthY(
 ): Float {
     if (length == null) return 0f
     return if (primitiveUnitsAreUser) {
-        length.floatValueY(renderContext) * canvasScaleY
+        length.floatValueYInContext() * canvasScaleY
     } else {
-        length.floatValue(renderContext, 1f) * primitiveScaleY
+        length.floatValueInContext(1f) * primitiveScaleY
     }
 }
 
-private fun applyMorphology(input: Bitmap, radiusX: Int, radiusY: Int, erode: Boolean): Bitmap {
+context(renderContext: RenderContext)
+private fun applyMorphology(
+    input: Bitmap,
+    radiusX: Int,
+    radiusY: Int,
+    erode: Boolean,
+    primitiveNode: FeMorphologyRenderNode,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+): Bitmap {
     if (radiusX <= 0 && radiusY <= 0) {
         return input
     }
 
     val width = input.width
     val height = input.height
-    val src = IntArray(width * height)
+    val size = width * height
+    val src = primitiveNode.srcPixels.getWithSize(size)
     input.getPixels(src, 0, width, 0, 0, width, height)
-    val dst = IntArray(width * height)
+    val dst = primitiveNode.dstPixels.getWithSize(size)
+
+    val clipLeft = clamp(((primitiveRegion.left - filterRegion.left)).toInt(), 0, width)
+    val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
+    val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
+    val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
 
     val channelInitialValue = if (erode) 255 else 0
 
-    for (y in 0 until height) {
+    dst.fill(0) // Initialize with transparent
+
+    for (y in clipTop until clipBottom) {
         val rowOffset = y * width
         val top = max(0, y - radiusY)
         val bottom = min(height - 1, y + radiusY)
-        for (x in 0 until width) {
+        for (x in clipLeft until clipRight) {
             var a = channelInitialValue
             var r = channelInitialValue
             var g = channelInitialValue
@@ -238,22 +312,38 @@ private fun applyMorphology(input: Bitmap, radiusX: Int, radiusY: Int, erode: Bo
         }
     }
 
-    val res = createBitmapSameAs(input)
+    val res = renderContext.bitmapPool.acquireSameAs(input)
     res.setPixels(dst, 0, width, 0, 0, width, height)
     return res
 }
 
-private fun applyTile(input: Bitmap): Bitmap {
-    val res = createBitmapSameAs(input)
-    val c = Canvas(res)
-    var y = 0f
-    while (y < res.height) {
-        var x = 0f
-        while (x < res.width) {
-            c.drawBitmap(input, x, y, null)
-            x += input.width
+context(renderContext: RenderContext)
+private fun applyTile(
+    input: Bitmap,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+): Bitmap {
+    val res = renderContext.bitmapPool.acquireSameAs(input)
+    renderContext.canvasPool.withPooledObject { c ->
+        c.setBitmap(res)
+        val clipLeft = (primitiveRegion.left - filterRegion.left)
+        val clipTop = (primitiveRegion.top - filterRegion.top)
+        val clipRight = (primitiveRegion.right - filterRegion.left)
+        val clipBottom = (primitiveRegion.bottom - filterRegion.top)
+
+        c.withClip(clipLeft, clipTop, clipRight, clipBottom) {
+            var y = clipTop
+            while (y < clipBottom) {
+                var x = clipLeft
+                while (x < clipRight) {
+                    c.drawBitmap(input, x, y, null)
+                    x += input.width
+                }
+                y += input.height
+            }
         }
-        y += input.height
     }
     return res
 }

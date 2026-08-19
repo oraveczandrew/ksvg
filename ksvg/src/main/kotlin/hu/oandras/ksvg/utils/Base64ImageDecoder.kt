@@ -19,8 +19,8 @@ package hu.oandras.ksvg.utils
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Base64
 import android.util.Log
+import kotlin.io.encoding.Base64
 
 private const val TAG = "Base64ImageDecoder"
 
@@ -50,8 +50,8 @@ internal fun checkForImageDataURL(url: String): Bitmap? {
 
     try {
         val imageData = Base64.decode(
-            url.substring(comma + 1),
-            Base64.DEFAULT
+            source = url,
+            startIndex = comma + 1
         ) // throws IllegalArgumentException for bad data
         return BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
     } catch (e: Exception) {

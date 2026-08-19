@@ -17,6 +17,10 @@
 
 package hu.oandras.ksvg.parser
 
+import androidx.collection.FloatList
+import androidx.collection.IntList
+import androidx.collection.MutableIntList
+import androidx.collection.mutableFloatListOf
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
 import hu.oandras.ksvg.parser.IntegerParser.parseInt
@@ -385,6 +389,53 @@ internal open class TextScanner(input: String) {
             position = inputLength
             input.substring(start)
         }
+    }
+
+    fun skipSemicolonWhitespace(): Boolean {
+        skipWhitespace()
+        if (empty()) return false
+        val found = input[position] == ';' || input[position] == ','
+        if (found) {
+            position++
+            skipWhitespace()
+        }
+        return found
+    }
+
+    fun nextSemicolonFloatList(): FloatList {
+        val result = mutableFloatListOf()
+        while (!empty()) {
+            skipWhitespace()
+            if (empty()) break
+            if (consume(';')) continue
+            if (consume(',')) continue
+
+            val f = nextFloat()
+            if (f.isNaN()) {
+                // Skip the invalid token so we neither crash nor loop forever.
+                while (!empty() && input[position] != ';' && input[position] != ',' && !isWhitespace(input[position])) {
+                    position++
+                }
+                skipSemicolonWhitespace()
+                continue
+            }
+            result.add(f)
+            skipSemicolonWhitespace()
+        }
+        return result
+    }
+
+    fun nextSemicolonColorList(): IntList {
+        val result = MutableIntList()
+        while (!empty()) {
+            val token = nextToken(';', true)?.trim()
+            if (!token.isNullOrEmpty()) {
+                val color = ColorParser.parseColor(token)
+                result.add(color.value)
+            }
+            if (!skipSemicolonWhitespace()) break
+        }
+        return result
     }
 }
 

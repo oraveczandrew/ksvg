@@ -16,8 +16,6 @@
 
 @file:Suppress("UnstableApiUsage")
 
-import org.gradle.api.initialization.resolve.RepositoriesMode
-
 pluginManagement {
     repositories {
         google()
@@ -43,4 +41,9 @@ dependencyResolutionManagement {
     }
 }
 
-include(":ksvg")
+include(listOf(
+    ":ksvg",
+    ":nativeblur",
+    ":glide",
+    ":showcase",
+))

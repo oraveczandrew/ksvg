@@ -1,0 +1,4 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <path fill-rule="evenodd" fill="purple" d="M 50 50 L 150 50 L 150 150 L 50 150 Z M 70 70 L 130 70 L 130 130 L 70 130 Z"/>
+  <path fill-rule="nonzero" fill="teal" d="M 50 50 L 150 50 L 150 150 L 50 150 Z M 70 70 L 70 130 L 130 130 L 130 70 Z"/>
+</svg>

@@ -1,0 +1,5 @@
+<svg width="200" height="120" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+  <text x="10" y="40" font-size="20" font-family="serif" fill="navy" font-variation-settings="wght 700">Bold weight</text>
+  <text x="10" y="80" font-size="20" font-family="sans-serif" fill="teal" font-feature-settings="smcp" font-variant-caps="small-caps">Small Caps</text>
+  <text x="10" y="110" font-size="20" font-family="monospace" fill="black" font-variation-settings="wght 300, wdth 150">Light wide</text>
+</svg>

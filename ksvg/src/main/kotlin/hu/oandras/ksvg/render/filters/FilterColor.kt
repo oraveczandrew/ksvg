@@ -17,74 +17,112 @@
 package hu.oandras.ksvg.render.filters
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
-import hu.oandras.ksvg.dom.FeColorMatrixType
-import hu.oandras.ksvg.dom.FeFuncType
-import hu.oandras.ksvg.dom.SvgObject.FeColorMatrix
-import hu.oandras.ksvg.dom.SvgObject.FeComponentTransfer
-import hu.oandras.ksvg.dom.SvgObject.FeFunc
-import hu.oandras.ksvg.render.SVGAndroidRenderer.Companion.LUMINANCE_TO_ALPHA_BLUE
-import hu.oandras.ksvg.render.SVGAndroidRenderer.Companion.LUMINANCE_TO_ALPHA_GREEN
-import hu.oandras.ksvg.render.SVGAndroidRenderer.Companion.LUMINANCE_TO_ALPHA_RED
+import android.graphics.RectF
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
+import hu.oandras.ksvg.dom.filter.FeColorMatrixType
+import hu.oandras.ksvg.dom.filter.FeFunc
+import hu.oandras.ksvg.dom.filter.FeFuncType
+import hu.oandras.ksvg.render.FeColorMatrixRenderNode
+import hu.oandras.ksvg.render.FeComponentTransferRenderNode
+import hu.oandras.ksvg.render.RenderContext
+import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_BLUE
+import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_GREEN
+import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_RED
+import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.clamp255
-import hu.oandras.ksvg.utils.createBitmapSameAs
-import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.linearToSRgb
 import hu.oandras.ksvg.utils.red
+import hu.oandras.ksvg.utils.sRgbToLinear
 import hu.oandras.ksvg.utils.toRadians
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.sin
 
-internal fun doFeColorMatrixFilter(primitive: FeColorMatrix, inputBitmap: Bitmap): Bitmap {
-    val res = createBitmapSameAs(inputBitmap)
-    val c = Canvas(res)
-    val paint = Paint()
-    val cm = when (primitive.type) {
+internal val luminanceToAlphaFloatArray: FloatArray = floatArrayOf(
+    0f, 0f, 0f, 0f, 0f,
+    0f, 0f, 0f, 0f, 0f,
+    0f, 0f, 0f, 0f, 0f,
+    LUMINANCE_TO_ALPHA_RED, LUMINANCE_TO_ALPHA_GREEN, LUMINANCE_TO_ALPHA_BLUE, 0f, 0f
+)
+
+private val identity: FloatArray = floatArrayOf(
+    1f, 0f, 0f, 0f, 0f,
+    0f, 1f, 0f, 0f, 0f,
+    0f, 0f, 1f, 0f, 0f,
+    0f, 0f, 0f, 1f, 0f
+)
+
+context(renderContext: RenderContext)
+internal fun doFeColorMatrixFilter(
+    primitiveNode: FeColorMatrixRenderNode,
+    inputBitmap: Bitmap,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+): Bitmap {
+    val paint = primitiveNode.paint
+        ?: createFilterPaint(
+            type = primitiveNode.type,
+            values = primitiveNode.values
+        ).also {
+            primitiveNode.paint = it
+        }
+
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
+    renderContext.canvasPool.withPooledObject { c ->
+        c.setBitmap(res)
+        val clipLeft = (primitiveRegion.left - filterRegion.left)
+        val clipTop = (primitiveRegion.top - filterRegion.top)
+        val clipRight = (primitiveRegion.right - filterRegion.left)
+        val clipBottom = (primitiveRegion.bottom - filterRegion.top)
+        c.clipRect(clipLeft, clipTop, clipRight, clipBottom)
+        c.drawBitmap(inputBitmap, 0f, 0f, paint)
+    }
+    return res
+}
+
+internal fun createFilterPaint(type: FeColorMatrixType, values: FloatArray?): Paint {
+    val cm = when (type) {
         FeColorMatrixType.matrix -> {
-            val values = primitive.values?.copyOf() ?: floatArrayOf(
-                1f, 0f, 0f, 0f, 0f,
-                0f, 1f, 0f, 0f, 0f,
-                0f, 0f, 1f, 0f, 0f,
-                0f, 0f, 0f, 1f, 0f
-            )
+            val values = (values ?: identity).copyOf()
+
             if (values.size >= 20) {
                 values[4] *= 255f
                 values[9] *= 255f
                 values[14] *= 255f
                 values[19] *= 255f
             }
+
             ColorMatrix(values)
         }
 
-        FeColorMatrixType.saturate -> ColorMatrix().apply { setSaturation(primitive.values?.get(0) ?: 1f) }
-        FeColorMatrixType.hueRotate -> ColorMatrix(createHueRotateMatrix(primitive.values?.get(0) ?: 0f))
-        FeColorMatrixType.luminanceToAlpha -> ColorMatrix(
-            floatArrayOf(
-                0f, 0f, 0f, 0f, 0f,
-                0f, 0f, 0f, 0f, 0f,
-                0f, 0f, 0f, 0f, 0f,
-                LUMINANCE_TO_ALPHA_RED, LUMINANCE_TO_ALPHA_GREEN, LUMINANCE_TO_ALPHA_BLUE, 0f, 0f
-            )
-        )
-    }
-    paint.setColorFilter(ColorMatrixColorFilter(cm))
-    c.drawBitmap(inputBitmap, 0f, 0f, paint)
-    return res
-}
+        FeColorMatrixType.saturate -> {
+            ColorMatrix().apply {
+                setSaturation(values?.get(0) ?: 1f)
+            }
+        }
 
-internal fun doFeComponentTransferFilter(
-    primitive: FeComponentTransfer,
-    inputBitmap: Bitmap,
-): Bitmap = applyComponentTransfer(inputBitmap, primitive)
+        FeColorMatrixType.hueRotate -> {
+            ColorMatrix(createHueRotateMatrix(values?.get(0) ?: 0f))
+        }
+
+        FeColorMatrixType.luminanceToAlpha -> ColorMatrix(luminanceToAlphaFloatArray)
+    }
+
+    val paint = Paint()
+    paint.setColorFilter(ColorMatrixColorFilter(cm))
+    return paint
+}
 
 private fun createHueRotateMatrix(degrees: Float): FloatArray {
     val angle = degrees.toRadians()
@@ -117,48 +155,68 @@ private fun createHueRotateMatrix(degrees: Float): FloatArray {
     )
 }
 
-private fun applyComponentTransfer(input: Bitmap, primitive: FeComponentTransfer): Bitmap {
-    val funcs = Array<FeFunc?>(4) { null }
-    primitive.getChildren().forEachElement { child ->
-        if (child is FeFunc) {
-            when (child.channel) {
-                FeFunc.Channel.R -> funcs[0] = child
-                FeFunc.Channel.G -> funcs[1] = child
-                FeFunc.Channel.B -> funcs[2] = child
-                FeFunc.Channel.A -> funcs[3] = child
+context(renderContext: RenderContext)
+internal fun doFeComponentTransferFilter(
+    inputBitmap: Bitmap,
+    primitiveNode: FeComponentTransferRenderNode,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+): Bitmap {
+    val transferFunctions = primitiveNode.transferFunctions
+
+    val width = inputBitmap.width
+    val height = inputBitmap.height
+    val size = width * height
+    val pixels = primitiveNode.srcPixels.getWithSize(size)
+    inputBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+    val outPixels = primitiveNode.outPixels.getWithSize(size)
+    
+    val clipLeft = clamp(((primitiveRegion.left - filterRegion.left)).toInt(), 0, width)
+    val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
+    val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
+    val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
+
+    outPixels.fill(0) // Initialize with transparent
+    val useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LinearRGB
+
+    for (y in clipTop until clipBottom) {
+        val rowOffset = y * width
+        for (x in clipLeft until clipRight) {
+            val i = rowOffset + x
+            val color = pixels[i]
+            if (useLinear) {
+                outPixels[i] = argb(
+                    alpha = applyTransferFunction(color.alpha, transferFunctions.a),
+                    red = linearToSRgb(applyTransferFunction(sRgbToLinear(color.red), transferFunctions.r)),
+                    green = linearToSRgb(applyTransferFunction(sRgbToLinear(color.green), transferFunctions.g)),
+                    blue = linearToSRgb(applyTransferFunction(sRgbToLinear(color.blue), transferFunctions.b)),
+                )
+            } else {
+                outPixels[i] = argb(
+                    alpha = applyTransferFunction(color.alpha, transferFunctions.a),
+                    red = applyTransferFunction(color.red, transferFunctions.r),
+                    green = applyTransferFunction(color.green, transferFunctions.g),
+                    blue = applyTransferFunction(color.blue, transferFunctions.b),
+                )
             }
         }
     }
 
-    val width = input.width
-    val height = input.height
-    val pixels = IntArray(width * height)
-    val outPixels = IntArray(width * height)
-    input.getPixels(pixels, 0, width, 0, 0, width, height)
-    for (i in pixels.indices) {
-        val color = pixels[i]
-        outPixels[i] = argb(
-            alpha = applyTransferFunction(color.alpha, funcs[3]),
-            red = applyTransferFunction(color.red, funcs[0]),
-            green = applyTransferFunction(color.green, funcs[1]),
-            blue = applyTransferFunction(color.blue, funcs[2]),
-        )
-    }
-
-    val res = createBitmapSameAs(input)
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     res.setPixels(outPixels, 0, width, 0, 0, width, height)
     return res
 }
 
-private fun applyTransferFunction(value: Int, func: FeFunc?): Int {
-    if (func == null || func.type == FeFuncType.identity) return value
+private fun applyTransferFunction(value: Int, transferFunction: FeFunc?): Int {
+    if (transferFunction == null || transferFunction.type == FeFuncType.identity) return value
     val x = value / 255f
-    val y = when (func.type) {
-        FeFuncType.table -> interpolateTable(x, func.tableValues)
-        FeFuncType.discrete -> discreteTable(x, func.tableValues)
-        FeFuncType.linear -> func.slope * x + func.intercept
-        FeFuncType.gamma -> func.amplitude * x.pow(func.exponent) + func.offset
-        FeFuncType.identity -> x
+    val y = when (transferFunction.type) {
+        FeFuncType.table -> interpolateTable(x, transferFunction.tableValues)
+        FeFuncType.discrete -> discreteTable(x, transferFunction.tableValues)
+        FeFuncType.linear -> transferFunction.slope * x + transferFunction.intercept
+        FeFuncType.gamma -> transferFunction.amplitude * x.pow(transferFunction.exponent) + transferFunction.offset
     }
     return clamp255(y * 255f)
 }

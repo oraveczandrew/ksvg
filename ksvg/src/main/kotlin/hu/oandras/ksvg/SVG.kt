@@ -21,56 +21,41 @@ import android.content.res.AssetManager
 import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Path
-import android.graphics.Picture
 import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.render.PathConverter
 import java.io.IOException
 import java.io.InputStream
 
 /**
  * KSVG is a library for reading, parsing and rendering SVG documents on Android devices.
- * 
- * 
+ *
  * All interaction with KSVG is via this class.
- * 
- * 
+ *
  * Typically, you will call one of the SVG loading and parsing classes then call the renderer,
  * passing it a canvas to draw upon.
- * 
+ *
  * <h3>Usage summary</h3>
- * 
- * 
+ *
  *  * Use one of the static `getFromX()` methods to read and parse the SVG file.  They will
  * return an instance of this class.
  *  * Call one of the `renderToX()` methods to render the document.
- * 
- * 
- * <h3>Usage example</h3>
- * 
- * <pre>
- * `SVG.registerExternalFileResolver(myResolver); SVG  svg = SVG.getFromAsset(getContext().getAssets(), svgPath); Bitmap  newBM = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888); Canvas  bmcanvas = new Canvas(newBM); bmcanvas.drawRGB(255, 255, 255);  // Clear background to white svg.renderToCanvas(bmcanvas); `
-</pre> * 
- * 
- * For more detailed information on how to use this library, see the documentation at `http://code.google.com/p/androidsvg/`
  */
 public interface SVG {
     /**
      * Indicates whether internal entities were enabled when this SVG was parsed.
-     * 
-     * *Note: prior to release 1.5, this was a static method of {@code SVG}.  In 1.5, it was
-     * changed to an instance method to coincide with the change making parsing settings thread safe.*
-     * 
 
      */
     public val isInternalEntitiesEnabled: Boolean
 
 
     /**
-     * The [SVGExternalFileResolver] in effect when this SVG was parsed.
+     * The [ExternalFileResolver] in effect when this SVG was parsed.
      * 
 
      */
-    public val externalFileResolver: SVGExternalFileResolver?
+    public val externalFileResolver: ExternalFileResolver?
 
 
     /**
@@ -84,71 +69,35 @@ public interface SVG {
      */
     public var renderDPI: Float
 
-    //===============================================================================
-    // SVG document rendering to a Picture object (indirect rendering)
     /**
-     * Renders this SVG document to a Picture object.
-     * 
-     * 
-     * An attempt will be made to determine a suitable initial viewport from the contents of the SVG file.
-     * If an appropriate viewport can't be determined, a default viewport of 512x512 will be used.
-     * 
-     * @return a Picture object suitable for later rendering using `Canvas.drawPicture()`
+     * Returns this SVG document as a [Drawable].
+     *
+     * The returned drawable renders the SVG into its current bounds when drawn. If no bounds have
+     * been assigned, the drawable uses the document's intrinsic dimensions where available.
      */
-    public fun renderToPicture(): Picture
-
+    public fun toDrawable(): KSVGDrawable
 
     /**
-     * Renders this SVG document to a [Picture].
-     * 
-     * @param widthInPixels the width of the initial viewport
-     * @param heightInPixels the height of the initial viewport
-     * @return a Picture object suitable for later rendering using [Canvas.drawPicture]
+     * Returns this SVG document as a [Drawable].
+     *
+     * @param renderOptions options that describe how to render this SVG.
      */
-    public fun renderToPicture(widthInPixels: Int, heightInPixels: Int): Picture
-
+    public fun toDrawable(renderOptions: RenderOptions?): KSVGDrawable
 
     /**
-     * Renders this SVG document to a [Picture].
-     * 
-     * @param renderOptions options that describe how to render this SVG on the Canvas.
-     * @return a Picture object suitable for later rendering using [Canvas.drawPicture]
-
+     * Returns this SVG document as an animatable [Drawable].
+     *
+     * This currently uses the same rendering path as [toDrawable], but exposes Android's animation
+     * lifecycle so SVG animation support can be driven by the drawable API.
      */
-    public fun renderToPicture(renderOptions: RenderOptions?): Picture
-
+    public fun toAnimatedDrawable(): KSVGAnimatedDrawable
 
     /**
-     * Renders this SVG document to a [Picture].
-     * 
-     * @param widthInPixels the width of the `Picture`
-     * @param heightInPixels the height of the `Picture`
-     * @param renderOptions options that describe how to render this SVG on the Canvas.
-     * @return a Picture object suitable for later rendering using [Canvas.drawPicture]
-
+     * Returns this SVG document as an animatable [Drawable].
+     *
+     * @param renderOptions options that describe how to render this SVG.
      */
-    public fun renderToPicture(
-        widthInPixels: Int,
-        heightInPixels: Int,
-        renderOptions: RenderOptions?
-    ): Picture
-
-
-    /**
-     * Renders this SVG document to a [Picture] using the specified view defined in the document.
-     * 
-     * 
-     * A View is a special element in an SVG document that describes a rectangular area in the document.
-     * Calling this method with a `viewId` will result in the specified view being positioned and scaled
-     * to the viewport.  In other words, use [.renderToPicture] to render the whole document, or use this
-     * method instead to render just a part of it.
-     * 
-     * @param viewId the id of a view element in the document that defines which section of the document is to be visible.
-     * @param widthInPixels the width of the initial viewport
-     * @param heightInPixels the height of the initial viewport
-     * @return a Picture object suitable for later rendering using `Canvas.drawPicture()`, or null if the viewId was not found.
-     */
-    public fun renderViewToPicture(viewId: String?, widthInPixels: Int, heightInPixels: Int): Picture
+    public fun toAnimatedDrawable(renderOptions: RenderOptions?): KSVGAnimatedDrawable
 
 
     //===============================================================================
@@ -188,7 +137,7 @@ public interface SVG {
      * 
      * A View is a special element in an SVG documents that describes a rectangular area in the document.
      * Calling this method with a `viewId` will result in the specified view being positioned and scaled
-     * to the viewport.  In other words, use [.renderToPicture] to render the whole document, or use this
+     * to the viewport.  In other words, use [renderToCanvas] to render the whole document, or use this
      * method instead to render just a part of it.
      * 
      * 
@@ -206,7 +155,7 @@ public interface SVG {
      * 
      * A View is a special element in an SVG documents that describes a rectangular area in the document.
      * Calling this method with a `viewId` will result in the specified view being positioned and scaled
-     * to the viewport.  In other words, use [.renderToPicture] to render the whole document, or use this
+     * to the viewport.  In other words, use [renderToCanvas] to render the whole document, or use this
      * method instead to render just a part of it.
      * 
      * 
@@ -217,6 +166,37 @@ public interface SVG {
      * @param viewPort the bounds of the area on the canvas you want the SVG rendered, or null for the whole canvas.
      */
     public fun renderViewToCanvas(viewId: String?, canvas: Canvas, viewPort: RectF?)
+
+
+    /**
+     * Sets a listener for click events on `<a>` elements in the SVG document.
+     *
+     * Must be called after [renderToCanvas] so that hit regions are available.
+     *
+     * @param listener the listener to invoke when an `<a>` element is clicked, or `null` to remove.
+     */
+    public fun setOnSvgClickListener(listener: OnSvgClickListener?)
+
+
+    /**
+     * Returns the list of clickable regions in the most recently rendered SVG.
+     *
+     * Each region corresponds to an `<a>` element and contains its `href` and
+     * bounding rectangle in screen (canvas) coordinates. An empty list is returned
+     * if no `<a>` elements exist or if no rendering has been performed yet.
+     */
+    public fun getHitRegions(): List<HitRegion>
+
+
+    /**
+     * Performs a hit-test at the given screen coordinates and returns the `href`
+     * of the topmost `<a>` element that contains the point, or `null` if none.
+     *
+     * @param x the x coordinate in canvas/screen space.
+     * @param y the y coordinate in canvas/screen space.
+     * @return the `href` attribute value of the hit `<a>` element, or `null`.
+     */
+    public fun hitTest(x: Float, y: Float): String?
 
 
     /**
@@ -275,10 +255,10 @@ public interface SVG {
      * of the root `<svg>` element.
      * 
      * @param value A valid SVG 'length' attribute, such as "100px" or "10cm".
-     * @throws SVGParseException if `value` cannot be parsed successfully.
+     * @throws KSVGParseException if `value` cannot be parsed successfully.
      * @throws IllegalArgumentException if there is no current SVG document loaded.
      */
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     public fun setDocumentWidth(value: String)
 
     /**
@@ -303,10 +283,10 @@ public interface SVG {
      * of the root `<svg>` element.
      * 
      * @param value A valid SVG 'length' attribute, such as "100px" or "10cm".
-     * @throws SVGParseException if `value` cannot be parsed successfully.
+     * @throws KSVGParseException if `value` cannot be parsed successfully.
      * @throws IllegalArgumentException if there is no current SVG document loaded.
      */
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     public fun setDocumentHeight(value: String)
 
 
@@ -373,19 +353,24 @@ public interface SVG {
          * @return the version number in string format
          */
         //static final String  TAG = "SVG";
-        public const val VERSION: String = "1.5"
+        public const val VERSION: String = "1.0"
 
         /**
          * Read and parse an SVG from the given `InputStream`.
          * 
          * @param inputStream the input stream from which to read the file.
+         * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws SVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error parsing the document.
          */
         @JvmStatic
-        @Throws(SVGParseException::class)
-        public fun getFromInputStream(inputStream: InputStream): SVG {
-            return SVGImpl.getFromInputStream(inputStream)
+        @JvmOverloads
+        @Throws(KSVGParseException::class)
+        public fun getFromInputStream(
+            inputStream: InputStream,
+            parseAnimations: Boolean = false
+        ): SVG {
+            return SVGImpl.getFromInputStream(inputStream, parseAnimations)
         }
 
 
@@ -393,13 +378,18 @@ public interface SVG {
          * Read and parse an SVG from the given `String`.
          * 
          * @param svg the String instance containing the SVG document.
+         * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws SVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error parsing the document.
          */
         @JvmStatic
-        @Throws(SVGParseException::class)
-        public fun getFromString(svg: String): SVG {
-            return SVGImpl.getFromString(svg)
+        @JvmOverloads
+        @Throws(KSVGParseException::class)
+        public fun getFromString(
+            svg: String,
+            parseAnimations: Boolean = false
+        ): SVG {
+            return SVGImpl.getFromString(svg, parseAnimations)
         }
 
 
@@ -408,13 +398,19 @@ public interface SVG {
          * 
          * @param context the Android context of the resource.
          * @param resourceId the resource identifier of the SVG document.
+         * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws SVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error parsing the document.
          */
         @JvmStatic
-        @Throws(SVGParseException::class)
-        public fun getFromResource(context: Context, resourceId: Int): SVG {
-            return getFromResource(context.resources, resourceId)
+        @JvmOverloads
+        @Throws(KSVGParseException::class)
+        public fun getFromResource(
+            context: Context,
+            resourceId: Int,
+            parseAnimations: Boolean = false
+        ): SVG {
+            return getFromResource(context.resources, resourceId, parseAnimations)
         }
 
 
@@ -423,13 +419,20 @@ public interface SVG {
          * 
          * @param resources the set of Resources in which to locate the file.
          * @param resourceId the resource identifier of the SVG document.
+         * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws SVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error parsing the document.
     
          */
-        @Throws(SVGParseException::class)
-        public fun getFromResource(resources: Resources, resourceId: Int): SVG {
-            return SVGImpl.getFromResource(resources, resourceId)
+        @JvmStatic
+        @JvmOverloads
+        @Throws(KSVGParseException::class)
+        public fun getFromResource(
+            resources: Resources,
+            resourceId: Int,
+            parseAnimations: Boolean = false
+        ): SVG {
+            return SVGImpl.getFromResource(resources, resourceId, parseAnimations)
         }
 
 
@@ -438,81 +441,77 @@ public interface SVG {
          * 
          * @param assetManager the AssetManager instance to use when reading the file.
          * @param filename the filename of the SVG document within assets.
+         * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws SVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error parsing the document.
          * @throws IOException if there is some IO error while reading the file.
          */
-        @Throws(SVGParseException::class, IOException::class)
-        public fun getFromAsset(assetManager: AssetManager, filename: String): SVG {
-            return SVGImpl.getFromAsset(assetManager, filename)
+        @JvmStatic
+        @JvmOverloads
+        @Throws(KSVGParseException::class, IOException::class)
+        public fun getFromAsset(
+            assetManager: AssetManager,
+            filename: String,
+            parseAnimations: Boolean = false
+        ): SVG {
+            return SVGImpl.getFromAsset(assetManager, filename, parseAnimations)
         }
 
 
-        /**
-         * Parse an SVG path definition from the given `String`.
-         * 
-         * `Path  path = SVG.parsePath("M 0,0 L 100,100"); path.setFillType(Path.FillType.EVEN_ODD); // You could render the path to a Canvas now Paint paint = new Paint(); paint.setStyle(Paint.Style.FILL); paint.setColor(Color.RED); canvas.drawPath(path, paint); // Or perform other operations on it RectF bounds = new RectF(); path.computeBounds(bounds, false); `
-         * 
-         * Note that this method does not throw any exceptions or return any errors. Per the SVG
-         * specification, if there are any errors in the path definition, the valid portion of the
-         * path up until the first error is returned.
-         * 
-         * @param pathDefinition an SVG path element definition string
-         * @return an Android `Path`
-    
-         */
+         /**
+          * Parse an SVG path definition from the given `String`.
+          *
+          * Note that this method does not throw any exceptions or return any errors. Per the SVG
+          * specification, if there are any errors in the path definition, the valid portion of the
+          * path up until the first error is returned.
+          *
+          * @param pathDefinition an SVG path element definition string
+          * @return an Android `Path`
+          */
         @JvmStatic
         public fun parsePath(pathDefinition: String): Path {
-            return SVGImpl.parsePath(pathDefinition)
+            val pathDef = hu.oandras.ksvg.parser.parsePath(pathDefinition)
+            val pathConv = PathConverter(pathDef)
+            return pathConv.path
         }
 
 
         //===============================================================================
-        /**
-         * Tells the parser whether to allow the expansion of internal entities.
-         * An example of a document containing an internal entities is:
-         * 
-         * `<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd" [   <!ENTITY hello "Hello World!"> ]> <svg>    <text>&hello;</text> </svg> `
-         * 
-         * Entities are useful in some circumstances, but SVG files that use them are quite rare.  Note
-         * also that enabling entity expansion makes you vulnerable to the
-         * [Billion Laughs Attack](https://en.wikipedia.org/wiki/Billion_laughs_attack)
-         * 
-         * Entity expansion is enabled by default.
-         * 
-         * @param enable Set true if you want to enable entity expansion by the parser.
-    
-         */
+         /**
+          * Tells the parser whether to allow the expansion of internal entities.
+          *
+          * Entities are useful in some circumstances, but SVG files that use them are quite rare.  Note
+          * also that enabling entity expansion makes you vulnerable to the
+          * [Billion Laughs Attack](https://en.wikipedia.org/wiki/Billion_laughs_attack)
+          *
+          * Entity expansion is enabled by default.
+          *
+          * @param enable Set true if you want to enable entity expansion by the parser.
+          */
         @JvmStatic
         public fun setInternalEntitiesEnabled(enable: Boolean) {
             SVGImpl.setInternalEntitiesEnabled(enable)
         }
 
         /**
-         * Register an [SVGExternalFileResolver] instance that the renderer should use when resolving
+         * Register an [ExternalFileResolver] instance that the renderer should use when resolving
          * external references such as images, fonts, and CSS stylesheets.
-         * 
-         * 
-         * 
-         * *Note: prior to release 1.3, this was an instance method of {@code SVG}.  In 1.3, it was
-         * changed to a static method so that users can resolve external references to CSS files while
-         * the SVG is being parsed.*
-         * 
-         * 
+         *
          * @param fileResolver the resolver to use.
     
          */
         @JvmStatic
-        public fun registerExternalFileResolver(fileResolver: SVGExternalFileResolver?) {
+        public fun registerExternalFileResolver(fileResolver: ExternalFileResolver?) {
             SVGImpl.registerExternalFileResolver(fileResolver)
         }
 
 
         /**
-         * De-register the current [SVGExternalFileResolver] instance.
+         * De-register the current [ExternalFileResolver] instance.
          * 
     
          */
+        @JvmStatic
         public fun deregisterExternalFileResolver() {
             SVGImpl.deregisterExternalFileResolver()
         }

@@ -1,0 +1,6 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <polyline points="10,20 50,60 10,100 50,140" fill="none" stroke="red" stroke-width="8" stroke-linejoin="miter" stroke-miterlimit="4"/>
+  <polyline points="110,20 150,60 110,100 150,140" fill="none" stroke="blue" stroke-width="8" stroke-linejoin="round"/>
+  <polyline points="10,170 50,180 90,170 130,180 170,170" fill="none" stroke="green" stroke-width="6" stroke-linejoin="bevel"/>
+  <path d="M 10 195 L 190 195" stroke="black" stroke-width="6" stroke-dasharray="10 5" stroke-dashoffset="3" stroke-linecap="square"/>
+</svg>

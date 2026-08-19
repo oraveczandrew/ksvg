@@ -1,6 +1,9 @@
 local.properties
 build
+.cxx
 .gradle
 *.iml
 .idea/
 .artifacts/
+**/test-data/visual-diff/
+**/test-data/ai-helper/

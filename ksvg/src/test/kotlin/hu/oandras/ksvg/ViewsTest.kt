@@ -27,7 +27,7 @@ import org.robolectric.annotation.Config
 @Config(manifest = Config.NONE)
 class ViewsTest {
 
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     @Test
     fun getViewList() {
         val test = "<?xml version=\"1.0\" standalone=\"no\"?>\n" +

@@ -16,34 +16,33 @@
 
 package hu.oandras.ksvg
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import hu.oandras.ksvg.dom.SVGImpl
-import hu.oandras.ksvg.dom.SvgObject
+import hu.oandras.ksvg.dom.core.Defs
+import hu.oandras.ksvg.dom.filter.FeImage
+import hu.oandras.ksvg.dom.filter.Filter
+import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.red
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class FiltersTest {
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feColorMatrix() {
         val test = """
             <svg width="100" height="100">
@@ -57,7 +56,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -72,7 +71,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feOffset() {
         val test = """
             <svg width="100" height="100">
@@ -86,7 +85,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -98,7 +97,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feTurbulence() {
         val test = """
             <svg width="100" height="100">
@@ -112,25 +111,30 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
-        val pixel = bm.getPixel(50, 50)
-        // Current implementation produces color noise, including the alpha channel
-        assertTrue("Alpha should be non-zero", pixel.alpha > 0)
-        
-        // It shouldn't be the original red
-        assertNotEquals("Should not be pure red", 255, pixel.red)
-        assertNotEquals("Should not be pure black", 0, pixel.red)
-        
-        // With the new 4-channel noise, R, G, B are likely different
-        val isGrayscale = pixel.red == pixel.green && pixel.red == pixel.blue
-        assertFalse("Should be color noise, not grayscale", isGrayscale)
+        // feTurbulence generates per-channel noise, including the alpha channel.
+        // A single pixel may legitimately have alpha 0 (turbulence can evaluate to 0),
+        // so we scan the whole image to confirm non-zero alpha noise exists and that
+        // the result is color (not grayscale) noise somewhere.
+        var maxAlpha = 0
+        var colorNoiseFound = false
+        for (y in 0 until 100) {
+            for (x in 0 until 100) {
+                val p = bm.getPixel(x, y)
+                if (p.alpha > maxAlpha) maxAlpha = p.alpha
+                if (p.red != p.green || p.red != p.blue) colorNoiseFound = true
+            }
+        }
+
+        assertTrue("Alpha channel should contain non-zero noise", maxAlpha > 0)
+        assertTrue("Should be color noise, not grayscale", colorNoiseFound)
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feConvolveMatrix() {
         val test = """
             <svg width="100" height="100">
@@ -144,7 +148,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -155,7 +159,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feDisplacementMap() {
         val test = """
             <svg width="100" height="100">
@@ -170,7 +174,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -189,7 +193,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feDiffuseLighting() {
         val test = """
             <svg width="100" height="100">
@@ -206,7 +210,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -220,7 +224,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun fePointLight() {
         val test = """
             <svg width="100" height="100">
@@ -237,7 +241,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -247,7 +251,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feSpecularLighting() {
         val test = """
             <svg width="100" height="100">
@@ -264,7 +268,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -273,7 +277,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feSpotLight() {
         val test = """
             <svg width="100" height="100">
@@ -290,7 +294,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -299,7 +303,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun primitiveUnitsObjectBoundingBox() {
         val test = """
             <svg width="100" height="100">
@@ -313,7 +317,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -325,7 +329,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feFlood() {
         val test = """
             <svg width="100" height="100">
@@ -339,7 +343,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -353,7 +357,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feMerge() {
         val test = """
             <svg width="100" height="100">
@@ -371,7 +375,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -382,7 +386,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feGaussianBlur() {
         val test = """
             <svg width="100" height="100">
@@ -396,7 +400,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -408,7 +412,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun complexDropShadow() {
         // Typical drop shadow pattern used in meteocons
         val test = """
@@ -429,7 +433,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(128, 128)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -443,7 +447,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feBlendModes() {
         val test = """
             <svg width="100" height="100">
@@ -458,7 +462,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -468,7 +472,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feCompositeArithmetic() {
         val test = """
             <svg width="100" height="100">
@@ -483,7 +487,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -494,7 +498,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feGaussianBlurWithSeparateStdDeviationValues() {
         val test = """
             <svg width="100" height="100">
@@ -508,7 +512,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -516,7 +520,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feComponentTransfer() {
         val test = """
             <svg width="100" height="100">
@@ -535,19 +539,21 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
         val pixel = bm.getPixel(50, 50)
-        // Red (255) * 0.5 = 127.5 -> rounded to 128
-        assertEquals(128, pixel.red)
+        // color-interpolation-filters defaults to LinearRGB (spec), so the transfer
+        // function operates in linear light: sRGB 255 -> linear 1.0 -> 1.0 * 0.5 -> 0.5
+        // -> back to sRGB ~= 188 (not 128).
+        assertEquals(188, pixel.red)
         assertEquals(0, pixel.green)
         assertEquals(0, pixel.blue)
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feMorphologyAndTile() {
         val test = """
             <svg width="100" height="100">
@@ -562,7 +568,7 @@ class FiltersTest {
         """.trimIndent()
         val svg = SVG.getFromString(test)
 
-        val bm = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(100, 100)
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
@@ -572,7 +578,7 @@ class FiltersTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun feImage() {
         val test = """
             <svg width="100" height="100">
@@ -589,11 +595,11 @@ class FiltersTest {
         var feImageHref: String? = null
 
         root.getChildren().forEachElement { child ->
-            if (child is SvgObject.Defs) {
+            if (child is Defs) {
                 child.getChildren().forEachElement { defsChild ->
-                    if (defsChild is SvgObject.Filter) {
+                    if (defsChild is Filter) {
                         defsChild.getChildren().forEachElement { primitive ->
-                            if (primitive is SvgObject.FeImage) {
+                            if (primitive is FeImage) {
                                 feImageHref = primitive.href
                             }
                         }

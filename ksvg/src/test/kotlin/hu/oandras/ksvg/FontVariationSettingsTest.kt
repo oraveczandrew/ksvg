@@ -19,6 +19,11 @@ package hu.oandras.ksvg
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Build
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,14 +38,14 @@ import org.robolectric.annotation.Config
 )
 class FontVariationSettingsTest {
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun fontVariation() {
         val test = "<svg>\n" +
                 "  <text style=\"font-variation-settings: 'wght' 100, 'slnt' -14, 'ital' 1 \">Test</text>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm1: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm1: Bitmap = createBitmap(200, 200)
         val canvas = Canvas(bm1)
         svg.renderToCanvas(canvas)
 
@@ -52,7 +57,7 @@ class FontVariationSettingsTest {
             sortVariations("'ital' 1,'slnt' -14,'wdth' 100,'wght' 100"),
             sortVariations(
                 mock.paintProp(
-                    3,
+                    4,
                     "fv"
                 )
             )
@@ -61,14 +66,14 @@ class FontVariationSettingsTest {
 
     //-----------------------------------------------------------------------------------------------
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun fontBoldVsWght() {
         val test = "<svg>\n" +
                 "  <text style=\"font-weight: bold; font-variation-settings: 'wght' 100 \">Test</text>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm1: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm1: Bitmap = createBitmap(200, 200)
         val canvas = Canvas(bm1)
         svg.renderToCanvas(canvas)
 
@@ -80,7 +85,7 @@ class FontVariationSettingsTest {
             sortVariations("'wdth' 100,'wght' 100"),
             sortVariations(
                 mock.paintProp(
-                    3,
+                    4,
                     "fv"
                 )
             )

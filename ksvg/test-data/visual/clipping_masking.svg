@@ -1,0 +1,35 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -    You may obtain a copy of the License at
+  -
+  -        http://www.apache.org/licenses/LICENSE-2.0
+  -
+  -    Unless required by applicable law or agreed to in writing, software
+  -    distributed under the License is distributed on an "AS IS" BASIS,
+  -    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  -    See the License for the specific language governing permissions and
+  -    limitations under the License.
+  -->
+
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="clip1">
+      <circle cx="50" cy="50" r="40" />
+    </clipPath>
+    <mask id="mask1">
+      <rect x="110" y="10" width="80" height="80" fill="white" opacity="0.5" />
+      <circle cx="150" cy="50" r="30" fill="black" />
+    </mask>
+  </defs>
+
+  <rect x="10" y="10" width="80" height="80" fill="green" clip-path="url(#clip1)" />
+
+  <rect x="110" y="10" width="80" height="80" fill="orange" mask="url(#mask1)" />
+
+  <g transform="translate(0, 100)">
+    <text x="100" y="50" text-anchor="middle" font-size="20">Clip &amp; Mask</text>
+  </g>
+</svg>

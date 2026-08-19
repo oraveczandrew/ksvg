@@ -22,17 +22,8 @@ import hu.oandras.ksvg.parser.TextScanner
  * The PreserveAspectRatio class tells the renderer how to scale and position the
  * SVG document in the current viewport.  It is roughly equivalent to the
  * `preserveAspectRatio` attribute of an `<svg>` element.
- * 
- * 
+ *
  * In order for scaling to happen, the SVG document must have a viewBox attribute set.
- * For example:
- * 
- * <pre>
- * `<svg version="1.1" viewBox="0 0 200 100"> `
-</pre> * 
- * 
- * This class was previous named `SVGPositioning`. It was renamed in version 1.3
- * to reduce confusion when used as part of the [RenderOptions] class.
  */
 @ConsistentCopyVisibility
 @Suppress("EnumEntryName")
@@ -192,6 +183,7 @@ public data class PreserveAspectRatio internal constructor(
          * 
          * Equivalent to `preserveAspectRatio="xMidYMax meet"` in an SVG.
          */
+        @JvmField
         public val BOTTOM: PreserveAspectRatio = PreserveAspectRatio(Alignment.xMidYMax, Scale.meet)
 
         /**
@@ -232,18 +224,18 @@ public data class PreserveAspectRatio internal constructor(
         public fun of(value: String): PreserveAspectRatio {
             try {
                 return parsePreserveAspectRatio(value)
-            } catch (e: SVGParseException) {
+            } catch (e: KSVGParseException) {
                 throw IllegalArgumentException(e.message)
             }
         }
 
-        @Throws(SVGParseException::class)
+        @Throws(KSVGParseException::class)
         private fun parsePreserveAspectRatio(value: String): PreserveAspectRatio {
             val scan = TextScanner(value)
             scan.skipWhitespace()
 
             var word = scan.nextToken()
-            if ("defer" == word) {    // Ignore defer keyword
+            if ("defer" == word?.lowercase()) {    // Ignore defer keyword
                 scan.skipWhitespace()
                 word = scan.nextToken()
             }
@@ -255,29 +247,28 @@ public data class PreserveAspectRatio internal constructor(
             var scale: Scale? = null
             if (!scan.empty()) {
                 val meetOrSlice = scan.nextToken()
-                scale = when (meetOrSlice) {
+                scale = when (meetOrSlice?.lowercase()) {
                     "meet" -> Scale.meet
                     "slice" -> Scale.slice
-                    else -> throw SVGParseException("Invalid preserveAspectRatio definition: $value")
+                    else -> throw KSVGParseException("Invalid preserveAspectRatio definition: $value")
                 }
             }
 
             return PreserveAspectRatio(align, scale)
         }
 
-        @Suppress("SpellCheckingInspection")
         private fun resolveAspectRatioKeyword(keyword: String?): Alignment? {
-            return when (keyword) {
+            return when (keyword?.lowercase()) {
                 "none" -> Alignment.none
-                "xMinYMin" -> Alignment.xMinYMin
-                "xMidYMin" -> Alignment.xMidYMin
-                "xMaxYMin" -> Alignment.xMaxYMin
-                "xMinYMid" -> Alignment.xMinYMid
-                "xMidYMid" -> Alignment.xMidYMid
-                "xMaxYMid" -> Alignment.xMaxYMid
-                "xMinYMax" -> Alignment.xMinYMax
-                "xMidYMax" -> Alignment.xMidYMax
-                "xMaxYMax" -> Alignment.xMaxYMax
+                "xminymin" -> Alignment.xMinYMin
+                "xmidymin" -> Alignment.xMidYMin
+                "xmaxymin" -> Alignment.xMaxYMin
+                "xminymid" -> Alignment.xMinYMid
+                "xmidymid" -> Alignment.xMidYMid
+                "xmaxymid" -> Alignment.xMaxYMid
+                "xminymax" -> Alignment.xMinYMax
+                "xmidymax" -> Alignment.xMidYMax
+                "xmaxymax" -> Alignment.xMaxYMax
                 else -> null
             }
         }

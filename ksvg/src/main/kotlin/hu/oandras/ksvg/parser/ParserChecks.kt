@@ -18,20 +18,35 @@
 
 package hu.oandras.ksvg.parser
 
-import hu.oandras.ksvg.SVGParseException
+import hu.oandras.ksvg.KSVGParseException
+import hu.oandras.ksvg.css.CSSParseException
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
 /**
- * Throws [SVGParseException] if [condition] is false.
+ * Throws [KSVGParseException] if [condition] is false.
  */
-@Throws(SVGParseException::class)
+@Throws(KSVGParseException::class)
 internal inline fun checkState(condition: Boolean, lazyMessage: () -> String) {
     contract {
         returns() implies condition
     }
 
     if (!condition) {
-        throw SVGParseException(lazyMessage())
+        throw KSVGParseException(lazyMessage())
+    }
+}
+
+/**
+ * Throws [CSSParseException] if [condition] is false.
+ */
+@Throws(CSSParseException::class)
+internal inline fun checkCssState(condition: Boolean, lazyMessage: () -> String) {
+    contract {
+        returns() implies condition
+    }
+
+    if (!condition) {
+        throw CSSParseException(lazyMessage())
     }
 }

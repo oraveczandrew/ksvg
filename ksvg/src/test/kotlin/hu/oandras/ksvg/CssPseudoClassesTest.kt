@@ -18,6 +18,11 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.utils.ceilToInt
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -29,7 +34,7 @@ import org.robolectric.annotation.Config
 @Config(manifest = Config.NONE, shadows = [MockCanvas::class, MockPath::class, MockPaint::class])
 class CssPseudoClassesTest {
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun firstChild() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -41,10 +46,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -54,9 +58,9 @@ class CssPseudoClassesTest {
         val mock: MockCanvas = canvas.asShadow()
         val ops: MutableList<String> = mock.getOperations()
 
-        println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
+        //println("DEBUG OPS: " + ops.joinToString(", "))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
 
         ops.clear()
 
@@ -67,14 +71,14 @@ class CssPseudoClassesTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals(
             "#ff00ff00",
-            mock.paintProp(3, "color")
+            mock.paintProp(4, "color")
         ) // Still green because it is more specific
-        assertEquals("#ff0000ff", mock.paintProp(6, "color")) // Should now be blue
+        assertEquals("#ff0000ff", mock.paintProp(7, "color")) // Should now be blue
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun lastChild() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -86,10 +90,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -100,13 +103,13 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun root() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -119,10 +122,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -133,13 +135,13 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun firstOfType() {
         //disableLogging();
         var test = "<svg width=\"100\" height=\"100\">" +
@@ -152,10 +154,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         var svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -166,9 +167,9 @@ class CssPseudoClassesTest {
         val ops: MutableList<String> = mock.getOperations()
 
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
 
         ops.clear()
 
@@ -190,14 +191,14 @@ class CssPseudoClassesTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
 
         // All the elements will be green because :first-of-type matches the <svg> and all the child elements inherit that green
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun lastOfType() {
         //disableLogging();
         var test = "<svg width=\"100\" height=\"100\">" +
@@ -210,10 +211,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         var svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -224,9 +224,9 @@ class CssPseudoClassesTest {
         val ops: MutableList<String> = mock.getOperations()
 
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
 
         // Test tagless version
         ops.clear()
@@ -249,14 +249,14 @@ class CssPseudoClassesTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
 
         // All the elements will be green because :first-of-type matches the <svg> and all the child elements inherit that green
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun onlyChild() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -270,10 +270,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -284,13 +283,13 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(8, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun onlyOfType() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -303,10 +302,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -317,14 +315,14 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun empty() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -338,10 +336,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -352,17 +349,17 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        //assertEquals("#ff000000", mock.paintProp(6, "color"));   TODO uncomment when we support children of graphics elements (e.g. when we have a proper DOM)
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        //assertEquals("#ff000000", mock.paintProp(7, "color"));   TODO uncomment when we support children of graphics elements (e.g. when we have a proper DOM)
         assertEquals(
             "#ff00ff00",
-            mock.paintProp(6, "color")
+            mock.paintProp(7, "color")
         ) // TODO temporary: remove when above fix happens
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildOdd() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -376,10 +373,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -390,15 +386,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildOddAlt() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -412,10 +408,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -426,15 +421,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildEven() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -448,10 +443,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -462,15 +456,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildEvenAlt() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -484,10 +478,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -498,15 +491,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChild4th() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -526,10 +519,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -540,21 +532,21 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
-        assertEquals("#ff000000", mock.paintProp(15, "color"))
-        assertEquals("#ff000000", mock.paintProp(18, "color"))
-        assertEquals("#ff000000", mock.paintProp(21, "color"))
-        assertEquals("#ff000000", mock.paintProp(24, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(27, "color"))
-        assertEquals("#ff000000", mock.paintProp(30, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
+        assertEquals("#ff000000", mock.paintProp(16, "color"))
+        assertEquals("#ff000000", mock.paintProp(19, "color"))
+        assertEquals("#ff000000", mock.paintProp(22, "color"))
+        assertEquals("#ff000000", mock.paintProp(25, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(28, "color"))
+        assertEquals("#ff000000", mock.paintProp(31, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChild4thAlt() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -574,10 +566,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -588,21 +579,21 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
-        assertEquals("#ff000000", mock.paintProp(15, "color"))
-        assertEquals("#ff000000", mock.paintProp(18, "color"))
-        assertEquals("#ff000000", mock.paintProp(21, "color"))
-        assertEquals("#ff000000", mock.paintProp(24, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(27, "color"))
-        assertEquals("#ff000000", mock.paintProp(30, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
+        assertEquals("#ff000000", mock.paintProp(16, "color"))
+        assertEquals("#ff000000", mock.paintProp(19, "color"))
+        assertEquals("#ff000000", mock.paintProp(22, "color"))
+        assertEquals("#ff000000", mock.paintProp(25, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(28, "color"))
+        assertEquals("#ff000000", mock.paintProp(31, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildFirst3() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -617,10 +608,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -631,16 +621,16 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
-        assertEquals("#ff000000", mock.paintProp(15, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
+        assertEquals("#ff000000", mock.paintProp(16, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChild2nd() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -655,10 +645,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -669,16 +658,16 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
-        assertEquals("#ff000000", mock.paintProp(15, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
+        assertEquals("#ff000000", mock.paintProp(16, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChild2ndAlt() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -693,10 +682,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -707,16 +695,16 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
-        assertEquals("#ff000000", mock.paintProp(15, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
+        assertEquals("#ff000000", mock.paintProp(16, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun unsupported() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -734,10 +722,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -748,16 +735,16 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
-        assertEquals("#ff000000", mock.paintProp(15, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
+        assertEquals("#ff000000", mock.paintProp(16, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildMinus4Plus10() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -777,10 +764,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -791,21 +777,21 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
-        assertEquals("#ff000000", mock.paintProp(15, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(18, "color"))
-        assertEquals("#ff000000", mock.paintProp(21, "color"))
-        assertEquals("#ff000000", mock.paintProp(24, "color"))
-        assertEquals("#ff000000", mock.paintProp(27, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(30, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
+        assertEquals("#ff000000", mock.paintProp(16, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(19, "color"))
+        assertEquals("#ff000000", mock.paintProp(22, "color"))
+        assertEquals("#ff000000", mock.paintProp(25, "color"))
+        assertEquals("#ff000000", mock.paintProp(28, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(31, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildAll() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -820,10 +806,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -834,16 +819,16 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(15, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(16, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildAllAlt1() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -858,10 +843,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -872,16 +856,16 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(15, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(16, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthChildAllAlt2() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -896,10 +880,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -910,16 +893,16 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(15, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(16, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthOfTypeOdd() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -933,10 +916,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -947,15 +929,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthOfTypeEven() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -969,10 +951,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -983,15 +964,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthLastChildOdd() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1005,10 +986,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1019,15 +999,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthLastChildEven() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1041,10 +1021,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1055,15 +1034,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthLastOfTypeOdd() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1077,10 +1056,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1091,15 +1069,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff00ff00", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nthLastOfTypeEven() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1113,10 +1091,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1127,15 +1104,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun not() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1149,10 +1126,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1163,15 +1139,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun not2() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1185,10 +1161,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1199,15 +1174,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun not3() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1221,10 +1196,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1235,15 +1209,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun notNotInNot() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1258,10 +1232,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1272,15 +1245,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff000000", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff000000", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun idSelect() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1297,10 +1270,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1312,13 +1284,13 @@ class CssPseudoClassesTest {
         val ops: List<String> = mock.getOperations()
 
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(12, ops.size)
-        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals(8, ops.size)
+        assertEquals("#ff00ff00", mock.paintProp(4, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun target() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1333,10 +1305,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1347,15 +1318,15 @@ class CssPseudoClassesTest {
 
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff000000", mock.paintProp(3, "color"))
-        assertEquals("#ff00ff00", mock.paintProp(6, "color"))
-        assertEquals("#ff000000", mock.paintProp(9, "color"))
-        assertEquals("#ff000000", mock.paintProp(12, "color"))
+        assertEquals("#ff000000", mock.paintProp(4, "color"))
+        assertEquals("#ff00ff00", mock.paintProp(7, "color"))
+        assertEquals("#ff000000", mock.paintProp(10, "color"))
+        assertEquals("#ff000000", mock.paintProp(13, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun idTargetSelect() {
         //disableLogging();
         val test = "<svg width=\"100\" height=\"100\">" +
@@ -1372,10 +1343,9 @@ class CssPseudoClassesTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
-            svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
+            svg.documentHeight.ceilToInt()
         )
         val canvas = Canvas(newBM)
 
@@ -1389,8 +1359,8 @@ class CssPseudoClassesTest {
         var ops: MutableList<String> = mock.getOperations()
 
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(12, ops.size)
-        assertEquals("#ffffff00", mock.paintProp(5, "color"))
+        assertEquals(8, ops.size)
+        assertEquals("#ffffff00", mock.paintProp(4, "color"))
 
         ops.clear()
 
@@ -1401,7 +1371,7 @@ class CssPseudoClassesTest {
         ops = mock.getOperations()
 
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(12, ops.size)
-        assertEquals("#ff0000ff", mock.paintProp(9, "color"))
+        assertEquals(8, ops.size)
+        assertEquals("#ff0000ff", mock.paintProp(4, "color"))
     }
 }

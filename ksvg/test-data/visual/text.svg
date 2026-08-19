@@ -1,0 +1,10 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#f4f4f4"/>
+  <text x="10" y="40" font-size="22" fill="navy" font-family="sans-serif">Hello KSVG</text>
+  <text x="10" y="90" font-size="16" fill="teal" font-family="sans-serif">
+    <tspan x="10" dy="0">Multi</tspan>
+    <tspan dy="22" fill="red">line</tspan>
+    <tspan dy="22" fill="blue">text</tspan>
+  </text>
+  <text x="10" y="180" font-size="18" fill="none" stroke="green" stroke-width="1" font-family="sans-serif">Outlined</text>
+</svg>

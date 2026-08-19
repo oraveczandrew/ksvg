@@ -27,6 +27,36 @@ internal inline fun <T> List<T>.forEachElement(r: (T) -> Unit) {
     }
 }
 
+internal inline fun <T> List<T>.indexOfFirstElement(predicate: (T) -> Boolean): Int {
+    for (i in indices) {
+        if (predicate(get(i))) {
+            return i
+        }
+    }
+
+    return -1
+}
+
+internal inline fun <reified K> List<*>.forEachInstance(r: (K) -> Unit) {
+    for (i in indices) {
+        val item = get(i)
+        if (item is K) {
+            r.invoke(item)
+        }
+    }
+}
+
+internal inline fun <reified K> List<*>.firstInstanceOrNull(): K? {
+    for (i in indices) {
+        val item = get(i)
+        if (item is K) {
+            return item
+        }
+    }
+
+    return null
+}
+
 internal fun <T> MutableObjectIntMap<T>?.copyIfNotEmpty(): MutableObjectIntMap<T>? {
     return if (this == null || this.isEmpty()) {
         null
@@ -53,8 +83,51 @@ internal inline fun<K, V> SimpleArrayMap<K, V>.forEachKeyValue(r: (K, V) -> Unit
     }
 }
 
+internal inline fun<K, V> SimpleArrayMap<K, V>.forEachKey(r: (K) -> Unit) {
+    for (i in 0 until size()) {
+        r(keyAt(i))
+    }
+}
+
 internal fun FloatList.toFloatArray(): FloatArray {
     return FloatArray(size) {
         get(it)
+    }
+}
+
+internal inline fun <T, R> List<T>.mapNotNullElements(r: (T) -> R?): List<R> {
+    return when (val size = this@mapNotNullElements.size) {
+        0 -> emptyList()
+        1 -> {
+            val item = r(get(0))
+            if (item == null) emptyList() else listOf(item)
+        }
+        else -> {
+            val ret = ArrayList<R>(size)
+            for (i in 0 until size) {
+                val item = r(get(i))
+                if (item != null) {
+                    ret.add(item)
+                }
+            }
+            ret.optimizeReadOnlyList()
+        }
+    }
+}
+
+internal fun <T> List<T>.optimizeReadOnlyList() = when (size) {
+    0 -> emptyList()
+    1 -> listOf(this[0])
+    else -> {
+        if (this is ArrayList) {
+            trimToSize()
+        }
+        this
+    }
+}
+
+internal inline fun <T> List<T>.mapToFloatArray(r: (T) -> Float): FloatArray {
+    return FloatArray(size) {
+        r(get(it))
     }
 }

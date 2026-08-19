@@ -15,18 +15,16 @@
  */
 package hu.oandras.ksvg
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MaskTest {
     @Test
@@ -43,7 +41,7 @@ class MaskTest {
             </svg>
             """.trimIndent()
         )
-        val bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(10, 10)
 
         svg.renderToCanvas(Canvas(bitmap))
 
@@ -65,7 +63,7 @@ class MaskTest {
             </svg>
             """.trimIndent()
         )
-        val bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(10, 10)
 
         svg.renderToCanvas(Canvas(bitmap))
 
@@ -89,7 +87,7 @@ class MaskTest {
             </svg>
             """.trimIndent()
         )
-        val bitmap = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(20, 20)
 
         svg.renderToCanvas(Canvas(bitmap))
 

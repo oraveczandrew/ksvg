@@ -15,12 +15,14 @@
  *    limitations under the License.
  */
 
+@file:Suppress("LocalVariableName")
+
 package hu.oandras.ksvg.render
 
 import android.graphics.Matrix
 import android.graphics.Path
-import hu.oandras.ksvg.dom.PathDefinition
-import hu.oandras.ksvg.dom.PathInterface
+import hu.oandras.ksvg.dom.core.PathDefinition
+import hu.oandras.ksvg.dom.core.PathInterface
 import hu.oandras.ksvg.utils.toRadians
 import kotlin.math.PI
 import kotlin.math.abs
@@ -101,6 +103,58 @@ internal class PathConverter internal constructor(pathDef: PathDefinition?) : Pa
 
     override fun close() {
         path.close()
+    }
+}
+
+/*
+* A reusable [PathInterface] that appends commands into a settable target [Path].
+* Used during <animate attributeName="d"> path morphing to avoid per-frame allocations.
+*/
+internal class PathAppender : PathInterface {
+    var target: Path? = null
+    var lastX: Float = 0f
+    var lastY: Float = 0f
+
+    override fun moveTo(x: Float, y: Float) {
+        target!!.moveTo(x, y)
+        lastX = x
+        lastY = y
+    }
+
+    override fun lineTo(x: Float, y: Float) {
+        target!!.lineTo(x, y)
+        lastX = x
+        lastY = y
+    }
+
+    override fun cubicTo(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float) {
+        target!!.cubicTo(x1, y1, x2, y2, x3, y3)
+        lastX = x3
+        lastY = y3
+    }
+
+    override fun quadTo(x1: Float, y1: Float, x2: Float, y2: Float) {
+        target!!.quadTo(x1, y1, x2, y2)
+        lastX = x2
+        lastY = y2
+    }
+
+    override fun arcTo(
+        rx: Float,
+        ry: Float,
+        xAxisRotation: Float,
+        largeArcFlag: Boolean,
+        sweepFlag: Boolean,
+        x: Float,
+        y: Float
+    ) {
+        arcTo(lastX, lastY, rx, ry, xAxisRotation, largeArcFlag, sweepFlag, x, y, this)
+        lastX = x
+        lastY = y
+    }
+
+    override fun close() {
+        target!!.close()
     }
 }
 

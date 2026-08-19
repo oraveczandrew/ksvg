@@ -21,6 +21,11 @@ import android.graphics.Canvas
 import android.graphics.Path
 import android.os.Build
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -38,7 +43,7 @@ import org.robolectric.annotation.Config
 )
 class ParseTest {
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun emptySVG() {
         // XmlPullParser
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
@@ -48,7 +53,7 @@ class ParseTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun emptySVGEntitiesEnabled() {
         // NOTE: Is *really* slow when running under JUnit (15-20secs).
         // However, the speed seems to be okay under normal usage (a real app).
@@ -63,7 +68,7 @@ class ParseTest {
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun emptySVGEntitiesDisabled() {
         val test =
             "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.0//EN\" \"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd\" [" +
@@ -76,8 +81,8 @@ class ParseTest {
         assertNotNull(svg.rootElement)
     }
 
-    @Test(expected = SVGParseException::class)
-    @Throws(SVGParseException::class)
+    @Test(expected = KSVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun unbalancedClose() {
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "</svg>" +
@@ -112,7 +117,7 @@ class ParseTest {
 
     /*
    @Test
-   public void issue177() throws SVGParseException
+   public void issue177() throws KSVGParseException
    {
       String  test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                      "  <defs></defs>" +
@@ -147,17 +152,17 @@ class ParseTest {
       try {
          SVG  svg = SVG.getFromString(test);
          fail("Should have thrown ParseException");
-      } catch (SVGParseException e) {
+      } catch (KSVGParseException e) {
          // passed!
       }
    }
 */
     /*
     * Checks that A elements are parsed and rendered correctly.
-    * @throws SVGParseException
+    * @throws KSVGParseException
     */
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun parseA() {
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "<a>" +
@@ -166,7 +171,7 @@ class ParseTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm: Bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)
+        val bm: Bitmap = createBitmap(10, 10)
         val bmCanvas = Canvas(bm)
 
         // Test that A element has been inserted in the DOM tree correctly
@@ -179,14 +184,14 @@ class ParseTest {
         val ops: List<String> = mock.getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals(
-            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
-            ops[4]
+            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; grad:null; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            ops[5]
         )
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun parseB() {
         // Test that A elements are being visited properly while rendering
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
@@ -196,7 +201,7 @@ class ParseTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm: Bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)
+        val bm: Bitmap = createBitmap(10, 10)
         val bmCanvas = Canvas(bm)
 
         svg.renderToCanvas(bmCanvas)
@@ -205,8 +210,8 @@ class ParseTest {
         val ops: List<String> = mock.getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals(
-            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
-            ops[4]
+            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; grad:null; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            ops[5]
         )
     }
 
@@ -216,14 +221,14 @@ class ParseTest {
      * CSS properties without a value are badly parsed.
      */
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun issue186() {
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "<text style=\"text-decoration:;fill:green\">Test</text>" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm: Bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)
+        val bm: Bitmap = createBitmap(10, 10)
         val bmCanvas = Canvas(bm)
 
         svg.renderToCanvas(bmCanvas)
@@ -231,19 +236,19 @@ class ParseTest {
         val mock: MockCanvas = bmCanvas.asShadow()
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff008000", mock.paintProp(3, "color"))
+        assertEquals("#ff008000", mock.paintProp(4, "color"))
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun parseStyleLeadingColon() {
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "<text style=\"fill:green;:fill:red\">Test</text>" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm: Bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)
+        val bm: Bitmap = createBitmap(10, 10)
         val bmCanvas = Canvas(bm)
 
         svg.renderToCanvas(bmCanvas)
@@ -251,7 +256,7 @@ class ParseTest {
         val mock: MockCanvas = bmCanvas.asShadow()
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("#ff008000", mock.paintProp(3, "color"))
+        assertEquals("#ff008000", mock.paintProp(4, "color"))
     }
 
 
@@ -260,7 +265,7 @@ class ParseTest {
      * Semi-thread safe parsing properties (enableInternalEntities and externalFileResolver)
      */
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun issue199() {
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"
 
@@ -269,7 +274,7 @@ class ParseTest {
         assertNull(svg.externalFileResolver)
 
         SVG.setInternalEntitiesEnabled(false)
-        val resolver: SVGExternalFileResolver = TestAssetResolver()
+        val resolver: ExternalFileResolver = TestAssetResolver()
         SVG.registerExternalFileResolver(resolver)
 
         val svg2: SVG = SVG.getFromString(test)
@@ -281,5 +286,5 @@ class ParseTest {
         assertNull(svg.externalFileResolver)
     }
 
-    private class TestAssetResolver: SVGExternalFileResolver()
+    private class TestAssetResolver: ExternalFileResolver()
 }

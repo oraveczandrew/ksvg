@@ -107,9 +107,7 @@
   <div class="breadcrumbs"><a href="../../../index.html">KSVG</a><span class="delimiter">/</span><a href="../index.html">hu.oandras.ksvg</a><span class="delimiter">/</span><span class="current">SVG</span></div>
   <div class="cover ">
     <h1 class="cover"><span><span>SVG</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">SVG</a></div><p class="paragraph">KSVG is a library for reading, parsing and rendering SVG documents on Android devices.</p><p class="paragraph">All interaction with KSVG is via this class.</p><p class="paragraph">Typically, you will call one of the SVG loading and parsing classes then call the renderer, passing it a canvas to draw upon.</p><p class="paragraph"><h3>Usage summary</h3></p><ul><li><p class="paragraph">Use one of the static <code class="lang-kotlin">getFromX()</code> methods to read and parse the SVG file.  They will return an instance of this class.</p></li><li><p class="paragraph">Call one of the <code class="lang-kotlin">renderToX()</code> methods to render the document.</p></li></ul><p class="paragraph"><h3>Usage example</h3></p><pre>
-`SVG.registerExternalFileResolver(myResolver); SVG  svg = SVG.getFromAsset(getContext().getAssets(), svgPath); Bitmap  newBM = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888); Canvas  bmcanvas = new Canvas(newBM); bmcanvas.drawRGB(255, 255, 255);  // Clear background to white svg.renderToCanvas(bmcanvas); `
-</pre> * <p class="paragraph">For more detailed information on how to use this library, see the documentation at <code class="lang-kotlin">http://code.google.com/p/androidsvg/</code></p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">SVG</a></div><p class="paragraph">KSVG is a library for reading, parsing and rendering SVG documents on Android devices.</p><p class="paragraph">All interaction with KSVG is via this class.</p><p class="paragraph">Typically, you will call one of the SVG loading and parsing classes then call the renderer, passing it a canvas to draw upon.</p><p class="paragraph"><h3>Usage summary</h3></p><ul><li><p class="paragraph">Use one of the static <code class="lang-kotlin">getFromX()</code> methods to read and parse the SVG file.  They will return an instance of this class.</p></li><li><p class="paragraph">Call one of the <code class="lang-kotlin">renderToX()</code> methods to render the document.</p></li></ul></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -265,7 +263,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="external-file-resolver.html">externalFileResolver</a><span class="token operator">: </span><a href="../-s-v-g-external-file-resolver/index.html">SVGExternalFileResolver</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The <a href="../-s-v-g-external-file-resolver/index.html">SVGExternalFileResolver</a> in effect when this SVG was parsed.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="external-file-resolver.html">externalFileResolver</a><span class="token operator">: </span><a href="../-external-file-resolver/index.html">ExternalFileResolver</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The <a href="../-external-file-resolver/index.html">ExternalFileResolver</a> in effect when this SVG was parsed.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -319,7 +317,37 @@
       </div>
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="-1506746716%2FFunctions%2F444996287" anchor-label="renderToCanvas" id="-1506746716%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+        <div class="table"><a data-name="-1150719671%2FFunctions%2F444996287" anchor-label="getHitRegions" id="-1150719671%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-hit-regions.html"><span>get</span><wbr></wbr><span>Hit</span><wbr></wbr><span><span>Regions</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1150719671%2FFunctions%2F444996287"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="get-hit-regions.html"><span class="token function">getHitRegions</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="../-hit-region/index.html">HitRegion</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Returns the list of clickable regions in the most recently rendered SVG.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="844338969%2FFunctions%2F444996287" anchor-label="hitTest" id="844338969%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="hit-test.html"><span>hit</span><wbr></wbr><span><span>Test</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="844338969%2FFunctions%2F444996287"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="hit-test.html"><span class="token function">hitTest</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">x<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a><span class="token punctuation">, </span></span><span class="parameter ">y<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Performs a hit-test at the given screen coordinates and returns the <code class="lang-kotlin">href</code> of the topmost <code class="lang-kotlin">&lt;a&gt;</code> element that contains the point, or <code class="lang-kotlin">null</code> if none.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1506746716%2FFunctions%2F444996287" anchor-label="renderToCanvas" id="-1506746716%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
           <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -330,21 +358,6 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-to-canvas.html"><span class="token function">renderToCanvas</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">canvas<span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Canvas.html">Canvas</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Renders this SVG document to a Canvas object.  The full width and height of the canvas will be used as the viewport into which the document will be rendered.</p></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-to-canvas.html"><span class="token function">renderToCanvas</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">canvas<span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Canvas.html">Canvas</a><span class="token punctuation">, </span></span><span class="parameter ">viewPort<span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/RectF.html">RectF</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-to-canvas.html"><span class="token function">renderToCanvas</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">canvas<span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Canvas.html">Canvas</a><span class="token punctuation">, </span></span><span class="parameter ">renderOptions<span class="token operator">: </span><a href="../-render-options/index.html">RenderOptions</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Renders this SVG document to a Canvas object.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="887614333%2FFunctions%2F444996287" anchor-label="renderToPicture" id="887614333%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="render-to-picture.html"><span>render</span><wbr></wbr><span>To</span><wbr></wbr><span><span>Picture</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="887614333%2FFunctions%2F444996287"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-to-picture.html"><span class="token function">renderToPicture</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Picture.html">Picture</a></div><div class="brief "><p class="paragraph">Renders this SVG document to a Picture object.</p></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-to-picture.html"><span class="token function">renderToPicture</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">renderOptions<span class="token operator">: </span><a href="../-render-options/index.html">RenderOptions</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Picture.html">Picture</a></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-to-picture.html"><span class="token function">renderToPicture</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">widthInPixels<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">heightInPixels<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Picture.html">Picture</a></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-to-picture.html"><span class="token function">renderToPicture</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">widthInPixels<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">heightInPixels<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">renderOptions<span class="token operator">: </span><a href="../-render-options/index.html">RenderOptions</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Picture.html">Picture</a></div><div class="brief "><p class="paragraph">Renders this SVG document to a <a href="https://developer.android.com/reference/kotlin/android/graphics/Picture.html">Picture</a>.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -360,21 +373,6 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-view-to-canvas.html"><span class="token function">renderViewToCanvas</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">viewId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">canvas<span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Canvas.html">Canvas</a></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-view-to-canvas.html"><span class="token function">renderViewToCanvas</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">viewId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">canvas<span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Canvas.html">Canvas</a><span class="token punctuation">, </span></span><span class="parameter ">viewPort<span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/RectF.html">RectF</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Renders this SVG document to a Canvas using the specified view defined in the document.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="-1097574654%2FFunctions%2F444996287" anchor-label="renderViewToPicture" id="-1097574654%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="render-view-to-picture.html"><span>render</span><wbr></wbr><span>View</span><wbr></wbr><span>To</span><wbr></wbr><span><span>Picture</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1097574654%2FFunctions%2F444996287"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="render-view-to-picture.html"><span class="token function">renderViewToPicture</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">viewId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">widthInPixels<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">heightInPixels<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/Picture.html">Picture</a></div><div class="brief "><p class="paragraph">Renders this SVG document to a <a href="https://developer.android.com/reference/kotlin/android/graphics/Picture.html">Picture</a> using the specified view defined in the document.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -420,6 +418,51 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-document-width.html"><span class="token function">setDocumentWidth</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Change the width of the document by altering the &quot;width&quot; attribute of the root <code class="lang-kotlin">&lt;svg&gt;</code> element.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="223931498%2FFunctions%2F444996287" anchor-label="setOnSvgClickListener" id="223931498%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-on-svg-click-listener.html"><span>set</span><wbr></wbr><span>On</span><wbr></wbr><span>Svg</span><wbr></wbr><span>Click</span><wbr></wbr><span><span>Listener</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="223931498%2FFunctions%2F444996287"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-on-svg-click-listener.html"><span class="token function">setOnSvgClickListener</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">listener<span class="token operator">: </span><a href="../-on-svg-click-listener/index.html">OnSvgClickListener</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets a listener for click events on <code class="lang-kotlin">&lt;a&gt;</code> elements in the SVG document.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1314895251%2FFunctions%2F444996287" anchor-label="toAnimatedDrawable" id="1314895251%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-animated-drawable.html"><span>to</span><wbr></wbr><span>Animated</span><wbr></wbr><span><span>Drawable</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1314895251%2FFunctions%2F444996287"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="to-animated-drawable.html"><span class="token function">toAnimatedDrawable</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-k-s-v-g-animated-drawable/index.html">KSVGAnimatedDrawable</a></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="to-animated-drawable.html"><span class="token function">toAnimatedDrawable</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">renderOptions<span class="token operator">: </span><a href="../-render-options/index.html">RenderOptions</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-k-s-v-g-animated-drawable/index.html">KSVGAnimatedDrawable</a></div><div class="brief "><p class="paragraph">Returns this SVG document as an animatable <a href="https://developer.android.com/reference/kotlin/android/graphics/drawable/Drawable.html">Drawable</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1703942157%2FFunctions%2F444996287" anchor-label="toDrawable" id="-1703942157%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-drawable.html"><span>to</span><wbr></wbr><span><span>Drawable</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1703942157%2FFunctions%2F444996287"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="to-drawable.html"><span class="token function">toDrawable</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/drawable/Drawable.html">Drawable</a></div><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="to-drawable.html"><span class="token function">toDrawable</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">renderOptions<span class="token operator">: </span><a href="../-render-options/index.html">RenderOptions</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/drawable/Drawable.html">Drawable</a></div><div class="brief "><p class="paragraph">Returns this SVG document as a <a href="https://developer.android.com/reference/kotlin/android/graphics/drawable/Drawable.html">Drawable</a>.</p></div></div></div>
                 </div>
               </div>
             </div>

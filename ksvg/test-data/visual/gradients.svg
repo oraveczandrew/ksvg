@@ -1,0 +1,35 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -    You may obtain a copy of the License at
+  -
+  -        http://www.apache.org/licenses/LICENSE-2.0
+  -
+  -    Unless required by applicable law or agreed to in writing, software
+  -    distributed under the License is distributed on an "AS IS" BASIS,
+  -    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  -    See the License for the specific language governing permissions and
+  -    limitations under the License.
+  -->
+
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lin1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="red" />
+      <stop offset="100%" stop-color="blue" />
+    </linearGradient>
+    <radialGradient id="rad1" cx="50%" cy="50%" r="50%" fx="25%" fy="25%">
+      <stop offset="0%" stop-color="yellow" />
+      <stop offset="100%" stop-color="green" />
+    </radialGradient>
+    <linearGradient id="lin2" x1="0%" y1="0%" x2="50%" y2="50%" spreadMethod="reflect">
+      <stop offset="0%" stop-color="white" />
+      <stop offset="100%" stop-color="black" />
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="180" height="50" fill="url(#lin1)" />
+  <circle cx="50" cy="130" r="40" fill="url(#rad1)" />
+  <rect x="110" y="90" width="80" height="80" fill="url(#lin2)" />
+</svg>

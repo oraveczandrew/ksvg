@@ -14,19 +14,33 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
 package hu.oandras.ksvg.css
 
 import hu.oandras.ksvg.parser.INVALID_CHAR
 import hu.oandras.ksvg.parser.IntegerParser
 import hu.oandras.ksvg.parser.IntegerParser.parseInt
 import hu.oandras.ksvg.parser.TextScanner
-import hu.oandras.ksvg.utils.compilePattern
+import hu.oandras.ksvg.parser.checkCssState
 import hu.oandras.ksvg.utils.forEachElement
+import hu.oandras.ksvg.utils.toPattern
 import java.util.regex.Pattern
+
+private typealias AnPlusB = Long
+
+private fun AnPlusB(a: Int, b: Int): AnPlusB =
+    (a.toLong() shl 32) or (b.toLong() and 0xFFFFFFFFL)
+
+private val AnPlusB.a: Int
+    get() = (this shr 32).toInt()
+
+private val AnPlusB.b: Int
+    get() = toInt()
 
 internal class CSSTextScanner(input: String) : TextScanner(
     input = PATTERN_BLOCK_COMMENTS.matcher(input).replaceAll("")
 ) {
+
     /*
     * Scans for a CSS 'ident' identifier.
     */
@@ -111,15 +125,16 @@ internal class CSSTextScanner(input: String) : TextScanner(
         if (empty()) return false
 
         val start = position
-        var combinator: CSSParser.Combinator? = null
+        var combinator: Combinator? = null
         var selectorPart: CSSParser.SimpleSelector? = null
 
+        skipWhitespace()
         if (!selector.isEmpty) {
             if (consume('>')) {
-                combinator = CSSParser.Combinator.CHILD
+                combinator = Combinator.CHILD
                 skipWhitespace()
             } else if (consume('+')) {
-                combinator = CSSParser.Combinator.FOLLOWS
+                combinator = Combinator.FOLLOWS
                 skipWhitespace()
             }
         }
@@ -141,7 +156,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
                     selectorPart = CSSParser.SimpleSelector(combinator, null)
                 }
                 val value = nextIdentifier() ?: throw CSSParseException("Invalid \".class\" simpleSelectors")
-                selectorPart.addAttrib(CSSParser.CLASS, CSSParser.AttribOp.EQUALS, value)
+                selectorPart.addAttrib(CSSParser.CLASS, AttribOp.EQUALS, value)
                 selector.addedAttributeOrPseudo()
                 continue
             }
@@ -152,7 +167,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
                     selectorPart = CSSParser.SimpleSelector(combinator, null)
                 }
                 val value = nextIdentifier() ?: throw CSSParseException("Invalid \"#id\" simpleSelectors")
-                selectorPart.addAttrib(CSSParser.ID, CSSParser.AttribOp.EQUALS, value)
+                selectorPart.addAttrib(CSSParser.ID, AttribOp.EQUALS, value)
                 selector.addedIdAttribute()
                 continue
             }
@@ -167,12 +182,12 @@ internal class CSSTextScanner(input: String) : TextScanner(
                 var attrValue = ""
                 skipWhitespace()
 
-                val op: CSSParser.AttribOp? = if (consume('=')) {
-                    CSSParser.AttribOp.EQUALS
+                val op: AttribOp? = if (consume('=')) {
+                    AttribOp.EQUALS
                 } else if (consume("~=")) {
-                    CSSParser.AttribOp.INCLUDES
+                    AttribOp.INCLUDES
                 } else if (consume("|=")) {
-                    CSSParser.AttribOp.DASHMATCH
+                    AttribOp.DASH_MATCH
                 } else {
                     null
                 }
@@ -183,13 +198,11 @@ internal class CSSTextScanner(input: String) : TextScanner(
                     skipWhitespace()
                 }
 
-                if (!consume(']')) {
-                    throw CSSParseException("Invalid attribute simpleSelectors")
-                }
+                checkCssState(consume(']')) { "Invalid attribute simpleSelectors" }
 
                 selectorPart.addAttrib(
                     attrName,
-                    op ?: CSSParser.AttribOp.EXISTS,
+                    op ?: AttribOp.EXISTS,
                     attrValue
                 )
                 selector.addedAttributeOrPseudo()
@@ -218,33 +231,23 @@ internal class CSSTextScanner(input: String) : TextScanner(
     }
 
 
-    private class AnPlusB(
-        @JvmField
-        val a: Int,
-        @JvmField
-        val b: Int
-    )
-
-
-    private fun nextAnPlusB(): AnPlusB? {
-        if (empty()) {
-            return null
-        }
+    private fun nextAnPlusB(): Long {
+        checkCssState(!empty()) { "Invalid or missing parameter section for pseudo class" }
 
         val start = position
 
-        if (!consume('(')) {
-            return null
-        }
+        checkCssState(consume('(')) { "Invalid or missing parameter section for pseudo class" }
         skipWhitespace()
 
         val result = when {
             consume("odd") -> {
                 AnPlusB(2, 1)
             }
+
             consume("even") -> {
                 AnPlusB(2, 0)
             }
+
             else -> {
                 // Parse an expression of the form +An+B
                 // First check for an optional leading sign
@@ -280,7 +283,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
                             position = b.endPos
                         } else {
                             position = start
-                            return null
+                            throw CSSParseException("Invalid or missing parameter section for pseudo class")
                         }
                     }
                 }
@@ -298,7 +301,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
         }
 
         position = start
-        return null
+        throw CSSParseException("Invalid or missing parameter section for pseudo class")
     }
 
 
@@ -367,7 +370,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
                 val simpleSelector = simpleSelectors[j]
                 val pseudos = simpleSelector.pseudos ?: break
                 pseudos.forEachElement { pseudo ->
-                    if (pseudo is CSSParser.PseudoClassNot) {
+                    if (pseudo is PseudoClassNot) {
                         return null
                     }
                 }
@@ -383,14 +386,12 @@ internal class CSSTextScanner(input: String) : TextScanner(
     */
     @Throws(CSSParseException::class)
     private fun parsePseudoClass(selector: CSSParser.Selector, selectorPart: CSSParser.SimpleSelector) {
-        // skip pseudo
-//         int     pseudoStart = position;
         val identifier = nextIdentifier() ?: throw CSSParseException("Invalid pseudo class")
 
-        val pseudo: CSSParser.PseudoClass?
-        when (val identifierEnum = CSSParser.PseudoClassIdentifiers.fromString(identifier)) {
-            CSSParser.PseudoClassIdentifiers.first_child -> {
-                pseudo = CSSParser.PseudoClassAnPlusB(
+        val pseudo: PseudoClass?
+        when (val identifierEnum = PseudoClassIdentifiers.fromString(identifier)) {
+            PseudoClassIdentifiers.first_child -> {
+                pseudo = PseudoClassAnPlusB(
                     a = 0,
                     b = 1,
                     isFromStart = true,
@@ -400,8 +401,8 @@ internal class CSSTextScanner(input: String) : TextScanner(
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.last_child -> {
-                pseudo = CSSParser.PseudoClassAnPlusB(
+            PseudoClassIdentifiers.last_child -> {
+                pseudo = PseudoClassAnPlusB(
                     a = 0,
                     b = 1,
                     isFromStart = false,
@@ -411,13 +412,13 @@ internal class CSSTextScanner(input: String) : TextScanner(
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.only_child -> {
-                pseudo = CSSParser.PseudoClassOnlyChild(false, null)
+            PseudoClassIdentifiers.only_child -> {
+                pseudo = PseudoClassOnlyChild(false, null)
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.first_of_type -> {
-                pseudo = CSSParser.PseudoClassAnPlusB(
+            PseudoClassIdentifiers.first_of_type -> {
+                pseudo = PseudoClassAnPlusB(
                     a = 0,
                     b = 1,
                     isFromStart = true,
@@ -427,8 +428,8 @@ internal class CSSTextScanner(input: String) : TextScanner(
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.last_of_type -> {
-                pseudo = CSSParser.PseudoClassAnPlusB(
+            PseudoClassIdentifiers.last_of_type -> {
+                pseudo = PseudoClassAnPlusB(
                     a = 0,
                     b = 1,
                     isFromStart = false,
@@ -438,72 +439,73 @@ internal class CSSTextScanner(input: String) : TextScanner(
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.only_of_type -> {
-                pseudo = CSSParser.PseudoClassOnlyChild(true, selectorPart.tag)
+            PseudoClassIdentifiers.only_of_type -> {
+                pseudo = PseudoClassOnlyChild(true, selectorPart.tag)
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.root -> {
-                pseudo = CSSParser.PseudoClassRoot()
+            PseudoClassIdentifiers.root -> {
+                pseudo = PseudoClassRoot
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.empty -> {
-                pseudo = CSSParser.PseudoClassEmpty()
+            PseudoClassIdentifiers.empty -> {
+                pseudo = PseudoClassEmpty
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.nth_child,
-            CSSParser.PseudoClassIdentifiers.nth_last_child,
-            CSSParser.PseudoClassIdentifiers.nth_of_type,
-            CSSParser.PseudoClassIdentifiers.nth_last_of_type -> {
-                val fromStart = identifierEnum == CSSParser.PseudoClassIdentifiers.nth_child || identifierEnum == CSSParser.PseudoClassIdentifiers.nth_of_type
-                val ofType = identifierEnum == CSSParser.PseudoClassIdentifiers.nth_of_type || identifierEnum == CSSParser.PseudoClassIdentifiers.nth_last_of_type
+            PseudoClassIdentifiers.nth_child,
+            PseudoClassIdentifiers.nth_last_child,
+            PseudoClassIdentifiers.nth_of_type,
+            PseudoClassIdentifiers.nth_last_of_type -> {
+                val fromStart = identifierEnum == PseudoClassIdentifiers.nth_child || identifierEnum == PseudoClassIdentifiers.nth_of_type
+                val ofType = identifierEnum == PseudoClassIdentifiers.nth_of_type || identifierEnum == PseudoClassIdentifiers.nth_last_of_type
                 val ab = nextAnPlusB()
-                    ?: throw CSSParseException("Invalid or missing parameter section for pseudo class: $identifier")
-                pseudo =
-                    CSSParser.PseudoClassAnPlusB(ab.a, ab.b, fromStart, ofType, selectorPart.tag)
+                pseudo = PseudoClassAnPlusB(
+                    a = ab.a,
+                    b = ab.b,
+                    isFromStart = fromStart,
+                    isOfType = ofType,
+                    nodeName = selectorPart.tag
+                )
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.not -> {
+            PseudoClassIdentifiers.not -> {
                 val notSelectorGroup = nextPseudoNotParam()
                     ?: throw CSSParseException("Invalid or missing parameter section for pseudo class: $identifier")
-                pseudo = CSSParser.PseudoClassNot(notSelectorGroup)
+                pseudo = PseudoClassNot(notSelectorGroup)
                 selector.specificity = pseudo.specificity
             }
 
-            CSSParser.PseudoClassIdentifiers.target -> {
-                //TODO
-                pseudo = CSSParser.PseudoClassTarget()
+            PseudoClassIdentifiers.target -> {
+                pseudo = PseudoClassTarget
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.lang -> {
+            PseudoClassIdentifiers.lang -> {
                 val _ = nextIdentListParam()
-                pseudo = CSSParser.PseudoClassNotSupported(identifier)
+                pseudo = PseudoClassNotSupported(identifier)
                 selector.addedAttributeOrPseudo()
             }
 
-            CSSParser.PseudoClassIdentifiers.link,
-            CSSParser.PseudoClassIdentifiers.visited,
-            CSSParser.PseudoClassIdentifiers.hover,
-            CSSParser.PseudoClassIdentifiers.active,
-            CSSParser.PseudoClassIdentifiers.focus,
-            CSSParser.PseudoClassIdentifiers.enabled,
-            CSSParser.PseudoClassIdentifiers.disabled,
-            CSSParser.PseudoClassIdentifiers.checked,
-            CSSParser.PseudoClassIdentifiers.indeterminate -> {
-                pseudo = CSSParser.PseudoClassNotSupported(identifier)
+            PseudoClassIdentifiers.link,
+            PseudoClassIdentifiers.visited,
+            PseudoClassIdentifiers.hover,
+            PseudoClassIdentifiers.active,
+            PseudoClassIdentifiers.focus,
+            PseudoClassIdentifiers.enabled,
+            PseudoClassIdentifiers.disabled,
+            PseudoClassIdentifiers.checked,
+            PseudoClassIdentifiers.indeterminate -> {
+                pseudo = PseudoClassNotSupported(identifier)
                 selector.addedAttributeOrPseudo()
             }
 
             else -> throw CSSParseException("Unsupported pseudo class: $identifier")
         }
 
-//      selectorPart.addPseudo(input.substring(pseudoStart, position));
         selectorPart.addPseudo(pseudo)
-//      simpleSelectors.addedAttributeOrPseudo();
     }
 
 
@@ -670,6 +672,6 @@ internal class CSSTextScanner(input: String) : TextScanner(
 
     companion object {
         @JvmField
-        val PATTERN_BLOCK_COMMENTS: Pattern = compilePattern("(?s)/\\*.*?\\*/")
+        val PATTERN_BLOCK_COMMENTS: Pattern = "(?s)/\\*.*?\\*/".toPattern()
     }
 }

@@ -19,6 +19,11 @@ package hu.oandras.ksvg
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,96 +34,96 @@ import org.robolectric.annotation.Config
 @Config(manifest = Config.NONE, shadows = [MockCanvas::class, MockPath::class, MockPaint::class])
 class RenderToCanvasTest {
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun renderToCanvas() {
         val test = "<svg viewBox=\"0 0 200 100\">\n" +
                 "  <rect width=\"200\" height=\"100\" fill=\"green\"/>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm1: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm1: Bitmap = createBitmap(200, 200)
         val bmCanvas1 = Canvas(bm1)
         svg.renderToCanvas(bmCanvas1)
 
         val ops: List<String?> = bmCanvas1.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("concat(Matrix(1 0 0 1 0 50))", ops[1])
+        assertEquals("concat(Matrix(1 0 0 1 0 50))", ops[2])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
-            ops[3]
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; grad:null; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16; ws:0))",
+            ops[4]
         )
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun renderToCanvasWithViewPort() {
         val test = "<svg viewBox=\"0 0 200 100\">\n" +
                 "  <rect width=\"200\" height=\"100\" fill=\"green\"/>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm2: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm2: Bitmap = createBitmap(200, 200)
         val bmCanvas2 = Canvas(bm2)
         svg.renderToCanvas(bmCanvas2, RectF(50f, 50f, 150f, 150f))
 
         val ops: List<String> = bmCanvas2.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("concat(Matrix(0.5 0 0 0.5 50 75))", ops[1])
+        assertEquals("concat(Matrix(0.5 0 0 0.5 50 75))", ops[2])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
-            ops[3]
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; grad:null; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16; ws:0))",
+            ops[4]
         )
     }
 
 
     //--------------------------------------------------------------------------
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun renderViewToCanvas() {
         val test = "<svg viewBox=\"0 0 100 100\">\n" +
                 "  <view id=\"test\" viewBox=\"25 25 50 50\"/>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm1: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm1: Bitmap = createBitmap(200, 200)
         val bmCanvas1 = Canvas(bm1)
         svg.renderViewToCanvas("test", bmCanvas1)
 
         val ops: List<String?> = bmCanvas1.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("concat(Matrix(4 0 0 4 -100 -100))", ops[1])
+        assertEquals("concat(Matrix(4 0 0 4 -100 -100))", ops[2])
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun renderViewToCanvasViewPort() {
         val test = "<svg viewBox=\"0 0 100 100\">\n" +
                 "  <view id=\"test\" viewBox=\"25 25 50 50\"/>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm1: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm1: Bitmap = createBitmap(200, 200)
         val bmCanvas1 = Canvas(bm1)
         svg.renderViewToCanvas("test", bmCanvas1, RectF(100f, 100f, 200f, 200f))
 
         val ops: List<String?> = bmCanvas1.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("concat(Matrix(2 0 0 2 50 50))", ops[1])
+        assertEquals("concat(Matrix(2 0 0 2 50 50))", ops[2])
     }
 
 
     //--------------------------------------------------------------------------
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun renderToCanvasWithViewPortRO() {
         val test = "<svg viewBox=\"0 0 200 100\">\n" +
                 "  <rect width=\"200\" height=\"100\" fill=\"green\"/>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm2: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm2: Bitmap = createBitmap(200, 200)
         val bmCanvas2 = Canvas(bm2)
 
         val opts: RenderOptions = RenderOptions.create().viewPort(100f, 100f, 100f, 50f)
@@ -126,22 +131,22 @@ class RenderToCanvasTest {
 
         val ops: List<String?> = bmCanvas2.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("concat(Matrix(0.5 0 0 0.5 100 100))", ops[1])
+        assertEquals("concat(Matrix(0.5 0 0 0.5 100 100))", ops[2])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
-            ops[3]
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; grad:null; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16; ws:0))",
+            ops[4]
         )
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun renderToCanvasRO() {
         val test = "<svg>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm2: Bitmap = Bitmap.createBitmap(200, 300, Bitmap.Config.ARGB_8888)
+        val bm2: Bitmap = createBitmap(200, 300)
         val bmCanvas2 = Canvas(bm2)
 
         // Step 1
@@ -154,7 +159,7 @@ class RenderToCanvasTest {
         val mock: MockCanvas = bmCanvas2.asShadow()
         val ops: List<String> = mock.getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("concat(Matrix(2 0 0 2 0 100))", ops[1])
+        assertEquals("concat(Matrix(2 0 0 2 0 100))", ops[2])
 
         // Step 2
         mock.clearOperations()
@@ -167,7 +172,7 @@ class RenderToCanvasTest {
         svg.renderToCanvas(bmCanvas2, opts)
 
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("concat(Matrix(2 0 0 2 0 200))", ops[1])
+        assertEquals("concat(Matrix(2 0 0 2 0 200))", ops[2])
 
         // Step 3
         mock.clearOperations()
@@ -180,6 +185,6 @@ class RenderToCanvasTest {
         svg.renderToCanvas(bmCanvas2, opts)
 
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals("concat(Matrix(2 0 0 6 0 0))", ops[1])
+        assertEquals("concat(Matrix(2 0 0 6 0 0))", ops[2])
     }
 }

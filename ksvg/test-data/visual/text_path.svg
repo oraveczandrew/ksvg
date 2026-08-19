@@ -1,0 +1,9 @@
+<svg width="200" height="120" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <path id="tp" d="M 10 100 C 50 10, 150 10, 190 100" fill="none" stroke="lightgray" stroke-width="1"/>
+  </defs>
+  <use href="#tp"/>
+  <text font-size="16" fill="black" font-family="sans-serif">
+    <textPath href="#tp" startOffset="5%">Curved text along a path</textPath>
+  </text>
+</svg>

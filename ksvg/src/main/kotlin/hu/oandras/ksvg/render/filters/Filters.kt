@@ -17,12 +17,13 @@
 package hu.oandras.ksvg.render.filters
 
 import android.graphics.Bitmap
+import hu.oandras.ksvg.render.FilterSourceMap
 
 internal fun getFilterInput(
     name: String?,
-    results: Map<String, Bitmap>,
+    results: FilterSourceMap,
     lastResult: Bitmap?
 ): Bitmap? {
     if (name == null) return lastResult
-    return results[name]
+    return results.get(name)
 }

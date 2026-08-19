@@ -1,0 +1,8 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <text x="10" y="30" font-size="18" font-weight="bold" fill="navy" font-family="sans-serif">Bold</text>
+  <text x="10" y="60" font-weight="bold" font-style="italic" fill="teal" font-family="sans-serif">Bold Italic</text>
+  <text x="100" y="95" font-size="18" text-anchor="middle" fill="red" font-family="sans-serif" text-decoration="underline">Underlined</text>
+  <text x="190" y="125" font-size="18" text-anchor="end" fill="blue" font-family="sans-serif" text-decoration="line-through">Strikethrough</text>
+  <text x="10" y="155" font-size="18" letter-spacing="4" fill="green" font-family="sans-serif">Wide spacing</text>
+  <text x="10" y="185" font-size="18" word-spacing="12" fill="orange" font-family="sans-serif">word spacing here</text>
+</svg>

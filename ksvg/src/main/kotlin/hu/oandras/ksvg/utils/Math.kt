@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg.utils
 
+import hu.oandras.ksvg.KSVGParseException
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.max
@@ -58,3 +59,16 @@ internal fun Float.ceilToInt(): Int {
 }
 
 internal fun Int.squared(): Int = Math.multiplyExact(this, this)
+
+internal inline fun Float.takeIfNonZeroOrElse(r: () -> Float): Float {
+    return if (this != 0f) this
+    else r.invoke()
+}
+
+internal inline fun String.toFloatOrError(errorMessage: () -> String): Float {
+    return try {
+        toFloat()
+    } catch (e: NumberFormatException) {
+        throw KSVGParseException(errorMessage(), e)
+    }
+}

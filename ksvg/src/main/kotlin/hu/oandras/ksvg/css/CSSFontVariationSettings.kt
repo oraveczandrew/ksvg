@@ -14,70 +14,170 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+@file:OptIn(ExperimentalContracts::class)
 
 package hu.oandras.ksvg.css
 
-import androidx.collection.MutableObjectFloatMap
 import hu.oandras.ksvg.parser.TextScanner
-import hu.oandras.ksvg.utils.copyIfNotEmpty
 import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.util.Locale
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
-internal class CSSFontVariationSettings(
-    private var settings: MutableObjectFloatMap<String>?
+@ConsistentCopyVisibility
+internal data class CSSFontVariationSettings private constructor(
+    @JvmField
+    val weight: Float,
+    @JvmField
+    val italic: Float,
+    @JvmField
+    val slant: Float,
+    @JvmField
+    val width: Float
 ) {
 
-    private class FontVariationEntry(
-        @JvmField
-        var name: String,
-        @JvmField
-        var value: Float
+    private constructor() : this(
+        weight = Float.NaN,
+        italic = Float.NaN,
+        slant = Float.NaN,
+        width = Float.NaN
     )
 
-    constructor() : this(null)
+    constructor(
+        weight: Float,
+        width: Float,
+    ): this(
+        weight = weight,
+        italic = Float.NaN,
+        slant = Float.NaN,
+        width = width,
+    )
 
-    constructor(other: CSSFontVariationSettings) : this(other.settings.copyIfNotEmpty())
+    fun toBuilder(): Builder = Builder().apply { reset(this@CSSFontVariationSettings) }
 
-    private fun ensureSettings(): MutableObjectFloatMap<String> {
-        return settings ?: MutableObjectFloatMap<String>(1).also {
-            settings = it
+    class Builder {
+        private lateinit var original: CSSFontVariationSettings
+        private var weight: Float = Float.NaN
+        private var italic: Float = Float.NaN
+        private var slant: Float = Float.NaN
+        private var width: Float = Float.NaN
+
+        fun reset(original: CSSFontVariationSettings) {
+            this.original = original
+            this.weight = original.weight
+            this.italic = original.italic
+            this.slant = original.slant
+            this.width = original.width
         }
-    }
 
-    fun addSetting(key: String, value: Float) {
-        ensureSettings()[key] = value
-    }
+        fun addSetting(
+            key: String,
+            value: Float
+        ) {
+            when (key) {
+                VARIATION_WEIGHT -> weight = value
+                VARIATION_ITALIC -> italic = value
+                VARIATION_SLANT -> slant = value
+                VARIATION_WIDTH -> width = value
+            }
+        }
 
-    fun applySettings(other: CSSFontVariationSettings?) {
-        val otherSettings = other?.settings
+        fun addSettings(other: CSSFontVariationSettings?) {
+            if (other == null) return
 
-        if (otherSettings == null || otherSettings.isEmpty()) return
+            if (!other.weight.isNaN()) weight = other.weight
+            if (!other.italic.isNaN()) italic = other.italic
+            if (!other.slant.isNaN()) slant = other.slant
+            if (!other.width.isNaN()) width = other.width
+        }
 
-        val settings = settings
-        if (settings == null) {
-            this.settings = otherSettings.copyIfNotEmpty()
-        } else {
-            settings.putAll(otherSettings)
+        fun applySettings(other: CSSFontVariationSettings?) {
+            if (other == null) return
+
+            weight = other.weight
+            italic = other.italic
+            slant = other.slant
+            width = other.width
+        }
+
+        private var lastBuilt: CSSFontVariationSettings? = null
+        fun build(): CSSFontVariationSettings {
+            val original = original
+            if (dataIsEqualsWith(original)) {
+                return original
+            }
+
+            val lastBuilt = lastBuilt
+            if (dataIsEqualsWith(lastBuilt)) {
+                return lastBuilt
+            }
+
+            return CSSFontVariationSettings(
+                weight = weight,
+                italic = italic,
+                slant = slant,
+                width = width
+            ).also {
+                this.lastBuilt = it
+            }
+        }
+
+        private fun dataIsEqualsWith(settings: CSSFontVariationSettings?): Boolean {
+            contract {
+                returns(true) implies (settings != null)
+            }
+
+            return settings != null &&
+                    (weight == settings.weight || (weight.isNaN() && settings.weight.isNaN())) &&
+                    (italic == settings.italic || (italic.isNaN() && settings.italic.isNaN())) &&
+                    (slant == settings.slant || (slant.isNaN() && settings.slant.isNaN())) &&
+                    (width == settings.width || (width.isNaN() && settings.width.isNaN()))
         }
     }
 
     override fun toString(): String {
         return buildString {
-            val format = DecimalFormat("#.##")
+            appendSetting(
+                key = VARIATION_WEIGHT,
+                value = weight,
+            )
 
-            settings?.forEach { key, value ->
-                if (isNotEmpty()) {
-                    append(',')
-                }
+            appendSetting(
+                key = VARIATION_ITALIC,
+                value = italic,
+            )
 
-                append('\'')
-                append(key)
-                append("' ")
-                append(format.format(value))
-            }
+            appendSetting(
+                key = VARIATION_SLANT,
+                value = slant,
+            )
+
+            appendSetting(
+                key = VARIATION_WIDTH,
+                value = width,
+            )
         }
     }
 
+    private fun StringBuilder.appendSetting(
+        key: String,
+        value: Float,
+    ) {
+        if (value.isNaN()) return
+
+        if (isNotEmpty()) {
+            append(',')
+        }
+
+        append('\'')
+        append(key)
+        append("' ")
+        append(format.get()!!.format(value.toDouble()))
+    }
+
     companion object {
+
         private const val NORMAL = "normal"
 
         const val VARIATION_WEIGHT: String = "wght"
@@ -88,45 +188,60 @@ internal class CSSFontVariationSettings(
         const val VARIATION_ITALIC_VALUE_ON: Float = 1f
         const val VARIATION_OBLIQUE_VALUE_ON: Float = -14f // -14 degrees
 
+        @JvmField
+        val EMPTY = CSSFontVariationSettings()
 
-        //-----------------------------------------------------------------------------------------------
+        private val format = ThreadLocal.withInitial {
+            DecimalFormat("#.##", DecimalFormatSymbols(Locale.US))
+        }
+
+        // -----------------------------------------------------------------------------------------------
         // Parsing font-variation-settings property value
+
         /*
-        * Parse the value of the CSS property "font-variation-settings".
-        *
-        * Format is: normal | [ <string> <number>]#
-        */
-        fun parseFontVariationSettings(value: String): CSSFontVariationSettings? {
+         * Parse the value of the CSS property "font-variation-settings".
+         *
+         * Format is: normal | [ <string> <number>]#
+         */
+        fun parseFontVariationSettings(
+            value: String
+        ): CSSFontVariationSettings? {
             val scan = TextScanner(value)
             scan.skipWhitespace()
 
-            if (scan.consume(NORMAL)) return null
+            if (scan.consume(NORMAL)) {
+                return null
+            }
 
-            val result = MutableObjectFloatMap<String>()
+            val builder = EMPTY.toBuilder()
 
-            val tempEntry = FontVariationEntry("", 0f)
+            while (!scan.empty()) {
+                scan.skipWhitespace()
 
-            while (true) {
-                if (scan.empty()) break
-                val entry: FontVariationEntry? = nextFeatureEntry(scan, tempEntry)
-                if (entry == null || entry.value.isNaN()) break
-                result[entry.name] = entry.value
+                val name = scan.nextQuotedString()
+                    ?: return null
+
+                if (name.length != 4) {
+                    return null
+                }
+
+                scan.skipWhitespace()
+
+                if (scan.empty()) {
+                    return null
+                }
+
+                val num = scan.nextFloat()
+
+                if (num.isNaN()) {
+                    return null
+                }
+
+                builder.addSetting(name, num)
                 scan.skipCommaWhitespace()
             }
 
-            return CSSFontVariationSettings(result)
-        }
-
-        private fun nextFeatureEntry(scan: TextScanner, tempEntry: FontVariationEntry): FontVariationEntry? {
-            scan.skipWhitespace()
-            val name = scan.nextQuotedString()
-            if (name == null || name.length != 4) return null
-            scan.skipWhitespace()
-            if (scan.empty()) return null
-            val num = scan.nextFloat()
-            tempEntry.name = name
-            tempEntry.value = num
-            return tempEntry
+            return builder.build()
         }
     }
 }

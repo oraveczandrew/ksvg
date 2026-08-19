@@ -19,6 +19,11 @@ package hu.oandras.ksvg
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Build
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,14 +39,14 @@ import org.robolectric.annotation.Config
 class FontFeatureSettingsTest {
     @Suppress("SpellCheckingInspection")
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun fontFeatures() {
         val test = "<svg>\n" +
                 "  <text style=\"font-feature-settings: 'liga' 0, 'clig', 'pnum' on, 'swsh' 42\">Test</text>\n" +
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm1: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm1: Bitmap = createBitmap(200, 200)
         val canvas = Canvas(bm1)
         svg.renderToCanvas(canvas)
 
@@ -51,14 +56,14 @@ class FontFeatureSettingsTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals(
             sortVariations("'onum' 0,'subs' 0,'unic' 0,'calt' 1,'dlig' 0,'c2pc' 0,'mkmk' 1,'swsh' 42,'zero' 0,'hlig' 0,'c2sc' 0,'sups' 0,'pcap' 0,'jp78' 0,'pwid' 0,'trad' 0,'ordn' 0,'titl' 0,'fwid' 0,'frac' 0,'locl' 1,'pnum' 1,'smpl' 0,'kern' 1,'tnum' 0,'liga' 0,'lnum' 0,'clig' 1,'jp90' 0,'rlig' 1,'ccmp' 1,'ruby' 0,'jp83' 0,'smcp' 0,'afrc' 0,'jp04' 0,'mark' 1"),
-            sortVariations(mock.paintProp(3, "ff"))
+            sortVariations(mock.paintProp(4, "ff"))
         )
     }
 
     //-----------------------------------------------------------------------------------------------
     @Suppress("SpellCheckingInspection")
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun fontStretch() {
         val test = "<svg>\n" +
                 "  <text style=\"font-stretch: ultra-condensed\">Test\n" +
@@ -70,7 +75,7 @@ class FontFeatureSettingsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val bm1: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val bm1: Bitmap = createBitmap(200, 200)
         val canvas = Canvas(bm1)
         svg.renderToCanvas(canvas)
 
@@ -78,12 +83,12 @@ class FontFeatureSettingsTest {
 
         val ops: List<String> = mock.getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(sortVariations("'wdth' 50,'wght' 400"), sortVariations(mock.paintProp(5, "fv")))
-        assertEquals(sortVariations("'wdth' 100,'wght' 400"), sortVariations(mock.paintProp(7, "fv")))
-        assertEquals(sortVariations("'wdth' 200,'wght' 400"), sortVariations(mock.paintProp(11, "fv")))
-        assertEquals(sortVariations("'wdth' 80,'wght' 400"), sortVariations(mock.paintProp(14, "fv")))
+        assertEquals(sortVariations("'wdth' 50,'wght' 400"), sortVariations(mock.paintProp(4, "fv")))
+        assertEquals(sortVariations("'wdth' 100,'wght' 400"), sortVariations(mock.paintProp(5, "fv")))
+        assertEquals(sortVariations("'wdth' 200,'wght' 400"), sortVariations(mock.paintProp(8, "fv")))
+        assertEquals(sortVariations("'wdth' 80,'wght' 400"), sortVariations(mock.paintProp(11, "fv")))
+        assertEquals(sortVariations("'wdth' 100,'wght' 400"), sortVariations(mock.paintProp(14, "fv")))
         assertEquals(sortVariations("'wdth' 100,'wght' 400"), sortVariations(mock.paintProp(17, "fv")))
-        assertEquals(sortVariations("'wdth' 100,'wght' 400"), sortVariations(mock.paintProp(20, "fv")))
     }
 
 

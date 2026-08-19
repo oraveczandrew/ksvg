@@ -14,9 +14,6 @@
  *    limitations under the License.
  */
 
-import org.gradle.api.publish.PublishingExtension
-import org.gradle.api.publish.maven.MavenPublication
-import org.gradle.plugins.signing.SigningExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -25,10 +22,15 @@ plugins {
     id("signing")
     id("org.jetbrains.dokka")
     id("org.jetbrains.dokka-javadoc")
+    id("jacoco")
 }
 
 kotlin {
     explicitApi()
+}
+
+jacoco {
+    toolVersion = "0.8.12"
 }
 
 android.apply {
@@ -52,6 +54,8 @@ android.apply {
         }
         getByName("debug") {
             isMinifyEnabled = false
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
         }
         create("beta") {
             isMinifyEnabled = false
@@ -88,17 +92,43 @@ android.apply {
             assets.directories.add("test-data")
         }
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.jvmArgs("-noverify")
+            // Forward `-PverifyFilter=name` so visual-comparison tests can run on a single SVG.
+            val verifyFilter = project.findProperty("verifyFilter") as? String
+            if (!verifyFilter.isNullOrBlank()) {
+                it.systemProperty("ksvg.verify.filter", verifyFilter)
+            }
+        }
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    if (project.hasProperty("excludeSlowTests")) {
+        exclude("**/MeteoconsVisualComparisonTest.*")
+        exclude("**/VerificationVisualComparisonTest.*")
+    }
+    extensions.findByType<JacocoTaskExtension>()?.apply {
+        isIncludeNoLocationClasses = true
+        excludes = listOf("jdk.internal.*")
+    }
 }
 
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-Xlint:deprecation")
 }
 
+//noinspection UseTomlInstead
 dependencies.apply {
     implementation("androidx.annotation:annotation:1.10.0")
     implementation("androidx.lifecycle:lifecycle-common:2.11.0")
-    implementation("com.google.guava:guava:33.6.0-android")
+    implementation("com.google.guava:guava:33.7.1-android")
     implementation("androidx.collection:collection:1.6.0")
+
+    implementation(project(":nativeblur"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
@@ -274,12 +304,14 @@ tasks.register<Jar>("libraryJar") {
 
     // Add all dependencies except android.jar and JUnit
     from(
-        configurations.findByName("releaseRuntimeClasspath")
-        !!.filter {
+        configurations.named("releaseRuntimeClasspath").map { configuration ->
+            configuration.filter {
                 it.name != "android.jar" &&
                         !it.name.startsWith("junit")
+            }.map {
+                if (it.isDirectory) it else zipTree(it)
             }
-            .map { if (it.isDirectory) it else zipTree(it) }
+        }
     )
 
     archiveFileName.set("${artifactIdJAR}-${libraryVersion}.jar")
@@ -289,6 +321,37 @@ configure<SigningExtension> {
     val publishing = extensions.getByType<PublishingExtension>()
     sign(publishing.publications["mavenAAR"])
     sign(publishing.publications["mavenJAR"])
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    description = "Generates Jacoco coverage report for Debug unit tests."
+    group = "Reporting"
+    dependsOn("testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+
+    val fileFilter = listOf(
+        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*", "**/*Test*.*", "android/**/*.*"
+    )
+    
+    val kotlinClasses = fileTree("${layout.buildDirectory.get()}/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes") {
+        exclude(fileFilter)
+    }
+    val javaClasses = fileTree("${layout.buildDirectory.get()}/intermediates/javac/debug/compileDebugJavaWithJavac/classes") {
+        exclude(fileFilter)
+    }
+
+    sourceDirectories.setFrom(files("${project.projectDir}/src/main/kotlin", "${project.projectDir}/src/main/java"))
+    classDirectories.setFrom(files(kotlinClasses, javaClasses))
+    executionData.setFrom(fileTree(layout.buildDirectory.get()) {
+        include(
+            "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec",
+            "jacoco/testDebugUnitTest.exec"
+        )
+    })
 }
 
 afterEvaluate {

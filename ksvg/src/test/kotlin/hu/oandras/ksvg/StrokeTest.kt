@@ -18,6 +18,11 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,7 +38,7 @@ class StrokeTest {
        * See Issue #289. https://github.com/BigBadaboom/androidsvg/issues/289
        */
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun strokeWidthNonZero() {
         // First test a non-zero stroke so we know that's working
         val test =
@@ -42,7 +47,7 @@ class StrokeTest {
                     "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val newBM: Bitmap = createBitmap(200, 200)
         val canvas = Canvas(newBM)
         svg.renderToCanvas(canvas)
 
@@ -57,7 +62,7 @@ class StrokeTest {
     * See Issue #289. https://github.com/BigBadaboom/androidsvg/issues/289
     */
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun strokeWidthZero() {
         // Now test a zero stroke so we know that's working
         val test =
@@ -66,7 +71,7 @@ class StrokeTest {
                     "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        val newBM: Bitmap = createBitmap(200, 200)
         val canvas = Canvas(newBM)
         svg.renderToCanvas(canvas)
 
@@ -78,7 +83,7 @@ class StrokeTest {
 
     private fun countPathsDrawn(canvas: MockCanvas): Long {
         val ops: List<String> = canvas.getOperations()
-        println(ops.joinToString(","))
+        // println(ops.joinToString(","))
         return ops.stream().filter { op -> op.startsWith("drawPath(") }.count()
     }
 }

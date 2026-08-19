@@ -19,7 +19,9 @@ package hu.oandras.ksvg
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import androidx.test.platform.app.InstrumentationRegistry
-import hu.oandras.ksvg.utils.BitmapComparator
+import hu.oandras.ksvg.test.BitmapComparator
+import hu.oandras.ksvg.test.decodePng
+import hu.oandras.ksvg.test.renderWithLibrary
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith

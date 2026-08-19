@@ -17,31 +17,31 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.css.CSS
-import hu.oandras.ksvg.dom.Box
-import hu.oandras.ksvg.utils.RenderOptionsImpl
+import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.render.RenderOptionsImpl
 
 /**
  * A fluent builder interface that creates a render configuration object for the
- * [SVG.renderToCanvas] and [SVG.renderToPicture] methods.
- * 
- * <h3>Example usage</h3>
- * 
- * <pre class="code-block">
- * `RenderOption renderOptions = RenderOptions.create(); renderOptions.viewPort(100f, 100f, 400f, 300f)   // Set the area of the Canvas to render the SVG into              .css("rect { fill: red; }")         // Add some CSS that makes all rectangles red svg.renderToCanvas(canvas, renderOptions); `
-</pre> *
+ * [SVG.renderToCanvas] method.
  */
 public interface RenderOptions {
 
+    /** The parsed CSS rules to apply during render, or `null` if none were set. */
     public val css: CSS?
 
+    /** The id of a `<view>` element to render, or `null` if not set. */
     public val viewId: String?
 
+    /** The aspect ratio handling strategy, or `null` if not set. */
     public val preserveAspectRatio: PreserveAspectRatio?
 
+    /** The id of an element to treat as the `:target` CSS pseudo-class, or `null` if not set. */
     public val targetId: String?
 
+    /** An override for the root `viewBox` attribute, or `null` if not set. */
     public val viewBox: Box?
 
+    /** The viewport bounds into which the SVG should be rendered, or `null` if not set. */
     public val viewPort: Box?
 
     /**
@@ -58,7 +58,16 @@ public interface RenderOptions {
      * @param css CSS rules to apply
      * @return this same `RenderOptions` instance
      */
-    public fun css(css: String?, externalFileResolver: SVGExternalFileResolver? = null): RenderOptions
+    public fun css(css: String?): RenderOptions
+
+    /**
+     * Specifies some additional CSS rules that will be applied during render in addition to
+     * any specified in the file itself. CSS will be parsed during SVG render.
+     * @param css CSS rules to apply
+     * @param externalFileResolver resolver for external references in the CSS
+     * @return this same `RenderOptions` instance
+     */
+    public fun css(css: String?, externalFileResolver: ExternalFileResolver?): RenderOptions
 
     /**
      * Returns true if this RenderOptions instance has had CSS set with `css()`.

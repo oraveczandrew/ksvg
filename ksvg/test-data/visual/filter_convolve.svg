@@ -1,0 +1,9 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="conv">
+      <feConvolveMatrix order="3" kernelMatrix="1 1 1 1 -8 1 1 1 1" divisor="1" in="SourceGraphic"/>
+    </filter>
+  </defs>
+  <rect x="40" y="40" width="176" height="176" fill="red" filter="url(#conv)"/>
+  <circle cx="128" cy="128" r="60" fill="blue" filter="url(#conv)"/>
+</svg>

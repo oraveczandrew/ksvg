@@ -1,0 +1,44 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -    You may obtain a copy of the License at
+  -
+  -        http://www.apache.org/licenses/LICENSE-2.0
+  -
+  -    Unless required by applicable law or agreed to in writing, software
+  -    distributed under the License is distributed on an "AS IS" BASIS,
+  -    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  -    See the License for the specific language governing permissions and
+  -    limitations under the License.
+  -->
+
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <g font-family="sans-serif" font-size="20" fill="black">
+    <!-- Text Decoration -->
+    <text x="20" y="40" text-decoration="overline">Overline decoration</text>
+    <text x="20" y="80" text-decoration="underline line-through overline">Triple decoration</text>
+
+    <!-- Text Transform -->
+    <text x="20" y="130" text-transform="uppercase">uppercase transform</text>
+    <text x="20" y="160" text-transform="lowercase">LOWERCASE TRANSFORM</text>
+    <text x="20" y="190" text-transform="capitalize">capitalize first letters</text>
+
+    <!-- Baseline Shift -->
+    <text x="20" y="250">
+      Regular <tspan baseline-shift="super" font-size="12">super</tspan>
+      and <tspan baseline-shift="sub" font-size="12">sub</tspan> script
+    </text>
+    <text x="20" y="280">
+      Offset <tspan baseline-shift="10" font-size="12">shifted by 10px</tspan>
+    </text>
+
+    <!-- Alignment Baseline -->
+    <line x1="0" y1="350" x2="400" y2="350" stroke="lightgray" stroke-dasharray="4"/>
+    <text x="20" y="350" alignment-baseline="hanging">Hanging</text>
+    <text x="120" y="350" alignment-baseline="middle">Middle</text>
+    <text x="220" y="350" alignment-baseline="central">Central</text>
+    <text x="320" y="350" alignment-baseline="ideographic">Ideo</text>
+  </g>
+</svg>

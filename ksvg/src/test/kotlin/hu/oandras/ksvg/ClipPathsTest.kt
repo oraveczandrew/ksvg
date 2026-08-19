@@ -18,6 +18,11 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.mocks.asShadow
+import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.utils.ceilToInt
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -29,7 +34,7 @@ import org.robolectric.annotation.Config
 @Config(manifest = Config.NONE, shadows = [MockCanvas::class, MockPath::class, MockPaint::class])
 class ClipPathsTest {
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun emptyClipPath() {
         //disableLogging();
         val test = "<svg width=\"500\" height=\"100\">" +
@@ -41,10 +46,9 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
             svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(newBM)
 
@@ -53,13 +57,13 @@ class ClipPathsTest {
 
         val ops: List<String> = canvas.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(7, ops.size)
-        assertEquals("clipPath()", ops[3])
+        assertEquals(8, ops.size)
+        assertEquals("clipPath()", ops[4])
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun simpleClipPath() {
         //disableLogging();
         val test = "<svg width=\"500\" height=\"100\">" +
@@ -72,10 +76,9 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
             svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(newBM)
 
@@ -84,13 +87,13 @@ class ClipPathsTest {
 
         val ops: List<String> = canvas.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(7, ops.size)
-        assertEquals("clipPath(M 10 10 L 90 10 L 90 90 L 10 90 L 10 10 Z)", ops[3])
+        assertEquals(9, ops.size)
+        assertEquals("clipPath(M 10 10 L 90 10 L 90 90 L 10 90 L 10 10 Z)", ops[4])
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun twoClipPath() {
         //disableLogging();
         val test = "<svg width=\"500\" height=\"100\">" +
@@ -104,10 +107,9 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
             svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(newBM)
 
@@ -116,16 +118,16 @@ class ClipPathsTest {
 
         val ops: List<String> = canvas.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(7, ops.size)
+        assertEquals(9, ops.size)
         assertEquals(
             "clipPath(( M 10 10 L 50 10 L 50 90 L 10 90 L 10 10 Z \u222a M 50 50 L 90 10 L 90 90 Z ))",
-            ops[3]
+            ops[4]
         )
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun clipPathWithClipPath() {
         //disableLogging();
         val test = "<svg width=\"500\" height=\"100\">" +
@@ -141,10 +143,9 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
             svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(newBM)
 
@@ -153,16 +154,16 @@ class ClipPathsTest {
 
         val ops: List<String> = canvas.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(7, ops.size)
+        assertEquals(9, ops.size)
         assertEquals(
             "clipPath(( M 10 10 L 90 10 L 90 90 L 10 90 L 10 10 Z \u2229 M 20 50 L 80 20 L 80 80 Z ))",
-            ops[3]
+            ops[4]
         )
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun clipPathIncludesClipPath() {
         //disableLogging();
         val test = "<svg width=\"500\" height=\"100\">" +
@@ -178,10 +179,9 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
             svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(newBM)
 
@@ -190,16 +190,16 @@ class ClipPathsTest {
 
         val ops: List<String> = canvas.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(7, ops.size)
+        assertEquals(9, ops.size)
         assertEquals(
             "clipPath(( M 10 10 L 90 10 L 90 90 L 10 90 L 10 10 Z \u2229 M 20 50 L 80 20 L 80 80 Z ))",
-            ops[3]
+            ops[4]
         )
     }
 
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun clipPathObjectBoundingBox() {
         //disableLogging();
         val test = "<svg width=\"500\" height=\"100\">" +
@@ -212,10 +212,9 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(
+        val newBM: Bitmap = createBitmap(
             svg.documentWidth.ceilToInt(),
             svg.documentHeight.ceilToInt(),
-            Bitmap.Config.ARGB_8888
         )
         val canvas = Canvas(newBM)
 
@@ -224,15 +223,15 @@ class ClipPathsTest {
 
         val ops: List<String> = canvas.asShadow().getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
-        assertEquals(7, ops.size)
+        assertEquals(9, ops.size)
         assertEquals(
             "clipPath(M 0.1 0.1 L 0.9 0.1 L 0.9 0.9 L 0.1 0.9 L 0.1 0.1 Z \u00d7 [100, 0, 0, 100, 400, 300])",
-            ops[3]
+            ops[4]
         )
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun clipPathObjectBoundingBoxPercentages() {
         val test = "<svg width=\"100\" height=\"100\">" +
                 "  <defs>" +
@@ -244,19 +243,19 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val newBM: Bitmap = createBitmap(100, 100)
         val canvas = Canvas(newBM)
         svg.renderToCanvas(canvas)
 
         val ops: List<String> = canvas.asShadow().getOperations()
         assertEquals(
             "clipPath(M 0.1 0.1 L 0.9 0.1 L 0.9 0.9 L 0.1 0.9 L 0.1 0.1 Z \u00d7 [100, 0, 0, 100, 0, 0])",
-            ops[3]
+            ops[4]
         )
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun nestedClipPathWithObjectBoundingBox() {
         val test = "<svg width=\"100\" height=\"100\">" +
                 "  <defs>" +
@@ -271,19 +270,19 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val newBM: Bitmap = createBitmap(100, 100)
         val canvas = Canvas(newBM)
         svg.renderToCanvas(canvas)
 
         val ops: List<String> = canvas.asShadow().getOperations()
         assertEquals(
             "clipPath(( M 0 0 L 1 0 L 1 1 L 0 1 L 0 0 Z \u2229 M 0.1 0.1 L 0.9 0.1 L 0.9 0.9 L 0.1 0.9 L 0.1 0.1 Z ) \u00d7 [100, 0, 0, 100, 0, 0])",
-            ops[3]
+            ops[4]
         )
     }
 
     @Test
-    @Throws(SVGParseException::class)
+    @Throws(KSVGParseException::class)
     fun clipPathWithGroup() {
         val test = "<svg width=\"100\" height=\"100\">" +
                 "  <defs>" +
@@ -298,14 +297,14 @@ class ClipPathsTest {
                 "</svg>"
         val svg: SVG = SVG.getFromString(test)
 
-        val newBM: Bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val newBM: Bitmap = createBitmap(100, 100)
         val canvas = Canvas(newBM)
         svg.renderToCanvas(canvas)
 
         val ops: List<String> = canvas.asShadow().getOperations()
         assertEquals(
             "clipPath(( M 10 10 L 50 10 L 50 90 L 10 90 L 10 10 Z \u222a M 50 10 L 90 10 L 90 90 L 50 90 L 50 10 Z ))",
-            ops[3]
+            ops[4]
         )
     }
 }

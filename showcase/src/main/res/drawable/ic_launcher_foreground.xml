@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~    Copyright 2013-2020 Paul LeBeau, Cave Rock Software Ltd.
+  ~    Copyright 2026 András Oravecz <info@oandras.hu>
+  ~
+  ~    Licensed under the Apache License, Version 2.0 (the "License");
+  ~    you may not use this file except in compliance with the License.
+  ~    You may obtain a copy of the License at
+  ~
+  ~        http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~    Unless required by applicable law or agreed to in writing, software
+  ~    distributed under the License is distributed on an "AS IS" BASIS,
+  ~    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~    See the License for the specific language governing permissions and
+  ~    limitations under the License.
+  -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M31,63.923C31,63.923 43.856,59.248 50.695,48.952C57.535,38.657 50.786,23.447 50.786,23.447C50.786,23.447 62.662,33.273 59.724,49.14C56.786,65.007 31,63.923 31,63.923Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M71,63.923C71,63.923 58.144,59.248 51.305,48.952C44.465,38.657 51.214,23.447 51.214,23.447C51.214,23.447 39.338,33.273 42.276,49.14C45.214,65.007 71,63.923 71,63.923Z" />
+</vector>
