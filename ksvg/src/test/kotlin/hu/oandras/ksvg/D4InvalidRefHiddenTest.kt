@@ -1,0 +1,71 @@
+package hu.oandras.ksvg
+
+import android.graphics.Canvas
+import hu.oandras.ksvg.render.createBitmap
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+@RunWith(RobolectricTestRunner::class)
+@Config(manifest = Config.NONE)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class D4InvalidRefHiddenTest {
+
+    private fun render(extra: String): android.graphics.Bitmap {
+        val svg = """
+            <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <clipPath id="goodClip"><rect x="0" y="0" width="50" height="100"/></clipPath>
+                <mask id="goodMask"><rect x="0" y="0" width="50" height="100" fill="white"/></mask>
+                <rect id="notAClip" x="0" y="0" width="10" height="10"/>
+              </defs>
+              $extra
+            </svg>
+        """.trimIndent()
+
+        val bitmap = createBitmap(100, 100)
+        SVG.getFromString(svg).renderToCanvas(Canvas(bitmap))
+        return bitmap
+    }
+
+    private fun isRed(bitmap: android.graphics.Bitmap, x: Int, y: Int): Boolean {
+        val p = bitmap.getPixel(x, y)
+        return (p shr 16 and 0xff) > 200 && (p shr 8 and 0xff) < 60 && (p and 0xff) < 60
+    }
+
+    @Test
+    fun missingClipPathReferenceHidesElement() {
+        val bitmap = render("""<rect x="10" y="10" width="80" height="80" fill="red" clip-path="url(#nope)"/>""")
+        assertTrue("Element with missing clip-path ref must be hidden", !isRed(bitmap, 25, 50))
+        assertTrue(!isRed(bitmap, 75, 50))
+    }
+
+    @Test
+    fun wrongTypeClipPathReferenceHidesElement() {
+        val bitmap = render("""<rect x="10" y="10" width="80" height="80" fill="red" clip-path="url(#notAClip)"/>""")
+        assertTrue("Element with wrong-type clip-path ref must be hidden", !isRed(bitmap, 25, 50))
+    }
+
+    @Test
+    fun validClipPathClips() {
+        val bitmap = render("""<rect x="10" y="10" width="80" height="80" fill="red" clip-path="url(#goodClip)"/>""")
+        assertTrue("Left half visible", isRed(bitmap, 25, 50))
+        assertTrue("Right half clipped", !isRed(bitmap, 75, 50))
+    }
+
+    @Test
+    fun missingMaskReferenceHidesElement() {
+        val bitmap = render("""<rect x="10" y="10" width="80" height="80" fill="red" mask="url(#nope)"/>""")
+        assertTrue("Element with missing mask ref must be hidden", !isRed(bitmap, 25, 50))
+        assertTrue(!isRed(bitmap, 75, 50))
+    }
+
+    @Test
+    fun wrongTypeMaskReferenceHidesElement() {
+        val bitmap = render("""<rect x="10" y="10" width="80" height="80" fill="red" mask="url(#notAClip)"/>""")
+        assertTrue("Element with wrong-type mask ref must be hidden", !isRed(bitmap, 25, 50))
+    }
+}

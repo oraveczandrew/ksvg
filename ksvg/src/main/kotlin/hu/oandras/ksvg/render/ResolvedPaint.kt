@@ -21,6 +21,7 @@ import android.graphics.RadialGradient
 import android.graphics.Shader.TileMode
 import android.util.Log
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.dom.core.Pattern
 import hu.oandras.ksvg.dom.core.SolidColor
 import hu.oandras.ksvg.dom.gradient.Gradient
 import hu.oandras.ksvg.dom.gradient.GradientLinear
@@ -173,7 +174,15 @@ internal fun resolvePaintReference(document: SVGImpl, paint: SvgPaint?): Resolve
         }
 
         is SolidColor -> ResolvedPaint.Solid(ref)
-        else -> null
+
+        // Patterns are valid paint servers too, but they are handled separately
+        // via RenderNode.fillPatternNode.
+        is Pattern -> null
+
+        // A reference to any other element type is an invalid paint reference:
+        // per spec the fallback color applies, or the paint is 'none' — NOT the
+        // inherited/previous element's color.
+        else -> ResolvedPaint.Missing
     }
 }
 

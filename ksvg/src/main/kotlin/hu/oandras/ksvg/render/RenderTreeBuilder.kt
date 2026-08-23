@@ -316,9 +316,12 @@ internal class RenderTreeBuilder(
             else -> null
         }
 
+        // Per SVG 1.1, a clip-path or mask property that references a missing or
+        // non-matching element is an error: the element must not be rendered.
+        var hideInvalidReference = false
         if (node != null && obj is ElementBase) {
             val state = state
-            state.style.filter?.let { 
+            state.style.filter?.let {
                 val filter = document.resolveIRI(it) as? Filter
                 if (filter != null) {
                     node.filterNode = buildFilter(filter)
@@ -328,6 +331,9 @@ internal class RenderTreeBuilder(
                 val clipPath = document.resolveIRI(it) as? ClipPath
                 if (clipPath != null) {
                     node.clipPathNode = buildClipPath(clipPath)
+                } else {
+                    Log.w("KSVG", "Clip-path reference '$it' is missing or invalid; hiding element")
+                    hideInvalidReference = true
                 }
             }
             state.style.mask?.let {
@@ -335,7 +341,8 @@ internal class RenderTreeBuilder(
                 if (mask != null) {
                     node.maskNode = buildMask(mask)
                 } else {
-                    Log.e("KSVG", "Mask reference '$it' not found")
+                    Log.w("KSVG", "Mask reference '$it' is missing or invalid; hiding element")
+                    hideInvalidReference = true
                 }
             }
 
@@ -363,7 +370,7 @@ internal class RenderTreeBuilder(
         }
 
         statePop()
-        return node
+        return if (hideInvalidReference) null else node
         } finally {
             if (id != null) buildingIds.remove(id)
         }
