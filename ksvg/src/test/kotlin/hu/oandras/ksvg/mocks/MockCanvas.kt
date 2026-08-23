@@ -47,6 +47,9 @@ class MockCanvas {
 
     private val operations: ArrayList<String> = ArrayList()
 
+    @JvmField
+    var lastPathPaint: Paint? = null
+
     @Implementation
     fun __constructor__(bitmap: Bitmap?) {
         this.bitmap = bitmap!!
@@ -147,6 +150,7 @@ class MockCanvas {
 
     @Implementation
     fun drawPath(path: Path, paint: Paint?) {
+        lastPathPaint = paint
         operations.add(
             String.format(
                 Locale.US,

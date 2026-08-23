@@ -19,6 +19,7 @@ package hu.oandras.ksvg.mocks
 
 import android.graphics.BlendMode
 import android.graphics.ColorFilter
+import android.graphics.DashPathEffect
 import android.graphics.MaskFilter
 import android.graphics.Paint
 import android.graphics.Path
@@ -41,6 +42,12 @@ import java.math.RoundingMode
 @Implements(Paint::class)
 class MockPaint: ShadowPaint() {
     private val settings: LinkedHashMap<String, String> = LinkedHashMap()
+
+    @JvmField
+    var lastPathEffect: PathEffect? = null
+
+    @JvmField
+    var lastDashIntervals: FloatArray? = null
 
     @Implementation
     fun __constructor__() {}
@@ -101,6 +108,16 @@ class MockPaint: ShadowPaint() {
     override fun setPathEffect(pathEffect: PathEffect?): PathEffect? {
         settings.remove(PATHEFFECT)
         settings[PATHEFFECT] = "dash:$pathEffect"
+        lastPathEffect = pathEffect
+        lastDashIntervals = if (pathEffect is DashPathEffect) {
+            try {
+                DashPathEffect::class.java.getMethod("getIntervals").invoke(pathEffect) as? FloatArray
+            } catch (_: Throwable) {
+                null
+            }
+        } else {
+            null
+        }
         return pathEffect
     }
 
