@@ -65,9 +65,11 @@ class C6AdditiveTest {
         svg.animationTimeMs = 0L
         drawable.draw(canvas)
 
-        // Frame 2: same cached node.
+        // Frame 2: same cached node. Clear the canvas first, otherwise frame 2
+        // composites over frame 1 and the opaque-on-transparent rect accumulates.
         // Correct: base 0.3 + 0.1 = 0.4 -> alpha 102.
         // Bug: (0.4 from frame1) + 0.1 = 0.5 -> alpha 127.
+        bitmap.eraseColor(0)
         svg.animationTimeMs = 0L
         drawable.draw(canvas)
 

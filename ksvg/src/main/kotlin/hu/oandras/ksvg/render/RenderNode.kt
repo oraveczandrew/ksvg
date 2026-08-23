@@ -94,6 +94,13 @@ internal sealed class RenderNode<T: SvgObject>(
     @JvmField var animationNodes: List<AnimationNode>? = null
     @JvmField var hasAnimationsInSubtree: Boolean = false
 
+    // Snapshot of the fully resolved base style + paint state (before any animation),
+    // captured lazily on the first updateAnimations() pass. Each animation frame reverts
+    // `renderState` to this base before applying the current animation values, so
+    // `fill="remove"` reverts to the base and `additive="sum"` adds to the base rather
+    // than compounding the previous frame's result.
+    @JvmField var baseAnimatorState: RendererState? = null
+
     // The state at the time of building (resolved styles, etc.); filled via apply() at build time.
     @JvmField val renderState: RendererState = RendererState()
 

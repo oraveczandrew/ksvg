@@ -102,14 +102,22 @@ internal fun RenderNode<*>.updateAnimations(animationTimeMs: Long): Boolean {
                 }
             }
 
-            // Update animated styles in renderState
-            renderContext.styleBuilderPool.withPooledObject { builder ->
-                builder.reset(renderState.style)
-                if (applyAnimatedStyle(renderState, builder, this)) {
-                    renderState.style = builder.build()
-                    contentChanged = true
+                // Revert to the resolved base style + paint state before applying this
+                // frame's animation values, so a finished `fill="remove"` animation
+                // reverts to the base and `additive="sum"` adds to the base value
+                // (instead of compounding the previous frame's result).
+                val baseState = baseAnimatorState
+                    ?: RendererState().apply { apply(renderState) }.also { baseAnimatorState = it }
+                renderState.apply(baseState)
+
+                // Update animated styles in renderState
+                renderContext.styleBuilderPool.withPooledObject { builder ->
+                    builder.reset(renderState.style)
+                    if (applyAnimatedStyle(renderState, builder, this)) {
+                        renderState.style = builder.build()
+                        contentChanged = true
+                    }
                 }
-            }
         }
 
         if (matrix != tempMatrix) {

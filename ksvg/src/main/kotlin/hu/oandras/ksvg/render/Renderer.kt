@@ -880,7 +880,7 @@ internal class Renderer internal constructor(
 
                                 oldCanvas.withSave {
                                     oldCanvas.setMatrix(null)
-                                    oldCanvas.drawBitmap(cachedFilterOutput, deviceRegion.left, deviceRegion.top, null)
+                                    oldCanvas.drawBitmap(cachedFilterOutput, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
                                 }
                                 return
                             }
@@ -966,7 +966,7 @@ internal class Renderer internal constructor(
                             if (filteredBitmap != null) {
                                 oldCanvas.withSave {
                                     oldCanvas.setMatrix(null)
-                                    oldCanvas.drawBitmap(filteredBitmap, deviceRegion.left, deviceRegion.top, null)
+                                    oldCanvas.drawBitmap(filteredBitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
                                 }
                             }
                         }
@@ -2529,6 +2529,34 @@ internal class Renderer internal constructor(
         return (dimension + 31) and 31.inv()
     }
 
+    /**
+     * Reusable paint for compositing a filtered bitmap back onto the canvas. Must honour the
+     * element's own `opacity` and `mix-blend-mode`, which are otherwise silently dropped when a
+     * `filter` is present (see renderWithFilter). Kept per-Renderer-instance (not in the
+     * companion object) so it is never shared mutable state across Drawables/threads.
+     */
+    private val filterCompositePaint: Paint = Paint()
+
+    /**
+     * The filtered bitmap is composited back onto the original canvas. This paint must
+     * honour the element's own `opacity` and `mix-blend-mode`, otherwise they are silently
+     * dropped when a `filter` is present (see renderWithFilter).
+     *
+     * When neither applies (fully opaque, normal blend) we return `null` so the bitmap is
+     * drawn exactly as before, preserving existing rendering/compositing behaviour.
+     */
+    private fun configureFilterCompositePaint(state: RendererState): Paint? {
+        val opacity = if (state.style.opacity.isNaN()) 1f else state.style.opacity
+        val alpha = (opacity * 255f).toInt().coerceIn(0, 255)
+        val blendMode = state.style.mixBlendMode
+        if (alpha >= 255 && (blendMode == null || blendMode == CSSBlendMode.normal)) {
+            return null
+        }
+        filterCompositePaint.alpha = alpha
+        setBlendMode(state, filterCompositePaint)
+        return filterCompositePaint
+    }
+
     companion object {
         private const val TAG = "Renderer"
 
@@ -2555,7 +2583,6 @@ internal class Renderer internal constructor(
 
         private val bitmapPaint: Paint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val bitmapPaintOptimizeSpeed: Paint = Paint()
-
 
         @Suppress("SameParameterValue")
         private fun error(message: String) {
