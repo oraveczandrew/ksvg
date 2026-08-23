@@ -113,7 +113,7 @@ public fun StackBlurScratch(): StackBlurScratch =
  * depending on the [StackBlurScratch] handed to it, so callers always get a working
  * blur without needing to branch on availability themselves.
  */
-private object NativeGaussianBlur {
+internal object NativeGaussianBlur {
 
     @JvmField
     val isAvailable: Boolean = try {
