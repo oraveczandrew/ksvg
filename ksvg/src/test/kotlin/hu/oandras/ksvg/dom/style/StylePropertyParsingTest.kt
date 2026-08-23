@@ -190,6 +190,14 @@ class StylePropertyParsingTest {
     }
 
     @Test
+    fun testStrokeMiterLimitClampedToOne() {
+        // Per spec values below 1 are invalid; clamped to 1 rather than used as-is.
+        assertEquals(1f, process("stroke-miterlimit", "0.5").buildAndGet().strokeMiterLimit, 0.001f)
+        assertEquals(1f, process("stroke-miterlimit", "0").buildAndGet().strokeMiterLimit, 0.001f)
+        assertEquals(1f, process("stroke-miterlimit", "-3").buildAndGet().strokeMiterLimit, 0.001f)
+    }
+
+    @Test
     fun testStrokeMiterLimitInvalid() {
         val s = process("stroke-miterlimit", "abc")
         assertFalse(specified(s.specifiedFlags, Style.SPECIFIED_STROKE_MITERLIMIT))

@@ -32,6 +32,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import kotlin.math.abs
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -272,8 +273,9 @@ class FiltersTest {
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
+        // Per spec feSpecularLighting produces alpha = max(R,G,B).
         val pixel = bm.getPixel(50, 50)
-        assertEquals(255, pixel.alpha)
+        assertTrue(abs(maxOf(pixel.red, pixel.green, pixel.blue) - pixel.alpha) <= 1)
     }
 
     @Test
@@ -298,8 +300,9 @@ class FiltersTest {
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
+        // Per spec feSpecularLighting produces alpha = max(R,G,B).
         val pixel = bm.getPixel(50, 50)
-        assertEquals(255, pixel.alpha)
+        assertTrue(abs(maxOf(pixel.red, pixel.green, pixel.blue) - pixel.alpha) <= 1)
     }
 
     @Test

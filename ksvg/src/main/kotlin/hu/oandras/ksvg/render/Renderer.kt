@@ -1295,8 +1295,6 @@ internal class Renderer internal constructor(
                 inputBitmap = inputBitmap,
                 primitiveRegion = primitiveRegion,
                 filterRegion = region,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
             )
 
             is FeBlendRenderNode -> doFeBlendFilter(
@@ -1348,8 +1346,6 @@ internal class Renderer internal constructor(
         inputBitmap: Bitmap,
         primitiveRegion: RectF,
         filterRegion: RectF,
-        canvasScaleX: Float,
-        canvasScaleY: Float,
     ): Bitmap {
         val color = withNewState { state ->
             styleBuilderPool.withPooledObject { builder ->

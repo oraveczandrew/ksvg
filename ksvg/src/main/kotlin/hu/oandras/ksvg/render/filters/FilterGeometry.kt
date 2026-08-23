@@ -284,7 +284,14 @@ private fun applyMorphology(
         val rowOffset = y * width
         val top = max(0, y - radiusY)
         val bottom = min(height - 1, y + radiusY)
+        val kernelTouchesTopBottom = y - radiusY < 0 || y + radiusY > height - 1
         for (x in clipLeft until clipRight) {
+            // Out-of-bounds input pixels are transparent black per spec. For dilation
+            // they never win the max, but erosion must yield transparent black whenever
+            // the kernel reaches outside the input (dst is pre-filled with 0).
+            if (erode && (kernelTouchesTopBottom || x - radiusX < 0 || x + radiusX > width - 1)) {
+                continue
+            }
             var a = channelInitialValue
             var r = channelInitialValue
             var g = channelInitialValue

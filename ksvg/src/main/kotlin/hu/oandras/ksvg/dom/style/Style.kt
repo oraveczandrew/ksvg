@@ -1824,7 +1824,8 @@ internal class Style internal constructor(
                 }
 
                 SVGAttr.stroke_miterlimit -> try {
-                    builder.strokeMiterLimit = parseFloat(value)
+                    // Per spec the value must be >= 1; smaller values are clamped.
+                    builder.strokeMiterLimit = parseFloat(value).coerceAtLeast(1f)
                     builder.addSpecifiedFlag(SPECIFIED_STROKE_MITERLIMIT)
                 } catch (_: KSVGParseException) {
                 }

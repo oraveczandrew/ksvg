@@ -63,6 +63,8 @@ private inline fun doLightingFilter(
     canvasScaleY: Float,
     primitiveRegion: RectF,
     filterRegion: RectF,
+    // feSpecularLighting produces a transparency map (alpha = max(R,G,B)); feDiffuseLighting is opaque.
+    alphaIsMaxOfChannels: Boolean = false,
     computeIntensity: (NormalVector, LightVector) -> Float
 ): Bitmap {
     val lightSource = light ?: return inputBitmap
@@ -127,7 +129,8 @@ private inline fun doLightingFilter(
             val outR = clamp255(lightR * intensity)
             val outG = clamp255(lightG * intensity)
             val outB = clamp255(lightB * intensity)
-            out[rowOffset + x] = argb(255, outR, outG, outB)
+            val outA = if (alphaIsMaxOfChannels) maxOf(outR, outG, outB) else 255
+            out[rowOffset + x] = argb(outA, outR, outG, outB)
         }
     }
     res.setPixels(out, 0, width, 0, 0, width, height)
@@ -218,6 +221,7 @@ internal fun doFeSpecularLightingFilter(
         canvasScaleY = canvasScaleY,
         primitiveRegion = primitiveRegion,
         filterRegion = filterRegion,
+        alphaIsMaxOfChannels = true,
     ) { normal, lightVec ->
         specularIntensity(normal, lightVec, specularConstant, specularExponent)
     }
