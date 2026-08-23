@@ -17,6 +17,7 @@
 
 package hu.oandras.ksvg.dom.core
 
+import android.graphics.Matrix
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.dom.SVGImpl
 
@@ -24,10 +25,12 @@ internal class Symbol(
     baseParams: BaseParams,
     conditionalBundle: Conditional,
     preserveAspectRatio: PreserveAspectRatio?,
-    viewBox: Box?
+    viewBox: Box?,
+    transform: Matrix?
 ) : ViewBoxContainer(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
+    transform = transform,
     preserveAspectRatio = preserveAspectRatio,
     viewBox = viewBox
 ), NotDirectlyRendered {
@@ -44,7 +47,8 @@ internal class Symbol(
                 baseParams = getBaseParams(),
                 conditionalBundle = getSvgConditionalBundle(),
                 preserveAspectRatio = getPreserveAspectRatio(),
-                viewBox = getViewBox()
+                viewBox = getViewBox(),
+                transform = getTransform()
             )
         }
     }

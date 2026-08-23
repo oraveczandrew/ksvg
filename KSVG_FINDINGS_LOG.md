@@ -36,3 +36,34 @@ Format for each entry:
 - **Resolution:** No source change. Kept `D7FeColorMatrixOffsetTest` as a regression
   guard (prevents a well-meaning "fix" that would remove the ×255). Removed the
   temporary `D7AndroidConventionProbe` and the stray `D7FeColorMatrixOffsetProbe`.
+
+---
+
+## D11 — `transform` + `viewBox` order
+
+- **Location:** `Renderer.kt:266-290` (`renderGroupNode`); dom `Svg.kt` / `Symbol.kt`.
+- **Claim (KSVG_EXECUTION_PLAN.md D11):** order of element `transform` and
+  `viewBox` fit is uncertain; "apply element transform outermost if diverging."
+- **Investigation:** For a nested `<svg>` with both `transform` and `viewBox`, the
+  element `transform` must be **outermost** (it positions the element in its
+  parent); the `viewBox` fit maps content → viewport and is innermost. The render
+  order in `renderGroupNode` was `viewBoxTransform` then `transform`, i.e. viewBox
+  outermost — **wrong**. Additionally, `Svg`/`Symbol` DOM classes never forwarded
+  the parsed `transform` into the built node (`Svg.Builder.build()`/`copy()` and
+  `Symbol.Builder.build()` omitted `transform`), so `<svg>`/`<symbol>` ignored the
+  `transform` attribute entirely.
+- **Verification method:** render test `D11TransformViewBoxOrderTest` — nested
+  `<svg width=100 height=100 viewBox="0 0 10 10" transform="translate(50,0)">`
+  with a red rect. Correct (transform outermost): red spans x 50..150. Before the
+  fix the rect rendered at the origin (transform dropped) / off-screen (wrong
+  order); after the fix it spans 50..150.
+- **Conclusion:** Real defect (two parts): (1) `transform` attribute was silently
+  dropped on `<svg>`/`<symbol>`; (2) when applied, it was composed innermost
+  instead of outermost relative to the `viewBox` fit.
+- **Status:** CONFIRMED_BUG (fixed)
+- **Resolution:**
+  - `Renderer.renderGroupNode`: apply element `transform` **before**
+    `viewBoxTransform` so the element transform is outermost.
+  - `Svg` / `Symbol` DOM: add `transform` constructor param and forward
+    `getTransform()` from the builder (and `Svg.copy()`).
+  - Added `D11TransformViewBoxOrderTest` regression test.

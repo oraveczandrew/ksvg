@@ -17,6 +17,7 @@
 
 package hu.oandras.ksvg.dom.core
 
+import android.graphics.Matrix
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.SVGImpl
@@ -29,6 +30,7 @@ internal class Svg(
     conditionalBundle: Conditional,
     preserveAspectRatio: PreserveAspectRatio?,
     viewBox: Box?,
+    transform: Matrix?,
     @JvmField
     val x: CSSLength?,
     @JvmField
@@ -38,10 +40,11 @@ internal class Svg(
     @JvmField
     val height: CSSLength?,
     @JvmField
-    val version: String?
+    val version: String?,
 ) : ViewBoxContainer(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
+    transform = transform,
     preserveAspectRatio = preserveAspectRatio,
     viewBox = viewBox
 ) {
@@ -61,6 +64,7 @@ internal class Svg(
             conditionalBundle = this@Svg.conditionalBundle,
             preserveAspectRatio = preserveAspectRatio,
             viewBox = viewBox,
+            transform = getTransform(),
             x = x,
             y = y,
             width = width,
@@ -102,6 +106,7 @@ internal class Svg(
                 conditionalBundle = getSvgConditionalBundle(),
                 preserveAspectRatio = getPreserveAspectRatio(),
                 viewBox = getViewBox(),
+                transform = getTransform(),
                 x = x,
                 y = y,
                 width = width,

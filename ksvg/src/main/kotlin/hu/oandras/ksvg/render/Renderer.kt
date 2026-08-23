@@ -270,8 +270,8 @@ internal class Renderer internal constructor(
                 node.viewPort?.let { setClipRect(it) }
             }
 
-            node.viewBoxTransform?.let { canvas.concat(it) }
             node.applyTransformTo(canvas)
+            node.viewBoxTransform?.let { canvas.concat(it) }
 
             parentPush(sourceElement)
 

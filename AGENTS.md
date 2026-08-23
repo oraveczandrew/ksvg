@@ -88,7 +88,7 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 - **`AiVisualDiffTest`**: Parameterized per-SVG diff test. It renders each SVG under `test-data/verification/`/`filters/`/`meteocons/`, compares against the matching `*-golden/*.png` (rsvg/browser reference) using `hu.oandras.ksvg.comparisons.GoldenImageUtils.compareWithGolden`, and writes `<name>.out.png`, `<name>.diff.png`, and `summary.txt` (similarity, diffPixels, cornerDiff, meanAbsErr) under `ksvg/test-data/ai-helper/<name>/`.
 - Use the library color helpers from `hu.oandras.ksvg.utils.ColorUtils` (`val Int.alpha/red/green/blue`) for pixel math — do not recompute `(p shr 24) and 0xff` inline.
 - **CLI filtering**: pass `-PverifyFilter=<substring>` (e.g. `-PverifyFilter=filter_specular`) to run a single SVG across all visual-comparison suites (`VerificationVisualComparisonTest`, `FiltersVisualComparisonTest`, `MeteoconsVisualComparisonTest`, `AiVisualDiffTest`). The value is forwarded to the JVM system property `ksvg.verify.filter` and matched case-sensitively against the SVG file name.
-- Example: `./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AiVisualDiffTest" -PverifyFilter=filter_specular --no-daemon`
+- Example: `./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AiVisualDiffTest" -PverifyFilter=filter_specular`
 
 ## Rendering
 - Drawables must be renderable off the main thread.
@@ -102,14 +102,15 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 - **Caller-owned buffers**: blur state lives in `StackBlurScratch` (sealed interface) — `NativeScratch` (lazy native handle) and `FallbackScratch` (Kotlin stack blur). Never add shared/global mutable state to the native code.
 
 ## Quick Commands
-- Build: `./gradlew :ksvg:compileDebugKotlin --no-daemon`
-- Tests: `./gradlew :ksvg:testDebugUnitTest --no-daemon`
-- Coverage: `./gradlew :ksvg:jacocoTestReport --no-daemon`
+- **Do not pass `--no-daemon` to Gradle** — always use the Gradle daemon (omit `--no-daemon`).
+- Build: `./gradlew :ksvg:compileDebugKotlin`
+- Tests: `./gradlew :ksvg:testDebugUnitTest`
+- Coverage: `./gradlew :ksvg:jacocoTestReport`
 
 ### Viewing test `println` / stdout
 Test standard output (e.g. `println` debug statements) is suppressed by default. Pass `-PshowTestOutput --console=plain` to surface it:
 ```bash
-./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AnalyzeComponentTransferTest" -PshowTestOutput --console=plain --no-daemon
+./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AnalyzeComponentTransferTest" -PshowTestOutput --console=plain
 ```
 
 
