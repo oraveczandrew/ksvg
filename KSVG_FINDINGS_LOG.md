@@ -67,3 +67,22 @@ Format for each entry:
   - `Svg` / `Symbol` DOM: add `transform` constructor param and forward
     `getTransform()` from the builder (and `Svg.copy()`).
   - Added `D11TransformViewBoxOrderTest` regression test.
+
+---
+
+## D12 — `glyph-orientation-vertical` no-op
+
+- **Location:** `dom/style/Style.kt`, `render/text/*`.
+- **Claim (KSVG_EXECUTION_PLAN.md D12):** property is a no-op; doc claims Full.
+- **Investigation:** The value is parsed and propagated through the style system,
+  but no code in the text renderer consumes it. Vertical glyph orientation only
+  has observable effect inside a vertical text layout, and `writing-mode`
+  itself is unimplemented — so implementing this property alone would not
+  change any rendering output today.
+- **Conclusion:** Implementing is not worthwhile until vertical text layout
+  exists; the honest state is "unsupported".
+- **Status:** RESOLVED as doc-downgrade (per plan: "either implement or
+  downgrade doc claim")
+- **Resolution:** `SVG-SUPPORT.md` entry changed Full → None with note. No code
+  change; the parsed value remains harmless. Revisit together with any future
+  `writing-mode` implementation.

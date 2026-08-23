@@ -209,7 +209,7 @@
 | [`letter-spacing`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/letter-spacing)                         | Full    |                                                           |
 | [`word-spacing`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/word-spacing)                             | Full    |                                                           |
 | [`writing-mode`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/writing-mode)                             | Full    |                                                           |
-| [`glyph-orientation-vertical`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/glyph-orientation-vertical) | Full    |                                                           |
+| [`glyph-orientation-vertical`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/glyph-orientation-vertical) | None    | Parsed but not applied (no vertical text layout)          |
 
 ### Rendering
 
