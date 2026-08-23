@@ -64,6 +64,7 @@ import hu.oandras.ksvg.dom.style.ColorValue
 import hu.oandras.ksvg.dom.style.CurrentColor
 import hu.oandras.ksvg.dom.style.Isolation
 import hu.oandras.ksvg.dom.style.MaskType
+import hu.oandras.ksvg.dom.style.PaintOrder
 import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.RenderQuality
 import hu.oandras.ksvg.dom.style.Style
@@ -320,15 +321,28 @@ internal class Renderer internal constructor(
             checkForGradientsAndPatterns(node, sourceElement)
             if (checkForClipPath(node)) {
                 withNewRenderLayer(node) { state ->
-                    if (state.hasFill) {
-                        node.path.fillType = state.fillType
-                        doFilledPath(node, node.path)
+                    // Paint order encoded as three 2-bit components: fill=1, stroke=2, markers=3.
+                    // Default ("normal") is fill, stroke, markers.
+                    val order = when (state.style.paintOrder) {
+                        PaintOrder.StrokeFillMarkers -> STROKE_FILL_MARKERS
+                        PaintOrder.FillMarkersStroke -> FILL_MARKERS_STROKE
+                        PaintOrder.MarkersFillStroke -> MARKERS_FILL_STROKE
+                        PaintOrder.StrokeMarkersFill -> STROKE_MARKERS_FILL
+                        PaintOrder.MarkersStrokeFill -> MARKERS_STROKE_FILL
+                        else -> FILL_STROKE_MARKERS
                     }
-                    if (state.hasStroke) {
-                        doStroke(node.path, node)
+                    for (shift in 4 downTo 0 step 2) {
+                        when ((order shr shift) and 3) {
+                            COMPONENT_FILL -> if (state.hasFill) {
+                                node.path.fillType = state.fillType
+                                doFilledPath(node, node.path)
+                            }
+                            COMPONENT_STROKE -> if (state.hasStroke) {
+                                doStroke(node.path, node)
+                            }
+                            COMPONENT_MARKERS -> renderMarkers(node)
+                        }
                     }
-
-                    renderMarkers(node)
                 }
             }
         }
@@ -2559,6 +2573,17 @@ internal class Renderer internal constructor(
 
     companion object {
         private const val TAG = "Renderer"
+
+        // paint-order component codes (2 bits each) and the six packed orders.
+        private const val COMPONENT_FILL = 1
+        private const val COMPONENT_STROKE = 2
+        private const val COMPONENT_MARKERS = 3
+        private const val FILL_STROKE_MARKERS = (COMPONENT_FILL shl 4) or (COMPONENT_STROKE shl 2) or COMPONENT_MARKERS
+        private const val STROKE_FILL_MARKERS = (COMPONENT_STROKE shl 4) or (COMPONENT_FILL shl 2) or COMPONENT_MARKERS
+        private const val FILL_MARKERS_STROKE = (COMPONENT_FILL shl 4) or (COMPONENT_MARKERS shl 2) or COMPONENT_STROKE
+        private const val MARKERS_FILL_STROKE = (COMPONENT_MARKERS shl 4) or (COMPONENT_FILL shl 2) or COMPONENT_STROKE
+        private const val STROKE_MARKERS_FILL = (COMPONENT_STROKE shl 4) or (COMPONENT_MARKERS shl 2) or COMPONENT_FILL
+        private const val MARKERS_STROKE_FILL = (COMPONENT_MARKERS shl 4) or (COMPONENT_STROKE shl 2) or COMPONENT_FILL
 
         // The feColorMatrix luminance-to-alpha coefficient. Used for <mask>s.
         // Note we are using the CSS/SVG2 version of the coefficients here, rather than the older SVG1.1 coefficients.

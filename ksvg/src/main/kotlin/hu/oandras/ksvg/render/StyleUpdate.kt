@@ -378,7 +378,12 @@ internal fun updateStyle(
         builder.floodOpacity = sourceStyle.floodOpacity
     }
 
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_PAINT_ORDER)) {
+        builder.paintOrder = sourceStyle.paintOrder
+    }
+
     builder.addSpecifiedFlag(sourceStyle.specifiedFlags)
+    builder.addSpecifiedFlag2(sourceStyle.specifiedFlags2)
 }
 
 internal fun reapplyDynamicPaints(state: RendererState) {

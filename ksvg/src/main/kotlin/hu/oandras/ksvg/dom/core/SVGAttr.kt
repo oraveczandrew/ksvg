@@ -100,6 +100,7 @@ internal enum class SVGAttr {
     orient,
     rotate,
     overflow,
+    paint_order,
     path,
     pathLength,
     patternContentUnits, patternTransform, patternUnits,
@@ -278,6 +279,7 @@ internal enum class SVGAttr {
             "orient" -> orient
             "rotate" -> rotate
             "overflow" -> overflow
+            "paint-order" -> paint_order
             "path" -> path
             "pathLength" -> pathLength
             "patternContentUnits" -> patternContentUnits

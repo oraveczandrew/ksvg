@@ -117,6 +117,7 @@
 | [`stroke-dasharray`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/stroke-dasharray)   | Full    | Space/comma-separated lengths                                      |
 | [`stroke-dashoffset`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/stroke-dashoffset) | Full    |                                                                    |
 | [`stroke-opacity`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/stroke-opacity)       | Full    |                                                                    |
+| [`paint-order`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/paint-order)             | Full    | `normal`, any `fill`/`stroke`/`markers` permutation (shapes)        |
 | [`opacity`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/opacity)                     | Full    |                                                                    |
 | [`color`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/color)                         | Full    | Sets `currentColor`                                                |
 | [`stop-color`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/stop-color)               | Full    |                                                                    |

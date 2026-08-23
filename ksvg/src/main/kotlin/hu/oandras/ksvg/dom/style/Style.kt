@@ -593,6 +593,10 @@ internal class Style internal constructor(
     @JvmField
     val specifiedFlags: Long,
 
+    @SpecifiedFlags2
+    @JvmField
+    val specifiedFlags2: Long,
+
     @JvmField val fill: SvgPaint?,
     @JvmField val fillRule: FillRule?,
     @JvmField val fillOpacity: Float,
@@ -687,10 +691,18 @@ internal class Style internal constructor(
     @JvmField val colorInterpolationFilters: ColorInterpolation?,
     @JvmField val letterSpacing: CSSLength?,
     @JvmField val wordSpacing: CSSLength?,
+
+    // SVG2 paint-order. `null` means "normal" (fill, stroke, markers).
+    // Note: no SPECIFIED_* flag exists for this property — all 64 bits of
+    // specifiedFlags are taken. Inheritance works via Builder.reset() since the
+    // value is only overwritten when explicitly parsed, and paint-order is not
+    // animatable so StyleUpdate/AnimationRenderer never need to test it.
+    @JvmField val paintOrder: PaintOrder?,
 ) {
 
     constructor() : this(
         specifiedFlags = 0,
+        specifiedFlags2 = 0,
         fill = null,
         fillRule = null,
         fillOpacity = Float.NaN,
@@ -757,6 +769,7 @@ internal class Style internal constructor(
         colorInterpolationFilters = null,
         letterSpacing = null,
         wordSpacing = null,
+        paintOrder = null,
     )
 
     fun toBuilder(): Builder = Builder().apply { reset(this@Style) }
@@ -765,6 +778,8 @@ internal class Style internal constructor(
         private lateinit var original: Style
         @JvmField
         var specifiedFlags: Long = 0
+        @JvmField
+        var specifiedFlags2: Long = 0
         @JvmField
         var fill: SvgPaint? = null
         @JvmField
@@ -932,9 +947,17 @@ internal class Style internal constructor(
         var letterSpacing: CSSLength? = null
         @JvmField
         var wordSpacing: CSSLength? = null
+        @JvmField
+        var paintOrder: PaintOrder? = null
 
         fun addSpecifiedFlag(@SpecifiedFlags flag: Long) {
             specifiedFlags = specifiedFlags or flag
+        }
+
+        // Group-2 flags use a distinct name: @LongDef annotations are source-only and
+        // cannot disambiguate same-signature overloads.
+        fun addSpecifiedFlag2(@SpecifiedFlags2 flag: Long) {
+            specifiedFlags2 = specifiedFlags2 or flag
         }
 
         fun resetNonInheritingProperties(isRootSVG: Boolean): Builder {
@@ -963,6 +986,7 @@ internal class Style internal constructor(
         fun reset(original: Style) {
             this.original = original
             this.specifiedFlags = original.specifiedFlags
+            this.specifiedFlags2 = original.specifiedFlags2
             this.fill = original.fill
             this.fillRule = original.fillRule
             this.fillOpacity = original.fillOpacity
@@ -1029,6 +1053,7 @@ internal class Style internal constructor(
             this.colorInterpolationFilters = original.colorInterpolationFilters
             this.letterSpacing = original.letterSpacing
             this.wordSpacing = original.wordSpacing
+            this.paintOrder = original.paintOrder
         }
 
         private var lastBuilt: Style? = null
@@ -1048,6 +1073,7 @@ internal class Style internal constructor(
 
             return Style(
                 specifiedFlags = specifiedFlags,
+                specifiedFlags2 = specifiedFlags2,
                 fill = fill,
                 fillRule = fillRule,
                 fillOpacity = fillOpacity,
@@ -1114,6 +1140,7 @@ internal class Style internal constructor(
                 colorInterpolationFilters = colorInterpolationFilters,
                 letterSpacing = letterSpacing,
                 wordSpacing = wordSpacing,
+                paintOrder = paintOrder,
             ).also {
                 this.lastBuilt = it
             }
@@ -1129,6 +1156,8 @@ internal class Style internal constructor(
             }
 
             return original != null && specifiedFlags == original.specifiedFlags &&
+                    specifiedFlags2 == original.specifiedFlags2 &&
+                    paintOrder == original.paintOrder &&
                     fill == original.fill &&
                     fillRule == original.fillRule &&
                     (fillOpacity == original.fillOpacity || (fillOpacity.isNaN() && original.fillOpacity.isNaN())) &&
@@ -1270,10 +1299,22 @@ internal class Style internal constructor(
     )
     annotation class SpecifiedFlags
 
+    @Retention(AnnotationRetention.SOURCE)
+    @LongDef(
+        flag = true,
+        value = [
+            SPECIFIED_PAINT_ORDER
+        ]
+    )
+    annotation class SpecifiedFlags2
+
     fun isSpecified(@SpecifiedFlags flag: Long): Boolean = (specifiedFlags and flag) != 0L
+
+    fun isSpecified2(@SpecifiedFlags2 flag: Long): Boolean = (specifiedFlags2 and flag) != 0L
 
     fun copy(
         specifiedFlags: Long = this.specifiedFlags,
+        specifiedFlags2: Long = this.specifiedFlags2,
         fill: SvgPaint? = this.fill,
         fillRule: FillRule? = this.fillRule,
         fillOpacity: Float = this.fillOpacity,
@@ -1343,6 +1384,7 @@ internal class Style internal constructor(
     ): Style {
         return Style(
             specifiedFlags = specifiedFlags,
+            specifiedFlags2 = specifiedFlags2,
             fill = fill,
             fillRule = fillRule,
             fillOpacity = fillOpacity,
@@ -1409,6 +1451,7 @@ internal class Style internal constructor(
             colorInterpolationFilters = colorInterpolationFilters,
             letterSpacing = letterSpacing,
             wordSpacing = wordSpacing,
+            paintOrder = paintOrder,
         )
     }
 
@@ -1416,6 +1459,8 @@ internal class Style internal constructor(
         return buildString {
             append("Style(specifiedFlags=")
             append(specifiedFlags)
+            append(", specifiedFlags2=")
+            append(specifiedFlags2)
             append(", fill=")
             append(fill)
             append(", fillRule=")
@@ -1546,6 +1591,8 @@ internal class Style internal constructor(
             append(letterSpacing)
             append(", wordSpacing=")
             append(wordSpacing)
+            append(", paintOrder=")
+            append(paintOrder)
             append(")")
         }
     }
@@ -1626,6 +1673,9 @@ internal class Style internal constructor(
         const val SPECIFIED_FLOOD_COLOR: Long = 1L shl 56
         const val SPECIFIED_FLOOD_OPACITY: Long = 1L shl 57
         const val SPECIFIED_LIGHTING_COLOR: Long = 1L shl 58
+
+        // Second flag group (specifiedFlags2) — the first 64 bits are exhausted.
+        const val SPECIFIED_PAINT_ORDER: Long = 1L shl 0
 
         // Flags for the settings that are applied to reset the root style
         private const val SPECIFIED_RESET: Long = -1L
@@ -2172,6 +2222,17 @@ internal class Style internal constructor(
                     val wordSpacing = parseLetterOrWordSpacing(value)
                     builder.wordSpacing = wordSpacing
                     if (wordSpacing != null) builder.addSpecifiedFlag(SPECIFIED_WORD_SPACING)
+                }
+
+                SVGAttr.paint_order -> {
+                    if (value.equals(NORMAL, ignoreCase = true)) {
+                        builder.paintOrder = PaintOrder.FillStrokeMarkers
+                        builder.addSpecifiedFlag2(SPECIFIED_PAINT_ORDER)
+                    } else {
+                        val paintOrder = PaintOrder.parse(value)
+                        builder.paintOrder = paintOrder
+                        if (paintOrder != null) builder.addSpecifiedFlag2(SPECIFIED_PAINT_ORDER)
+                    }
                 }
 
                 else -> {}
