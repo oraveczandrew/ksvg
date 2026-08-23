@@ -162,6 +162,11 @@ internal class RenderTreeBuilder(
     private val filterNodeCache = ArrayMap<Filter, FilterRenderNode>()
     private val clipPathNodeCache = ArrayMap<ClipPath, ClipPathRenderNode>()
 
+    // Tracks element IDs currently being resolved through a reference
+    // (<use>/clip-path) so that a cyclic reference (A->B->A) is treated as an
+    // empty/missing reference instead of causing unbounded recursion.
+    private val buildingIds = mutableSetOf<String>()
+
     private var ruleMatchContext: CSSParser.RuleMatchContext? = null
 
     override val animationTimeMs: Long
@@ -181,6 +186,7 @@ internal class RenderTreeBuilder(
 
     fun build(viewPort: Box): RenderNode<*>? {
         val rootObj = document.rootElement ?: return null
+        buildingIds.clear()
 
         state = RendererState()
         styleBuilderPool.withPooledObject { builder ->
@@ -195,6 +201,7 @@ internal class RenderTreeBuilder(
 
     fun build(renderOptions: RenderOptions): RenderNode<*>? {
         val rootObj = document.rootElement ?: return null
+        buildingIds.clear()
 
         val css = renderOptions.css
         if (css != null) {
@@ -285,6 +292,15 @@ internal class RenderTreeBuilder(
         if (obj is NotDirectlyRendered) return null
         if (obj is Conditional && !displayConditional(obj)) return null
 
+        // Break cyclic references (e.g. <use>/<g> A->B->A). A referenced element is
+        // re-entered while still being built only via such a cycle, so treating its
+        // re-entry as empty/missing matches the spec and avoids unbounded recursion.
+        val id = (obj as? ElementBase)?.id
+        if (id != null && !buildingIds.add(id)) {
+            Log.w("KSVG", "Cyclic reference detected for id '$id'; treating as empty")
+            return null
+        }
+        try {
         statePush()
         checkXMLSpaceAttribute(obj)
 
@@ -348,6 +364,9 @@ internal class RenderTreeBuilder(
 
         statePop()
         return node
+        } finally {
+            if (id != null) buildingIds.remove(id)
+        }
     }
 
     private fun resolvePatternReference(obj: PaintReference?): PatternRenderNode? {
@@ -1239,7 +1258,13 @@ internal class RenderTreeBuilder(
         parentStack.pop()
     }
 
-    private fun buildClipPath(clipPath: ClipPath): ClipPathRenderNode {
+    private fun buildClipPath(clipPath: ClipPath): ClipPathRenderNode? {
+        val id = clipPath.id
+        if (id != null && !buildingIds.add(id)) {
+            Log.w("KSVG", "Cyclic clip-path reference detected for id '$id'; treating as empty")
+            return null
+        }
+        try {
         clipPathNodeCache[clipPath]?.let { return it }
 
         val oldState = state
@@ -1269,6 +1294,9 @@ internal class RenderTreeBuilder(
 
         clipPathNodeCache[clipPath] = node
         return node
+        } finally {
+            if (id != null) buildingIds.remove(id)
+        }
     }
 
     private fun buildMask(mask: Mask): MaskRenderNode {
@@ -1673,11 +1701,27 @@ internal class RenderTreeBuilder(
     }
 
     private fun updateStyleForElement(state: RendererState, obj: ElementBase) {
+        // Derive the stroke-dash scaling implied by a declared `pathLength` so that
+        // RendererState.updateStrokeDash can honour it. Scale = actualLength / pathLength.
+        state.dashLengthScale = computePathLengthScale(obj)
+
         obj.styleBuilder.also { builder ->
             builder.reset(state.style)
             updateStyleForElement(state, builder, obj)
             state.style = builder.build()
         }
+    }
+
+    private fun computePathLengthScale(obj: ElementBase): Float {
+        if (obj !is PathShape) return 1f
+        val declared = obj.pathLength ?: return 1f
+        if (declared <= 0f) return 1f
+        val d = obj.d ?: return 1f
+        val measure = PathMeasure()
+        measure.setPath(PathConverter(d).path, false)
+        val length = measure.length
+        if (length <= 0f) return 1f
+        return length / declared
     }
 
     private fun updateStyleForElement(state: RendererState, builder: Style.Builder, obj: ElementBase) {

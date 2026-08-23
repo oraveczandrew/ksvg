@@ -133,6 +133,11 @@ internal class RendererState private constructor(
     @JvmField
     val textWidthBuffer = FloatArrayBucket()
 
+    // Scale applied to stroke-dasharray / dashoffset when the shape declares a
+    // `pathLength`. Computed from (actual path length / declared pathLength).
+    @JvmField
+    var dashLengthScale: Float = 1f
+
     private var lastDashIntervals: FloatArray? = null
     private var lastDashOffset: Float = 0f
     private var lastPathEffect: DashPathEffect? = null
@@ -239,6 +244,13 @@ internal class RendererState private constructor(
                 }
             }
 
+            if (dashLengthScale != 1f) {
+                for (i in 0 until arrayLen) {
+                    intervals[i] *= dashLengthScale
+                }
+                intervalSum *= dashLengthScale
+            }
+
             if (intervalSum == 0f) {
                 lastDashIntervals = null
                 lastPathEffect = null
@@ -248,6 +260,10 @@ internal class RendererState private constructor(
                     strokeDashOffsetResolved
                 } else {
                     strokeDashOffset?.floatValueInContext() ?: 0f
+                }
+
+                if (dashLengthScale != 1f) {
+                    offset *= dashLengthScale
                 }
                 
                 if (offset < 0) {

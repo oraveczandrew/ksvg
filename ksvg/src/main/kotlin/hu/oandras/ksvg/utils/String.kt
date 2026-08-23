@@ -16,7 +16,7 @@
 
 package hu.oandras.ksvg.utils
 
-import java.util.Locale
+import java.util.*
 import java.util.regex.Pattern
 
 internal fun String.charCount(c: Char): Int {
@@ -25,18 +25,6 @@ internal fun String.charCount(c: Char): Int {
         if (this[i] == c) count++
     }
     return count
-}
-
-internal fun String.removeTabsAndLineBreaks(): String {
-    if (!contains('\n') && !contains('\t')) return this
-
-    return buildString(length) {
-        for (c in this@removeTabsAndLineBreaks) {
-            if (c != '\n' && c != '\t') {
-                append(c)
-            }
-        }
-    }
 }
 
 private val PATTERN_DOUBLE_SPACES: Pattern = "\\s{2,}".toPattern()
@@ -51,16 +39,20 @@ internal fun textXMLSpaceTransform(
     spacePreserve: Boolean,
 ): String {
     if (spacePreserve) {
-        // xml:space = "preserve"
-        return text.removeTabsAndLineBreaks()
+        // xml:space = "preserve": keep all characters (incl. tabs/newlines) verbatim.
+        return text
     }
 
-    // xml:space = "default"
-    val result = text.removeTabsAndLineBreaks()
+    // xml:space = "default": per SVG/CSS text whitespace handling, newlines and tabs
+    // are converted to spaces (not deleted), leading/trailing spaces are trimmed, and
+    // runs of spaces are collapsed to a single space.
+    val withSpaces = text.replace('\n', ' ').replace('\t', ' ').replace('\r', ' ')
+
+    val trimmed = withSpaces
         .let { if (isFirstChild) it.trimStart { c -> c.isSpaceLike() } else it }
         .let { if (isLastChild) it.trimEnd { c -> c.isSpaceLike() } else it }
 
-    return result.removeDoubleSpaces()
+    return trimmed.removeDoubleSpaces()
 }
 
 internal fun String.trimLowerThanSpace(): String {

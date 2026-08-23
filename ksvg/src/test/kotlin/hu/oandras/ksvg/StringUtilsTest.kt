@@ -1,45 +1,12 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.utils.removeDoubleSpaces
-import hu.oandras.ksvg.utils.removeTabsAndLineBreaks
 import hu.oandras.ksvg.utils.textXMLSpaceTransform
 import hu.oandras.ksvg.utils.trimLowerThanSpace
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class StringUtilsTest {
-
-    // --- removeTabsAndLineBreaks ---
-
-    @Test
-    fun testRemoveTabsAndLineBreaksNoSpecialChars() {
-        assertEquals("hello world", "hello world".removeTabsAndLineBreaks())
-    }
-
-    @Test
-    fun testRemoveTabsAndLineBreaksWithTabs() {
-        assertEquals("helloworld", "hello\tworld".removeTabsAndLineBreaks())
-    }
-
-    @Test
-    fun testRemoveTabsAndLineBreaksWithNewlines() {
-        assertEquals("helloworld", "hello\nworld".removeTabsAndLineBreaks())
-    }
-
-    @Test
-    fun testRemoveTabsAndLineBreaksWithBoth() {
-        assertEquals("helloworld", "hello\n\tworld".removeTabsAndLineBreaks())
-    }
-
-    @Test
-    fun testRemoveTabsAndLineBreaksEmpty() {
-        assertEquals("", "".removeTabsAndLineBreaks())
-    }
-
-    @Test
-    fun testRemoveTabsAndLineBreaksOnlySpecial() {
-        assertEquals("", "\n\t\n\t".removeTabsAndLineBreaks())
-    }
 
     // --- removeDoubleSpaces ---
 
@@ -78,7 +45,7 @@ class StringUtilsTest {
     @Test
     fun testXMLSpaceTransformPreserve() {
         assertEquals(
-            "helloworld",
+            "hello\tworld",
             textXMLSpaceTransform(
                 "hello\tworld",
                 isFirstChild = true,
@@ -89,9 +56,9 @@ class StringUtilsTest {
     }
 
     @Test
-    fun testXMLSpaceTransformPreserveStripsTabs() {
+    fun testXMLSpaceTransformPreserveKeepsTabs() {
         assertEquals(
-            "helloworld",
+            "hello\tworld",
             textXMLSpaceTransform(
                 "hello\tworld",
                 isFirstChild = true,

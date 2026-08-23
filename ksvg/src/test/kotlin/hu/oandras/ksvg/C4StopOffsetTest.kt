@@ -72,8 +72,8 @@ class C4StopOffsetTest {
             </svg>
             """.trimIndent()
         )
-        assertEquals(listOf(0f, 1.2f), offsets)
-        // Correct behaviour: 120% -> 1.0f
+        // Correct behaviour: 120% -> 1.0f (clamped to [0,1])
+        assertEquals(listOf(0f, 1.0f), offsets)
         assertEquals(1.0f, offsets[1], 0.001f)
     }
 

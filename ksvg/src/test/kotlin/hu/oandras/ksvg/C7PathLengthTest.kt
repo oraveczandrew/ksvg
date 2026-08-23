@@ -1,71 +1,41 @@
-/*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
- *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
- */
-
 package hu.oandras.ksvg
 
 import android.graphics.Canvas
-import android.graphics.DashPathEffect
-import hu.oandras.ksvg.mocks.MockCanvas
-import hu.oandras.ksvg.mocks.MockPaint
-import hu.oandras.ksvg.mocks.MockPath
-import hu.oandras.ksvg.mocks.asShadow
 import hu.oandras.ksvg.render.createBitmap
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
-/**
- * Phase 0 baseline (C7): `pathLength` is parsed but never applied.
- *
- * When `pathLength` is set on a shape, dash arrays / dash offsets must be scaled
- * by `computedPathLength / pathLength`. Today `RendererState.updateStrokeDash`
- * ignores `pathLength`, so the declared dash period is used verbatim.
- *
- * The geometry here: a straight line from (0,50) to (100,50) has computed length
- * 100; `pathLength="50"` must scale the dash array `[10, 10]` to `[20, 20]`.
- *
- * Asserts the CORRECT (post-fix) behaviour. Today it fails.
- */
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, shadows = [MockCanvas::class, MockPath::class, MockPaint::class])
+@Config(manifest = Config.NONE)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class C7PathLengthTest {
 
     @Test
     fun pathLengthScalesDashArray() {
         val svg = """
-            <svg width="100" height="100" viewBox="0 0 100 100">
-              <path d="M0 50 H100" fill="none" stroke="black" stroke-width="4"
+            <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+              <path d="M0 50 L100 50" fill="none" stroke="black" stroke-width="4"
                     stroke-dasharray="10 10" pathLength="50"/>
             </svg>
         """.trimIndent()
 
         val document = SVG.getFromString(svg)
-        val canvas = Canvas(createBitmap(100, 100))
+
+        val bitmap = createBitmap(100, 100)
+        val canvas = Canvas(bitmap)
         document.renderToCanvas(canvas)
 
-        val shadowPaint = canvas.asShadow().lastPathPaint?.asShadow()
-        val effect = shadowPaint?.lastPathEffect
-        assertTrue("Expected a DashPathEffect on the stroke paint", effect is DashPathEffect)
-
-        val intervals = shadowPaint?.lastDashIntervals
-        assertTrue("Expected dash intervals to be captured from the stroke paint", intervals != null)
-        // Correct: scaled by 100/50 = 2 -> [20, 20]. Bug: unchanged [10, 10].
-        assertArrayEquals(floatArrayOf(20f, 20f), intervals!!, 0.5f)
+        val drawn = { x: Int -> bitmap.getPixel(x, 50).ushr(24) and 0xff > 100 }
+        // pathLength=50 on a 100px path doubles the dash array: [10,10] -> [20,20].
+        // Pattern on a 100px stroke: on [0,20), off [20,40), on [40,60), off [60,80), on [80,100).
+        // Without pathLength scaling the dash stays [10,10] -> x=25 would be ON.
+        assertTrue("Expected stroke to be drawn near the path start (x=5)", drawn(5))
+        assertTrue("Expected a dash gap at x=25 (pathLength=50 doubles the dash -> gap)", !drawn(25))
+        assertTrue("Expected a dash segment at x=45", drawn(45))
+        assertTrue("Expected a dash gap at x=65 (pathLength=50 doubles the dash -> gap)", !drawn(65))
     }
 }

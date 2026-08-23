@@ -97,7 +97,7 @@ internal class Stop(
                 if (isPercent) {
                     scalar /= 100f
                 }
-                return clamp(scalar, 0f, 100f)
+                return clamp(scalar, 0f, 1f)
             } catch (e: NumberFormatException) {
                 throw KSVGParseException("Invalid offset value in <stop>: $value", e)
             }
