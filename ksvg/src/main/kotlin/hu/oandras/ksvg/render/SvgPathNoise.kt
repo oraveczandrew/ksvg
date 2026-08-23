@@ -66,16 +66,32 @@ internal class SvgPathNoise(lcg: LcgRandom) {
     private fun sCurve(t: Double): Double = t * t * (3.0 - 2.0 * t)
     private fun lerp(t: Double, a: Double, b: Double): Double = a + t * (b - a)
 
-    fun noise2(x: Double, y: Double): Double {
-        val bx0 = floor(x).toInt() and BM
-        val bx1 = (bx0 + 1) and BM
-        val rx0 = x - floor(x)
+    fun noise2(x: Double, y: Double, periodX: Int = 0, periodY: Int = 0): Double {
+        val xf = floor(x)
+        var bx0 = xf.toInt()
+        val rx0 = x - xf
         val rx1 = rx0 - 1.0
 
-        val by0 = floor(y).toInt() and BM
-        val by1 = (by0 + 1) and BM
-        val ry0 = y - floor(y)
+        val yf = floor(y)
+        var by0 = yf.toInt()
+        val ry0 = y - yf
         val ry1 = ry0 - 1.0
+
+        // With a positive period the lattice wraps so that the noise tiles
+        // seamlessly every `period` lattice cells (feTurbulence stitchTiles).
+        if (periodX > 0) {
+            bx0 = Math.floorMod(bx0, periodX)
+        } else {
+            bx0 = bx0 and BM
+        }
+        val bx1 = if (periodX > 0) (bx0 + 1) % periodX else (bx0 + 1) and BM
+
+        if (periodY > 0) {
+            by0 = Math.floorMod(by0, periodY)
+        } else {
+            by0 = by0 and BM
+        }
+        val by1 = if (periodY > 0) (by0 + 1) % periodY else (by0 + 1) and BM
 
         val i = p[bx0]
         val j = p[bx1]

@@ -19,6 +19,7 @@ package hu.oandras.ksvg.render.filters
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.RectF
+import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
 import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
 import hu.oandras.ksvg.render.FeImageRenderNode
@@ -30,6 +31,7 @@ import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.clamp255
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.max
 
 @SuppressLint("UseKtx")
@@ -85,12 +87,32 @@ internal fun doFeTurbulenceFilter(
     val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
     val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
 
+    // feTurbulence stitchTiles="stitch": adjust the base frequencies so the tile
+    // contains a whole number of lattice cells, then sample the noise periodically
+    // over that period so opposite edges match seamlessly (SVG 1.1 §15.25).
+    var baseFrequencyX = baseX
+    var baseFrequencyY = baseY
+    var periodX = 0
+    var periodY = 0
+    if (primitive.stitchTiles == FeStitchTiles.stitch) {
+        val tileWidthUnits = (clipRight - clipLeft) * invCanvasScaleX / primitiveUnitSizeX
+        val tileHeightUnits = (clipBottom - clipTop) * invCanvasScaleY / primitiveUnitSizeY
+        val stitchX = floor(tileWidthUnits * baseX + 0.5).toInt()
+        val stitchY = floor(tileHeightUnits * baseY + 0.5).toInt()
+        if (stitchX > 0 && stitchY > 0 && tileWidthUnits > 0.0 && tileHeightUnits > 0.0) {
+            baseFrequencyX = stitchX / tileWidthUnits
+            baseFrequencyY = stitchY / tileHeightUnits
+            periodX = stitchX
+            periodY = stitchY
+        }
+    }
+
     for (y in clipTop until clipBottom) {
         val userY = userTop + y.toDouble() * invCanvasScaleY
-        val py0 = ((userY - originY) / primitiveUnitSizeY) * baseY
+        val py0 = ((userY - originY) / primitiveUnitSizeY) * baseFrequencyY
         for (x in clipLeft until clipRight) {
             val userX = userLeft + x.toDouble() * invCanvasScaleX
-            val px0 = ((userX - originX) / primitiveUnitSizeX) * baseX
+            val px0 = ((userX - originX) / primitiveUnitSizeX) * baseFrequencyX
 
             var r = 0.0
             var g = 0.0
@@ -102,12 +124,16 @@ internal fun doFeTurbulenceFilter(
                 var ratio = 1.0
                 var px = px0
                 var py = py0
+                var octavePeriodX = periodX
+                var octavePeriodY = periodY
                 for (_ in 0 until octaves) {
-                    val n = generators[channel].noise2(px, py)
+                    val n = generators[channel].noise2(px, py, octavePeriodX, octavePeriodY)
                     value += if (isFractal) n / ratio else abs(n) / ratio
                     px *= 2.0
                     py *= 2.0
                     ratio *= 2.0
+                    octavePeriodX += octavePeriodX
+                    octavePeriodY += octavePeriodY
                 }
                 val finalVal = if (isFractal) (value + 1.0) * 127.5 else value * 255.0
                 when (channel) {
