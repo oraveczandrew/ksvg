@@ -2051,8 +2051,10 @@ internal class Renderer internal constructor(
             _r = gradient.r?.floatValueInContext(1f) ?: 0.5f
 
             if (SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS) {
-                _fx = gradient.fx?.floatValueInContext(1f) ?: 0.5f
-                _fy = gradient.fy?.floatValueInContext(1f) ?: 0.5f
+                // Per spec, fx/fy default to the gradient center (not 0.5), even in
+                // objectBoundingBox mode where cx/cy may have explicit non-default values.
+                _fx = gradient.fx?.floatValueInContext(1f) ?: _cx
+                _fy = gradient.fy?.floatValueInContext(1f) ?: _cy
                 _fr = gradient.fr?.floatValueInContext(1f) ?: 0f
             }
         }

@@ -107,6 +107,10 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 - Tests: `./gradlew :ksvg:testDebugUnitTest`
 - Coverage: `./gradlew :ksvg:jacocoTestReport`
 
+### Tooling preferences
+- **Prefer IDE functions over shell commands** whenever one exists — e.g. `idea_build_project` for compiling, `idea_get_file_problems`/`idea_lint_files` for diagnostics, `idea_search_symbol`/`idea_search_regex` for search, `idea_rename_refactoring` for renames. Fall back to the terminal only when no IDE tool fits.
+- **Temporary files go inside the project**, in a `tmp/` folder at the repo root (git-ignored), not in system temp directories. Clean it up when done.
+
 ### Viewing test `println` / stdout
 Test standard output (e.g. `println` debug statements) is suppressed by default. Pass `-PshowTestOutput --console=plain` to surface it:
 ```bash
