@@ -86,11 +86,9 @@ inline void convolveScalarPixel(
 
 void applyScalar(
         const jint* src, jint* dst, jint width, jint height,
-        jfloatArray jKernel, JNIEnv* env,
+        const jfloat* kernel,
         jint orderX, jint orderY, jint targetX, jint targetY,
         jfloat divisor, jfloat bias, jboolean preserveAlpha, jint edgeMode) {
-    jfloat* kernel = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(jKernel, nullptr));
-    if (kernel == nullptr) return;
     const bool preserve = preserveAlpha == JNI_TRUE;
     for (jint y = 0; y < height; y++) {
         const jint rowOffset = y * width;
@@ -358,63 +356,69 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
         jint targetX, jint targetY,
         jfloat divisor, jfloat bias,
         jboolean preserveAlpha, jint edgeMode) {
+    // Fetch the small kernel array with a regular (non-critical) call BEFORE
+    // entering any GetPrimitiveArrayCritical section: ART aborts on JNI calls
+    // made between a critical get/release pair.
+    auto* kernel = env->GetFloatArrayElements(jKernel, nullptr);
+    if (kernel == nullptr) return;
+
     auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
-    if (src == nullptr) return;
+    if (src == nullptr) {
+        env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
+        return;
+    }
     auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
     if (dst == nullptr) {
         env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+        env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
         return;
     }
 
 #if defined(__aarch64__) || (!defined(__aarch64__) && defined(__SSE2__))
     if (edgeMode == 0 && height >= orderY && width >= orderX) {
-        // duplicate edge: top/bottom border rows scalar, middle rows via the
-        // vectorized interior pass.
-        auto* kernel = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(jKernel, nullptr));
-        if (kernel != nullptr) {
-            const bool preserve = preserveAlpha == JNI_TRUE;
-            const jint yLo = targetY;
-            const jint yHi = height - orderY + 1 + targetY;
+        const bool preserve = preserveAlpha == JNI_TRUE;
+        const jint yLo = targetY;
+        const jint yHi = height - orderY + 1 + targetY;
 
-            for (jint y = 0; y < yLo; y++) {
-                for (jint x = 0; x < width; x++) convolveScalarPixel(
-                        src, dst, width, height, kernel, orderX, orderY,
-                        targetX, targetY, divisor, bias, preserve, 0, x, y);
-            }
-            for (jint y = yHi; y < height; y++) {
-                for (jint x = 0; x < width; x++) convolveScalarPixel(
-                        src, dst, width, height, kernel, orderX, orderY,
-                        targetX, targetY, divisor, bias, preserve, 0, x, y);
-            }
-#ifdef __aarch64__
-            applyNeonInterior(dst, src, width, height, kernel, orderX, orderY,
-                              targetX, targetY, divisor, bias, preserve);
-#else
-            switch (detectSimdLevel()) {
-                case SIMD_AVX512:
-                    ksvgConvolveApplyInteriorAvx512(dst, src, width, height, kernel,
-                        orderX, orderY, targetX, targetY, divisor, bias, preserve);
-                    break;
-                case SIMD_AVX2:
-                    ksvgConvolveApplyInteriorAvx2(dst, src, width, height, kernel,
-                        orderX, orderY, targetX, targetY, divisor, bias, preserve);
-                    break;
-                default:
-                    applySseInterior(dst, src, width, height, kernel, orderX, orderY,
-                                     targetX, targetY, divisor, bias, preserve);
-            }
-#endif
-            env->ReleasePrimitiveArrayCritical(jKernel, kernel, JNI_ABORT);
-            env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
-            env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
-            return;
+        for (jint y = 0; y < yLo; y++) {
+            for (jint x = 0; x < width; x++) convolveScalarPixel(
+                    src, dst, width, height, kernel, orderX, orderY,
+                    targetX, targetY, divisor, bias, preserve, 0, x, y);
         }
+        for (jint y = yHi; y < height; y++) {
+            for (jint x = 0; x < width; x++) convolveScalarPixel(
+                    src, dst, width, height, kernel, orderX, orderY,
+                    targetX, targetY, divisor, bias, preserve, 0, x, y);
+        }
+#ifdef __aarch64__
+        applyNeonInterior(dst, src, width, height, kernel, orderX, orderY,
+                          targetX, targetY, divisor, bias, preserve);
+#else
+        switch (detectSimdLevel()) {
+            case SIMD_AVX512:
+                ksvgConvolveApplyInteriorAvx512(dst, src, width, height, kernel,
+                    orderX, orderY, targetX, targetY, divisor, bias, preserve);
+                break;
+            case SIMD_AVX2:
+                ksvgConvolveApplyInteriorAvx2(dst, src, width, height, kernel,
+                    orderX, orderY, targetX, targetY, divisor, bias, preserve);
+                break;
+            default:
+                applySseInterior(dst, src, width, height, kernel, orderX, orderY,
+                                 targetX, targetY, divisor, bias, preserve);
+        }
+#endif
+        env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
+        env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+        env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
+        return;
     }
 #endif
 
-    applyScalar(src, dst, width, height, jKernel, env,
+    applyScalar(src, dst, width, height, kernel,
                 orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
 
     env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
     env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
 }

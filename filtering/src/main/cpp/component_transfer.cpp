@@ -297,16 +297,31 @@ Java_hu_oandras_ksvg_filtering_ComponentTransferNative_apply(
         const jint width, const jint height,
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jbyteArray jTableA, const jbyteArray jTableR, const jbyteArray jTableG, const jbyteArray jTableB) {
-    auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
-    if (src == nullptr) return;
-    auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    // Small arrays first: no JNI call may occur between a
+    // GetPrimitiveArrayCritical pair, so the byte tables must be fetched
+    // BEFORE entering the critical sections.
     auto* tableA = env->GetByteArrayElements(jTableA, nullptr);
     auto* tableR = env->GetByteArrayElements(jTableR, nullptr);
     auto* tableG = env->GetByteArrayElements(jTableG, nullptr);
     auto* tableB = env->GetByteArrayElements(jTableB, nullptr);
-    if (dst == nullptr || tableA == nullptr || tableR == nullptr ||
-        tableG == nullptr || tableB == nullptr) {
-        if (src != nullptr) env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+    if (tableA == nullptr || tableR == nullptr || tableG == nullptr || tableB == nullptr) {
+        return;
+    }
+    auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
+    if (src == nullptr) {
+        env->ReleaseByteArrayElements(jTableA, tableA, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableR, tableR, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableG, tableG, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableB, tableB, JNI_ABORT);
+        return;
+    }
+    auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    if (dst == nullptr) {
+        env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableA, tableA, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableR, tableR, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableG, tableG, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableB, tableB, JNI_ABORT);
         return;
     }
 
