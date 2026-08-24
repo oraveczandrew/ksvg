@@ -125,13 +125,18 @@ inline int32_t adjustForStitch(const int32_t v, const int32_t wrap, const int32_
 
 inline void noise2(
         const LatticeTables& t,
-        const float px, const float py,
+        const double pxd, const double pyd,
         const StitchInfo& stitch, const bool stitchEnabled,
         float* out /* [4], channel order R,G,B,A */) {
-    const int32_t b0xRaw = static_cast<int32_t>(std::floor(px));
-    const int32_t b0yRaw = static_cast<int32_t>(std::floor(py));
-    const float rx0 = px - static_cast<float>(b0xRaw);
-    const float ry0 = py - static_cast<float>(b0yRaw);
+    // Coordinates stay double until the integer part is wrapped (mask/period):
+    // casting large un-wrapped values to float would quantize neighbouring
+    // pixels onto the same sample point -> visible blocks.
+    const double fxd = std::floor(pxd);
+    const double fyd = std::floor(pyd);
+    const int32_t b0xRaw = static_cast<int32_t>(fxd);
+    const int32_t b0yRaw = static_cast<int32_t>(fyd);
+    const float rx0 = static_cast<float>(pxd - fxd);
+    const float ry0 = static_cast<float>(pyd - fyd);
     const float rx1 = rx0 - 1.0f;
     const float ry1 = ry0 - 1.0f;
 
@@ -177,13 +182,15 @@ inline void noise2(
 
 inline void noise2Vec(
         const LatticeTables& t,
-        const float px, const float py,
+        const double pxd, const double pyd,
         const StitchInfo& stitch, const bool stitchEnabled,
         float* out) {
-    const int32_t b0xRaw = static_cast<int32_t>(std::floor(px));
-    const int32_t b0yRaw = static_cast<int32_t>(std::floor(py));
-    const float rx0 = px - static_cast<float>(b0xRaw);
-    const float ry0 = py - static_cast<float>(b0yRaw);
+    const double fxd = std::floor(pxd);
+    const double fyd = std::floor(pyd);
+    const int32_t b0xRaw = static_cast<int32_t>(fxd);
+    const int32_t b0yRaw = static_cast<int32_t>(fyd);
+    const float rx0 = static_cast<float>(pxd - fxd);
+    const float ry0 = static_cast<float>(pyd - fyd);
     const float rx1 = rx0 - 1.0f;
     const float ry1 = ry0 - 1.0f;
 
@@ -229,13 +236,15 @@ inline void noise2Vec(
 
 inline void noise2Vec(
         const LatticeTables& t,
-        const float px, const float py,
+        const double pxd, const double pyd,
         const StitchInfo& stitch, const bool stitchEnabled,
         float* out) {
-    const int32_t b0xRaw = static_cast<int32_t>(std::floor(px));
-    const int32_t b0yRaw = static_cast<int32_t>(std::floor(py));
-    const float rx0 = px - static_cast<float>(b0xRaw);
-    const float ry0 = py - static_cast<float>(b0yRaw);
+    const double fxd = std::floor(pxd);
+    const double fyd = std::floor(pyd);
+    const int32_t b0xRaw = static_cast<int32_t>(fxd);
+    const int32_t b0yRaw = static_cast<int32_t>(fyd);
+    const float rx0 = static_cast<float>(pxd - fxd);
+    const float ry0 = static_cast<float>(pyd - fyd);
     const float rx1 = rx0 - 1.0f;
     const float ry1 = ry0 - 1.0f;
 
@@ -322,8 +331,8 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
             float sums[4] = {0.f, 0.f, 0.f, 0.f};
             StitchInfo si = stitch;
             float ratio = 1.f;
-            float fx = static_cast<float>(px0);
-            float fy = static_cast<float>(py0);
+            double fx = px0;
+            double fy = py0;
 
             for (jint octave = 0; octave < octaves; octave++) {
                 float noise[4];
