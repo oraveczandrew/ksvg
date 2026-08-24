@@ -21,6 +21,7 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
+import hu.oandras.ksvg.filtering.TurbulenceNative
 import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
 import hu.oandras.ksvg.render.FeImageRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
@@ -105,6 +106,21 @@ internal fun doFeTurbulenceFilter(
             periodX = stitchX
             periodY = stitchY
         }
+    }
+
+    if (TurbulenceNative.isAvailable) {
+        TurbulenceNative.apply(
+            pixels, width, height,
+            clipLeft, clipTop, clipRight, clipBottom,
+            baseFrequencyX, baseFrequencyY, periodX, periodY,
+            octaves, isFractal,
+            invCanvasScaleX, invCanvasScaleY,
+            userLeft, userTop, originX, originY,
+            primitiveUnitSizeX, primitiveUnitSizeY,
+            primitive.seed.toInt()
+        )
+        res.setPixels(pixels, 0, width, 0, 0, width, height)
+        return res
     }
 
     for (y in clipTop until clipBottom) {

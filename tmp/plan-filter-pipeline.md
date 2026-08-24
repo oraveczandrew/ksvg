@@ -289,6 +289,27 @@ Original van Herk source notes (kept for the possible future optimization):
 
 ### feTurbulence (source: Mozilla gfx SVGTurbulenceRenderer-inl.h, MPL-2.0)
 
+**STATUS: DONE (Phase 2b). Per decision: SVG-reference algorithm, not the previous
+Kotlin Perlin variant.** `turbulence.cpp` + `TurbulenceNative` implement the
+SVG 1.1 §15.25 / mozilla scheme:
+- Park–Miller seeded lattice init, 4-channel gradient packing per lattice point,
+- turbulence |n|/ratio vs fractalNoise (n+1)/2 scaling,
+- stitchTiles via lattice wrap periods (period doubling per octave);
+  the base-frequency stitch adjustment stays Kotlin-side (it needs canvas/unit
+  mapping context),
+- output written UNPREMULTIPLIED ARGB ints into the clip region (our
+  getPixels/setPixels domain — the vendored source's premultiplied-BGRA step
+  is intentionally dropped),
+- lattice tables rebuilt per call on the native stack (~10 KB): no shared state.
+- Scalar float32 this round; the 4-pixel-wide f32 SIMD inner loop from the
+  vendored source is a mechanical follow-up (structure mirrors Noise2/Turbulence).
+- ⚠️ Golden note: turbulence/displacement fixtures were ALREADY excluded from
+  pixel comparison (VisualComparisonTest threshold 0.0) because any correct
+  spec implementation differs per PRNG; gates are parse/render success +
+  non-black output + all other fixtures staying green.
+- JVM fallback remains the legacy SvgPathNoise loop until a spec-exact Kotlin
+  kernel is wanted (device vs JVM outputs differ by design).
+
 - Port as C++ file in `:filtering`; specialize its `f32x4_t/i32x4_t/u8x16_t` templates to
   NEON intrinsics + scalar fallback. Stitch tiles supported upstream.
 - ⚠️ Source depends on mozilla infra (`2D.h`, `Filters.h`, `SIMD.h`,
