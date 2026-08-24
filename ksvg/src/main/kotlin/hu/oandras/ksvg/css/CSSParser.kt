@@ -404,6 +404,8 @@ internal class CSSParser internal constructor(
          * Follows ordered set parser algorithm: https://dom.spec.whatwg.org/#concept-ordered-set-parser
          */
         fun parseClassAttribute(value: String): List<String>? {
+            if (value.isEmpty()) return null
+
             val scan = CSSTextScanner(value)
             var classNameList: MutableList<String>? = null
 

@@ -995,8 +995,10 @@ internal class SVGParserImpl : SVGParser {
 
             builder.parseAttributes(attributes)
 
-            // <set> always uses discrete mode
+            // <set> always uses discrete mode and an indefinite simple duration
+            // when no dur is given (active from begin until end).
             builder.calcMode = CalcMode.discrete
+            builder.useIndefiniteDurationForSet()
 
             val obj = builder.build()
             target.addAnimation(obj)

@@ -73,6 +73,7 @@ internal sealed class Animation(
     ) : ElementBase.Builder<T>(document, parent) {
         protected var attributeName: SVGAttr? = null
         protected var durMs: Long = 0L
+        protected var durSpecified: Boolean = false
         protected var beginMs: Long = 0L
         protected var repeatCount: Int = 1
         protected var repeatDurMs: Long = 0L
@@ -89,6 +90,15 @@ internal sealed class Animation(
         protected var toStr: String? = null
         protected var byStr: String? = null
 
+        /**
+         * `<set>` has an indefinite simple duration when no `dur` is given: it stays
+         * active from `begin` until `end` (or forever). Without this the animation
+         * would be dropped by [isValid] (durMs == 0).
+         */
+        internal fun useIndefiniteDurationForSet() {
+            if (!durSpecified) durMs = Long.MAX_VALUE
+        }
+
         override fun onAttribute(
             attributes: Attributes,
             index: Int,
@@ -97,7 +107,10 @@ internal sealed class Animation(
         ): Boolean {
             when (attr) {
                 SVGAttr.attributeName -> attributeName = SVGAttr.fromString(value)
-                SVGAttr.dur -> durMs = parseClockValueMillis(value)
+                SVGAttr.dur -> {
+                    durMs = parseClockValueMillis(value)
+                    durSpecified = true
+                }
                 SVGAttr.begin -> beginMs = parseClockValueMillis(value)
                 SVGAttr.repeatCount -> repeatCount = if (value == "indefinite") {
                     REPEAT_INDEFINITE
