@@ -441,33 +441,36 @@ private fun parseTextDirection(value: String): TextDirection? {
 
 
 // Parse fill rule
-private fun parseFillRule(value: String?): FillRule? {
+@FillRule
+private fun parseFillRule(value: String?): Int {
     return when {
-        value.equals("nonzero", ignoreCase = true) -> FillRule.NonZero
-        value.equals("evenodd", ignoreCase = true) -> FillRule.EvenOdd
-        else -> null
+        value.equals("nonzero", ignoreCase = true) -> FillRule.NON_ZERO
+        value.equals("evenodd", ignoreCase = true) -> FillRule.EVEN_ODD
+        else -> FillRule.UNSPECIFIED
     }
 }
 
 
 // Parse stroke-line-cap
-private fun parseStrokeLineCap(value: String?): LineCap? {
+@LineCap
+private fun parseStrokeLineCap(value: String?): Int {
     return when {
-        value.equals("butt", ignoreCase = true) -> LineCap.Butt
-        value.equals("round", ignoreCase = true) -> LineCap.Round
-        value.equals("square", ignoreCase = true) -> LineCap.Square
-        else -> null
+        value.equals("butt", ignoreCase = true) -> LineCap.BUTT
+        value.equals("round", ignoreCase = true) -> LineCap.ROUND
+        value.equals("square", ignoreCase = true) -> LineCap.SQUARE
+        else -> LineCap.UNSPECIFIED
     }
 }
 
 
 // Parse stroke-line-join
-private fun parseStrokeLineJoin(value: String?): LineJoin? {
+@LineJoin
+private fun parseStrokeLineJoin(value: String?): Int {
     return when {
-        value.equals("miter", ignoreCase = true) -> LineJoin.Miter
-        value.equals("round", ignoreCase = true) -> LineJoin.Round
-        value.equals("bevel", ignoreCase = true) -> LineJoin.Bevel
-        else -> null
+        value.equals("miter", ignoreCase = true) -> LineJoin.MITER
+        value.equals("round", ignoreCase = true) -> LineJoin.ROUND
+        value.equals("bevel", ignoreCase = true) -> LineJoin.BEVEL
+        else -> LineJoin.UNSPECIFIED
     }
 }
 
@@ -610,14 +613,20 @@ internal class Style internal constructor(
     val importantFlags: Long,
 
     @JvmField val fill: SvgPaint?,
-    @JvmField val fillRule: FillRule?,
+    @JvmField
+    @FillRule
+    val fillRule: Int,
     @JvmField val fillOpacity: Float,
 
     @JvmField val stroke: SvgPaint?,
     @JvmField val strokeOpacity: Float,
     @JvmField val strokeWidth: CSSLength?,
-    @JvmField val strokeLineCap: LineCap?,
-    @JvmField val strokeLineJoin: LineJoin?,
+    @JvmField
+    @LineCap
+    val strokeLineCap: Int,
+    @JvmField
+    @LineJoin
+    val strokeLineJoin: Int,
     @JvmField val strokeMiterLimit: Float,
     @JvmField val strokeDashArray: Array<CSSLength>?,
     @JvmField val strokeDashOffset: CSSLength?,
@@ -656,7 +665,9 @@ internal class Style internal constructor(
     @JvmField val stopOpacity: Float,
 
     @JvmField val clipPath: String?,
-    @JvmField val clipRule: FillRule?,
+    @JvmField
+    @FillRule
+    val clipRule: Int,
 
     @JvmField val mask: String?,
 
@@ -726,13 +737,13 @@ internal class Style internal constructor(
         cssWideKeywordFlags = 0,
         importantFlags = 0,
         fill = null,
-        fillRule = null,
+        fillRule = FillRule.UNSPECIFIED,
         fillOpacity = Float.NaN,
         stroke = null,
         strokeOpacity = Float.NaN,
         strokeWidth = null,
-        strokeLineCap = null,
-        strokeLineJoin = null,
+        strokeLineCap = LineCap.UNSPECIFIED,
+        strokeLineJoin = LineJoin.UNSPECIFIED,
         strokeMiterLimit = 4f,
         strokeDashArray = null,
         strokeDashOffset = null,
@@ -762,7 +773,7 @@ internal class Style internal constructor(
         stopColor = null,
         stopOpacity = Float.NaN,
         clipPath = null,
-        clipRule = null,
+        clipRule = FillRule.UNSPECIFIED,
         mask = null,
         maskType = null,
         filter = null,
@@ -813,7 +824,8 @@ internal class Style internal constructor(
         @JvmField
         var fill: SvgPaint? = null
         @JvmField
-        var fillRule: FillRule? = null
+        @FillRule
+        var fillRule: Int = FillRule.UNSPECIFIED
         @JvmField
         var fillOpacity: Float = Float.NaN
         @JvmField
@@ -823,9 +835,11 @@ internal class Style internal constructor(
         @JvmField
         var strokeWidth: CSSLength? = null
         @JvmField
-        var strokeLineCap: LineCap? = null
+        @LineCap
+        var strokeLineCap: Int = LineCap.UNSPECIFIED
         @JvmField
-        var strokeLineJoin: LineJoin? = null
+        @LineJoin
+        var strokeLineJoin: Int = LineJoin.UNSPECIFIED
         @JvmField
         var strokeMiterLimit: Float = 4f
         @JvmField
@@ -885,7 +899,8 @@ internal class Style internal constructor(
         @JvmField
         var clipPath: String? = null
         @JvmField
-        var clipRule: FillRule? = null
+        @FillRule
+        var clipRule: Int = FillRule.UNSPECIFIED
         @JvmField
         var mask: String? = null
         @JvmField
@@ -1391,13 +1406,16 @@ internal class Style internal constructor(
         cssWideKeywordFlags: Long = this.cssWideKeywordFlags,
         importantFlags: Long = this.importantFlags,
         fill: SvgPaint? = this.fill,
-        fillRule: FillRule? = this.fillRule,
+        @FillRule
+        fillRule: Int = this.fillRule,
         fillOpacity: Float = this.fillOpacity,
         stroke: SvgPaint? = this.stroke,
         strokeOpacity: Float = this.strokeOpacity,
         strokeWidth: CSSLength? = this.strokeWidth,
-        strokeLineCap: LineCap? = this.strokeLineCap,
-        strokeLineJoin: LineJoin? = this.strokeLineJoin,
+        @LineCap
+        strokeLineCap: Int = this.strokeLineCap,
+        @LineJoin
+        strokeLineJoin: Int = this.strokeLineJoin,
         strokeMiterLimit: Float = this.strokeMiterLimit,
         strokeDashArray: Array<CSSLength>? = this.strokeDashArray,
         strokeDashOffset: CSSLength? = this.strokeDashOffset,
@@ -1427,7 +1445,8 @@ internal class Style internal constructor(
         stopColor: SvgColor? = this.stopColor,
         stopOpacity: Float = this.stopOpacity,
         clipPath: String? = this.clipPath,
-        clipRule: FillRule? = this.clipRule,
+        @FillRule
+        clipRule: Int = this.clipRule,
         mask: String? = this.mask,
         maskType: MaskType? = this.maskType,
         filter: String? = this.filter,
@@ -1761,13 +1780,13 @@ internal class Style internal constructor(
             val def = Builder()
             def.reset(Style())
             def.fill = ColorValue.BLACK
-            def.fillRule = FillRule.NonZero
+            def.fillRule = FillRule.NON_ZERO
             def.fillOpacity = 1f
             def.stroke = null // none
             def.strokeOpacity = 1f
             def.strokeWidth = CSSLength(1f)
-            def.strokeLineCap = LineCap.Butt
-            def.strokeLineJoin = LineJoin.Miter
+            def.strokeLineCap = LineCap.BUTT
+            def.strokeLineJoin = LineJoin.MITER
             def.strokeMiterLimit = 4f
             def.strokeDashArray = null
             def.strokeDashOffset = CSSLength.ZERO
@@ -1796,7 +1815,7 @@ internal class Style internal constructor(
             def.stopColor = ColorValue.BLACK
             def.stopOpacity = 1f
             def.clipPath = null
-            def.clipRule = FillRule.NonZero
+            def.clipRule = FillRule.NON_ZERO
             def.mask = null
             def.maskType = MaskType.luminance
             def.filter = null
@@ -1864,8 +1883,10 @@ internal class Style internal constructor(
 
                 SVGAttr.fill_rule -> {
                     val fillRule = parseFillRule(value)
-                    builder.fillRule = fillRule
-                    if (fillRule != null) builder.addSpecifiedFlag(SPECIFIED_FILL_RULE)
+                    if (fillRule != FillRule.UNSPECIFIED) {
+                        builder.fillRule = fillRule
+                        builder.addSpecifiedFlag(SPECIFIED_FILL_RULE)
+                    }
                 }
 
                 SVGAttr.fill_opacity -> {
@@ -1897,14 +1918,18 @@ internal class Style internal constructor(
 
                 SVGAttr.stroke_linecap -> {
                     val strokeLineCap = parseStrokeLineCap(value)
-                    builder.strokeLineCap = strokeLineCap
-                    if (strokeLineCap != null) builder.addSpecifiedFlag(SPECIFIED_STROKE_LINECAP)
+                    if (strokeLineCap != LineCap.UNSPECIFIED) {
+                        builder.strokeLineCap = strokeLineCap
+                        builder.addSpecifiedFlag(SPECIFIED_STROKE_LINECAP)
+                    }
                 }
 
                 SVGAttr.stroke_linejoin -> {
                     val strokeLineJoin = parseStrokeLineJoin(value)
-                    builder.strokeLineJoin = strokeLineJoin
-                    if (strokeLineJoin != null) builder.addSpecifiedFlag(SPECIFIED_STROKE_LINEJOIN)
+                    if (strokeLineJoin != LineJoin.UNSPECIFIED) {
+                        builder.strokeLineJoin = strokeLineJoin
+                        builder.addSpecifiedFlag(SPECIFIED_STROKE_LINEJOIN)
+                    }
                 }
 
                 SVGAttr.stroke_miterlimit -> try {
@@ -2122,8 +2147,10 @@ internal class Style internal constructor(
 
                 SVGAttr.clip_rule -> {
                     val clipRule = parseFillRule(value)
-                    builder.clipRule = clipRule
-                    if (clipRule != null) builder.addSpecifiedFlag(SPECIFIED_CLIP_RULE)
+                    if (clipRule != FillRule.UNSPECIFIED) {
+                        builder.clipRule = clipRule
+                        builder.addSpecifiedFlag(SPECIFIED_CLIP_RULE)
+                    }
                 }
 
                 SVGAttr.mask -> {

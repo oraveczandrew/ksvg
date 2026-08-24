@@ -96,13 +96,13 @@ class StylePropertyParsingTest {
     fun testFillRuleNonZero() {
         val s = process("fill-rule", "nonzero").buildAndGet()
         assertTrue(specified(s.specifiedFlags, Style.SPECIFIED_FILL_RULE))
-        assertEquals(FillRule.NonZero, s.fillRule)
+        assertEquals(FillRule.NON_ZERO, s.fillRule)
     }
 
     @Test
     fun testFillRuleEvenOdd() {
         val s = process("fill-rule", "evenodd").buildAndGet()
-        assertEquals(FillRule.EvenOdd, s.fillRule)
+        assertEquals(FillRule.EVEN_ODD, s.fillRule)
     }
 
     @Test
@@ -140,25 +140,25 @@ class StylePropertyParsingTest {
     @Test
     fun testStrokeLineCapRound() {
         val s = process("stroke-linecap", "round").buildAndGet()
-        assertEquals(LineCap.Round, s.strokeLineCap)
+        assertEquals(LineCap.ROUND, s.strokeLineCap)
     }
 
     @Test
     fun testStrokeLineCapSquare() {
         val s = process("stroke-linecap", "square").buildAndGet()
-        assertEquals(LineCap.Square, s.strokeLineCap)
+        assertEquals(LineCap.SQUARE, s.strokeLineCap)
     }
 
     @Test
     fun testStrokeLineCapButt() {
         val s = process("stroke-linecap", "butt").buildAndGet()
-        assertEquals(LineCap.Butt, s.strokeLineCap)
+        assertEquals(LineCap.BUTT, s.strokeLineCap)
     }
 
     @Test
     fun testStrokeLineCapInvalid() {
         val s = process("stroke-linecap", "invalid")
-        assertNull(s.strokeLineCap)
+        assertEquals(LineCap.UNSPECIFIED, s.strokeLineCap)
     }
 
     // --- stroke-linejoin ---
@@ -166,19 +166,19 @@ class StylePropertyParsingTest {
     @Test
     fun testStrokeLineJoinMiter() {
         val s = process("stroke-linejoin", "miter").buildAndGet()
-        assertEquals(LineJoin.Miter, s.strokeLineJoin)
+        assertEquals(LineJoin.MITER, s.strokeLineJoin)
     }
 
     @Test
     fun testStrokeLineJoinBevel() {
         val s = process("stroke-linejoin", "bevel").buildAndGet()
-        assertEquals(LineJoin.Bevel, s.strokeLineJoin)
+        assertEquals(LineJoin.BEVEL, s.strokeLineJoin)
     }
 
     @Test
     fun testStrokeLineJoinRound() {
         val s = process("stroke-linejoin", "round").buildAndGet()
-        assertEquals(LineJoin.Round, s.strokeLineJoin)
+        assertEquals(LineJoin.ROUND, s.strokeLineJoin)
     }
 
     // --- stroke-miterlimit ---
@@ -581,13 +581,13 @@ class StylePropertyParsingTest {
     @Test
     fun testClipRuleNonZero() {
         val s = process("clip-rule", "nonzero").buildAndGet()
-        assertEquals(FillRule.NonZero, s.clipRule)
+        assertEquals(FillRule.NON_ZERO, s.clipRule)
     }
 
     @Test
     fun testClipRuleEvenOdd() {
         val s = process("clip-rule", "evenodd").buildAndGet()
-        assertEquals(FillRule.EvenOdd, s.clipRule)
+        assertEquals(FillRule.EVEN_ODD, s.clipRule)
     }
 
     // --- mask ---

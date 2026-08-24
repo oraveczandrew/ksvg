@@ -1,5 +1,4 @@
 /*
- *    Copyright 2013-2020 Paul LeBeau, Cave Rock Software Ltd.
  *    Copyright 2026 András Oravecz <info@oandras.hu>
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +16,28 @@
 
 package hu.oandras.ksvg.dom.style
 
-internal enum class LineJoin {
-    Miter,
-    Round,
-    Bevel
+import androidx.annotation.IntDef
+
+/**
+ * SVG `stroke-linejoin`.
+ *
+ * Constant values intentionally match the ordinals of [android.graphics.Paint.Join],
+ * so stored values can be applied to paints without translation.
+ * [UNSPECIFIED] (-1) means "not specified".
+ */
+@Retention(AnnotationRetention.SOURCE)
+@IntDef(
+    LineJoin.MITER,
+    LineJoin.ROUND,
+    LineJoin.BEVEL,
+    LineJoin.UNSPECIFIED,
+)
+public annotation class LineJoin {
+    public companion object {
+        public const val UNSPECIFIED: Int = -1
+
+        public const val MITER: Int = 0
+        public const val ROUND: Int = 1
+        public const val BEVEL: Int = 2
+    }
 }

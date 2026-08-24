@@ -2357,7 +2357,7 @@ internal class Renderer internal constructor(
             }
         }
 
-        combinedPath.fillType = clipPathNode.renderState.clipRule
+        combinedPath.fillType = clipPathNode.renderState.clipFillType
         return true
     }
 

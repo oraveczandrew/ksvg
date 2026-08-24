@@ -164,22 +164,10 @@ internal class RendererState private constructor(
     }
 
     val fillType: Path.FillType
-        get() {
-            return if (style.fillRule == FillRule.EvenOdd) {
-                Path.FillType.EVEN_ODD
-            } else {
-                Path.FillType.WINDING
-            }
-        }
+        get() = Path.FillType.entries[style.fillRule]
 
-    val clipRule: Path.FillType
-        get() {
-            return if (style.clipRule == FillRule.EvenOdd) {
-                Path.FillType.EVEN_ODD
-            } else {
-                Path.FillType.WINDING
-            }
-        }
+    val clipFillType: Path.FillType
+        get() = Path.FillType.entries[style.clipRule]
 
     internal constructor() : this(
         style = Style.getDefaultStyle(),

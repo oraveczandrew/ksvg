@@ -1,5 +1,4 @@
 /*
- *    Copyright 2013-2020 Paul LeBeau, Cave Rock Software Ltd.
  *    Copyright 2026 András Oravecz <info@oandras.hu>
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +16,28 @@
 
 package hu.oandras.ksvg.dom.style
 
-internal enum class LineCap {
-    Butt,
-    Round,
-    Square
+import androidx.annotation.IntDef
+
+/**
+ * SVG `stroke-linecap`.
+ *
+ * Constant values intentionally match the ordinals of [android.graphics.Paint.Cap],
+ * so stored values can be applied to paints without translation.
+ * [UNSPECIFIED] (-1) means "not specified".
+ */
+@Retention(AnnotationRetention.SOURCE)
+@IntDef(
+    LineCap.BUTT,
+    LineCap.ROUND,
+    LineCap.SQUARE,
+    LineCap.UNSPECIFIED,
+)
+public annotation class LineCap {
+    public companion object {
+        public const val UNSPECIFIED: Int = -1
+
+        public const val BUTT: Int = 0
+        public const val ROUND: Int = 1
+        public const val SQUARE: Int = 2
+    }
 }

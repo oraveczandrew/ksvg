@@ -25,8 +25,6 @@ import hu.oandras.ksvg.dom.style.ContextFill
 import hu.oandras.ksvg.dom.style.ContextStroke
 import hu.oandras.ksvg.dom.style.CurrentColor
 import hu.oandras.ksvg.dom.style.FontStyle
-import hu.oandras.ksvg.dom.style.LineCap
-import hu.oandras.ksvg.dom.style.LineJoin
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.SvgPaint
 import hu.oandras.ksvg.utils.colorWithOpacity
@@ -95,23 +93,17 @@ internal fun updateStyle(
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE_LINECAP)) {
-        val strokeLineCap = sourceStyle.strokeLineCap!!
+        val strokeLineCap = sourceStyle.strokeLineCap
         builder.strokeLineCap = strokeLineCap
-        state.strokeConfig.setStrokeCap(when (strokeLineCap) {
-            LineCap.Butt -> Paint.Cap.BUTT
-            LineCap.Round -> Paint.Cap.ROUND
-            LineCap.Square -> Paint.Cap.SQUARE
-        })
+        // LineCap constants equal Paint.Cap ordinals: no translation needed.
+        state.strokeConfig.setStrokeCap(Paint.Cap.entries[strokeLineCap])
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE_LINEJOIN)) {
-        val strokeLineJoin = sourceStyle.strokeLineJoin!!
+        val strokeLineJoin = sourceStyle.strokeLineJoin
         builder.strokeLineJoin = strokeLineJoin
-        state.strokeConfig.setStrokeJoin(when (strokeLineJoin) {
-            LineJoin.Miter -> Paint.Join.MITER
-            LineJoin.Round -> Paint.Join.ROUND
-            LineJoin.Bevel -> Paint.Join.BEVEL
-        })
+        // LineJoin constants equal Paint.Join ordinals: no translation needed.
+        state.strokeConfig.setStrokeJoin(Paint.Join.entries[strokeLineJoin])
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE_MITERLIMIT)) {

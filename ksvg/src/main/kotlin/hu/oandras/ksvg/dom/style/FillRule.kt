@@ -1,5 +1,4 @@
 /*
- *    Copyright 2013-2020 Paul LeBeau, Cave Rock Software Ltd.
  *    Copyright 2026 András Oravecz <info@oandras.hu>
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +16,26 @@
 
 package hu.oandras.ksvg.dom.style
 
-internal enum class FillRule {
-    NonZero,
-    EvenOdd
+import androidx.annotation.IntDef
+
+/**
+ * SVG `fill-rule` / `clip-rule`.
+ *
+ * Constant values intentionally match the ordinals of [android.graphics.Path.FillType],
+ * so stored values can be mapped to path fill types without translation.
+ * [UNSPECIFIED] (-1) means "not specified".
+ */
+@Retention(AnnotationRetention.SOURCE)
+@IntDef(
+    FillRule.NON_ZERO,
+    FillRule.EVEN_ODD,
+    FillRule.UNSPECIFIED,
+)
+public annotation class FillRule {
+    public companion object {
+        public const val UNSPECIFIED: Int = -1
+
+        public const val NON_ZERO: Int = 0
+        public const val EVEN_ODD: Int = 1
+    }
 }
