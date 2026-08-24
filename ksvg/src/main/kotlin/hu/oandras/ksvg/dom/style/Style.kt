@@ -791,7 +791,7 @@ internal class Style internal constructor(
         colorInterpolationFilters = null,
         letterSpacing = null,
         wordSpacing = null,
-        paintOrder = PaintOrder.FillStrokeMarkers,
+        paintOrder = PaintOrder.FILL_STROKE_MARKERS,
     )
 
     fun toBuilder(): Builder = Builder().apply { reset(this@Style) }
@@ -2311,7 +2311,7 @@ internal class Style internal constructor(
 
                 SVGAttr.paint_order -> {
                     val paintOrder = if (value.equals(NORMAL, ignoreCase = true)) {
-                        PaintOrder.FillStrokeMarkers
+                        PaintOrder.FILL_STROKE_MARKERS
                     } else {
                         PaintOrder.parse(value)
                     }

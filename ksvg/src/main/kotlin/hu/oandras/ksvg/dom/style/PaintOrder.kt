@@ -29,17 +29,17 @@ import java.util.Locale
  *
  * Partial token lists are normalized by appending the missing components in
  * canonical (fill, stroke, markers) order, so every valid value maps to one of
- * the six permutations. `normal` is [Companion.FillStrokeMarkers].
+ * the six permutations. `normal` is [Companion.FILL_STROKE_MARKERS].
  * 0 means unspecified.
  */
 @Retention(AnnotationRetention.SOURCE)
 @IntDef(
-    PaintOrder.FillStrokeMarkers,
-    PaintOrder.StrokeFillMarkers,
-    PaintOrder.FillMarkersStroke,
-    PaintOrder.MarkersFillStroke,
-    PaintOrder.StrokeMarkersFill,
-    PaintOrder.MarkersStrokeFill,
+    PaintOrder.FILL_STROKE_MARKERS,
+    PaintOrder.STROKE_FILL_MARKERS,
+    PaintOrder.FILL_MARKERS_STROKE,
+    PaintOrder.MARKERS_FILL_STROKE,
+    PaintOrder.STROKE_MARKERS_FILL,
+    PaintOrder.MARKERS_STROKE_FILL,
     PaintOrder.UNSPECIFIED,
 )
 public annotation class PaintOrder {
@@ -50,12 +50,12 @@ public annotation class PaintOrder {
         public const val STROKE: Int = 2
         public const val MARKERS: Int = 3
 
-        public const val FillStrokeMarkers: Int = (FILL shl 4) or (STROKE shl 2) or MARKERS
-        public const val StrokeFillMarkers: Int = (STROKE shl 4) or (FILL shl 2) or MARKERS
-        public const val FillMarkersStroke: Int = (FILL shl 4) or (MARKERS shl 2) or STROKE
-        public const val MarkersFillStroke: Int = (MARKERS shl 4) or (FILL shl 2) or STROKE
-        public const val StrokeMarkersFill: Int = (STROKE shl 4) or (MARKERS shl 2) or FILL
-        public const val MarkersStrokeFill: Int = (MARKERS shl 4) or (STROKE shl 2) or FILL
+        public const val FILL_STROKE_MARKERS: Int = (FILL shl 4) or (STROKE shl 2) or MARKERS
+        public const val STROKE_FILL_MARKERS: Int = (STROKE shl 4) or (FILL shl 2) or MARKERS
+        public const val FILL_MARKERS_STROKE: Int = (FILL shl 4) or (MARKERS shl 2) or STROKE
+        public const val MARKERS_FILL_STROKE: Int = (MARKERS shl 4) or (FILL shl 2) or STROKE
+        public const val STROKE_MARKERS_FILL: Int = (STROKE shl 4) or (MARKERS shl 2) or FILL
+        public const val MARKERS_STROKE_FILL: Int = (MARKERS shl 4) or (STROKE shl 2) or FILL
 
         /** Parses a `paint-order` value; returns [UNSPECIFIED] when invalid or empty. */
         public fun parse(value: String): Int {
