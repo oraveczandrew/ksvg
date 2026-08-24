@@ -1,0 +1,336 @@
+# Execution Plan — Unified Filter Pipeline (Reports 1–3), detailed
+
+Prerequisites: **Report 4 (RenderScene / bounds-update) is DONE** — the render tree is
+updatable in place, `RenderScene` exists, contentVersion-based display-list invalidation works.
+
+---
+
+## 1. Current state (code map)
+
+Filter execution today lives entirely in `ksvg` module:
+
+| Concern | Location |
+|---|---|
+| Filter entry + source re-render + cache | `Renderer.renderWithFilter` (Renderer.kt:934–1075) — inline, pooled rects/matrices, `node.cachedFilterOutput` keyed by contentVersion + filterNode.version + scale |
+| Per-primitive loop | `Renderer.applyFilterToBitmap` (1162–1232) → `applyPrimitive` (1234+) via `when(primitiveNode)` |
+| Primitive implementations | `render/filters/`: `FilterPixels.kt` (convolve edge sampling, component transfer), `FilterGeneration.kt` (turbulence — double-based Kotlin loop), `FilterGeometry.kt` (morphology, displacement), `FilterComposition.kt`, `FilterColor.kt`, `FilterLighting.kt` |
+| Named-result bookkeeping | `FilterSourceMap` (per-`FilterRenderNode`, reused via `reInitWith`) |
+| Blur scratch | `RenderNode.blurScratch: StackBlurScratch` (RenderNode.kt:477) — caller-owned precedent |
+| Native blur module | `:nativeblur`: `NativeGaussianBlur.kt`, `StackBlur.kt`, cpp: `gaussian_blur.cpp` + `Blur_advsimd{,64}.S` + `x86.cpp` scalar fallback |
+
+## 1b. Third-party source verification (actually reviewed)
+
+### renderscript-intrinsics-replacement-toolkit (`tmp/renderscript-intrinsics-replacement-toolkit/`)
+- **Instance-based, NOT singleton-forced**: `Toolkit.kt` uses
+  `createNative(): Long / destroyNative(handle)` JNI pairs + `shutdown()` — a per-render-op
+  instance with its own native handle and bounded pool is the DESIGNED usage. The Report 1
+  singleton concern is resolved by adopting this handle model directly (no global state).
+- Kernels are C++ files reusing AOSP RS intrinsic asm entry points
+  (`rsdIntrinsicConvolve3x3_K` etc.) behind `TaskProcessor` row-parallelism.
+- `convolve`: only `Convolve3x3.cpp` / `Convolve5x5.cpp` exist → fixed sizes, center anchor,
+  clamp edge, no bias — confirms the subset restriction in Phase 1. Divisor = RS kernel
+  normalization; SVG `bias≠0` graphs must stay on Kotlin.
+- `lut(Bitmap, table: LookupTable, restriction)` — ARGB_8888 premultiplied path;
+  `ByteArray` variant also exists (`sizeX*sizeY*4`). `LookupTable` = 4×256 entries,
+  matches our per-channel table build.
+- Vendoring scope for us: `Lut.cpp`, `Convolve3x3.cpp`, `Convolve5x5.cpp`,
+  `Convolve_{neon,advsimd}.S`, plus required infra (`TaskProcessor.{h,cpp}`, `Utils.*`,
+  `RenderScriptToolkit.{h,cpp}` trimmed, `JniEntryPoints.cpp` adapted). Blend/ColorMatrix/
+  Blur/Histogram/Lut3d/Resize/YuvToRgb NOT needed initially (blur stays ours).
+
+### go-images images (`tmp/images/internal/kernels/`)
+- `kernels.go:960–1044+` verified: `Erode/Dilate` → separable van Herk/Gil–Werman
+  (`morphScratch.vanHerk1D`), exactly 3 comparisons/pixel, per-worker reusable scratch
+  (`pad/pref/suf`) — maps cleanly to our caller-owned scratch rule.
+- **Two adaptations needed, not one**:
+  1. clamp-to-edge pad → transparent-black pad (known), AND
+  2. go-images "**preserve alpha**" semantics (alpha copied through) vs SVG spec where
+     erode/dilate applies to ALL FOUR channels incl. alpha. Must change the vertical pass
+     to include the alpha channel.
+- `simd_arm64.s` present as NEON vmin/vmax reference (asm itself not portable — Go ABI).
+
+### Mozilla SVGTurbulenceRenderer-inl.h + FULL gfx/2d tree (`tmp/turbulence/`, 158 files)
+- The complete `gfx/2d` directory was vendored (not just 4 headers): includes
+  `Point.h`, `BasePoint.h`, `BaseRect.h`, `BaseSize.h`, `Types.h`, `Rect.h`,
+  `FilterNodeSoftware.cpp` (Firefox's own filter executor), plus all backends
+  (Cairo/Skia/DWrite/Recording) we will NOT use.
+- **Whole-Firefox-tree NOT needed**: the only thing still missing from this folder is
+  `mfbt` (`mozilla/*` headers: RefPtr, Attributes, Assertions, Atomics…) which lives
+  outside `gfx/2d`. We deliberately do NOT compile against it — the extraction approach
+  (self-contained TU over raw byte buffers) stands. The vendored tree's value is as an
+  exact REFERENCE for semantics, not as a compile unit.
+- Key reference facts extracted:
+  - `Types.h:24`: `typedef float Float` → turbulence math runs on float32, not double
+    (our current Kotlin uses double — expect small golden deltas after the port;
+    Firefox output is the reference).
+  - `Point.h`/`BasePoint.h`/`BaseRect.h`: exact operator semantics to mirror in our
+    mini geometry header (`Point*scalar`, mixed `Point±IntPoint`, `Rect::X/Y/Width/Height`,
+    `Size` from `BaseSize.h`). Copy semantics, not the files (they still include
+    `mozilla/Attributes.h`, `mozilla/gfx/NumericTools.h`).
+  - `FilterNodeSoftware.cpp:481+,2732–2781`: how Firefox instantiates the renderer
+    (attributes: baseFrequency pair, tile rect, stitchable flag, numOctaves, seed,
+    TurbulenceType) — ideal integration-reference for our JNI parameter surface.
+  - `TurbulenceType` enum: `Filters.h:229–230`.
+- **SIMD.h re-checked in full tree**: STILL scalar + SSE2 only (`xmmintrin.h` guard,
+  no `__ARM_NEON` section anywhere in this copy). NEON specializations remain OUR work:
+  ship scalar-first, NEON follow-up (~13 functions listed below).
+  - ⚠️ **Rounding mismatch inside SIMD.h**: scalar `F32ToI32` = `floor(x + 0.5f)`
+    (round-half-up), SSE2 `_mm_cvtps_epi32` = round-to-nearest-even → pick ONE semantic
+    for the port (recommend scalar floor(+0.5) so device/x86 outputs match); goldens must
+    use that single implementation.
+- License headers carry project Apache + MPL-2.0 notice — confirm policy before merge.
+
+## 2. Target architecture
+
+```
+hu.oandras.ksvg.filtering            (new package inside :filtering module)
+├─ FilterPipeline.kt                 object-ish factory → internal class, create(...)
+├─ FilterBackend.kt                  internal interface
+├─ FilterPrimitiveSet.kt             bit-set of required primitives for graph-level decision
+├─ impls/
+│  ├─ FilterPipelineImpl33.kt        AGSL RuntimeShader chain   (API 33+, HW canvas)
+│  ├─ FilterPipelineImpl31.kt        RenderEffect chain         (API 31+, HW canvas)
+│  └─ FilterPipelineNativeImpl.kt    CPU kernels                (all APIs)
+└─ jni/                              C++ sources, CMakeLists.txt
+```
+
+### Backend interface (explicit API mode: everything `internal`)
+
+```kotlin
+internal interface FilterBackend {
+    /** Per-primitive bitmap→bitmap execution (CPU path). */
+    fun applyPrimitive(ctx: FilterPrimitiveContext): Bitmap?
+
+    /**
+     * Whole-graph GPU chain; null = "cannot represent this graph".
+     * Non-null result lets renderWithFilter skip ALL intermediate bitmaps.
+     */
+    fun buildEffectChain(graph: FilterGraphInfo): RenderEffect?
+
+    fun release()   // backend-owned scratch, called from render operation teardown
+}
+```
+
+Selection (`FilterPipeline.create`), evaluated once per render operation at first
+filtered node:
+
+1. `!canvas.isHardwareAccelerated || SDK < 31` → `FilterPipelineNativeImpl`
+2. SDK ≥ 33 && Impl33.supports(set) → Impl33
+3. SDK ≥ 31 && Impl31.supports(set) → Impl31
+4. else → NativeImpl
+
+**Graph-level decision**: `supports()` receives a `FilterPrimitiveSet` collected by walking
+`filterNode.primitives` once. Mixed graphs never split across backends (readback would cost
+more than software execution).
+
+### Integration point in Renderer
+
+`applyFilterToBitmap` stays as the native-backend driver (its body moves behind
+`FilterBackend.applyPrimitive`). In `renderWithFilter`, before the source-render step,
+try:
+
+```kotlin
+val chain = pipeline?.buildEffectChain(graphInfo)
+if (chain != null) {
+    // draw cachedSourceContent once with paint.setRenderEffect(chain) onto canvas
+    // update node.cached* fields with an EffectCache marker instead of Bitmap
+} else {
+    // today's applyFilterToBitmap loop through activeBackend.applyPrimitive
+}
+```
+
+The existing cache check (Renderer.kt:970–985) keeps working unchanged on the CPU path;
+on the GPU path the cached value becomes the stored `RenderEffect` (rebuild skipped while
+contentVersion/scale keys match).
+
+---
+
+## Phase 0 — Module rename + skeleton (behavior-neutral)
+
+1. Rename dir `nativeblur/` → `filtering/`, Gradle module `:nativeblur` → `:filtering`,
+   namespace/package `hu.oandras.ksvg.nativeblur` → `hu.oandras.ksvg.filtering`.
+   Update `settings.gradle(.kts)`, `ksvg/build.gradle.kts` dep, imports
+   (`RenderNode.kt:66` `StackBlurScratch`). Keep `NativeGaussianBlur`, `StackBlur`,
+   asm files untouched.
+2. Add `FilterBackend`, `FilterPipeline`, `FilterPrimitiveSet`, context/info value classes.
+3. Wrap today's `applyPrimitive` `when`-dispatch as `FilterPipelineNativeImpl`; wire factory
+   so every device takes the native backend (no behavior change).
+   **Gate:** full unit suite + `FiltersVisualComparisonTest` goldens.
+
+## Phase 1 — Toolkit kernels into the native backend (wins on ALL APIs)
+
+Vendor at source level into `:filtering/src/main/cpp/` (like blur asm, not a Gradle dep):
+convolve (3×3/5×5) + LUT kernels; optionally blend/colorMatrix.
+
+### feComponentTransfer → LUT (highest-value toolkit match)
+
+- Build-time: compute four 256-entry tables (`table`/`discrete`/`linear`/`gamma`) per
+  channel exactly as today's Kotlin does, then one JNI call over the whole bitmap.
+- **linearRGB/color-interpolation-filters**: fold sRGB→linear into table construction only
+  if the primitive runs unpremultiplied end-to-end; otherwise keep the existing pre/post
+  bitmap conversion passes and make the LUT operate in linear space consistently with them.
+- **Premultiplied gotcha** (critical): Toolkit's Bitmap variant operates on premultiplied
+  pixels. Component transfer is defined on unpremultiplied components. Two safe options:
+  - use the ByteArray variant on `bitmap.copyPixelsToBuffer` (raw, premultiplied too!) —
+    still needs unpremul round-trip, OR
+  - simplest correct route: `getPixels` IntArray → unpremultiply → LUT JNI (u8 buffers) →
+    premultiply → `setPixels`. The unpremul/premul pair can itself be folded into the LUT
+    (two extra 256-entry tables for R,G,B scaling-by-alpha approximation is NOT spec-exact;
+    do real unpremultiply). Benchmark before optimizing.
+
+### feConvolveMatrix → convolve subset
+
+- Fast path ONLY when: order ∈ {3×3, 5×5}, anchor == center, bias == 0,
+  edgeMode == duplicate(clamp). Everything else keeps the Kotlin loop in
+  `FilterPixels.kt`. Route selection happens in `FilterPipelineNativeImpl.applyPrimitive`
+  so behavior is identical either way.
+- divisor: pre-divide kernel weights on the Kotlin side before JNI (toolkit has no bias).
+
+### Threading / ownership rules
+
+- Use the toolkit's native-handle model directly: one `Toolkit` instance per render
+  operation (createNative/destroyNative JNI pairs), thread count fixed in constructor.
+  No global instance.
+- Pixel I/O via Bitmap getPixels/setPixels into pooled `IntArray`s; intermediate bitmaps
+  from the existing `BitmapPool`.
+- JNI ABI: verify exact symbol names/signatures before wiring (AGENTS.md rule); C++
+  intrinsics preferred over hand-written asm; scalar fallback mandatory for x86 + Robolectric.
+
+**Gate:** goldens for componentTransfer + convolve fixtures
+(`./gradlew :ksvg:testDebugUnitTest --tests "...FiltersVisualComparisonTest"` +
+`AiVisualDiffTest -PverifyFilter=<fixture>`); add unit tests for LUT construction math
+(table/discrete/linear/gamma × sRGB/linearRGB) — pure logic, no Android deps.
+
+## Phase 2 — Own native kernels: morphology + turbulence (+ displacement)
+
+### feMorphology (source: go-images/images, BSD-3)
+
+- Port van Herk/Gil–Werman O(1)-radius separated min/max from `internal/kernels/kernels.go:973+`.
+- Reference NEON asm exists (`simd_arm64.s` vmin/vmax) — treat as reference only; implement
+  C++ intrinsics.
+- **Spec adaptation** (verified against source, two changes needed):
+  1. clamp-to-edge padding → SVG transparent-black padding;
+  2. go-images copies alpha through ("preserve alpha") — the port must min/max all four
+     channels including alpha (spec), i.e. extend both passes to the alpha channel.
+- Port structure including per-worker `morphScratch` (`pad/pref/suf`) as caller-owned scratch.
+
+### feTurbulence (source: Mozilla gfx SVGTurbulenceRenderer-inl.h, MPL-2.0)
+
+- Port as C++ file in `:filtering`; specialize its `f32x4_t/i32x4_t/u8x16_t` templates to
+  NEON intrinsics + scalar fallback. Stitch tiles supported upstream.
+- ⚠️ Source depends on mozilla infra (`2D.h`, `Filters.h`, `SIMD.h`,
+  `RefPtr<DataSourceSurface>`): extract the renderer body into a self-contained TU over
+  raw byte buffers rather than stubbing the whole gfx layer (small surface: ctor +
+  `Render(IntSize, Point)`).
+- **Full extraction checklist** (verified line-by-line):
+  - Trivial types to replace: `Point`, `Size`, `IntPoint`, `IntSize`, `Rect`,
+    `Float` (=float, `Types.h:24`) → own tiny header mirroring `BasePoint/BaseRect/
+    BaseSize` operator semantics from the vendored tree (reference-copy, not include).
+  - `TurbulenceType` enum (`TURBULENCE_TYPE_TURBULENCE/_FRACTAL_NOISE`) → copy.
+  - **SIMD.h surface is only 13 functions**: `FromF32, From32, SplatF32, MulF32, AddF32,
+    DivF32, AbsF32, MixF32, WSumF32, F32ToI32, Pick, PackAndSaturate32To8, Store8` —
+    the vendored SIMD.h has scalar + SSE2 only; NEON specializations are OURS to write
+    (scalar-first shipping, NEON as follow-up).
+  - Allocation/map layer to strip: `Factory::CreateDataSourceSurface`,
+    `DataSourceSurface::ScopedMap`, `RefPtr/already_AddRefed`, `MOZ_ALWAYS_INLINE` →
+    replace with caller-provided `uint8_t* out + stride` parameter.
+  - `<utility>` `std::swap` only other std include — fine.
+  - ⚠️ **Channel-order gotcha**: output is written as **B8G8R8A8 byte order**
+    (see `ColorToBGRA`: premultiplied RGB + unpremultiplied alpha packed as BGRA), while
+    Android `ARGB_8888` memory layout is **RGBA byte order** → swap R/B lanes either in
+    `PackAndSaturate32To8` consumption or a dedicated store helper. Premultiplied output
+    itself matches Android's bitmap convention — good.
+  - ⚠️ **Width multiple-of-4 assumption**: `Render()` loops `x += 4` with no tail handling
+    → pad the render width up to a multiple of 4 (or add scalar tail) for arbitrary
+    filter-region sizes.
+- Replaces the double-based Kotlin loop in `FilterGeneration.kt` — biggest CPU win after blur.
+- License: MPL-2.0 file vendored verbatim with attribution header preserved (check project
+  license compatibility before merging).
+- JNI input: write directly into a byte buffer view of the destination bitmap
+  (BGRA byte buffer) rather than ARGB IntArray conversion.
+
+### feDisplacementMap
+
+- Simple gather loop; port natively only if turbulence port infrastructure makes it cheap
+  (< ~1 day), otherwise defer to AGSL in Phase 4. Decision point at end of turbulence task.
+
+**Gate:** new verification fixtures (turbulence with stitchTiles variants, morphology
+erode/dilate radius sweep) compared against rsvg goldens via `AiVisualDiffTest`.
+
+## Phase 3 — `FilterPipelineImpl31` (RenderEffect, API 31+)
+
+`supports(set)` claims graphs composed of: GaussianBlur, ColorMatrix/luminanceToAlpha,
+Offset, Flood, Image, Merge, DropShadow-equivalent chains. Anything else → fall through.
+
+Mapping:
+- feGaussianBlur → `RenderEffect.createBlurEffect(sigmaX*sx, sigmaY*sy, CLAMP)`; edgeMode
+  "none" still needs the transparent-pedestal clear step around it (as today).
+- feColorMatrix → `createColorFilterEffect(ColorMatrixColorFilter)` — reuse the matrix
+  construction from the existing `createFilterPaint()` path 1:1.
+- feOffset/Flood/Image/Merge → plain draws between chained effects where expressible;
+  if a graph mixes these awkwardly, prefer falling back rather than emulating with saveLayer.
+- feDropShadow → blur+offset+composite `ChainEffect` sequence.
+
+Caching: extend the `node.cachedFilterOutput` mechanism — when the last applied result was
+an Effect chain, store the `RenderEffect` (and skip `buildEffectChain` while keys match).
+Watch bitmap lifecycle: `cachedSourceContent` recycling must also drop any stored effect.
+
+Threading: backend instances owned by the render operation; `release()` drops shaders/effects.
+
+**Gate:** API 31 emulator/device run of FiltersVisualComparisonTest + side-by-side against
+software output of the same SVGs; single OEM sanity device (OnePlus-class) for the known
+per-draw allocation pathology — RenderEffect avoids Paint hooks but verify once.
+
+## Phase 4 — `FilterPipelineImpl33` (AGSL RuntimeShader)
+
+Order of implementation (value/risk ascending):
+1. feTurbulence — pure generator shader, no input bitmap; biggest win.
+2. feDisplacementMap — two-input sampling, trivially shader-shaped.
+3. feMorphology, feConvolveMatrix — fixed-window loops; edge-mode encoded in-shader.
+4. feComposite(arithmetic) + feBlend — `createRuntimeShaderEffect(shader, inputTextureName)`
+   with second input as child effect.
+5. feDiffuse/feSpecularLighting — alpha-as-heightmap normals + `pow()` lighting; most complex.
+
+Semantics that MUST be handled inside shaders:
+- premultiplied ↔ unpremultiplied conversions where spec-sensitive (composite arithmetic,
+  component transfer),
+- color-interpolation-filters=linearRGB: sRGB↔linear in-shader, or keep the framework-level
+  pre/post passes used by the CPU path (decide once, apply uniformly).
+
+Then relax `supports(set)` to claim the full set on API 33+ HW canvases.
+
+**Gate:** goldens on API 33+ device/emulator; explicit regression fixtures for premultiplied
+arithmetic-composite and linearRGB lighting cases.
+
+## Cross-cutting tasks
+
+- `SVG-SUPPORT.md` status updates per shipped primitive; `SvgFeatures.kt` strings if needed.
+- Unit-test policy: only non-trivial logic (LUT math, edge-mode handling, pipeline selection,
+  supports() classification). Visual correctness via golden suites.
+- Constraints honored throughout: no global/shared mutable state, no mutable singletons,
+  caller-owned reusable state, no capturing lambdas in hot paths, explicit API mode
+  (pipeline types stay `internal`).
+- Keep `MockCanvas` determinism: unit tests always exercise the native/Kotlin path; GPU
+  paths are covered by device-side visual tests only.
+
+## Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Premultiplied/unpremultiplied mismatches (LUT, AGSL) | Real unpremultiply in CPU path; in-shader conversions; dedicated golden fixtures before merge |
+| linearRGB inconsistency between backends | Single decision documented; same fixtures run against all three backends |
+| OEM RenderEffect quirks | Framework Skia path (low risk), one device sanity pass |
+| Toolkit thread pool vs no-global-state rule | Solved: toolkit's native-handle model is per-instance by design; one handle per render op |
+| Turbulence port drags in mozilla gfx infra | Solved: full gfx/2d vendored as reference; extraction into self-contained TU, no mfbt dependency |
+| MPL-2.0 vendored file | Preserve header/attribution; confirm license policy |
+| Morphology padding change alters goldens | Match current Kotlin semantics first, then fix to spec with fixture updates |
+
+## Commit sequence
+
+1. `:filtering` rename + FilterBackend/Pipeline skeleton, native wrapper (no behavior change)
+2. Toolkit LUT (component transfer)
+3. Toolkit convolve subset
+4. Native morphology
+5. Native turbulence (+ displacement decision)
+6. Impl31 (blur/colorMatrix/dropShadow chains + effect caching)
+7. Impl33 AGSL shaders (one commit per primitive)
