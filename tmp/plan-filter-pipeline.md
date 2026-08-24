@@ -83,15 +83,21 @@ Filter execution today lives entirely in `ksvg` module:
 ## 2. Target architecture
 
 ```
-hu.oandras.ksvg.filtering            (new package inside :filtering module)
-├─ FilterPipeline.kt                 object-ish factory → internal class, create(...)
-├─ FilterBackend.kt                  internal interface
-├─ FilterPrimitiveSet.kt             bit-set of required primitives for graph-level decision
-├─ impls/
-│  ├─ FilterPipelineImpl33.kt        AGSL RuntimeShader chain   (API 33+, HW canvas)
-│  ├─ FilterPipelineImpl31.kt        RenderEffect chain         (API 31+, HW canvas)
-│  └─ FilterPipelineNativeImpl.kt    CPU kernels                (all APIs)
-└─ jni/                              C++ sources, CMakeLists.txt
+hu.oandras.ksvg.render.filters.pipeline (in :ksvg — DECISION: backend infra stays in
+│                                        the main module as `internal`. The Kotlin
+│                                        filter orchestration depends on ~30 :ksvg-
+│                                        internal types; splitting kernel-math vs
+│                                        orchestration across modules would need a
+│                                        public-API widening or an allocation-heavy
+│                                        adapter layer. Attempted move to :filtering
+│                                        was reverted.)
+├─ FilterPipeline.kt                 capability-based factory, create(canvas)
+├─ FilterBackend.kt                  internal interface + FilterGraphInfo
+├─ FilterPrimitiveSet.kt             @JvmInline value class over Int, flag constants
+└─ FilterPipelineNativeImpl.kt       CPU backend, claims every set for now
+
+:filtering keeps the pure kernels only: ComponentTransferNative, ConvolveNative,
+future native morphology/turbulence JNI + their C++ sources.
 ```
 
 ### Backend interface (explicit API mode: everything `internal`)
