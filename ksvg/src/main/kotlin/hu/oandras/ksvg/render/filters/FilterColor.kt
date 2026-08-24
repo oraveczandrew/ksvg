@@ -26,6 +26,7 @@ import hu.oandras.ksvg.dom.filter.FeColorMatrixType
 import hu.oandras.ksvg.dom.filter.FeFunc
 import hu.oandras.ksvg.dom.filter.FeFuncType
 import hu.oandras.ksvg.filtering.ComponentTransferNative
+import hu.oandras.ksvg.filtering.KotlinKernels
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeComponentTransferRenderNode
 import hu.oandras.ksvg.render.ComponentTransferFunctions
@@ -180,22 +181,40 @@ internal fun doFeComponentTransferFilter(
     val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
     val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
 
+    val tables = primitiveNode.lutTables ?: buildTransferLutTables(
+        transferFunctions,
+        primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+    ).also { primitiveNode.lutTables = it }
+
     if (ComponentTransferNative.isAvailable) {
-        val tables = primitiveNode.lutTables ?: buildTransferLutTables(
-            transferFunctions,
-            primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
-        ).also { primitiveNode.lutTables = it }
         ComponentTransferNative.apply(
-            pixels, outPixels, width, height,
-            clipLeft, clipTop, clipRight, clipBottom,
-            tables[0], tables[1], tables[2], tables[3]
+            src = pixels,
+            dst = outPixels,
+            width = width,
+            height = height,
+            clipLeft = clipLeft,
+            clipTop = clipTop,
+            clipRight = clipRight,
+            clipBottom = clipBottom,
+            tableA = tables[0],
+            tableR = tables[1],
+            tableG = tables[2],
+            tableB = tables[3]
         )
     } else {
-        doComponentTransferKotlin(
-            pixels, outPixels, width, height,
-            clipLeft, clipTop, clipRight, clipBottom,
-            transferFunctions,
-            primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+        KotlinKernels.componentTransfer(
+            src = pixels,
+            dst = outPixels,
+            width = width,
+            height = height,
+            clipLeft = clipLeft,
+            clipTop = clipTop,
+            clipRight = clipRight,
+            clipBottom = clipBottom,
+            tableA = tables[0],
+            tableR = tables[1],
+            tableG = tables[2],
+            tableB = tables[3]
         )
     }
 
@@ -232,42 +251,6 @@ private fun buildChannelLut(func: FeFunc?, useLinearRgb: Boolean, isAlpha: Boole
     return table
 }
 
-private fun doComponentTransferKotlin(
-    pixels: IntArray,
-    outPixels: IntArray,
-    width: Int,
-    height: Int,
-    clipLeft: Int,
-    clipTop: Int,
-    clipRight: Int,
-    clipBottom: Int,
-    transferFunctions: ComponentTransferFunctions,
-    useLinear: Boolean,
-) {
-    outPixels.fill(0) // Initialize with transparent, matching the native kernel
-    for (y in clipTop until clipBottom) {
-        val rowOffset = y * width
-        for (x in clipLeft until clipRight) {
-            val i = rowOffset + x
-            val color = pixels[i]
-            if (useLinear) {
-                outPixels[i] = argb(
-                    alpha = applyTransferFunction(color.alpha, transferFunctions.a),
-                    red = linearToSRgb(applyTransferFunction(sRgbToLinear(color.red), transferFunctions.r)),
-                    green = linearToSRgb(applyTransferFunction(sRgbToLinear(color.green), transferFunctions.g)),
-                    blue = linearToSRgb(applyTransferFunction(sRgbToLinear(color.blue), transferFunctions.b)),
-                )
-            } else {
-                outPixels[i] = argb(
-                    alpha = applyTransferFunction(color.alpha, transferFunctions.a),
-                    red = applyTransferFunction(color.red, transferFunctions.r),
-                    green = applyTransferFunction(color.green, transferFunctions.g),
-                    blue = applyTransferFunction(color.blue, transferFunctions.b),
-                )
-            }
-        }
-    }
-}
 
 private fun applyTransferFunction(value: Int, transferFunction: FeFunc?): Int {
     if (transferFunction == null || transferFunction.type == FeFuncType.identity) return value

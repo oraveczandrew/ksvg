@@ -31,13 +31,13 @@ import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withClip
 import hu.oandras.ksvg.filtering.ConvolveNative
+import hu.oandras.ksvg.filtering.KotlinKernels
 import hu.oandras.ksvg.filtering.MorphologyNative
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp
-import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.red
 import kotlin.math.max
@@ -108,65 +108,16 @@ internal fun doFeConvolveMatrixFilter(
             divisor, bias, preserveAlpha, edgeMode.ordinal
         )
     } else {
-        doConvolveMatrixKotlin(
+        KotlinKernels.convolveMatrix(
             srcPixels, outPixels, width, height,
             kernel, orderX, orderY, targetX, targetY,
-            divisor, bias, preserveAlpha, edgeMode
+            divisor, bias, preserveAlpha, edgeMode.ordinal
         )
     }
     res.setPixels(outPixels, 0, width, 0, 0, width, height)
     return res
 }
 
-/**
- * Reference scalar loop kept as the JVM/Robolectric fallback; the native kernel
- * in `convolve_matrix.cpp` must stay bit-exact with this implementation.
- */
-private fun doConvolveMatrixKotlin(
-    srcPixels: IntArray,
-    outPixels: IntArray,
-    width: Int,
-    height: Int,
-    kernel: FloatArray,
-    orderX: Int,
-    orderY: Int,
-    targetX: Int,
-    targetY: Int,
-    divisor: Float,
-    bias: Float,
-    preserveAlpha: Boolean,
-    edgeMode: ConvolveMatrixEdgeMode,
-) {
-    for (y in 0 until height) {
-        val rowOffset = y * width
-        for (x in 0 until width) {
-            var r = 0f
-            var g = 0f
-            var b = 0f
-            var a = 0f
-
-            for (ky in 0 until orderY) {
-                for (kx in 0 until orderX) {
-                    val srcX = sampleCoordinate(x + kx - targetX, width, edgeMode)
-                    val srcY = sampleCoordinate(y + ky - targetY, height, edgeMode)
-                    val pixel = if (srcX < 0 || srcY < 0) 0 else srcPixels[srcY * width + srcX]
-                    val weight = kernel[ky * orderX + kx]
-
-                    r += pixel.red * weight
-                    g += pixel.green * weight
-                    b += pixel.blue * weight
-                    a += pixel.alpha * weight
-                }
-            }
-
-            val outR = clamp255(r / divisor + bias * 255f)
-            val outG = clamp255(g / divisor + bias * 255f)
-            val outB = clamp255(b / divisor + bias * 255f)
-            val outA = if (preserveAlpha) srcPixels[rowOffset + x].alpha else clamp255(a / divisor + bias * 255f)
-            outPixels[rowOffset + x] = argb(outA, outR, outG, outB)
-        }
-    }
-}
 
 context(renderContext: RenderContext)
 internal fun doFeGaussianBlurFilter(
@@ -323,9 +274,9 @@ private fun applyMorphology(
             clipLeft, clipTop, clipRight, clipBottom
         )
     } else {
-        doMorphologyKotlin(
+        KotlinKernels.morphology(
             src, dst, width, height, radiusX, radiusY, erode,
-            channelInitialValue, clipLeft, clipTop, clipRight, clipBottom
+            clipLeft, clipTop, clipRight, clipBottom
         )
     }
 
@@ -334,63 +285,6 @@ private fun applyMorphology(
     return res
 }
 
-/**
- * Reference scalar loop kept as the JVM/Robolectric fallback; the native kernel
- * in `morphology.cpp` must stay bit-exact with this implementation.
- */
-private fun doMorphologyKotlin(
-    src: IntArray,
-    dst: IntArray,
-    width: Int,
-    height: Int,
-    radiusX: Int,
-    radiusY: Int,
-    erode: Boolean,
-    channelInitialValue: Int,
-    clipLeft: Int,
-    clipTop: Int,
-    clipRight: Int,
-    clipBottom: Int,
-) {
-    for (y in clipTop until clipBottom) {
-        val rowOffset = y * width
-        val top = max(0, y - radiusY)
-        val bottom = min(height - 1, y + radiusY)
-        val kernelTouchesTopBottom = y - radiusY < 0 || y + radiusY > height - 1
-        for (x in clipLeft until clipRight) {
-            // Out-of-bounds input pixels are transparent black per spec. For dilation
-            // they never win the max, but erosion must yield transparent black whenever
-            // the kernel reaches outside the input (dst is pre-filled with 0).
-            if (erode && (kernelTouchesTopBottom || x - radiusX < 0 || x + radiusX > width - 1)) {
-                continue
-            }
-            var a = channelInitialValue
-            var r = channelInitialValue
-            var g = channelInitialValue
-            var b = channelInitialValue
-            val left = max(0, x - radiusX)
-            val right = min(width - 1, x + radiusX)
-            for (ky in top..bottom) {
-                val kRowOffset = ky * width
-                for (kx in left..right) {
-                    val color = src[kRowOffset + kx]
-                    if (erode) {
-                        a = min(a, color.alpha)
-                        r = min(r, color.red)
-                        g = min(g, color.green)
-                        b = min(b, color.blue)
-                    } else {
-                        a = max(a, color.alpha)
-                        r = max(r, color.red)
-                        g = max(g, color.green)
-                        b = max(b, color.blue)
-                    }
-                }
-            }
-            dst[rowOffset + x] = argb(a, r, g, b)
-        }
-    }
-}
 
 context(renderContext: RenderContext)
 private fun applyTile(

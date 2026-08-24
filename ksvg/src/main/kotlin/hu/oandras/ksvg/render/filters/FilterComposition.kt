@@ -19,6 +19,7 @@ package hu.oandras.ksvg.render.filters
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.RectF
+import hu.oandras.ksvg.filtering.KotlinKernels
 import hu.oandras.ksvg.compat.BlendModeCompat
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.compat.setBlendModeCompat
@@ -142,37 +143,12 @@ private fun applyArithmeticComposite(
     val k4 = primitive.k4
     
     val outPixels = IntArray(size) // We need a clean output
-    val useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
-
-    val cTop: Int = clipTop
-    val cBottom: Int = clipBottom
-    val cLeft: Int = clipLeft
-    val cRight: Int = clipRight
-
-    for (y in cTop until cBottom) {
-        val rowOffset = y * width
-        for (x in cLeft until cRight) {
-            val i = rowOffset + x
-            val a = inputPixels[i]
-            val b = in2Pixels[i]
-
-            if (useLinear) {
-                outPixels[i] = argb(
-                    alpha = arithmeticChannel(a.alpha, b.alpha, k1, k2, k3, k4),
-                    red = linearToSRgb(arithmeticChannel(sRgbToLinear(a.red), sRgbToLinear(b.red), k1, k2, k3, k4)),
-                    green = linearToSRgb(arithmeticChannel(sRgbToLinear(a.green), sRgbToLinear(b.green), k1, k2, k3, k4)),
-                    blue = linearToSRgb(arithmeticChannel(sRgbToLinear(a.blue), sRgbToLinear(b.blue), k1, k2, k3, k4)),
-                )
-            } else {
-                outPixels[i] = argb(
-                    alpha = arithmeticChannel(a.alpha, b.alpha, k1, k2, k3, k4),
-                    red = arithmeticChannel(a.red, b.red, k1, k2, k3, k4),
-                    green = arithmeticChannel(a.green, b.green, k1, k2, k3, k4),
-                    blue = arithmeticChannel(a.blue, b.blue, k1, k2, k3, k4),
-                )
-            }
-        }
-    }
+    KotlinKernels.arithmeticComposite(
+        inputPixels, in2Pixels, outPixels, width, height,
+        clipLeft, clipTop, clipRight, clipBottom,
+        k1, k2, k3, k4,
+        primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+    )
 
     val res = createBitmapSameAs(input)
     res.setPixels(outPixels, 0, width, 0, 0, width, height)
