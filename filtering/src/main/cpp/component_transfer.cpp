@@ -89,8 +89,8 @@ inline void applyNeonBlock(
 }
 
 void applyNeon64(
-        jint* src, jint* dst, jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        const jint* src, jint* dst, const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB) {
     const jint total = width * height;
 
@@ -293,10 +293,10 @@ void applyNeon32(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ComponentTransferNative_apply(
         JNIEnv* env, jclass clazz,
-        jintArray jSrc, jintArray jDst,
-        jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        jbyteArray jTableA, jbyteArray jTableR, jbyteArray jTableG, jbyteArray jTableB) {
+        const jintArray jSrc, const jintArray jDst,
+        const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jbyteArray jTableA, const jbyteArray jTableR, const jbyteArray jTableG, const jbyteArray jTableB) {
     auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
     if (src == nullptr) return;
     auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));

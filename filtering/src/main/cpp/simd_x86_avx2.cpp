@@ -27,7 +27,7 @@
 
 namespace {
 
-inline void reduce32(const uint8_t* buf, bool isErode, jint (&mins)[4], jint (&maxs)[4]) {
+inline void reduce32(const uint8_t* buf, const bool isErode, jint (&mins)[4], jint (&maxs)[4]) {
     for (int ch = 0; ch < 4; ch++) {
         for (int p = 0; p < 8; p++) {
             const jint v = buf[p * 4 + ch];
@@ -37,7 +37,7 @@ inline void reduce32(const uint8_t* buf, bool isErode, jint (&mins)[4], jint (&m
     }
 }
 
-inline jint pick(bool isErode, jint ch, const jint (&mins)[4], const jint (&maxs)[4]) {
+inline jint pick(const bool isErode, const jint ch, const jint (&mins)[4], const jint (&maxs)[4]) {
     return isErode ? mins[ch] : maxs[ch];
 }
 
@@ -46,8 +46,8 @@ inline jint pick(bool isErode, jint ch, const jint (&mins)[4], const jint (&maxs
 extern "C" {
 
 void ksvgMorphologyApplyPixelAvx2(
-        const jint* src, jint* dst, jint width,
-        jint radiusX, jint radiusY, jboolean erode, jint x, jint y) {
+        const jint* src, jint* dst, const jint width,
+        const jint radiusX, const jint radiusY, const jboolean erode, const jint x, const jint y) {
     const bool isErode = erode == JNI_TRUE;
     const jint top = y - radiusY;
     const jint bottom = y + radiusY;
@@ -99,9 +99,9 @@ void ksvgMorphologyApplyPixelAvx2(
 }
 
 void ksvgConvolveApplyInteriorAvx2(
-        jint* dst, const jint* src, jint width, jint height,
-        const jfloat* kernel, jint orderX, jint orderY, jint targetX, jint targetY,
-        jfloat divisor, jfloat bias, jboolean preserveAlpha) {
+        jint* dst, const jint* src, const jint width, const jint height,
+        const jfloat* kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const jfloat divisor, const jfloat bias, const jboolean preserveAlpha) {
     const bool preserve = preserveAlpha == JNI_TRUE;
     const __m256 vDivisor = _mm256_set1_ps(divisor);
     const __m256 vBias255 = _mm256_mul_ps(_mm256_set1_ps(bias), _mm256_set1_ps(255.0f));
@@ -174,8 +174,8 @@ void ksvgConvolveApplyInteriorAvx2(
 }
 
 void ksvgComponentTransferApplyAvx2(
-        jint* src, jint* dst, jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        const jint* src, jint* dst, const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB) {
     alignas(16) __m128i rowsA[16], rowsR[16], rowsG[16], rowsB[16];
     for (int i = 0; i < 16; i++) {
@@ -206,7 +206,7 @@ void ksvgComponentTransferApplyAvx2(
         return result;
     };
 
-    const auto extractChannel = [](int laneByte, __m256i pixels8) {
+    const auto extractChannel = [](const int laneByte, const __m256i pixels8) {
         // Same relative byte positions repeated per 128-bit lane.
         const __m128i m = _mm_setr_epi8(
                 static_cast<char>(laneByte), static_cast<char>(laneByte + 4),

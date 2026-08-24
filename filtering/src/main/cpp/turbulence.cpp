@@ -17,7 +17,6 @@
 #include <jni.h>
 #include <cmath>
 #include <cstring>
-#include "cpu_dispatch.h"
 
 // feTurbulence — SVG 1.1 §15.25 reference algorithm, adapted from Mozilla gfx
 // SVGTurbulenceRenderer-inl.h (MPL-2.0, vendored under tmp/turbulence/).
@@ -284,17 +283,17 @@ inline void noise2Vec(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
         JNIEnv* env, jclass clazz,
-        jintArray jPixels,
-        jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        jdouble baseFrequencyX, jdouble baseFrequencyY,
-        jint periodX, jint periodY,
-        jint octaves, jboolean fractalNoise,
-        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
-        jdouble userLeft, jdouble userTop,
-        jdouble originX, jdouble originY,
-        jdouble unitSizeX, jdouble unitSizeY,
-        jint seed) {
+        const jintArray jPixels,
+        const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jdouble baseFrequencyX, const jdouble baseFrequencyY,
+        const jint periodX, const jint periodY,
+        const jint octaves, const jboolean fractalNoise,
+        const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+        const jdouble userLeft, const jdouble userTop,
+        const jdouble originX, const jdouble originY,
+        const jdouble unitSizeX, const jdouble unitSizeY,
+        const jint seed) {
     auto* pixels = static_cast<jint*>(env->GetPrimitiveArrayCritical(jPixels, nullptr));
     if (pixels == nullptr) return;
 

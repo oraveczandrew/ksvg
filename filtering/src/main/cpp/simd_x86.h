@@ -31,26 +31,30 @@ extern "C" {
 
 // morphology.cpp — one fully-interior output pixel (erode/dilate min/max).
 void ksvgMorphologyApplyPixelAvx2(
-        const jint* src, jint* dst, jint width,
-        jint radiusX, jint radiusY, jboolean erode, jint x, jint y);
+        const jint* src, jint* dst, const jint width,
+        const jint radiusX, const jint radiusY, const jboolean erode,
+        const jint x, const jint y);
 void ksvgMorphologyApplyPixelAvx512(
-        const jint* src, jint* dst, jint width,
-        jint radiusX, jint radiusY, jboolean erode, jint x, jint y);
+        const jint* src, jint* dst, const jint width,
+        const jint radiusX, const jint radiusY, const jboolean erode,
+        const jint x, const jint y);
 
 // convolve_matrix.cpp — duplicate-edge interior pass.
 void ksvgConvolveApplyInteriorAvx2(
-        jint* dst, const jint* src, jint width, jint height,
-        const jfloat* kernel, jint orderX, jint orderY, jint targetX, jint targetY,
-        jfloat divisor, jfloat bias, jboolean preserveAlpha);
+        jint* dst, const jint* src, const jint width, const jint height,
+        const jfloat* kernel, const jint orderX, const jint orderY,
+        const jint targetX, const jint targetY,
+        const jfloat divisor, const jfloat bias, const jboolean preserveAlpha);
 void ksvgConvolveApplyInteriorAvx512(
-        jint* dst, const jint* src, jint width, jint height,
-        const jfloat* kernel, jint orderX, jint orderY, jint targetX, jint targetY,
-        jfloat divisor, jfloat bias, jboolean preserveAlpha);
+        jint* dst, const jint* src, const jint width, const jint height,
+        const jfloat* kernel, const jint orderX, const jint orderY,
+        const jint targetX, const jint targetY,
+        const jfloat divisor, const jfloat bias, const jboolean preserveAlpha);
 
 // component_transfer.cpp — full clip-region LUT pass.
 void ksvgComponentTransferApplyAvx2(
-        jint* src, jint* dst, jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        const jint* src, jint* dst, const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB);
 
 #ifdef __cplusplus

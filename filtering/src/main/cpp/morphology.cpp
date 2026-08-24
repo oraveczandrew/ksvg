@@ -39,9 +39,9 @@
 namespace {
 
 void applyScalarPixel(
-        const jint* src, jint* dst, jint width, jint height,
-        jint radiusX, jint radiusY, bool isErode, jint init,
-        jint x, jint y) {
+        const jint* src, jint* dst, const jint width, const jint height,
+        const jint radiusX, const jint radiusY, const bool isErode, const jint init,
+        const jint x, const jint y) {
     const jint top = y - radiusY < 0 ? 0 : y - radiusY;
     const jint bottom = y + radiusY > height - 1 ? height - 1 : y + radiusY;
     const bool touchesTB = y - radiusY < 0 || y + radiusY > height - 1;
@@ -78,9 +78,9 @@ void applyScalarPixel(
 }
 
 void applyScalar(
-        const jint* src, jint* dst, jint width, jint height,
-        jint radiusX, jint radiusY, bool isErode, jint init,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom) {
+        const jint* src, jint* dst, const jint width, const jint height,
+        const jint radiusX, const jint radiusY, const bool isErode, const jint init,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
     std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
     for (jint y = clipTop; y < clipBottom; y++) {
         for (jint x = clipLeft; x < clipRight; x++) {
@@ -156,10 +156,10 @@ inline void applyVectorPixel(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
         JNIEnv* env, jclass clazz,
-        jintArray jSrc, jintArray jDst,
-        jint width, jint height,
-        jint radiusX, jint radiusY, jboolean erode,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom) {
+        const jintArray jSrc, jintArray jDst,
+        const jint width, const jint height,
+        const jint radiusX, const jint radiusY, const jboolean erode,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
     auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
     if (src == nullptr) return;
     auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
