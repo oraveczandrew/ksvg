@@ -30,7 +30,10 @@ if(ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
     set(BLUR_SOURCES x86.cpp)
 endif()
 
-add_library(ksvgblur SHARED gaussian_blur.cpp component_transfer.cpp ${BLUR_SOURCES})
+add_library(ksvgblur SHARED gaussian_blur.cpp component_transfer.cpp convolve_matrix.cpp ${BLUR_SOURCES})
+
+# Bit-exact float parity with the Kotlin reference loops: forbid FMA contraction.
+target_compile_options(ksvgblur PRIVATE -ffp-contract=off)
 
 # The ARM32 kernels use NEON instructions; enable the FPU for the C++ side too.
 if(BLUR_NEEDS_NEON)

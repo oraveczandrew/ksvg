@@ -198,6 +198,21 @@ directly on the existing pooled `IntArray`s:
 
 ### feConvolveMatrix → convolve subset
 
+**STATUS: DONE (Phase 1b). Deviation from the original subset restriction:**
+instead of capping at 3×3/5×5 center-anchor clamp-only, a custom kernel
+(`filtering/src/main/cpp/convolve_matrix.cpp` + `ConvolveNative`) supports ARBITRARY
+order/anchor, all three edge modes and preserveAlpha — bit-exact with the Kotlin
+reference loop (`doConvolveMatrixKotlin`, kept as JVM fallback):
+- same float accumulation order, explicit mul→add (no FMA), `-ffp-contract=off`,
+  half-up rounding via floor(+0.5) (trunc-vs-floor irrelevant after clamping negatives to 0),
+- edge-mode ordinals match `ConvolveMatrixEdgeMode` (duplicate=0, wrap=1, none=2),
+- **AArch64 NEON**: duplicate-edge interior vectorized 4 px/iteration (f32x4
+  accumulation, vcvtq u8→f32, vmin/vmax clamp); borders + other modes scalar.
+- armv7 / x86: scalar (documented; SSSE3/armv7-NEON can follow if profiling justifies).
+- Device parity test: `ConvolveNativeDeviceTest` (3 edge modes × preserveAlpha,
+  non-square kernel, off-center anchor, non-multiple-of-4 width).
+- Gates run: full unit suite (incl. slow tests) + `-PverifyFilter=convolve` green.
+
 - Fast path ONLY when: order ∈ {3×3, 5×5}, anchor == center, bias == 0,
   edgeMode == duplicate(clamp). Everything else keeps the Kotlin loop in
   `FilterPixels.kt`. Route selection happens in `FilterPipelineNativeImpl.applyPrimitive`

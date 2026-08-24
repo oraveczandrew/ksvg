@@ -22,6 +22,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.css.CSSLength
+import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
@@ -29,6 +30,7 @@ import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withClip
+import hu.oandras.ksvg.filtering.ConvolveNative
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.blue
@@ -98,6 +100,42 @@ internal fun doFeConvolveMatrixFilter(
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     inputBitmap.getPixels(srcPixels, 0, width, 0, 0, width, height)
 
+    if (ConvolveNative.isAvailable) {
+        ConvolveNative.apply(
+            srcPixels, outPixels, width, height,
+            kernel, orderX, orderY, targetX, targetY,
+            divisor, bias, preserveAlpha, edgeMode.ordinal
+        )
+    } else {
+        doConvolveMatrixKotlin(
+            srcPixels, outPixels, width, height,
+            kernel, orderX, orderY, targetX, targetY,
+            divisor, bias, preserveAlpha, edgeMode
+        )
+    }
+    res.setPixels(outPixels, 0, width, 0, 0, width, height)
+    return res
+}
+
+/**
+ * Reference scalar loop kept as the JVM/Robolectric fallback; the native kernel
+ * in `convolve_matrix.cpp` must stay bit-exact with this implementation.
+ */
+private fun doConvolveMatrixKotlin(
+    srcPixels: IntArray,
+    outPixels: IntArray,
+    width: Int,
+    height: Int,
+    kernel: FloatArray,
+    orderX: Int,
+    orderY: Int,
+    targetX: Int,
+    targetY: Int,
+    divisor: Float,
+    bias: Float,
+    preserveAlpha: Boolean,
+    edgeMode: ConvolveMatrixEdgeMode,
+) {
     for (y in 0 until height) {
         val rowOffset = y * width
         for (x in 0 until width) {
@@ -127,8 +165,6 @@ internal fun doFeConvolveMatrixFilter(
             outPixels[rowOffset + x] = argb(outA, outR, outG, outB)
         }
     }
-    res.setPixels(outPixels, 0, width, 0, 0, width, height)
-    return res
 }
 
 context(renderContext: RenderContext)
