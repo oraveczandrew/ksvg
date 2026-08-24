@@ -17,6 +17,8 @@
 package hu.oandras.ksvg.render.filters.pipeline
 
 import android.graphics.RenderEffect
+import android.os.Build
+import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.filters.buildColorMatrix
@@ -36,6 +38,7 @@ import hu.oandras.ksvg.utils.forEachElement
  * - Offset: needs CSSLength resolution with renderer context (planned);
  * - everything two-input or canvas-drawn (Blend/Composite/Merge/Flood/Image).
  */
+@RequiresApi(Build.VERSION_CODES.S)
 internal class FilterPipelineImpl31 : FilterBackend {
 
     override fun supports(primitives: FilterPrimitiveSet): Boolean {

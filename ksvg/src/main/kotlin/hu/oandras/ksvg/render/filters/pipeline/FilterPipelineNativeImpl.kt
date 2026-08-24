@@ -16,8 +16,10 @@
 
 package hu.oandras.ksvg.render.filters.pipeline
 
+import android.graphics.RenderEffect
+
 /**
- * CPU backend driving the existing Kotlin/native kernel path. Currently claims
+ * CPU backend driving the existing Kotlin/native kernel path. Currently, claims
  * every primitive set: it is both the software-canvas workhorse and the final
  * fallback of [FilterPipeline]. Kernel dispatch still lives in
  * `Renderer.applyPrimitive`; successive phases move individual kernels behind
@@ -27,5 +29,5 @@ internal class FilterPipelineNativeImpl : FilterBackend {
 
     override fun supports(primitives: FilterPrimitiveSet): Boolean = true
 
-    override fun buildEffectChain(graph: FilterGraphInfo): android.graphics.RenderEffect? = null
+    override fun buildEffectChain(graph: FilterGraphInfo): RenderEffect? = null
 }

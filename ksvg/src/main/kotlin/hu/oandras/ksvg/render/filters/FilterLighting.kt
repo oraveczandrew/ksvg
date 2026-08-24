@@ -20,6 +20,7 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.RectF
 import hu.oandras.ksvg.dom.COLOR_WHITE
+import hu.oandras.ksvg.filtering.LightingNative
 import hu.oandras.ksvg.dom.filter.FeDistantLight
 import hu.oandras.ksvg.dom.filter.FePointLight
 import hu.oandras.ksvg.dom.filter.FeSpotLight
@@ -65,6 +66,8 @@ private inline fun doLightingFilter(
     filterRegion: RectF,
     // feSpecularLighting produces a transparency map (alpha = max(R,G,B)); feDiffuseLighting is opaque.
     alphaIsMaxOfChannels: Boolean = false,
+    k: Float = 0f,
+    exponent: Float = 0f,
     computeIntensity: (NormalVector, LightVector) -> Float
 ): Bitmap {
     val lightSource = light ?: return inputBitmap
@@ -102,6 +105,49 @@ private inline fun doLightingFilter(
     val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
     val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
     val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
+
+    if (LightingNative.isAvailable) {
+        val params = DoubleArray(8)
+        var lightType = 0
+        when (lightSource) {
+            is FeDistantLight -> {
+                lightType = 0
+                params[0] = lightSource.azimuth.toDouble()
+                params[1] = lightSource.elevation.toDouble()
+            }
+            is FePointLight -> {
+                lightType = 1
+                params[0] = lightSource.x.toDouble()
+                params[1] = lightSource.y.toDouble()
+                params[2] = lightSource.z.toDouble()
+            }
+            is FeSpotLight -> {
+                lightType = 2
+                params[0] = lightSource.x.toDouble()
+                params[1] = lightSource.y.toDouble()
+                params[2] = lightSource.z.toDouble()
+                params[3] = lightSource.pointsAtX.toDouble()
+                params[4] = lightSource.pointsAtY.toDouble()
+                params[5] = lightSource.pointsAtZ.toDouble()
+                params[6] = lightSource.limitingConeAngle?.toDouble() ?: Double.NaN
+            }
+        }
+        LightingNative.apply(
+            pix, out, width, height,
+            clipLeft, clipTop, clipRight, clipBottom,
+            surfaceScaleNormalized,
+            invCanvasScaleX, invCanvasScaleY,
+            userLeft, userTop, originX, originY,
+            primitiveUnitSizeX, primitiveUnitSizeY,
+            canvasScaleX, canvasScaleY,
+            lightType, alphaIsMaxOfChannels,
+            k, exponent,
+            lightR, lightG, lightB,
+            params
+        )
+        res.setPixels(out, 0, width, 0, 0, width, height)
+        return res
+    }
 
     for (y in clipTop until clipBottom) {
         val userY = userTop + y.toDouble() * invCanvasScaleY
@@ -179,6 +225,7 @@ internal fun doFeDiffuseLightingFilter(
         canvasScaleY = canvasScaleY,
         primitiveRegion = primitiveRegion,
         filterRegion = filterRegion,
+        k = diffuseConstant,
     ) { normal, lightVec ->
         diffuseIntensity(normal, lightVec, diffuseConstant)
     }
@@ -222,6 +269,8 @@ internal fun doFeSpecularLightingFilter(
         primitiveRegion = primitiveRegion,
         filterRegion = filterRegion,
         alphaIsMaxOfChannels = true,
+        k = specularConstant,
+        exponent = specularExponent,
     ) { normal, lightVec ->
         specularIntensity(normal, lightVec, specularConstant, specularExponent)
     }
