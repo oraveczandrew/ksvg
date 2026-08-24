@@ -86,3 +86,19 @@ Format for each entry:
 - **Resolution:** `SVG-SUPPORT.md` entry changed Full → None with note. No code
   change; the parsed value remains harmless. Revisit together with any future
   `writing-mode` implementation.
+
+---
+
+## CSS2/CSS3/CSS5 — `revert`, `var()`, `revert-layer`/`@layer`
+
+- **Claim (KSVG_EXECUTION_PLAN.md):** `revert` cannot be fully correct without
+  cascade-origin tracking; `var()`/custom properties unimplemented (large,
+  ROI-low); layer features only meaningful with custom properties.
+- **Conclusion:** Per plan guidance ("CSS1 is the only correctness bug with
+  real-world impact; CSS2–CSS5 can be doc-downgraded"), these are documented as
+  Partial/unsupported instead of implemented. `!important` (CSS4) WAS
+  implemented since it has real-world impact.
+- **Status:** RESOLVED as doc-downgrade (CSS3 deferred)
+- **Resolution:** `SVG-SUPPORT.md` CSS keywords section updated: `unset`,
+  `initial`, `revert` → Partial with behavioral notes; explicit note that
+  `var()`/`revert-layer`/`@layer` are unsupported.

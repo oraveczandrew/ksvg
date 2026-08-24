@@ -248,10 +248,13 @@
 
 | Keyword                                                               | Support | Notes                                                                                        |
 |-----------------------------------------------------------------------|---------|----------------------------------------------------------------------------------------------|
-| [`inherit`](https://developer.mozilla.org/en-US/docs/Web/CSS/inherit) | Full    | Property left unspecified; inherits from parent.                                             |
-| [`unset`](https://developer.mozilla.org/en-US/docs/Web/CSS/unset)     | Full    | Same mechanism as `inherit` in KSVG's model (non-inherited → default, inherited → parent).   |
-| [`initial`](https://developer.mozilla.org/en-US/docs/Web/CSS/initial) | Partial | Correct for non-inherited properties; inherited properties currently fall back to `inherit`. |
-| [`revert`](https://developer.mozilla.org/en-US/docs/Web/CSS/revert)   | Full    | Supported via reset to initial/inherit.                                                      |
+| [`inherit`](https://developer.mozilla.org/en-US/docs/Web/CSS/inherit) | Full    | Wins over presentation attributes and lower-priority sources; parent computed value applies. |
+| [`unset`](https://developer.mozilla.org/en-US/docs/Web/CSS/unset)     | Partial | Currently behaves like `inherit` for all properties (no inherited/non-inherited split).      |
+| [`initial`](https://developer.mozilla.org/en-US/docs/Web/CSS/initial) | Partial | Behaves like `inherit`; correct only for non-inherited properties.                           |
+| [`revert`](https://developer.mozilla.org/en-US/docs/Web/CSS/revert)   | Partial | Treated like `unset` (no cascade-origin tracking).                                           |
+
+`var()` / custom properties, `!important`-aware `revert-layer` and `@layer` are not
+supported (`!important` itself is honored in the cascade).
 
 ---
 
