@@ -86,10 +86,10 @@ internal class SvgPathNoise(lcg: LcgRandom) {
         }
         val bx1 = if (periodX > 0) (bx0 + 1) % periodX else (bx0 + 1) and BM
 
-        if (periodY > 0) {
-            by0 = Math.floorMod(by0, periodY)
+        by0 = if (periodY > 0) {
+            Math.floorMod(by0, periodY)
         } else {
-            by0 = by0 and BM
+            by0 and BM
         }
         val by1 = if (periodY > 0) (by0 + 1) % periodY else (by0 + 1) and BM
 

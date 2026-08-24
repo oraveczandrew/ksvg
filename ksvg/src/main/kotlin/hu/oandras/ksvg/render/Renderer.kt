@@ -286,7 +286,7 @@ internal class Renderer internal constructor(
 
                 updateParentBoundingBox(canvas, sourceElement)
             } finally {
-                parentPop(canvas)
+                parentPop()
             }
         }
     }
@@ -307,7 +307,7 @@ internal class Renderer internal constructor(
 
                 updateParentBoundingBox(canvas, node.sourceElement)
             } finally {
-                parentPop(canvas)
+                parentPop()
             }
         }
     }
@@ -638,6 +638,14 @@ internal class Renderer internal constructor(
         val h = (bb.height + 2 * pad).toInt().coerceAtLeast(1)
         val ox = bb.minX - pad
         val oy = bb.minY - pad
+
+        val nodeCanvas = rec.beginRecord(key, w, h, ox, oy)
+        try {
+            content(nodeCanvas)
+        } finally {
+            rec.endRecord()
+        }
+        rec.replay(canvas, key)
     }
 
     private fun displayListKey(node: RenderNode<*>): Long {
@@ -670,10 +678,6 @@ internal class Renderer internal constructor(
         }
     }
 
-    private fun renderNodeChildren(canvas: Canvas, node: GroupRenderNode<*>) {
-        node.children.forEachElement { it.render(this@Renderer, canvas) }
-    }
-
     //==============================================================================
     private fun parentPush(obj: Container, canvas: Canvas) {
         parentStack.push(obj)
@@ -684,7 +688,7 @@ internal class Renderer internal constructor(
         matrixStack.push(matrixToPush)
     }
 
-    private fun parentPop(canvas: Canvas) {
+    private fun parentPop() {
         parentStack.pop()
         matrixPool.release(matrixStack.pop())
     }

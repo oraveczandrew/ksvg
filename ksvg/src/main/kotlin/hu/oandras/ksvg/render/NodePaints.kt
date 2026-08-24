@@ -30,7 +30,6 @@ import hu.oandras.ksvg.compat.setWordSpacingCompat
  */
 internal fun RenderNode<*>.obtainFillPaint(cfg: PaintConfiguration): Paint {
     var p = nodeFillPaint
-    val applied = appliedFillConfig
     if (p == null) {
         p = Paint().apply {
             flags = Paint.ANTI_ALIAS_FLAG or Paint.LINEAR_TEXT_FLAG or Paint.SUBPIXEL_TEXT_FLAG
@@ -43,14 +42,14 @@ internal fun RenderNode<*>.obtainFillPaint(cfg: PaintConfiguration): Paint {
         appliedFillConfig = PaintConfiguration().also { it.setFromQuietly(cfg) }
         return p
     }
-    writeConfigDiff(p, applied!!, cfg)
-    applied!!.setFromQuietly(cfg)
+    val applied = appliedFillConfig!!
+    writeConfigDiff(p, applied, cfg)
+    applied.setFromQuietly(cfg)
     return p
 }
 
 internal fun RenderNode<*>.obtainStrokePaint(cfg: PaintConfiguration): Paint {
     var p = nodeStrokePaint
-    val applied = appliedStrokeConfig
     if (p == null) {
         p = Paint().apply {
             flags = Paint.ANTI_ALIAS_FLAG or Paint.LINEAR_TEXT_FLAG or Paint.SUBPIXEL_TEXT_FLAG
@@ -62,8 +61,9 @@ internal fun RenderNode<*>.obtainStrokePaint(cfg: PaintConfiguration): Paint {
         appliedStrokeConfig = PaintConfiguration().also { it.setFromQuietly(cfg) }
         return p
     }
-    writeConfigDiff(p, applied!!, cfg)
-    applied!!.setFromQuietly(cfg)
+    val applied = appliedFillConfig!!
+    writeConfigDiff(p, applied, cfg)
+    applied.setFromQuietly(cfg)
     return p
 }
 
