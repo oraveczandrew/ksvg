@@ -16,9 +16,17 @@
 
 package hu.oandras.ksvg.render
 
+import android.graphics.Matrix
 import android.graphics.Rect
 import hu.oandras.ksvg.ExternalFileResolver
+import hu.oandras.ksvg.PreserveAspectRatio
+import hu.oandras.ksvg.css.CssUnit
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.core.Svg
+import hu.oandras.ksvg.dom.core.View
+import hu.oandras.ksvg.dom.core.ViewBoxContainer
+import hu.oandras.ksvg.render.PaintConfiguration.Companion.DEFAULT_TEXT_SIZE
 import hu.oandras.ksvg.render.pool.BitmapPool
 import hu.oandras.ksvg.render.pool.PoolOwner
 
@@ -28,15 +36,15 @@ import hu.oandras.ksvg.render.pool.PoolOwner
  *
  * Rebuild triggers:
  *  - document [modificationCount] changed (parse/mutation),
- *  - render-options fingerprint changed (css / view / viewBox / preserveAspectRatio / target),
- *  - viewport (drawable bounds) changed -- until viewport in-place updates are
- *    implemented, this also forces a rebuild (Step 1 behaviour).
+ *  - render-options fingerprint changed (css / view / viewBox / preserveAspectRatio / target).
  *
- * The options fingerprint deliberately excludes the viewport: bounds changes are
- * expected to be frequent (layout passes) and are handled by the update path.
+ * Viewport (drawable bounds) changes are handled IN PLACE by [applyViewport]:
+ * only nested viewport containers (<svg>/<symbol>) re-resolve their viewport
+ * and viewBox transform; everything else stays in user units.
  */
 internal class RenderScene private constructor(
     @JvmField val rootNode: RenderNode<*>?,
+    @JvmField val dPI: Float,
     @JvmField val modificationCount: Int,
     @JvmField val optionsFingerprint: Long,
 ) {
@@ -44,13 +52,121 @@ internal class RenderScene private constructor(
     /** Last applied drawable bounds. */
     @JvmField var viewport: Rect? = null
 
+    // Root-level view overrides resolved at build time (options.view / options.viewBox).
+    private var rootViewBoxOverride: Box? = null
+    private var rootParOverride: PreserveAspectRatio? = null
+
     fun isUpToDate(modificationCount: Int, fingerprint: Long): Boolean {
         return this.modificationCount == modificationCount &&
                 this.optionsFingerprint == fingerprint
     }
 
+    /**
+     * In-place viewport update: re-resolves every nested viewport container's
+     * viewport box and viewBox transform against the new drawable bounds.
+     * Content whose recorded geometry changed bumps its own contentVersion so
+     * display-list caches replay fresh content.
+     */
+    fun applyViewport(bounds: Rect, options: RenderOptionsImpl, pools: PoolOwner) {
+        val root = rootNode ?: return
+        val rootSvg = root.sourceElement as? Svg ?: return
+        if (root !is GroupRenderNode<*>) return
+
+        val ctx = SceneUpdateContext(pools, dPI)
+
+        // Mirror build(renderOptions): the external viewport is decisive, root
+        // width/height only refine it when expressed in percent.
+        var vp = options.viewPort ?: Box(
+            bounds.left.toFloat(),
+            bounds.top.toFloat(),
+            bounds.width().toFloat(),
+            bounds.height().toFloat()
+        )
+        with(ctx) {
+            rootSvg.width?.let {
+                if (it.unit == CssUnit.percent) vp = vp.copy(width = it.floatValueInContext(vp.width))
+            }
+            rootSvg.height?.let {
+                if (it.unit == CssUnit.percent) vp = vp.copy(height = it.floatValueInContext(vp.height))
+            }
+        }
+
+        updateViewportContainer(root, rootSvg, vp, rootViewBoxOverride, rootParOverride, ctx)
+        viewport = Rect(bounds)
+    }
+
     fun recycle(bitmapPool: BitmapPool) {
         rootNode?.recycle(bitmapPool)
+    }
+
+    /**
+     * Recomputes one viewport container's viewport box + viewBox transform;
+     * pushes the new coordinate context while its children are updated.
+     */
+    private fun updateViewportContainer(
+        node: GroupRenderNode<*>,
+        container: ViewBoxContainer,
+        viewPort: Box,
+        viewBoxOverride: Box?,
+        parOverride: PreserveAspectRatio?,
+        ctx: SceneUpdateContext,
+    ) {
+        node.viewPort = viewPort
+
+        val oldViewPort = ctx.walkViewPort
+        val oldViewBox = ctx.walkViewBox
+        ctx.walkViewPort = viewPort
+
+        val matrix = Matrix()
+        val viewBox = viewBoxOverride ?: container.viewBox
+        val positioning = parOverride
+                ?: container.preserveAspectRatio
+                ?: PreserveAspectRatio.LETTERBOX
+
+        if (viewBox != null) {
+            calculateViewBoxTransform(viewPort, viewBox, positioning, matrix)
+            ctx.walkViewBox = viewBox
+        } else {
+            matrix.preTranslate(viewPort.minX, viewPort.minY)
+            ctx.walkViewBox = null
+        }
+
+        if (node.viewBoxTransform != matrix) {
+            node.viewBoxTransform = matrix
+            // Recorded display-list content lives in the OLD coordinate system.
+            node.notifyChange(contentChanged = true)
+        }
+
+        updateChildren(node, ctx)
+
+        ctx.walkViewPort = oldViewPort
+        ctx.walkViewBox = oldViewBox
+    }
+
+    private fun updateChildren(node: GroupRenderNode<*>, ctx: SceneUpdateContext) {
+        val children = node.children
+        for (i in children.indices) {
+            val child = children[i]
+            if (child !is GroupRenderNode<*>) continue
+            val spec = child.viewportSpec ?: continue
+            val container = child.sourceElement as? ViewBoxContainer ?: continue
+
+            val vp = resolveViewport(spec, ctx)
+            updateViewportContainer(child, container, vp, null, null, ctx)
+        }
+    }
+
+    /** Mirrors RenderTreeBuilder.makeViewPort with the current walk context. */
+    private fun resolveViewport(spec: ViewportSpec, ctx: SceneUpdateContext): Box {
+        val contextBox = ctx.effectiveViewPortInUserUnits
+        return with(ctx) {
+            Box(
+                minX = spec.x?.floatValueXInContext() ?: 0f,
+                minY = spec.y?.floatValueYInContext() ?: 0f,
+                width = spec.width?.floatValueXInContext() ?: contextBox.width,
+                height = spec.height?.floatValueYInContext() ?: contextBox.height
+            )
+        }
     }
 
     internal companion object {
@@ -70,7 +186,9 @@ internal class RenderScene private constructor(
                 pools = pools,
             )
             val node = builder.build(options)
-            return RenderScene(node, modificationCount, optionsFingerprint)
+            val scene = RenderScene(node, dPI, modificationCount, optionsFingerprint)
+            scene.resolveRootOverrides(document, options)
+            return scene
         }
 
         /**
@@ -86,5 +204,40 @@ internal class RenderScene private constructor(
             return result
         }
     }
+
+    /** Mirrors the root view/viewBox/preserveAspectRatio resolution of build(renderOptions). */
+    private fun resolveRootOverrides(document: SVGImpl, options: RenderOptionsImpl) {
+        val rootObj = document.rootElement ?: return
+        if (options.hasView()) {
+            val obj = document.getElementById(options.viewId)
+            if (obj is View && obj.viewBox != null) {
+                rootViewBoxOverride = obj.viewBox
+                rootParOverride = obj.preserveAspectRatio
+            }
+        } else {
+            rootViewBoxOverride = if (options.hasViewBox()) options.viewBox else rootObj.viewBox
+            rootParOverride = if (options.hasPreserveAspectRatio()) {
+                options.preserveAspectRatio
+            } else {
+                rootObj.preserveAspectRatio
+            }
+        }
+    }
 }
 
+/**
+ * Minimal [RenderContext] for the update walk: length resolution only needs
+ * DPI (fixed), font size (build-time constant) and the current walk viewport.
+ */
+private class SceneUpdateContext(
+    pools: PoolOwner,
+    dpi: Float,
+) : RenderContext, PoolOwner by pools {
+    override val dPI: Float = dpi
+    override val currentFontSize: Float = DEFAULT_TEXT_SIZE
+    override val currentFontXHeight: Float = currentFontSize / 2f
+    var walkViewPort: Box? = null
+    var walkViewBox: Box? = null
+    override val effectiveViewPortInUserUnits: Box
+        get() = walkViewBox ?: checkNotNull(walkViewPort) { "Viewport is null" }
+}

@@ -731,6 +731,11 @@ internal class RenderTreeBuilder(
         val children = buildChildren(obj)
         val node = GroupRenderNode(obj, children)
         node.viewPort = viewPort
+        if (effectiveViewport == null) {
+            // Nested <svg>: remember the length sources so RenderScene can
+            // re-resolve this viewport when the drawable bounds change.
+            node.viewportSpec = ViewportSpec(obj.x, obj.y, obj.width, obj.height)
+        }
         // The viewBox->viewport fit is stored separately from the element's own (animated)
         // transform. updateAnimations() re-derives node.transform from the element each frame,
         // so keeping the fit here prevents it from being clobbered.
@@ -777,6 +782,7 @@ internal class RenderTreeBuilder(
         val children = buildChildren(obj)
         val node = GroupRenderNode(obj, children)
         node.viewPort = viewPort
+        node.viewportSpec = ViewportSpec(null, null, useWidth, useHeight)
         node.viewBoxTransform = transform
         node.renderState.apply(state)
         updateParentBoundingBox(obj)

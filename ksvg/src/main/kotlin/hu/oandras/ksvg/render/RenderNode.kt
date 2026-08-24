@@ -23,6 +23,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import hu.oandras.ksvg.compat.XFerModes
+import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.ClipPath
 import hu.oandras.ksvg.dom.core.ConditionalContainer
@@ -172,11 +173,26 @@ internal class TextSequenceNode(
     @JvmField val text: String
 ) : TextNode
 
+/**
+ * The x/y/width/height length sources a nested viewport container (<svg>,
+ * <symbol> via <use>) was sized from at build time. Kept so RenderScene can
+ * re-resolve the viewport when the drawable bounds change without rebuilding.
+ */
+internal class ViewportSpec(
+    @JvmField val x: CSSLength?,
+    @JvmField val y: CSSLength?,
+    @JvmField val width: CSSLength?,
+    @JvmField val height: CSSLength?,
+)
+
 internal open class GroupRenderNode<T: ConditionalContainer>(
     sourceElement: T,
     @JvmField val children: List<RenderNode<*>>
 ) : RenderNode<T>(sourceElement) {
     @JvmField var viewPort: Box? = null
+
+    /** Present when this node establishes its own viewport (nested <svg>/<symbol>). */
+    @JvmField var viewportSpec: ViewportSpec? = null
 
     override fun computeHasAnimations(): Boolean {
         return super.computeHasAnimations() || children.any { it.hasAnimations() }

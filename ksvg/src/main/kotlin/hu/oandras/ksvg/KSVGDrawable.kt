@@ -109,7 +109,6 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         val fingerprint = RenderScene.computeOptionsFingerprint(options)
         val currentScene = scene
         val upToDate = currentScene != null &&
-                currentScene.viewport?.equals(bounds) == true &&
                 currentScene.isUpToDate(modCount, fingerprint)
 
         if (!upToDate) {
@@ -124,10 +123,12 @@ public open class KSVGDrawable @JvmOverloads public constructor(
                 modificationCount = modCount,
                 optionsFingerprint = fingerprint,
             )
-            newScene.viewport = Rect(bounds)
             scene = newScene
             node = newScene.rootNode
             hitRegionsDirty = true
+        } else {
+            // Bounds-only change: update viewports/transforms in place, no rebuild.
+            currentScene.applyViewport(bounds, options, pools)
         }
 
         if (node != null) {
