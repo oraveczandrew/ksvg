@@ -65,12 +65,21 @@ internal fun assertArrayEquals(
 }
 
 fun assertInRange(
-    expected: IntRange,
+    expectedLow: Int,
+    expectedHigh: Int,
     actual: Int,
-    message: String = "Expected $actual to be in range $expected"
 ) {
-    if (actual !in expected) {
-        fail("$message (actual: $actual, range: $expected)")
+    assertInRange("Expected $actual to be in range $expectedLow .. $expectedHigh", expectedLow, expectedHigh, actual)
+}
+
+fun assertInRange(
+    message: String,
+    expectedLow: Int,
+    expectedHigh: Int,
+    actual: Int,
+) {
+    if (actual !in expectedLow..expectedHigh) {
+        fail(message)
     }
 }
 

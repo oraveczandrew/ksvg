@@ -59,7 +59,7 @@ class Phase5AnimationTests {
         val mid = alpha(renderAt(svg, 100))
         val end = alpha(renderAt(svg, 250))
         assertTrue("t=0 must be transparent", start < 20)
-        assertInRange(90..165, mid, "mid must be between endpoints")
+        assertInRange("mid must be between endpoints", 90, 165, mid)
         assertTrue("frozen end must be opaque", end > 235)
         assertTrue(mid > start && end > mid)
     }
@@ -106,7 +106,7 @@ class Phase5AnimationTests {
         fun alpha(b: android.graphics.Bitmap) = (b.getPixel(60, 60) ushr 24) and 0xff
         // t=150ms is inside the SECOND repetition, halfway -> ~0.5.
         val secondPass = alpha(renderAt(svg, 150))
-        assertInRange(90..165, secondPass, "Second repetition must restart interpolation")
+        assertInRange("Second repetition must restart interpolation", 90, 165, secondPass)
         // After both repetitions (no freeze) the value reverts to the base.
         val afterAll = alpha(renderAt(svg, 400))
         assertTrue("After last repetition without freeze, base applies: $afterAll", afterAll < 20)
