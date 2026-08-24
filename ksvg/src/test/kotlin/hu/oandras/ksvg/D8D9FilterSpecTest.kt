@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertTrue
@@ -24,13 +25,17 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import hu.oandras.ksvg.test.renderWithLibrary
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class D8D9FilterSpecTest {
 
-    private fun render(filterBody: String, rectAttrs: String = "x=\"20\" y=\"20\" width=\"60\" height=\"60\" fill=\"blue\""): android.graphics.Bitmap {
+    private fun render(
+        filterBody: String,
+        rectAttrs: String = "x=\"20\" y=\"20\" width=\"60\" height=\"60\" fill=\"blue\""
+    ): Bitmap {
         val svg = """
             <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -39,13 +44,10 @@ class D8D9FilterSpecTest {
               <rect $rectAttrs filter="url(#f)"/>
             </svg>
         """.trimIndent()
+        return renderWithLibrary(svg, createBitmap(100, 100))
+}
 
-        val bitmap = createBitmap(100, 100)
-        SVG.getFromString(svg).renderToCanvas(Canvas(bitmap))
-        return bitmap
-    }
-
-    private fun alpha(bitmap: android.graphics.Bitmap, x: Int, y: Int): Int =
+    private fun alpha(bitmap: Bitmap, x: Int, y: Int): Int =
         (bitmap.getPixel(x, y) ushr 24) and 0xff
 
     // --- D8: feSpecularLighting alpha must be max(R,G,B) ---

@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.SvgPathNoise
 import hu.oandras.ksvg.render.createBitmap
@@ -26,6 +27,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.abs
+import hu.oandras.ksvg.test.renderWithLibrary
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
@@ -38,15 +41,15 @@ class D10StitchTilesTest {
         val p = 10
         for (t in listOf(0.3, 3.7, 9.9999)) {
             val v = noise.noise2(t, 2.4, p, p)
-            assertTrue("noise(x+$p) must equal noise(x)", kotlin.math.abs(v - noise.noise2(t + p, 2.4, p, p)) < 1e-9)
-            assertTrue("noise(y+$p) must equal noise(y)", kotlin.math.abs(v - noise.noise2(t, 2.4 + p, p, p)) < 1e-9)
+            assertTrue("noise(x+$p) must equal noise(x)", abs(v - noise.noise2(t + p, 2.4, p, p)) < 1e-9)
+            assertTrue("noise(y+$p) must equal noise(y)", abs(v - noise.noise2(t, 2.4 + p, p, p)) < 1e-9)
         }
         // Sanity: without a period the values differ.
         val a = noise.noise2(1.234, 2.4)
-        assertTrue(kotlin.math.abs(a - noise.noise2(1.234 + p, 2.4)) > 1e-6)
+        assertTrue(abs(a - noise.noise2(1.234 + p, 2.4)) > 1e-6)
     }
 
-    private fun render(stitchTiles: String): android.graphics.Bitmap {
+    private fun render(stitchTiles: String): Bitmap {
         val svg = """
             <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -58,10 +61,7 @@ class D10StitchTilesTest {
               <rect x="0" y="0" width="100" height="100" fill="white" filter="url(#f)"/>
             </svg>
         """.trimIndent()
-
-        val bitmap = createBitmap(100, 100)
-        SVG.getFromString(svg).renderToCanvas(Canvas(bitmap))
-        return bitmap
+        return renderWithLibrary(svg, createBitmap(100, 100))
     }
 
     @Test
@@ -77,7 +77,7 @@ class D10StitchTilesTest {
             var last = -1
             for (x in 0 until 100) {
                 val v = (bitmap.getPixel(x, 50) shr 16) and 0xff
-                if (last >= 0) variance += kotlin.math.abs(v - last)
+                if (last >= 0) variance += abs(v - last)
                 last = v
             }
             assertTrue("Expected non-constant noise for $mode", variance > 500.0)

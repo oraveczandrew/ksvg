@@ -34,9 +34,19 @@ internal fun renderWithLibrary(file: File, outBitmap: Bitmap): Bitmap {
 
 @VisibleForTesting
 internal fun renderWithLibrary(input: InputStream, outBitmap: Bitmap): Bitmap {
+    val svg = SVG.getFromInputStream(input)
+    return renderSvgTo(svg, outBitmap)
+}
+
+@VisibleForTesting
+internal fun renderWithLibrary(input: String, outBitmap: Bitmap): Bitmap {
+    val svg = SVG.getFromString(input)
+    return renderSvgTo(svg, outBitmap)
+}
+
+private fun renderSvgTo(svg: SVG, outBitmap: Bitmap): Bitmap {
     outBitmap.eraseColor(0)
 
-    val svg = SVG.getFromInputStream(input)
     val canvas = Canvas(outBitmap)
 
     val options = RenderOptions.create()

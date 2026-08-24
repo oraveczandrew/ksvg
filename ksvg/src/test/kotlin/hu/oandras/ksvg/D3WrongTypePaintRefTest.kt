@@ -24,13 +24,16 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import hu.oandras.ksvg.test.renderWithLibrary
+
+import android.graphics.Bitmap
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class D3WrongTypePaintRefTest {
 
-    private fun render(fillAttr: String): android.graphics.Bitmap {
+    private fun render(fillAttr: String): Bitmap {
         val svg = """
             <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -43,10 +46,7 @@ class D3WrongTypePaintRefTest {
               <rect x="0" y="0" width="100" height="100" fill="$fillAttr"/>
             </svg>
         """.trimIndent()
-
-        val bitmap = createBitmap(100, 100)
-        SVG.getFromString(svg).renderToCanvas(Canvas(bitmap))
-        return bitmap
+        return renderWithLibrary(svg, createBitmap(100, 100))
     }
 
     @Test

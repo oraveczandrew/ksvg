@@ -1,19 +1,20 @@
 package hu.oandras.ksvg
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import hu.oandras.ksvg.test.renderWithLibrary
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class D1PaintOrderTest {
 
-    private fun render(paintOrderAttr: String?): android.graphics.Bitmap {
+    private fun render(paintOrderAttr: String?): Bitmap {
         val attr = if (paintOrderAttr != null) " paint-order=\"$paintOrderAttr\"" else ""
         val svg = """
             <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
@@ -21,11 +22,7 @@ class D1PaintOrderTest {
                     stroke="red" stroke-width="20"$attr/>
             </svg>
         """.trimIndent()
-
-        val document = SVG.getFromString(svg)
-        val bitmap = createBitmap(100, 100)
-        document.renderToCanvas(Canvas(bitmap))
-        return bitmap
+        return renderWithLibrary(svg, createBitmap(100, 100))
     }
 
 

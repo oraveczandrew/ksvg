@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertTrue
@@ -24,17 +25,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import hu.oandras.ksvg.test.renderWithLibrary
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class CSS4ImportantTest {
 
-    private fun render(svg: String): android.graphics.Bitmap {
-        val bitmap = createBitmap(100, 100)
-        SVG.getFromString(svg).renderToCanvas(Canvas(bitmap))
-        return bitmap
-    }
+    private fun render(svg: String): Bitmap = renderWithLibrary(svg, createBitmap(100, 100))
 
     @Test
     fun importantRuleBeatsInlineStyle() {

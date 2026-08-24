@@ -1,7 +1,8 @@
 package hu.oandras.ksvg
 
-import android.graphics.Canvas
+import android.graphics.Bitmap
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.test.renderWithLibrary
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -14,11 +15,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class Phase5PaintTests {
 
-    private fun render(svg: String): android.graphics.Bitmap {
-        val bitmap = createBitmap(120, 120)
-        SVG.getFromString(svg).renderToCanvas(Canvas(bitmap))
-        return bitmap
-    }
+    private fun render(svg: String): Bitmap = renderWithLibrary(svg, createBitmap(120, 120))
 
     // --- odd-length stroke-dasharray must be doubled ([10] -> [10,10]) ---
 
@@ -58,9 +55,9 @@ class Phase5PaintTests {
 
         // Line at user y=20 -> device y=80; device stroke width should be ~2px, not 8px.
         fun dark(x: Int, y: Int) = isBlack(b, x, y)
-        val column = (11..19).map { x -> x * 4 }.map { x ->
+        val column = (11..19).map { x -> x * 4 }.maxOfOrNull { x ->
             (74..86).count { y -> dark(x, y) }
-        }.maxOrNull() ?: 0
+        } ?: 0
         assertTrue("Expected ~2px device stroke, got $column", column <= 4)
     }
 
@@ -77,9 +74,9 @@ class Phase5PaintTests {
         """.trimIndent()
         val b = render(svg)
         fun dark(x: Int, y: Int) = isBlack(b, x, y)
-        val column = (11..19).map { x -> x * 4 }.map { x ->
+        val column = (11..19).map { x -> x * 4 }.maxOfOrNull { x ->
             (74..86).count { y -> dark(x, y) }
-        }.maxOrNull() ?: 0
+        } ?: 0
         assertTrue("Expected ~8px device stroke (2*4), got $column", column >= 7)
     }
 

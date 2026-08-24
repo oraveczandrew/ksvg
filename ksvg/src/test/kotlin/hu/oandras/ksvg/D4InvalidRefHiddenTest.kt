@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertTrue
@@ -24,13 +25,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import hu.oandras.ksvg.test.renderWithLibrary
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class D4InvalidRefHiddenTest {
 
-    private fun render(extra: String): android.graphics.Bitmap {
+    private fun render(extra: String): Bitmap {
         val svg = """
             <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -41,10 +43,7 @@ class D4InvalidRefHiddenTest {
               $extra
             </svg>
         """.trimIndent()
-
-        val bitmap = createBitmap(100, 100)
-        SVG.getFromString(svg).renderToCanvas(Canvas(bitmap))
-        return bitmap
+        return renderWithLibrary(svg, createBitmap(100, 100))
     }
 
 
