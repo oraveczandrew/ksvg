@@ -396,29 +396,30 @@ internal fun updateStyle(
  * ascending priority: presentation attributes < normal CSS rules < normal inline
  * style < '!important' CSS rules < '!important' inline style. The returned mask
  * holds concrete SPECIFIED_* bits.
+ *
+ * Implemented without local closures: capturing lambdas/functions would
+ * allocate on every call.
  */
 internal fun resolveCssWideKeywordMask(base: Style?, rules: List<Style>, inlineStyle: Style?): Long {
-    var keywordWinners = 0L
-
-    fun consider(declared: Long, keyword: Long) {
-        keywordWinners = (keywordWinners and declared.inv()) or keyword
+    var keywordWinners = foldCssWideKeyword(0L, base)
+    rules.forEachElement { style ->
+        keywordWinners = foldCssWideKeyword(keywordWinners, style)
     }
+    return foldCssWideKeyword(keywordWinners, inlineStyle)
+}
 
-    fun considerSource(s: Style?) {
-        if (s == null) return
-        val declared = s.specifiedFlags or s.specifiedFlags2 or s.cssWideKeywordFlags or s.importantFlags
-        val imp = s.importantFlags
-        // Normal tier.
-        consider(declared and imp.inv(), s.cssWideKeywordFlags and imp.inv())
-        // Important tier beats every normal declaration, but only declares the
-        // properties actually marked '!important'.
-        consider(imp, s.cssWideKeywordFlags and imp)
-    }
-
-    considerSource(base)
-    rules.forEachElement { considerSource(it) }
-    considerSource(inlineStyle)
-    return keywordWinners
+/** Folds one source style into the running keyword-winner mask. */
+private fun foldCssWideKeyword(keywordWinners: Long, s: Style?): Long {
+    if (s == null) return keywordWinners
+    val declared = s.specifiedFlags or s.specifiedFlags2 or s.cssWideKeywordFlags or s.importantFlags
+    val imp = s.importantFlags
+    val cssWide = s.cssWideKeywordFlags
+    // Normal tier.
+    var result = (keywordWinners and (declared and imp.inv()).inv()) or (cssWide and imp.inv())
+    // Important tier beats every normal declaration, but only declares the
+    // properties actually marked '!important'.
+    result = (result and imp.inv()) or (cssWide and imp)
+    return result
 }
 
 internal fun reapplyDynamicPaints(state: RendererState) {

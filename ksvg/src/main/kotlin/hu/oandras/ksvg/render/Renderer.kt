@@ -615,6 +615,7 @@ internal class Renderer internal constructor(
     }
     //==============================================================================
 
+    private val matchingRules = ArrayList<Style>()
     private fun updateStyleForElement(
         state: RendererState,
         builder: Style.Builder,
@@ -624,7 +625,7 @@ internal class Renderer internal constructor(
         val isRootSVG = obj.parent == null
 
         // Pass 1: resolve CSS-wide keyword winners (see RenderTreeBuilder).
-        val matchingRules = ArrayList<Style>()
+        matchingRules.clear()
         document.cSSRules.forEachElement { rule ->
             if (CSSParser.ruleMatch(ruleMatchContext, rule.selector, obj)) {
                 matchingRules.add(rule.style)
