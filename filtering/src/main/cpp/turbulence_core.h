@@ -140,12 +140,15 @@ inline void noise2(
     const uint8_t i = t.selector[bx0];
     const uint8_t j = t.selector[bx1];
 
+    // Corner rows follow the CORNER's lattice x: A/B share bx0 (selector i),
+    // C/D share bx1 (selector j). Mixing these breaks continuity at cell
+    // borders (visible as blocky seams).
     const float* qax = t.gradX[(i + by0) & S_BM];
     const float* qay = t.gradY[(i + by0) & S_BM];
-    const float* qbx = t.gradX[(i + by1) & S_BM];
-    const float* qby = t.gradY[(i + by1) & S_BM];
-    const float* qcx = t.gradX[(j + by0) & S_BM];
-    const float* qcy = t.gradY[(j + by0) & S_BM];
+    const float* qbx = t.gradX[(j + by0) & S_BM];
+    const float* qby = t.gradY[(j + by0) & S_BM];
+    const float* qcx = t.gradX[(i + by1) & S_BM];
+    const float* qcy = t.gradY[(i + by1) & S_BM];
     const float* qdx = t.gradX[(j + by1) & S_BM];
     const float* qdy = t.gradY[(j + by1) & S_BM];
 
@@ -201,10 +204,10 @@ inline void noise2Vec(
 
     const float32x4_t u = vmlaq_f32(vmulq_f32(vX0, vld1q_f32(t.gradX[(i + by0) & S_BM])),
                                     vY0, vld1q_f32(t.gradY[(i + by0) & S_BM]));
-    const float32x4_t v = vmlaq_f32(vmulq_f32(vX1, vld1q_f32(t.gradX[(i + by1) & S_BM])),
-                                    vY0, vld1q_f32(t.gradY[(i + by1) & S_BM]));
-    const float32x4_t w = vmlaq_f32(vmulq_f32(vX0, vld1q_f32(t.gradX[(j + by0) & S_BM])),
-                                    vY1, vld1q_f32(t.gradY[(j + by0) & S_BM]));
+    const float32x4_t v = vmlaq_f32(vmulq_f32(vX1, vld1q_f32(t.gradX[(j + by0) & S_BM])),
+                                    vY0, vld1q_f32(t.gradY[(j + by0) & S_BM]));
+    const float32x4_t w = vmlaq_f32(vmulq_f32(vX0, vld1q_f32(t.gradX[(i + by1) & S_BM])),
+                                    vY1, vld1q_f32(t.gradY[(i + by1) & S_BM]));
     const float32x4_t z = vmlaq_f32(vmulq_f32(vX1, vld1q_f32(t.gradX[(j + by1) & S_BM])),
                                     vY1, vld1q_f32(t.gradY[(j + by1) & S_BM]));
 
@@ -256,10 +259,10 @@ inline void noise2Vec(
     fprintf(stderr,"[vec] bx0=%d bx1=%d by0=%d by1=%d i=%d j=%d\n",bx0,bx1,by0,by1,i,j);
     const __m128 u = _mm_add_ps(_mm_mul_ps(vX0, _mm_loadu_ps(t.gradX[(i + by0) & S_BM])),
                                 _mm_mul_ps(vY0, _mm_loadu_ps(t.gradY[(i + by0) & S_BM])));
-    const __m128 v = _mm_add_ps(_mm_mul_ps(vX1, _mm_loadu_ps(t.gradX[(i + by1) & S_BM])),
-                                _mm_mul_ps(vY0, _mm_loadu_ps(t.gradY[(i + by1) & S_BM])));
-    const __m128 w = _mm_add_ps(_mm_mul_ps(vX0, _mm_loadu_ps(t.gradX[(j + by0) & S_BM])),
-                                _mm_mul_ps(vY1, _mm_loadu_ps(t.gradY[(j + by0) & S_BM])));
+    const __m128 v = _mm_add_ps(_mm_mul_ps(vX1, _mm_loadu_ps(t.gradX[(j + by0) & S_BM])),
+                                _mm_mul_ps(vY0, _mm_loadu_ps(t.gradY[(j + by0) & S_BM])));
+    const __m128 w = _mm_add_ps(_mm_mul_ps(vX0, _mm_loadu_ps(t.gradX[(i + by1) & S_BM])),
+                                _mm_mul_ps(vY1, _mm_loadu_ps(t.gradY[(i + by1) & S_BM])));
     const __m128 z = _mm_add_ps(_mm_mul_ps(vX1, _mm_loadu_ps(t.gradX[(j + by1) & S_BM])),
                                 _mm_mul_ps(vY1, _mm_loadu_ps(t.gradY[(j + by1) & S_BM])));
 
