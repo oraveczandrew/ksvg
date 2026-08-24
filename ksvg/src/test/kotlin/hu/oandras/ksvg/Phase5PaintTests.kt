@@ -20,9 +20,6 @@ class Phase5PaintTests {
         return bitmap
     }
 
-    private fun isDark(b: android.graphics.Bitmap, x: Int, y: Int): Boolean =
-        ((b.getPixel(x, y) ushr 24) and 0xff) > 200 && (b.getPixel(x, y) and 0xffffff) < 60 * 0x10101
-
     // --- odd-length stroke-dasharray must be doubled ([10] -> [10,10]) ---
 
     @Test
@@ -36,13 +33,13 @@ class Phase5PaintTests {
         val b = render(svg)
 
         // Pattern becomes on[0,20) off[20,40): sample mid-dash and mid-gap.
-        val on = isDark(b, 65, 60)   // 5..25 within segment -> ON region (x=65 is 55 from start: off)
+        val on = isBlack(b, 65, 60)   // 5..25 within segment -> ON region (x=65 is 55 from start: off)
         // Compute explicitly: dashes start at x=10: on [10,30), off [30,50), on [50,70), off [70,90), on [90,110).
-        assertTrue("x=20 must be a dash", isDark(b, 20, 60))
-        assertTrue("x=40 must be a gap", !isDark(b, 40, 60))
-        assertTrue("x=60 must be a dash", isDark(b, 60, 60))
-        assertTrue("x=80 must be a gap", !isDark(b, 80, 60))
-        assertTrue("x=100 must be a dash", isDark(b, 100, 60))
+        assertTrue("x=20 must be a dash", isBlack(b, 20, 60))
+        assertTrue("x=40 must be a gap", !isBlack(b, 40, 60))
+        assertTrue("x=60 must be a dash", isBlack(b, 60, 60))
+        assertTrue("x=80 must be a gap", !isBlack(b, 80, 60))
+        assertTrue("x=100 must be a dash", isBlack(b, 100, 60))
     }
 
     // --- vector-effect: non-scaling-stroke keeps stroke width in device units ---
@@ -60,7 +57,7 @@ class Phase5PaintTests {
         val b = render(svg)
 
         // Line at user y=20 -> device y=80; device stroke width should be ~2px, not 8px.
-        fun dark(x: Int, y: Int) = ((b.getPixel(x, y) ushr 24) and 0xff) > 200
+        fun dark(x: Int, y: Int) = isBlack(b, x, y)
         val column = (11..19).map { x -> x * 4 }.map { x ->
             (74..86).count { y -> dark(x, y) }
         }.maxOrNull() ?: 0
@@ -79,7 +76,7 @@ class Phase5PaintTests {
             </svg>
         """.trimIndent()
         val b = render(svg)
-        fun dark(x: Int, y: Int) = ((b.getPixel(x, y) ushr 24) and 0xff) > 200
+        fun dark(x: Int, y: Int) = isBlack(b, x, y)
         val column = (11..19).map { x -> x * 4 }.map { x ->
             (74..86).count { y -> dark(x, y) }
         }.maxOrNull() ?: 0

@@ -36,11 +36,6 @@ class CSS4ImportantTest {
         return bitmap
     }
 
-    private fun isGreen(bitmap: android.graphics.Bitmap): Boolean {
-        val p = bitmap.getPixel(50, 50)
-        return (p shr 16 and 0xff) < 60 && (p shr 8 and 0xff) > 200 && (p and 0xff) < 60
-    }
-
     @Test
     fun importantRuleBeatsInlineStyle() {
         val svg = """
@@ -49,7 +44,7 @@ class CSS4ImportantTest {
               <rect class="t" x="0" y="0" width="100" height="100" fill="red" style="fill: blue"/>
             </svg>
         """.trimIndent()
-        assertTrue("!important rule must beat inline style", isGreen(render(svg)))
+        assertTrue("!important rule must beat inline style", isGreen(render(svg), 50, 50))
     }
 
     @Test
@@ -60,10 +55,7 @@ class CSS4ImportantTest {
               <rect class="t" x="0" y="0" width="100" height="100" fill="red" style="fill: blue"/>
             </svg>
         """.trimIndent()
-        val bitmap = render(svg)
-        val p = bitmap.getPixel(50, 50)
-        val blue = (p shr 16 and 0xff) < 60 && (p shr 8 and 0xff) < 60 && (p and 0xff) > 200
-        assertTrue("Inline style must beat normal rule", blue)
+        assertTrue("Inline style must beat normal rule", isBlue(render(svg), 50, 50))
     }
 
     @Test
@@ -75,7 +67,7 @@ class CSS4ImportantTest {
                     style="fill: lime !important"/>
             </svg>
         """.trimIndent()
-        assertTrue("Inline !important must beat rule !important", isGreen(render(svg)))
+        assertTrue("Inline !important must beat rule !important", isGreen(render(svg), 50, 50))
     }
 
     @Test
@@ -86,6 +78,6 @@ class CSS4ImportantTest {
               <rect x="0" y="0" width="100" height="100" fill="red"/>
             </svg>
         """.trimIndent()
-        assertTrue(isGreen(render(svg)))
+        assertTrue(isGreen(render(svg), 50, 50))
     }
 }

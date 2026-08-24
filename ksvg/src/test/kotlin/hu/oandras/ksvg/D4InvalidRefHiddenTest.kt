@@ -47,10 +47,6 @@ class D4InvalidRefHiddenTest {
         return bitmap
     }
 
-    private fun isRed(bitmap: android.graphics.Bitmap, x: Int, y: Int): Boolean {
-        val p = bitmap.getPixel(x, y)
-        return (p shr 16 and 0xff) > 200 && (p shr 8 and 0xff) < 60 && (p and 0xff) < 60
-    }
 
     @Test
     fun missingClipPathReferenceHidesElement() {

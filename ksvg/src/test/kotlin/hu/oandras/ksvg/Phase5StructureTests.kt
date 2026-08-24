@@ -20,10 +20,6 @@ class Phase5StructureTests {
         return bitmap
     }
 
-    private fun isRed(b: android.graphics.Bitmap, x: Int, y: Int): Boolean {
-        val p = b.getPixel(x, y)
-        return (p shr 16 and 0xff) > 200 && (p shr 8 and 0xff) < 60 && (p and 0xff) < 60
-    }
 
     // --- marker placement & orientation on a path start ---
 
@@ -71,8 +67,7 @@ class Phase5StructureTests {
         fun darkInBand(yFrom: Int, yTo: Int): Int {
             var n = 0
             for (y in yFrom until yTo) for (x in 0 until 120) {
-                val p = b.getPixel(x, y)
-                if ((p ushr 24 and 0xff) > 200 && (p and 0xffffff) == 0) n++
+                if (isBlack(b, x, y)) n++
             }
             return n
         }
@@ -99,8 +94,9 @@ class Phase5StructureTests {
         // Robolectric default locale is en -> the second child must win; the bare
         // fallback rect is only used when NO systemLanguage child matches.
         assertTrue("Expected 'en' child to be selected", isRed(b, 60, 60).not())
-        val p = b.getPixel(60, 60)
-        val lime = (p shr 8 and 0xff) > 200 && (p shr 16 and 0xff) < 60
-        assertTrue("Expected lime ('en' branch), got #${Integer.toHexString(p)}", lime)
+        assertTrue(
+            "Expected lime ('en' branch)",
+            isGreen(b, 60, 60)
+        )
     }
 }

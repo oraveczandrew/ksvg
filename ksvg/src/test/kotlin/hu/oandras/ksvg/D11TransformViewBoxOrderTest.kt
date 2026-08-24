@@ -34,15 +34,10 @@ class D11TransformViewBoxOrderTest {
         val canvas = Canvas(bitmap)
         document.renderToCanvas(canvas)
 
-        val isRed: (Int, Int) -> Boolean = { x, y ->
-            val p = bitmap.getPixel(x, y)
-            (p shr 16 and 0xff) > 200 && (p shr 8 and 0xff) < 60 && (p and 0xff) < 60
-        }
-
         // Correct (transform outermost): red spans x 50..150.
-        assertTrue("Expected red rect shifted to x=75 (transform outermost)", isRed(75, 50))
-        assertTrue("Expected red rect at x=125 (transform outermost)", isRed(125, 50))
+        assertTrue("Expected red rect shifted to x=75 (transform outermost)", isRed(bitmap, 75, 50))
+        assertTrue("Expected red rect at x=125 (transform outermost)", isRed(bitmap, 125, 50))
         // It must NOT be at the origin (that would be the no-transform / wrong-order case).
-        assertTrue("Expected no red at x=25 (rect should be shifted right by 50)", !isRed(25, 50))
+        assertTrue("Expected no red at x=25 (rect should be shifted right by 50)", !isRed(bitmap, 25, 50))
     }
 }

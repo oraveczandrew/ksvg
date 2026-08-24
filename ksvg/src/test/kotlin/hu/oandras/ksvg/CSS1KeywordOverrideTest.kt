@@ -30,10 +30,6 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class CSS1KeywordOverrideTest {
 
-    private fun isRed(bitmap: android.graphics.Bitmap, x: Int, y: Int): Boolean {
-        val p = bitmap.getPixel(x, y)
-        return (p shr 16 and 0xff) > 200 && (p shr 8 and 0xff) < 60 && (p and 0xff) < 60
-    }
 
     // Parent group clips to the LEFT half; the rect's presentation attribute wants
     // the RIGHT half. The stylesheet's `clip-path: inherit` must win over the
@@ -103,8 +99,9 @@ class CSS1KeywordOverrideTest {
         val bitmap = createBitmap(100, 100)
         SVG.getFromString(svg).renderToCanvas(Canvas(bitmap))
 
-        val p = bitmap.getPixel(50, 50)
-        val green = (p shr 8 and 0xff) > 200 && (p shr 16 and 0xff) < 60
-        assertTrue("Expected parent's lime fill via style='fill: inherit'", green)
+        assertTrue(
+            "Expected parent's lime fill via style='fill: inherit'",
+            isGreen(bitmap, 50, 50)
+        )
     }
 }

@@ -49,35 +49,26 @@ class D3WrongTypePaintRefTest {
         return bitmap
     }
 
-    private fun isGreen(bitmap: android.graphics.Bitmap): Boolean {
-        val p = bitmap.getPixel(50, 50)
-        return (p shr 16 and 0xff) < 60 && (p shr 8 and 0xff) > 200 && (p and 0xff) < 60
-    }
-
-    private fun isTransparent(bitmap: android.graphics.Bitmap): Boolean {
-        return ((bitmap.getPixel(50, 50) ushr 24) and 0xff) == 0
-    }
-
     @Test
     fun wrongTypeReferencePaintsNothing() {
         // url(#rect) points at a non-paint-server element -> invalid reference.
         // Per spec the element must not be painted with the inherited color;
         // with no fallback it renders as 'none'.
         val bitmap = render("url(#notAPaint)")
-        assertTrue("Expected nothing painted for a wrong-type paint ref", !isGreen(bitmap))
-        assertTrue("Expected transparent output (paint = none)", isTransparent(bitmap))
+        assertTrue("Expected nothing painted for a wrong-type paint ref", !isGreen(bitmap, 50, 50))
+        assertTrue("Expected transparent output (paint = none)", isTransparent(bitmap, 50, 50))
     }
 
     @Test
     fun fallbackColorIsUsedForWrongTypeReference() {
         // With a fallback color, an invalid reference falls back to it.
         val bitmap = render("url(#notAPaint) lime")
-        assertTrue("Expected fallback color to apply", isGreen(bitmap))
+        assertTrue("Expected fallback color to apply", isGreen(bitmap, 50, 50))
     }
 
     @Test
     fun validGradientReferenceStillWorks() {
         val bitmap = render("url(#grad)")
-        assertTrue("Expected gradient paint to work", isGreen(bitmap))
+        assertTrue("Expected gradient paint to work", isGreen(bitmap, 50, 50))
     }
 }
