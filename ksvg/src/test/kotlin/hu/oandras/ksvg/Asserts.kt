@@ -101,7 +101,6 @@ fun assertStrictlyIncreasing(
         }
     }
 }
-}
 
 // ---------------------------------------------------------------------------
 // Pixel helpers shared by render-based tests
