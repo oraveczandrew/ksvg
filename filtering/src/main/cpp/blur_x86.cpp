@@ -21,6 +21,10 @@
  */
 
 #include <stdint.h>
+
+// Only compiled on x86/x86_64 (see CMakeLists.txt); included in every ABI's
+// target so IDEs don't flag it as orphaned.
+#if defined(__i386__) || defined(__x86_64__)
 #include <x86intrin.h>
 
 /* Unsigned extend packed 8-bit integer (in LBS) into packed 32-bit integer */
@@ -101,3 +105,5 @@ extern "C" void rsdIntrinsicBlurHFU4_K(void *dst,
         dst = static_cast<char *>(dst) + 4;
     }
 }
+
+#endif // __i386__ || __x86_64__
