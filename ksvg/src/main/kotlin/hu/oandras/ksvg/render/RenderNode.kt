@@ -297,10 +297,10 @@ internal abstract class KSVGTextContainerRenderNode<T : TextContainer>(
 
 internal class TextRenderNode(
     sourceElement: Text,
-    @JvmField val x: Float,
-    @JvmField val y: Float,
-    @JvmField val dx: Float,
-    @JvmField val dy: Float,
+    @JvmField var x: Float,
+    @JvmField var y: Float,
+    @JvmField var dx: Float,
+    @JvmField var dy: Float,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<Text>(sourceElement, children) {
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -310,10 +310,10 @@ internal class TextRenderNode(
 
 internal class TSpanRenderNode(
     sourceElement: TSpan,
-    @JvmField val x: FloatArray?,
-    @JvmField val y: FloatArray?,
-    @JvmField val dx: FloatArray?,
-    @JvmField val dy: FloatArray?,
+    @JvmField var x: FloatArray?,
+    @JvmField var y: FloatArray?,
+    @JvmField var dx: FloatArray?,
+    @JvmField var dy: FloatArray?,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<TSpan>(sourceElement, children) {
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -324,7 +324,7 @@ internal class TSpanRenderNode(
 internal class TextPathRenderNode(
     sourceElement: TextPath,
     @JvmField val path: Path,
-    @JvmField val startOffset: Float,
+    @JvmField var startOffset: Float,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<TextPath>(sourceElement, children) {
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -335,10 +335,10 @@ internal class TextPathRenderNode(
 internal class TRefRenderNode(
     sourceElement: TRef,
     @JvmField val text: String,
-    @JvmField val x: FloatArray?,
-    @JvmField val y: FloatArray?,
-    @JvmField val dx: FloatArray?,
-    @JvmField val dy: FloatArray?,
+    @JvmField var x: FloatArray?,
+    @JvmField var y: FloatArray?,
+    @JvmField var dx: FloatArray?,
+    @JvmField var dy: FloatArray?,
 ) : RenderNode<TRef>(sourceElement), TextNode {
     override fun render(renderer: Renderer, canvas: Canvas) {
         error("TRef is rendered via renderTRefNode(node, processor) during text traversal")

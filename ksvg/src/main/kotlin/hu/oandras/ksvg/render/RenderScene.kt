@@ -20,7 +20,22 @@ import android.graphics.Matrix
 import android.graphics.Rect
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.PreserveAspectRatio
+import android.graphics.PathMeasure
+import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
+import hu.oandras.ksvg.dom.core.ConditionalContainer
+import hu.oandras.ksvg.dom.shapes.CircleShape
+import hu.oandras.ksvg.dom.shapes.EllipseShape
+import hu.oandras.ksvg.dom.shapes.LineShape
+import hu.oandras.ksvg.dom.shapes.PathShape
+import hu.oandras.ksvg.dom.shapes.PolyLineShape
+import hu.oandras.ksvg.dom.shapes.RectShape
+import hu.oandras.ksvg.dom.shapes.Shape
+import hu.oandras.ksvg.dom.text.TRef
+import hu.oandras.ksvg.dom.text.Text
+import hu.oandras.ksvg.dom.text.TextPath
+import hu.oandras.ksvg.dom.text.TSpan
+import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.Svg
@@ -141,6 +156,8 @@ internal class RenderScene private constructor(
         val children = node.children
         for (i in children.indices) {
             val child = children[i]
+            resolveViewportDependentFields(child, ctx)
+
             if (child !is GroupRenderNode<*>) continue
 
             val container = child.sourceElement as? ViewBoxContainer
@@ -154,6 +171,141 @@ internal class RenderScene private constructor(
                 updateChildren(child, ctx)
             }
         }
+    }
+
+    /**
+     * Re-resolves viewport-relative fields from the source element's original
+     * lengths. Only values expressed in percent units can actually change with
+     * the drawable bounds; recomputing unconditionally and comparing keeps the
+     * logic simple and allocation-free for the common all-px case.
+     */
+    private fun resolveViewportDependentFields(node: RenderNode<*>, ctx: SceneUpdateContext) {
+        when (node) {
+            is TextRenderNode -> {
+                val obj = node.sourceElement
+                if (!obj.hasViewportDependentLengths()) return
+                with(ctx) {
+                    val x = obj.x?.firstOrNull()?.floatValueXInContext() ?: 0f
+                    val y = obj.y?.firstOrNull()?.floatValueYInContext() ?: 0f
+                    val dx = obj.dx?.firstOrNull()?.floatValueXInContext() ?: 0f
+                    val dy = obj.dy?.firstOrNull()?.floatValueYInContext() ?: 0f
+                    if (x != node.x || y != node.y || dx != node.dx || dy != node.dy) {
+                        node.x = x; node.y = y; node.dx = dx; node.dy = dy
+                        node.notifyChange(true)
+                    }
+                }
+            }
+
+            is TSpanRenderNode -> {
+                val obj = node.sourceElement
+                if (!obj.hasViewportDependentLengths()) return
+                with(ctx) {
+                    val x = obj.x?.map { it.floatValueXInContext() }?.toFloatArray()
+                    val y = obj.y?.map { it.floatValueYInContext() }?.toFloatArray()
+                    val dx = obj.dx?.map { it.floatValueXInContext() }?.toFloatArray()
+                    val dy = obj.dy?.map { it.floatValueYInContext() }?.toFloatArray()
+                    if (!contentEquals(x, node.x) || !contentEquals(y, node.y) ||
+                            !contentEquals(dx, node.dx) || !contentEquals(dy, node.dy)) {
+                        node.x = x; node.y = y; node.dx = dx; node.dy = dy
+                        node.notifyChange(true)
+                    }
+                }
+            }
+
+            is TextPathRenderNode -> {
+                val obj = node.sourceElement
+                if (!obj.hasViewportDependentLengths()) return
+                with(ctx) {
+                    val startOffset = obj.startOffset?.floatValueInContext(PathMeasure(node.path, false).length) ?: 0f
+                    if (startOffset != node.startOffset) {
+                        node.startOffset = startOffset
+                        node.notifyChange(true)
+                    }
+                }
+            }
+
+            is TRefRenderNode -> {
+                val obj = node.sourceElement
+                if (!obj.hasViewportDependentLengths()) return
+                with(ctx) {
+                    val x = obj.x?.map { it.floatValueXInContext() }?.toFloatArray()
+                    val y = obj.y?.map { it.floatValueYInContext() }?.toFloatArray()
+                    val dx = obj.dx?.map { it.floatValueXInContext() }?.toFloatArray()
+                    val dy = obj.dy?.map { it.floatValueYInContext() }?.toFloatArray()
+                    if (!contentEquals(x, node.x) || !contentEquals(y, node.y) ||
+                            !contentEquals(dx, node.dx) || !contentEquals(dy, node.dy)) {
+                        node.x = x; node.y = y; node.dx = dx; node.dy = dy
+                        node.notifyChange(true)
+                    }
+                }
+            }
+
+            is PathRenderNode -> updatePercentShape(node, ctx)
+
+            else -> {}
+        }
+    }
+
+    /**
+     * Shapes carry their geometry in user units; only percent coordinates move
+     * with the viewport. When present, regenerate path + element/node bounding box.
+     */
+    private fun updatePercentShape(node: PathRenderNode, ctx: SceneUpdateContext) {
+        val shape = node.sourceElement
+        if (!shapeUsesPercentUnits(shape)) return
+
+        with(ctx) {
+            val regenerated = when (shape) {
+                is RectShape -> updatePathAndBoundingBox(shape, node.path, node)
+                is CircleShape -> updatePathAndBoundingBox(shape, node.path, node)
+                is EllipseShape -> updatePathAndBoundingBox(shape, node.path, node)
+                is LineShape -> updatePathAndBoundingBox(shape, node.path, node)
+                else -> false
+            }
+            if (regenerated) {
+                node.boundingBox = shape.boundingBox
+                node.notifyChange(true)
+            }
+        }
+    }
+
+    private fun shapeUsesPercentUnits(shape: Shape): Boolean {
+        fun CSSLength?.isPercent(): Boolean = this != null && unit == CssUnit.percent
+        return when (shape) {
+            is RectShape -> shape.x.isPercent() || shape.y.isPercent() ||
+                    shape.width.isPercent() || shape.height.isPercent() ||
+                    shape.rx.isPercent() || shape.ry.isPercent()
+            is CircleShape -> shape.cx.isPercent() || shape.cy.isPercent() || shape.r.isPercent()
+            is EllipseShape -> shape.cx.isPercent() || shape.cy.isPercent() ||
+                    shape.rx.isPercent() || shape.ry.isPercent()
+            is LineShape -> shape.x1.isPercent() || shape.y1.isPercent() ||
+                    shape.x2.isPercent() || shape.y2.isPercent()
+            is PolyLineShape, is PathShape -> false // point lists / path data contain no lengths
+            else -> false
+        }
+    }
+
+    /**
+     * Builder post-processing (e.g. text-anchor justification) can adjust the
+     * resolved values away from their raw length resolution, so fields are only
+     * touched when a percent unit is actually present.
+     */
+    private fun hu.oandras.ksvg.dom.text.TextPositionedContainer.hasViewportDependentLengths(): Boolean =
+        hasPercent(x) || hasPercent(y) || hasPercent(dx) || hasPercent(dy)
+
+    private fun hu.oandras.ksvg.dom.text.TRef.hasViewportDependentLengths(): Boolean =
+        hasPercent(x) || hasPercent(y) || hasPercent(dx) || hasPercent(dy)
+
+    private fun TextPath.hasViewportDependentLengths(): Boolean = startOffset?.unit == CssUnit.percent
+
+    private fun hasPercent(lengths: List<CSSLength>?): Boolean =
+        lengths?.any { it.unit == CssUnit.percent } == true
+
+    private fun contentEquals(a: FloatArray?, b: FloatArray?): Boolean {
+        if (a === b) return true
+        if (a == null || b == null || a.size != b.size) return false
+        for (i in a.indices) if (a[i] != b[i]) return false
+        return true
     }
 
     private fun resolveViewport(spec: ViewportSpec, ctx: SceneUpdateContext): Box {
@@ -204,10 +356,11 @@ internal class RenderScene private constructor(
 private class SceneUpdateContext(
     pools: PoolOwner,
     dpi: Float,
-) : RenderContext, PoolOwner by pools {
+) : hu.oandras.ksvg.render.animation.AnimationContext, PoolOwner by pools {
     override val dPI: Float = dpi
     override val currentFontSize: Float = DEFAULT_TEXT_SIZE
     override val currentFontXHeight: Float = currentFontSize / 2f
+    override val animationTimeMs: Long = 0L // no animation state during viewport updates
     var walkViewPort: Box? = null
     var walkViewBox: Box? = null
     override val effectiveViewPortInUserUnits: Box

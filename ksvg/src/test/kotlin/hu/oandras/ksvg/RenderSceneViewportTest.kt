@@ -78,6 +78,25 @@ class RenderSceneViewportTest {
     }
 
     @Test
+    fun percentTextPositionResizedMatchesFreshBuild() {
+        val doc = """
+            <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+              <rect width="64" height="64" fill="#004488"/>
+              <text x="50%" y="30%" font-size="12" fill="#ffffff">Hi</text>
+            </svg>
+        """.trimIndent()
+
+        val svg = SVG.getFromString(svg = doc) as SVGImpl
+        drawAt(svg, 128)
+        val updated = drawAt(svg, 64)
+
+        val fresh = SVG.getFromString(svg = doc) as SVGImpl
+        val reference = drawAt(fresh, 64)
+
+        assertEquals(reference.getPixel(32, 20), updated.getPixel(32, 20))
+    }
+
+    @Test
     fun plainDocumentResizedMatchesFreshBuild() {
         val doc = """
             <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
