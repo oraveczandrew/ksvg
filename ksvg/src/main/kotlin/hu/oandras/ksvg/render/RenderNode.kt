@@ -380,6 +380,14 @@ internal class FilterRenderNode(
     @JvmField val sourceElement: Filter,
     @JvmField val primitives: List<FilterPrimitiveRenderNode<*>>
 ) {
+    // GPU fast-path state (touched only on hardware canvases, API 31+).
+    @JvmField var gpuNode: android.graphics.RenderNode? = null
+    @JvmField var gpuSourceVersion: Int = -1
+    @JvmField var gpuFilterVersion: Int = -1
+    @JvmField var gpuScaleX: Float = 0f
+    @JvmField var gpuScaleY: Float = 0f
+    @JvmField var gpuWidth: Int = 0
+    @JvmField var gpuHeight: Int = 0
     @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
     @JvmField val renderState: RendererState = RendererState()
 

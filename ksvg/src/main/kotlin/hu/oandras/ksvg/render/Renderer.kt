@@ -89,9 +89,8 @@ import hu.oandras.ksvg.render.filters.doFeTileFilter
 import hu.oandras.ksvg.render.filters.doFeTurbulenceFilter
 import hu.oandras.ksvg.render.filters.getFilterInput
 import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
-import hu.oandras.ksvg.render.filters.pipeline.FilterGraphInfo
+import hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31
 import hu.oandras.ksvg.render.filters.pipeline.FilterPipeline
-import hu.oandras.ksvg.render.filters.pipeline.FilterPrimitiveSet
 import hu.oandras.ksvg.render.filters.luminanceToAlphaFloatArray
 import hu.oandras.ksvg.render.pool.Pool
 import hu.oandras.ksvg.render.pool.PoolOwner
@@ -955,23 +954,6 @@ internal class Renderer internal constructor(
         }
         val boundingBox = node.boundingBox ?: Box.EMPTY
 
-        // GPU effect-chain attempt. The native CPU backend answers null and the
-        // primitive walk below is skipped entirely on the software path.
-        val hardwareCanvas = canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31
-        val effectChain = if (hardwareCanvas) {
-            val backend = obtainFilterBackend(canvas)
-            backend.buildEffectChain(
-                FilterGraphInfo(FilterPrimitiveSet.collect(filterNode))
-            )
-        } else {
-            null
-        }
-        if (effectChain != null) {
-            // GPU fast path lands with FilterPipelineImpl31/Impl33; the native
-            // backend never produces a chain.
-            return
-        }
-
         rectFPool.withPooledObject { region ->
             calculateRegion(filter, boundingBox, region)
             if (region.width() > 0f && region.height() > 0f) {
@@ -990,6 +972,24 @@ internal class Renderer internal constructor(
                             val sy = hypot(m[Matrix.MSCALE_Y], m[Matrix.MSKEW_X])
                             val width = stabilizeDimension(deviceRegion.width().ceilToInt())
                             val height = stabilizeDimension(deviceRegion.height().ceilToInt())
+
+                            // GPU effect-chain attempt (RenderEffect + RenderNode
+                            // recording). Only for graphs Impl31 represents exactly.
+                            if (canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31 &&
+                                state.style.opacity == 1f && state.style.mixBlendMode == CSSBlendMode.normal
+                            ) {
+                                val backend = obtainFilterBackend(canvas)
+                                if (backend is FilterPipelineImpl31) {
+                                    val chain = backend.tryBuildChain(filterNode)
+                                    if (chain != null) {
+                                        drawGpuFiltered(
+                                            canvas, filterNode, chain, sx, sy,
+                                            width, height, deviceRegion, matrix, r, state
+                                        )
+                                        return
+                                    }
+                                }
+                            }
 
                             // Cache check
                             val cachedFilterOutput = node.cachedFilterOutput
@@ -1181,6 +1181,53 @@ internal class Renderer internal constructor(
         } finally {
             statePop(canvas)
         }
+    }
+
+    private inline fun drawGpuFiltered(
+        canvas: Canvas,
+        filterNode: FilterRenderNode,
+        chain: android.graphics.RenderEffect,
+        sx: Float,
+        sy: Float,
+        width: Int,
+        height: Int,
+        deviceRegion: RectF,
+        matrix: Matrix,
+        record: (Canvas, RendererState) -> Unit,
+        state: RendererState,
+    ) {
+        val contentVersion = filterNode.contentVersion
+        var gpuNode = filterNode.gpuNode
+        val valid = gpuNode != null &&
+                filterNode.gpuSourceVersion == contentVersion &&
+                filterNode.gpuFilterVersion == filterNode.version &&
+                filterNode.gpuScaleX == sx && filterNode.gpuScaleY == sy &&
+                filterNode.gpuWidth == width && filterNode.gpuHeight == height
+        if (!valid || gpuNode == null) {
+            gpuNode = gpuNode ?: android.graphics.RenderNode("ksvg-filter-source")
+            val recording = gpuNode.beginRecording(width, height)
+            recording.translate(-deviceRegion.left, -deviceRegion.top)
+            recording.concat(matrix)
+            try {
+                record(recording, state)
+            } finally {
+                gpuNode.endRecording()
+            }
+            filterNode.gpuNode = gpuNode
+            filterNode.gpuSourceVersion = contentVersion
+            filterNode.gpuFilterVersion = filterNode.version
+            filterNode.gpuScaleX = sx
+            filterNode.gpuScaleY = sy
+            filterNode.gpuWidth = width
+            filterNode.gpuHeight = height
+        }
+
+        gpuNode.setRenderEffect(chain)
+        canvas.withSave {
+            canvas.setMatrix(null)
+            canvas.drawRenderNode(gpuNode)
+        }
+        gpuNode.setRenderEffect(null)
     }
 
     private fun obtainFilterBackend(canvas: Canvas): FilterBackend {

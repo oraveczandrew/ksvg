@@ -94,8 +94,7 @@ internal fun doFeColorMatrixFilter(
     return res
 }
 
-internal fun createFilterPaint(type: FeColorMatrixType, values: FloatArray?): Paint {
-    val cm = when (type) {
+internal fun buildColorMatrix(type: FeColorMatrixType, values: FloatArray?): ColorMatrix = when (type) {
         FeColorMatrixType.matrix -> {
             val values = (values ?: identity).copyOf()
 
@@ -122,8 +121,9 @@ internal fun createFilterPaint(type: FeColorMatrixType, values: FloatArray?): Pa
         FeColorMatrixType.luminanceToAlpha -> ColorMatrix(luminanceToAlphaFloatArray)
     }
 
+internal fun createFilterPaint(type: FeColorMatrixType, values: FloatArray?): Paint {
     val paint = Paint()
-    paint.setColorFilter(ColorMatrixColorFilter(cm))
+    paint.setColorFilter(ColorMatrixColorFilter(buildColorMatrix(type, values)))
     return paint
 }
 

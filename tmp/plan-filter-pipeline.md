@@ -353,27 +353,32 @@ erode/dilate radius sweep) compared against rsvg goldens via `AiVisualDiffTest`.
 
 ## Phase 3 — `FilterPipelineImpl31` (RenderEffect, API 31+)
 
-`supports(set)` claims graphs composed of: GaussianBlur, ColorMatrix/luminanceToAlpha,
-Offset, Flood, Image, Merge, DropShadow-equivalent chains. Anything else → fall through.
+**STATUS: first slice DONE. GPU path = RenderEffect + RenderNode RECORDING (no bitmaps):
+the filter source is recorded into a `RenderNode` via beginRecording/endRecording and
+drawn once with `node.setRenderEffect(chain)` — zero intermediate bitmap allocation,
+zero readback (per design direction).**
 
-Mapping:
-- feGaussianBlur → `RenderEffect.createBlurEffect(sigmaX*sx, sigmaY*sy, CLAMP)`; edgeMode
-  "none" still needs the transparent-pedestal clear step around it (as today).
-- feColorMatrix → `createColorFilterEffect(ColorMatrixColorFilter)` — reuse the matrix
-  construction from the existing `createFilterPaint()` path 1:1.
-- feOffset/Flood/Image/Merge → plain draws between chained effects where expressible;
-  if a graph mixes these awkwardly, prefer falling back rather than emulating with saveLayer.
-- feDropShadow → blur+offset+composite `ChainEffect` sequence.
+Implemented:
+- `FilterPipelineImpl31.tryBuildChain(filterNode)` — strictly linear
+  feColorMatrix chains map 1:1 onto `createColorFilterEffect(ColorMatrixColorFilter)`
+  built by the SAME `buildColorMatrix()` the CPU path uses -> pixel parity by construction.
+  Strict-chain check: every non-first `in` must equal the previous result name.
+- Renderer integration: on HW canvas + API 31+ + opacity 1 + blend normal,
+  source content is recorded into `filterNode.gpuNode` (re-recorded only when
+  contentVersion / filterVersion / scale / size keys change — dedicated gpu* cache
+  fields so the CPU bitmap cache stays independent), then drawn under identity
+  matrix with the effect attached.
+- All other graphs fall back to the CPU kernel path unchanged.
 
-Caching: extend the `node.cachedFilterOutput` mechanism — when the last applied result was
-an Effect chain, store the `RenderEffect` (and skip `buildEffectChain` while keys match).
-Watch bitmap lifecycle: `cachedSourceContent` recycling must also drop any stored effect.
+Deliberately NOT claimed yet:
+- GaussianBlur: CPU pads transparent black vs createBlurEffect(CLAMP) edge clamp
+  -> halo differences until pad handling is added;
+- Offset: needs CSSLength resolution with renderer context;
+- two-input/canvas-drawn primitives (Blend/Composite/Merge/Flood/Image);
+- node-keyed RenderEffect caching (chain rebuilt per frame for now — cheap).
 
-Threading: backend instances owned by the render operation; `release()` drops shaders/effects.
-
-**Gate:** API 31 emulator/device run of FiltersVisualComparisonTest + side-by-side against
-software output of the same SVGs; single OEM sanity device (OnePlus-class) for the known
-per-draw allocation pathology — RenderEffect avoids Paint hooks but verify once.
+Remaining mapping work (next slices): blur with transparent-pad wrapper, offset,
+then AGSL (Phase 4) for turbulence/lighting/composite-arithmetic.
 
 ## Phase 4 — `FilterPipelineImpl33` (AGSL RuntimeShader)
 
