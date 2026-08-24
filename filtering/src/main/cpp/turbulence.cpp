@@ -17,6 +17,7 @@
 #include <jni.h>
 #include <cmath>
 #include <cstring>
+#include "cpu_dispatch.h"
 
 // feTurbulence — SVG 1.1 §15.25 reference algorithm, adapted from Mozilla gfx
 // SVGTurbulenceRenderer-inl.h (MPL-2.0, vendored under tmp/turbulence/).
@@ -30,9 +31,17 @@
 //    frequency adjustment); this TU receives the final per-axis frequency and
 //    the lattice periods.
 //
+// Architecture strategy: like the vendored source, the SIMD axis is the four
+// COLOR CHANNELS of one pixel (one f32x4 lane per channel), not adjacent
+// pixels — the lattice lookups would require gathers across pixels. Therefore
+// there is exactly one wide path per ISA family:
+//   - ARM (armv7 NEON + AArch64): float32x4_t
+//   - x86 (SSE2 baseline and up; wider ISAs cannot exceed the 4-channel width)
+// plus a portable scalar reference. All paths perform identical operations in
+// the same order; results agree because each lane is independent.
+//
 // State: the lattice tables are rebuilt per call on the stack (~10 KB) — no
-// shared/global mutable state. Scalar float32 implementation; a 4-pixel-wide
-// SIMD variant can replace the inner loop later without changing semantics.
+// shared/global mutable state.
 
 namespace {
 
@@ -57,9 +66,12 @@ struct PnrRandom {
     }
 };
 
+// Channel-packed lattice: gradX[i] = {gx_R, gx_G, gx_B, gx_A} of point i,
+// gradY[i] likewise — one lookup serves all four channels (mozilla layout).
 struct LatticeTables {
     uint8_t selector[S_BSIZE];
-    float gradient[S_BSIZE][4][2];
+    float gradX[S_BSIZE][4];
+    float gradY[S_BSIZE][4];
 };
 
 void initLattice(LatticeTables& t, const int32_t seed) {
@@ -89,14 +101,14 @@ void initLattice(LatticeTables& t, const int32_t seed) {
         t.selector[j] = tmp;
     }
 
-    // Pack the four channel gradients of the same lattice point into one
-    // float4 so a single lookup serves all channels (channel order matches
-    // our ARGB byte order: index 0=R .. 3=A).
+    // Pack the four channel gradients of the same lattice point so a single
+    // vector lookup serves all channels (channel order matches our ARGB byte
+    // order: index 0=R .. 3=A).
     for (int32_t i = 0; i < S_BSIZE; i++) {
         const uint8_t j = t.selector[i];
         for (int ch = 0; ch < 4; ch++) {
-            t.gradient[i][ch][0] = gradient[ch][j][0];
-            t.gradient[i][ch][1] = gradient[ch][j][1];
+            t.gradX[i][ch] = gradient[ch][j][0];
+            t.gradY[i][ch] = gradient[ch][j][1];
         }
     }
 }
@@ -112,10 +124,7 @@ inline int32_t adjustForStitch(const int32_t v, const int32_t wrap, const int32_
     return v >= wrap ? v - period : v;
 }
 
-/**
- * One noise evaluation for all four channels at integer lattice coords.
- */
-void noise2(
+inline void noise2(
         const LatticeTables& t,
         const float px, const float py,
         const StitchInfo& stitch, const bool stitchEnabled,
@@ -141,18 +150,21 @@ void noise2(
     const uint8_t i = t.selector[bx0];
     const uint8_t j = t.selector[bx1];
 
+    const float* qax = t.gradX[(i + by0) & S_BM];
+    const float* qay = t.gradY[(i + by0) & S_BM];
+    const float* qbx = t.gradX[(i + by1) & S_BM];
+    const float* qby = t.gradY[(i + by1) & S_BM];
+    const float* qcx = t.gradX[(j + by0) & S_BM];
+    const float* qcy = t.gradY[(j + by0) & S_BM];
+    const float* qdx = t.gradX[(j + by1) & S_BM];
+    const float* qdy = t.gradY[(j + by1) & S_BM];
+
     for (int ch = 0; ch < 4; ch++) {
-        const float* qa = t.gradient[i + by0 & S_BM][ch];
-        const float* qb = t.gradient[i + by1 & S_BM][ch];
-        const float* qc = t.gradient[j + by0 & S_BM][ch];
-        const float* qd = t.gradient[j + by1 & S_BM][ch];
+        const float u = rx0 * qax[ch] + ry0 * qay[ch];
+        const float v = rx1 * qbx[ch] + ry0 * qby[ch];
+        const float w = rx0 * qcx[ch] + ry1 * qcy[ch];
+        const float z = rx1 * qdx[ch] + ry1 * qdy[ch];
 
-        const float u = rx0 * qa[0] + ry0 * qa[1];
-        const float v = rx1 * qb[0] + ry0 * qb[1];
-        const float w = rx0 * qc[0] + ry1 * qc[1];
-        const float z = rx1 * qd[0] + ry1 * qd[1];
-
-        // SCurve + bilinear mix.
         const float sx = rx0 * rx0 * (3 - 2 * rx0);
         const float sy = ry0 * ry0 * (3 - 2 * ry0);
         const float ab = u + sx * (v - u);
@@ -161,22 +173,128 @@ void noise2(
     }
 }
 
+#if defined(__ARM_NEON__) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+
+inline void noise2Vec(
+        const LatticeTables& t,
+        const float px, const float py,
+        const StitchInfo& stitch, const bool stitchEnabled,
+        float* out) {
+    const int32_t b0xRaw = static_cast<int32_t>(std::floor(px));
+    const int32_t b0yRaw = static_cast<int32_t>(std::floor(py));
+    const float rx0 = px - static_cast<float>(b0xRaw);
+    const float ry0 = py - static_cast<float>(b0yRaw);
+    const float rx1 = rx0 - 1.0f;
+    const float ry1 = ry0 - 1.0f;
+
+    int32_t bx0 = b0xRaw, by0 = b0yRaw, bx1 = b0xRaw + 1, by1 = b0yRaw + 1;
+    if (stitchEnabled && stitch.width > 0 && stitch.height > 0) {
+        bx0 = adjustForStitch(bx0, stitch.wrapX, stitch.width);
+        bx1 = adjustForStitch(bx1, stitch.wrapX, stitch.width);
+        by0 = adjustForStitch(by0, stitch.wrapY, stitch.height);
+        by1 = adjustForStitch(by1, stitch.wrapY, stitch.height);
+    } else {
+        bx0 &= S_BM; bx1 &= S_BM;
+        by0 &= S_BM; by1 &= S_BM;
+    }
+
+    const uint8_t i = t.selector[bx0];
+    const uint8_t j = t.selector[bx1];
+
+    const float32x4_t vX0 = vdupq_n_f32(rx0);
+    const float32x4_t vX1 = vdupq_n_f32(rx1);
+    const float32x4_t vY0 = vdupq_n_f32(ry0);
+    const float32x4_t vY1 = vdupq_n_f32(ry1);
+
+    const float32x4_t u = vmlaq_f32(vmulq_f32(vX0, vld1q_f32(t.gradX[(i + by0) & S_BM])),
+                                    vY0, vld1q_f32(t.gradY[(i + by0) & S_BM]));
+    const float32x4_t v = vmlaq_f32(vmulq_f32(vX1, vld1q_f32(t.gradX[(i + by1) & S_BM])),
+                                    vY0, vld1q_f32(t.gradY[(i + by1) & S_BM]));
+    const float32x4_t w = vmlaq_f32(vmulq_f32(vX0, vld1q_f32(t.gradX[(j + by0) & S_BM])),
+                                    vY1, vld1q_f32(t.gradY[(j + by0) & S_BM]));
+    const float32x4_t z = vmlaq_f32(vmulq_f32(vX1, vld1q_f32(t.gradX[(j + by1) & S_BM])),
+                                    vY1, vld1q_f32(t.gradY[(j + by1) & S_BM]));
+
+    const float32x4_t sxCurve = vmulq_f32(vX0, vsubq_f32(vdupq_n_f32(3.f),
+            vmulq_f32(vdupq_n_f32(2.f), vX0)));
+    const float32x4_t syCurve = vmulq_f32(vY0, vsubq_f32(vdupq_n_f32(3.f),
+            vmulq_f32(vdupq_n_f32(2.f), vY0)));
+
+    const float32x4_t ab = vmlaq_f32(u, sxCurve, vsubq_f32(v, u));
+    const float32x4_t cd = vmlaq_f32(w, sxCurve, vsubq_f32(z, w));
+    vst1q_f32(out, vmlaq_f32(ab, syCurve, vsubq_f32(cd, ab)));
+}
+#elif defined(__SSE2__)
+#include <emmintrin.h>
+
+inline void noise2Vec(
+        const LatticeTables& t,
+        const float px, const float py,
+        const StitchInfo& stitch, const bool stitchEnabled,
+        float* out) {
+    const int32_t b0xRaw = static_cast<int32_t>(std::floor(px));
+    const int32_t b0yRaw = static_cast<int32_t>(std::floor(py));
+    const float rx0 = px - static_cast<float>(b0xRaw);
+    const float ry0 = py - static_cast<float>(b0yRaw);
+    const float rx1 = rx0 - 1.0f;
+    const float ry1 = ry0 - 1.0f;
+
+    int32_t bx0 = b0xRaw, by0 = b0yRaw, bx1 = b0xRaw + 1, by1 = b0yRaw + 1;
+    if (stitchEnabled && stitch.width > 0 && stitch.height > 0) {
+        bx0 = adjustForStitch(bx0, stitch.wrapX, stitch.width);
+        bx1 = adjustForStitch(bx1, stitch.wrapX, stitch.width);
+        by0 = adjustForStitch(by0, stitch.wrapY, stitch.height);
+        by1 = adjustForStitch(by1, stitch.wrapY, stitch.height);
+    } else {
+        bx0 &= S_BM; bx1 &= S_BM;
+        by0 &= S_BM; by1 &= S_BM;
+    }
+
+    const uint8_t i = t.selector[bx0];
+    const uint8_t j = t.selector[bx1];
+
+    const __m128 vX0 = _mm_set1_ps(rx0);
+    const __m128 vX1 = _mm_set1_ps(rx1);
+    const __m128 vY0 = _mm_set1_ps(ry0);
+    const __m128 vY1 = _mm_set1_ps(ry1);
+
+    const __m128 u = _mm_add_ps(_mm_mul_ps(vX0, _mm_loadu_ps(t.gradX[(i + by0) & S_BM])),
+                                _mm_mul_ps(vY0, _mm_loadu_ps(t.gradY[(i + by0) & S_BM])));
+    const __m128 v = _mm_add_ps(_mm_mul_ps(vX1, _mm_loadu_ps(t.gradX[(i + by1) & S_BM])),
+                                _mm_mul_ps(vY0, _mm_loadu_ps(t.gradY[(i + by1) & S_BM])));
+    const __m128 w = _mm_add_ps(_mm_mul_ps(vX0, _mm_loadu_ps(t.gradX[(j + by0) & S_BM])),
+                                _mm_mul_ps(vY1, _mm_loadu_ps(t.gradY[(j + by0) & S_BM])));
+    const __m128 z = _mm_add_ps(_mm_mul_ps(vX1, _mm_loadu_ps(t.gradX[(j + by1) & S_BM])),
+                                _mm_mul_ps(vY1, _mm_loadu_ps(t.gradY[(j + by1) & S_BM])));
+
+    const __m128 sxCurve = _mm_mul_ps(vX0, _mm_sub_ps(_mm_set1_ps(3.f),
+            _mm_mul_ps(_mm_set1_ps(2.f), vX0)));
+    const __m128 syCurve = _mm_mul_ps(vY0, _mm_sub_ps(_mm_set1_ps(3.f),
+            _mm_mul_ps(_mm_set1_ps(2.f), vY0)));
+
+    const __m128 ab = _mm_add_ps(u, _mm_mul_ps(sxCurve, _mm_sub_ps(v, u)));
+    const __m128 cd = _mm_add_ps(w, _mm_mul_ps(sxCurve, _mm_sub_ps(z, w)));
+    _mm_storeu_ps(out, _mm_add_ps(ab, _mm_mul_ps(syCurve, _mm_sub_ps(cd, ab))));
+}
+#endif
+
 } // namespace
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
         JNIEnv* env, jclass clazz,
-        const jintArray jPixels,
-        const jint width, const jint height,
-        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
-        const jdouble baseFrequencyX, const jdouble baseFrequencyY,
-        const jint periodX, const jint periodY,
-        const jint octaves, const jboolean fractalNoise,
-        const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
-        const jdouble userLeft, const jdouble userTop,
-        const jdouble originX, const jdouble originY,
-        const jdouble unitSizeX, const jdouble unitSizeY,
-        const jint seed) {
+        jintArray jPixels,
+        jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY,
+        jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed) {
     auto* pixels = static_cast<jint*>(env->GetPrimitiveArrayCritical(jPixels, nullptr));
     if (pixels == nullptr) return;
 
@@ -194,8 +312,6 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
     stitch.wrapY = periodY;
 
     const bool fractal = fractalNoise == JNI_TRUE;
-    // Wrap period doubles per octave (matches the spec's stitch doubling).
-    const StitchInfo octaveStitchBase = stitch;
 
     for (jint y = clipTop; y < clipBottom; y++) {
         const jdouble userY = userTop + y * invCanvasScaleY;
@@ -205,17 +321,28 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
             const jdouble px0 = (userX - originX) / unitSizeX * baseFrequencyX;
 
             float sums[4] = {0.f, 0.f, 0.f, 0.f};
-            StitchInfo si = octaveStitchBase;
+            StitchInfo si = stitch;
             float ratio = 1.f;
             float fx = static_cast<float>(px0);
             float fy = static_cast<float>(py0);
 
             for (jint octave = 0; octave < octaves; octave++) {
                 float noise[4];
+#if defined(__ARM_NEON__) || defined(__ARM_NEON__) || defined(__SSE2__)
+                noise2Vec(tables, fx, fy, si, stitchEnabled, noise);
+#else
                 noise2(tables, fx, fy, si, stitchEnabled, noise);
-                for (int ch = 0; ch < 4; ch++) {
-                    const float n = fractal ? noise[ch] : std::abs(noise[ch]);
-                    sums[ch] += n / ratio;
+#endif
+                if (fractal) {
+                    sums[0] += noise[0] / ratio;
+                    sums[1] += noise[1] / ratio;
+                    sums[2] += noise[2] / ratio;
+                    sums[3] += noise[3] / ratio;
+                } else {
+                    sums[0] += std::abs(noise[0]) / ratio;
+                    sums[1] += std::abs(noise[1]) / ratio;
+                    sums[2] += std::abs(noise[2]) / ratio;
+                    sums[3] += std::abs(noise[3]) / ratio;
                 }
                 fx *= 2.f;
                 fy *= 2.f;
