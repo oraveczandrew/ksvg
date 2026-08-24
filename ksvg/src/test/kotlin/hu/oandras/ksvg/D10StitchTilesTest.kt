@@ -17,9 +17,9 @@
 package hu.oandras.ksvg
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import hu.oandras.ksvg.render.SvgPathNoise
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.test.renderWithLibrary
 import hu.oandras.ksvg.utils.LcgRandom
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,7 +28,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
-import hu.oandras.ksvg.test.renderWithLibrary
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)

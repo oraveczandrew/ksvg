@@ -53,13 +53,8 @@ internal fun RendererState.selectTypefaceAndFontStyling(
         fontStyle = fontStyle
     )!!
 
-    // Skip redundant writes: OEM ROMs (OnePlus PaintExtImpl) hook paint setters
-    // and allocate on every call, even for unchanged values.
-    if (appliedTypeface !== font) {
-        fillPaint.typeface = font
-        strokePaint.typeface = font
-        appliedTypeface = font
-    }
+    fillConfig.setTypeface(font)
+    strokeConfig.setTypeface(font)
 
     // Just in case this is a variable font, let's also set the fontVariationSettings
     // In order to get the desired font weight, style and width.
@@ -93,18 +88,12 @@ internal fun RendererState.selectTypefaceAndFontStyling(
     fvsBuilder.addSettings(style.fontVariationSettings)
     
     val fontVariationSettings = fontVariationSet.toString()
-    if (appliedFontVariationSettings != fontVariationSettings) {
-        fillPaint.fontVariationSettings = fontVariationSettings
-        strokePaint.fontVariationSettings = fontVariationSettings
-        appliedFontVariationSettings = fontVariationSettings
-    }
+    fillConfig.setFontVariationSettings(fontVariationSettings)
+    strokeConfig.setFontVariationSettings(fontVariationSettings)
 
     val fontFeatureSettings = fontFeatureSet.toString()
-    if (appliedFontFeatureSettings != fontFeatureSettings) {
-        fillPaint.fontFeatureSettings = fontFeatureSettings
-        strokePaint.fontFeatureSettings = fontFeatureSettings
-        appliedFontFeatureSettings = fontFeatureSettings
-    }
+    fillConfig.setFontFeatureSettings(fontFeatureSettings)
+    strokeConfig.setFontFeatureSettings(fontFeatureSettings)
 }
 
 private fun resolveFontFromFontFamily(

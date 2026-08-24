@@ -334,7 +334,7 @@ class MockPath: ShadowLegacyPath() {
             transforming = false
         }
         
-        val targetShadow = if (dst == null) this else dst.asShadow()
+        val targetShadow = dst?.asShadow() ?: this
         targetShadow.path = ArrayList(this.path)
         targetShadow.transforms = this.transforms?.let { ArrayList(it) }
         

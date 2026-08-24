@@ -145,7 +145,7 @@ internal class Renderer internal constructor(
     private var ruleMatchContext: RuleMatchContext? = null
 
     override val currentFontSize: Float
-        get() = state.fillPaint.textSize
+        get() = state.fillConfig.textSize
 
     override val currentFontXHeight: Float
         get() {
@@ -279,7 +279,17 @@ internal class Renderer internal constructor(
             try {
                 if (checkForClipPath(node)) {
                     withNewRenderLayer(node) {
-                        node.children.forEachElement { it.render(this) }
+                        // Static groups are captured whole: one replay call per frame.
+                        when (node.beginDisplayList()) {
+                            DisplayListMode.REPLAYED -> {}
+                            DisplayListMode.RECORD -> {
+                                renderNodeChildren(node)
+                                node.endDisplayList()
+                            }
+                            DisplayListMode.SKIP -> node.children.forEachElement {
+                                it.render(this)
+                            }
+                        }
                     }
                 }
 
@@ -321,26 +331,25 @@ internal class Renderer internal constructor(
             checkForGradientsAndPatterns(node, sourceElement)
             if (checkForClipPath(node)) {
                 withNewRenderLayer(node) { state ->
-                    // Paint order encoded as three 2-bit components: fill=1, stroke=2, markers=3.
-                    // Default ("normal") is fill, stroke, markers.
-                    val order = when (state.style.paintOrder) {
-                        PaintOrder.StrokeFillMarkers -> STROKE_FILL_MARKERS
-                        PaintOrder.FillMarkersStroke -> FILL_MARKERS_STROKE
-                        PaintOrder.MarkersFillStroke -> MARKERS_FILL_STROKE
-                        PaintOrder.StrokeMarkersFill -> STROKE_MARKERS_FILL
-                        PaintOrder.MarkersStrokeFill -> MARKERS_STROKE_FILL
-                        else -> FILL_STROKE_MARKERS
-                    }
-                    for (shift in 4 downTo 0 step 2) {
-                        when ((order shr shift) and 3) {
-                            COMPONENT_FILL -> if (state.hasFill) {
-                                node.path.fillType = state.fillType
-                                doFilledPath(node, node.path)
+                    val hasMarkers = node.markers != null || state.style.markerStart != null ||
+                            state.style.markerMid != null || state.style.markerEnd != null
+                    // Static, plain fill/stroke paths are drawn through the
+                    // display-list cache: playback is native, bypassing OEM canvas
+                    // hooks (changeArea etc.) and their per-draw allocations.
+                    val pathCacheable = node.fillPatternNode == null &&
+                            node.strokePatternNode == null && !hasMarkers &&
+                            state.style.vectorEffect == VectorEffect.None
+
+                    if (!pathCacheable) {
+                        drawPathContent(node, state)
+                    } else {
+                        when (node.beginDisplayList()) {
+                            DisplayListMode.REPLAYED -> {}
+                            DisplayListMode.RECORD -> {
+                                drawPathContent(node, state)
+                                node.endDisplayList()
                             }
-                            COMPONENT_STROKE -> if (state.hasStroke) {
-                                doStroke(node.path, node)
-                            }
-                            COMPONENT_MARKERS -> renderMarkers(node)
+                            DisplayListMode.SKIP -> drawPathContent(node, state)
                         }
                     }
                 }
@@ -524,7 +533,8 @@ internal class Renderer internal constructor(
     internal fun statePush(
         isRootContext: Boolean = false,
         saveCanvas: Boolean = true,
-        applyFrom: RendererState = state
+        applyFrom: RendererState = state,
+        host: RenderNode<*>? = null
     ): RendererState {
         val canvas = canvas
 
@@ -552,6 +562,7 @@ internal class Renderer internal constructor(
         stateStack.push(newSavedRendererState(oldState, savedCount))
         val newState = renderStatePool.pull()
         newState.apply(applyFrom)
+        newState.paintHost = host
         state = newState
         return newState
     }
@@ -562,7 +573,7 @@ internal class Renderer internal constructor(
         saveCanvas: Boolean = false,
         r: () -> Unit
     ) {
-        val newState = statePush(saveCanvas = saveCanvas, applyFrom = node.renderState)
+        val newState = statePush(saveCanvas = saveCanvas, applyFrom = node.renderState, host = node)
         val oldState = stateStack.peek().state
         if (newState.contextStroke == null) newState.contextStroke = oldState.contextStroke
         if (newState.contextFill == null) newState.contextFill = oldState.contextFill
@@ -595,8 +606,97 @@ internal class Renderer internal constructor(
 
     private fun switchState(newState: RendererState) {
         val oldState = state
+        newState.paintHost = oldState.paintHost
         state = newState
         renderStatePool.release(oldState)
+    }
+
+
+    private enum class DisplayListMode { SKIP, REPLAYED, RECORD }
+
+    /** Returns the display-list mode for this node and prepares recording if needed. */
+    private fun RenderNode<*>.beginDisplayList(): DisplayListMode {
+        // Software targets (offscreen bitmaps, screenshots, mocks) cannot play
+        // back display lists -- especially not drawRenderNode -- so never cache
+        // or replay against them, even if a recorder was created earlier on an
+        // HW canvas.
+        if (!canvas.isHardwareAccelerated) return DisplayListMode.SKIP
+        // Animated subtrees change every frame; caching would be pure overhead.
+        if (hasAnimationsInSubtree) return DisplayListMode.SKIP
+        val bb = boundingBox ?: return DisplayListMode.SKIP
+
+        var rec = displayList
+        if (rec == null) {
+            rec = CanvasRenderNodeCompatFactory.create(canvas)
+            displayList = rec
+        }
+        if (!rec.isSupported) return DisplayListMode.SKIP
+
+        val key = displayListKey(this)
+        if (rec.replay(canvas, key)) return DisplayListMode.REPLAYED
+
+        val pad = 16f
+        val w = (bb.width + 2 * pad).toInt().coerceAtLeast(1)
+        val h = (bb.height + 2 * pad).toInt().coerceAtLeast(1)
+        val ox = bb.minX - pad
+        val oy = bb.minY - pad
+
+        displayListCanvasStack.addLast(canvas)
+        canvas = rec.beginRecord(key, w, h, ox, oy)
+        return DisplayListMode.RECORD
+    }
+
+    /** Finishes recording started by [beginDisplayList] and replays the result. */
+    private fun RenderNode<*>.endDisplayList() {
+        val rec = displayList ?: return
+        rec.endRecord()
+        canvas = displayListCanvasStack.removeLast()
+        rec.replay(canvas, displayListKey(this))
+    }
+
+    // Recording target canvases saved while display lists are being recorded.
+    // A stack is required: nested static groups each record into their own
+    // display list, and the inner end must restore the OUTER recorder canvas,
+    // not just the most recently saved one.
+    private val displayListCanvasStack = ArrayDeque<Canvas>()
+
+
+    private fun displayListKey(node: RenderNode<*>): Long {
+        // Deliberately excludes the canvas matrix: recorded content is vector
+        // data replayed through the live matrix, so scale changes need no
+        // re-record. Nodes whose output DOES depend on scale (vector-effect)
+        // are excluded from caching instead.
+        var k = node.contentVersion.toLong() * 31
+        k = k * 31 + node.renderState.fillConfig.version
+        k = k * 31 + node.renderState.strokeConfig.version
+        return k
+    }
+
+    private fun drawPathContent(node: PathRenderNode, state: RendererState) {
+        val order = when (state.style.paintOrder) {
+            PaintOrder.StrokeFillMarkers -> STROKE_FILL_MARKERS
+            PaintOrder.FillMarkersStroke -> FILL_MARKERS_STROKE
+            PaintOrder.MarkersFillStroke -> MARKERS_FILL_STROKE
+            PaintOrder.StrokeMarkersFill -> STROKE_MARKERS_FILL
+            PaintOrder.MarkersStrokeFill -> MARKERS_STROKE_FILL
+            else -> FILL_STROKE_MARKERS
+        }
+        for (shift in 4 downTo 0 step 2) {
+            when ((order shr shift) and 3) {
+                COMPONENT_FILL -> if (state.hasFill) {
+                    node.path.fillType = state.fillType
+                    doFilledPath(node, node.path)
+                }
+                COMPONENT_STROKE -> if (state.hasStroke) {
+                    doStroke(node.path, node)
+                }
+                COMPONENT_MARKERS -> renderMarkers(node)
+            }
+        }
+    }
+
+    private fun renderNodeChildren(node: GroupRenderNode<*>) {
+        node.children.forEachElement { it.render(this) }
     }
 
     //==============================================================================
@@ -1034,6 +1134,7 @@ internal class Renderer internal constructor(
         stateStack.push(newSavedRendererState(oldState, savedCount))
         val newState = renderStatePool.pull()
         newState.apply(oldState)
+        newState.paintHost = oldState.paintHost
         state = newState
 
         return true

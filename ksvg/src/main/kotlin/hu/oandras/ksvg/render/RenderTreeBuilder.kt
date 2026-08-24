@@ -22,6 +22,7 @@ import android.graphics.Path
 import android.graphics.PathMeasure
 import android.util.Log
 import androidx.collection.ArrayMap
+import androidx.collection.ArraySet
 import androidx.collection.MutableFloatList
 import androidx.collection.MutableIntList
 import hu.oandras.ksvg.ExternalFileResolver
@@ -165,7 +166,7 @@ internal class RenderTreeBuilder(
     // Tracks element IDs currently being resolved through a reference
     // (<use>/clip-path) so that a cyclic reference (A->B->A) is treated as an
     // empty/missing reference instead of causing unbounded recursion.
-    private val buildingIds = mutableSetOf<String>()
+    private val buildingIds: ArraySet<String> = ArraySet()
 
     private var ruleMatchContext: CSSParser.RuleMatchContext? = null
 
@@ -173,7 +174,7 @@ internal class RenderTreeBuilder(
         get() = document.animationTimeMs
 
     override val currentFontSize: Float
-        get() = state.fillPaint.textSize
+        get() = state.fillConfig.textSize
 
     override val currentFontXHeight: Float
         get() = currentFontSize / 2f

@@ -47,8 +47,8 @@ internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathR
     // value (java.lang.Float) on each render pass.
     val rxLength = obj.rx
     val ryLength = obj.ry
-    var rxVal = if (rxLength != null) rxLength.floatValueXInContext() else 0f
-    var ryVal = if (ryLength != null) ryLength.floatValueYInContext() else 0f
+    var rxVal = rxLength?.floatValueXInContext() ?: 0f
+    var ryVal = ryLength?.floatValueYInContext() ?: 0f
 
     // Per SVG spec, if one of rx/ry is omitted it defaults to the other.
     if (ryLength == null && rxLength != null) ryVal = rxVal

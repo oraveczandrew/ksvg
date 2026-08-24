@@ -104,6 +104,20 @@ internal sealed class RenderNode<T: SvgObject>(
     // The state at the time of building (resolved styles, etc.); filled via apply() at build time.
     @JvmField val renderState: RendererState = RendererState()
 
+    // Node-owned paints: synced lazily (field-diff) against renderState's
+    // PaintConfigurations right before this node contributes draw operations.
+    // Null until first needed, so container-only subtrees never allocate.
+    var nodeFillPaint: Paint? = null
+    var nodeStrokePaint: Paint? = null
+    // SNAPSHOT copies (never aliased to a live config!) used as diff base.
+    var appliedFillConfig: PaintConfiguration? = null
+    var appliedStrokeConfig: PaintConfiguration? = null
+
+    // Off-screen display-list capture for static subtrees (CanvasRenderNodeCompat).
+    // Populated only for eligible (non-animated) nodes on hardware canvases.
+    var displayList: CanvasRenderNodeCompat? = null
+    var displayListKey: Long = Long.MIN_VALUE
+
     // Pre-calculated bounding box in user units
     @JvmField var boundingBox: Box? = null
 

@@ -184,7 +184,7 @@ class ParseTest {
         val ops: List<String> = mock.getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals(
-            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; grad:null; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(cap:BUTT; color:#ff008000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16))",
             ops[5]
         )
     }
@@ -210,7 +210,7 @@ class ParseTest {
         val ops: List<String> = mock.getOperations()
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals(
-            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(color:#ff008000; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; grad:null; h:OFF; ls:0; s:FILL; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z', Paint(cap:BUTT; color:#ff008000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16))",
             ops[5]
         )
     }

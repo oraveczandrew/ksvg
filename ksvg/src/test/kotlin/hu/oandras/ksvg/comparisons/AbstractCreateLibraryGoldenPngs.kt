@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg.comparisons
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG

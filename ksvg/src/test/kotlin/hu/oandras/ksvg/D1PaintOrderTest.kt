@@ -1,14 +1,13 @@
 package hu.oandras.ksvg
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.test.renderWithLibrary
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
-import hu.oandras.ksvg.test.renderWithLibrary
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

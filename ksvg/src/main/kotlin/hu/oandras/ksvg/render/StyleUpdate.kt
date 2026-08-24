@@ -17,7 +17,6 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.Paint
-import hu.oandras.ksvg.compat.setWordSpacingCompat
 import hu.oandras.ksvg.compat.supportsWordSpacing
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.dom.COLOR_BLACK
@@ -89,7 +88,7 @@ internal fun updateStyle(
         val strokeWidth = sourceStyle.strokeWidth!!
         builder.strokeWidth = strokeWidth
         if (!strokeWidth.isZero) {
-            state.strokePaint.strokeWidth = strokeWidth.floatValueInContext()
+            state.strokeConfig.setStrokeWidth(strokeWidth.floatValueInContext())
         } else {
             state.hasStroke = false
         }
@@ -98,27 +97,27 @@ internal fun updateStyle(
     if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE_LINECAP)) {
         val strokeLineCap = sourceStyle.strokeLineCap!!
         builder.strokeLineCap = strokeLineCap
-        state.strokePaint.strokeCap = when (strokeLineCap) {
+        state.strokeConfig.setStrokeCap(when (strokeLineCap) {
             LineCap.Butt -> Paint.Cap.BUTT
             LineCap.Round -> Paint.Cap.ROUND
             LineCap.Square -> Paint.Cap.SQUARE
-        }
+        })
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE_LINEJOIN)) {
         val strokeLineJoin = sourceStyle.strokeLineJoin!!
         builder.strokeLineJoin = strokeLineJoin
-        state.strokePaint.strokeJoin = when (strokeLineJoin) {
+        state.strokeConfig.setStrokeJoin(when (strokeLineJoin) {
             LineJoin.Miter -> Paint.Join.MITER
             LineJoin.Round -> Paint.Join.ROUND
             LineJoin.Bevel -> Paint.Join.BEVEL
-        }
+        })
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE_MITERLIMIT)) {
         val strokeMiterLimit = sourceStyle.strokeMiterLimit
         builder.strokeMiterLimit = strokeMiterLimit
-        state.strokePaint.strokeMiter = strokeMiterLimit
+        state.strokeConfig.setStrokeMiter(strokeMiterLimit)
     }
 
     var strokeDashArrayChanged = false
@@ -149,8 +148,8 @@ internal fun updateStyle(
     if (sourceStyle.isSpecified(Style.SPECIFIED_FONT_SIZE)) {
         val fontSize = sourceStyle.fontSize!!
         builder.fontSize = fontSize
-        state.fillPaint.textSize = fontSize.floatValueInContext(currentFontSize)
-        state.strokePaint.textSize = fontSize.floatValueInContext(currentFontSize)
+        state.fillConfig.setTextSize(fontSize.floatValueInContext(currentFontSize))
+        state.strokeConfig.setTextSize(fontSize.floatValueInContext(currentFontSize))
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_FONT_FAMILY)) {
@@ -184,10 +183,8 @@ internal fun updateStyle(
         val textDecoration = sourceStyle.textDecoration!!
         builder.textDecoration = textDecoration
         // We handle decorations manually in TextRenderer to support combinations and overline
-        state.fillPaint.isStrikeThruText = false
-        state.fillPaint.isUnderlineText = false
-        state.strokePaint.isStrikeThruText = false
-        state.strokePaint.isUnderlineText = false
+        state.fillConfig.setTextDecorations(strikeThru = false, underline = false)
+        state.strokeConfig.setTextDecorations(strikeThru = false, underline = false)
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_DIRECTION)) {
@@ -355,19 +352,16 @@ internal fun updateStyle(
                 spacing /= currentFontSize
             }
         }
-        state.fillPaint.letterSpacing = spacing
-        state.strokePaint.letterSpacing = spacing
+        state.fillConfig.setLetterSpacing(spacing)
+        state.strokeConfig.setLetterSpacing(spacing)
     }
 
     if (supportsWordSpacing() && sourceStyle.isSpecified(Style.SPECIFIED_WORD_SPACING)) {
         val wordSpacing = sourceStyle.wordSpacing!!
         builder.wordSpacing = wordSpacing
         val spacing = wordSpacing.floatValueInContext()
-        if (state.appliedWordSpacing != spacing) {
-            state.fillPaint.setWordSpacingCompat(spacing)
-            state.strokePaint.setWordSpacingCompat(spacing)
-            state.appliedWordSpacing = spacing
-        }
+        state.fillConfig.setWordSpacing(spacing)
+        state.strokeConfig.setWordSpacing(spacing)
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_FILTER)) {
@@ -431,7 +425,7 @@ internal fun reapplyDynamicPaints(state: RendererState) {
             paint = fill,
             color = style.color,
             paintOpacity = if (style.fillOpacity.isNaN()) 1f else style.fillOpacity,
-            targetPaint = state.fillPaint
+            targetConfiguration = state.fillConfig
         )
     }
     val stroke = style.stroke
@@ -441,7 +435,7 @@ internal fun reapplyDynamicPaints(state: RendererState) {
             paint = stroke,
             color = style.color,
             paintOpacity = if (style.strokeOpacity.isNaN()) 1f else style.strokeOpacity,
-            targetPaint = state.strokePaint
+            targetConfiguration = state.strokeConfig
         )
     }
 }
@@ -452,7 +446,7 @@ internal fun setFillPaintColor(state: RendererState, builder: Style.Builder, pai
         color = builder.color,
         paint = paint,
         paintOpacity = if (builder.fillOpacity.isNaN()) 1f else builder.fillOpacity,
-        targetPaint = state.fillPaint
+        targetConfiguration = state.fillConfig
     )
 }
 
@@ -462,7 +456,7 @@ internal fun setStrokePaintColor(state: RendererState, builder: Style.Builder, p
         color = builder.color,
         paint = paint,
         paintOpacity = if (builder.strokeOpacity.isNaN()) 1f else builder.strokeOpacity,
-        targetPaint = state.strokePaint
+        targetConfiguration = state.strokeConfig
     )
 }
 
@@ -471,7 +465,7 @@ private fun setPaintColor(
     paint: SvgPaint?,
     color: ColorValue?,
     paintOpacity: Float,
-    targetPaint: Paint
+    targetConfiguration: PaintConfiguration
 ) {
     val col: Int = when (paint) {
         is ColorValue -> {
@@ -503,12 +497,8 @@ private fun setPaintColor(
         }
     }
 
-    // Keep the explicit shader reset: mock-based tests record the assignment, and
-    // gradients rely on it being cleared. Only the color write is change-guarded
-    // (OEM ROMs like OnePlus allocate inside setters even for unchanged values).
-    targetPaint.shader = null
-    val newColor = col.colorWithOpacity(paintOpacity)
-    if (targetPaint.color != newColor) {
-        targetPaint.color = newColor
-    }
+    // Explicit shader reset must always be recorded (mock parity; gradients
+    // rely on clearing). setColor is equality-guarded internally.
+    targetConfiguration.setShader(null)
+    targetConfiguration.setColor(col.colorWithOpacity(paintOpacity))
 }

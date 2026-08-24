@@ -20,7 +20,6 @@ package hu.oandras.ksvg.render
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.Typeface
 import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.css.CSSLength
@@ -59,33 +58,46 @@ internal class RendererState private constructor(
     fontVariationSet: CSSFontVariationSettings,
 ) {
 
-    private var fillPaintDirty = false
-    private val _fillPaint: Paint = Paint().apply {
-        flags = Paint.ANTI_ALIAS_FLAG or Paint.LINEAR_TEXT_FLAG or Paint.SUBPIXEL_TEXT_FLAG
-        hinting = Paint.HINTING_OFF
-        style = Paint.Style.FILL
-        setTypeface(Typeface.DEFAULT)
-    }
+    // The state carries ONLY the paint-driving configuration (plain data).
+    // The actual Paint objects live on the RenderNodes and are lazily
+    // field-diffed against these configurations right before drawing, so a
+    // node whose style did not change performs zero paint writes per frame.
 
+    @JvmField
+    internal val fillConfig = PaintConfiguration()
+
+    @JvmField
+    internal val strokeConfig = PaintConfiguration()
+
+    /**
+     * Set by the renderer whenever this state becomes active for a node; the
+     * fillPaint/strokePaint getters resolve against this node's paints.
+     */
+    @JvmField
+    internal var paintHost: RenderNode<*>? = null
+
+    // Build-time (host-less) reads fall back to detached paints owned by this
+    // state, synced exactly like node paints.
+    private val detachedFillPaint: Paint = Paint()
+    private val detachedStrokePaint: Paint = Paint().apply { style = Paint.Style.STROKE }
+
+    /** Read access resolves against the active node's lazily-synced paint. */
     val fillPaint: Paint
         get() {
-            fillPaintDirty = true
-            return _fillPaint
+            val host = paintHost ?: return syncDetached(detachedFillPaint, fillConfig)
+            return host.obtainFillPaint(fillConfig)
         }
-
-    private var strokePaintDirty = false
-    private val _strokePaint: Paint = Paint().apply {
-        flags = Paint.ANTI_ALIAS_FLAG or Paint.LINEAR_TEXT_FLAG or Paint.SUBPIXEL_TEXT_FLAG
-        hinting = Paint.HINTING_OFF
-        style = Paint.Style.STROKE
-        setTypeface(Typeface.DEFAULT)
-    }
 
     val strokePaint: Paint
         get() {
-            strokePaintDirty = true
-            return _strokePaint
+            val host = paintHost ?: return syncDetached(detachedStrokePaint, strokeConfig)
+            return host.obtainStrokePaint(strokeConfig)
         }
+
+    private fun syncDetached(paint: Paint, cfg: PaintConfiguration): Paint {
+        PaintConfigSync.apply(paint, cfg)
+        return paint
+    }
 
     private var _fontFeatureSet: CSSFontFeatureSettings = fontFeatureSet
     private var _fontFeatureSetBuilder: CSSFontFeatureSettings.Builder? = null
@@ -140,14 +152,6 @@ internal class RendererState private constructor(
     // (OnePlus PaintExtImpl.replaceTypeface) hook paint setters and allocate on
     // EVERY call even for unchanged values, so callers skip redundant writes
     // using these caches instead of reading them back from Paint.
-    @JvmField
-    internal var appliedTypeface: Typeface? = null
-    @JvmField
-    internal var appliedFontVariationSettings: String? = null
-    @JvmField
-    internal var appliedFontFeatureSettings: String? = null
-    @JvmField
-    internal var appliedWordSpacing: Float = Float.NaN
 
     private var lastDashIntervals: FloatArray? = null
     private var lastDashOffset: Float = 0f
@@ -195,24 +199,9 @@ internal class RendererState private constructor(
         hasFill = other.hasFill
         hasStroke = other.hasStroke
 
-        if (!fillPaintDirty && !other.fillPaintDirty) {
-            // ignore
-        } else {
-            fillPaintDirty = other.fillPaintDirty
-            fillPaint.set(other.fillPaint)
-        }
-
-        if (!strokePaintDirty && !other.strokePaintDirty) {
-            // ignore
-        } else {
-            strokePaintDirty = other.strokePaintDirty
-            strokePaint.set(other.strokePaint)
-        }
-
-        appliedTypeface = null
-        appliedFontVariationSettings = null
-        appliedFontFeatureSettings = null
-        appliedWordSpacing = Float.NaN
+        // Config copy only: the paints are re-synced lazily on next read.
+        fillConfig.setFrom(other.fillConfig)
+        strokeConfig.setFrom(other.strokeConfig)
 
         viewPort = other.viewPort
         viewBox = other.viewBox
@@ -226,7 +215,7 @@ internal class RendererState private constructor(
     }
 
     override fun toString(): String {
-        return "RendererState(style=$style, hasFill=$hasFill, hasStroke=$hasStroke, viewPort=$viewPort, viewBox=$viewBox, spacePreserve=$spacePreserve, fillPaint=$fillPaint, strokePaint=$strokePaint, fontFeatureSet=$fontFeatureSet, fontVariationSet=$fontVariationSet)"
+        return "RendererState(style=$style, hasFill=$hasFill, hasStroke=$hasStroke, viewPort=$viewPort, viewBox=$viewBox, spacePreserve=$spacePreserve, fontFeatureSet=$fontFeatureSet, fontVariationSet=$fontVariationSet)"
     }
 
     context(renderContext: RenderContext)
@@ -236,7 +225,7 @@ internal class RendererState private constructor(
         strokeDashArrayResolved: FloatArray? = style.strokeDashArrayResolved,
         strokeDashOffsetResolved: Float = style.strokeDashOffsetResolved,
     ) {
-        strokePaint.pathEffect = if (strokeDashArrayResolved == null && strokeDashArray == null) {
+        strokeConfig.setPathEffect(if (strokeDashArrayResolved == null && strokeDashArray == null) {
             lastDashIntervals = null
             lastPathEffect = null
             null
@@ -302,6 +291,6 @@ internal class RendererState private constructor(
                     pathEffect
                 }
             }
-        }
+        })
     }
 }

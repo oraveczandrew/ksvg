@@ -20,7 +20,6 @@ import android.graphics.Matrix
 import android.graphics.Path
 import android.util.Log
 import hu.oandras.ksvg.BuildConfig
-import hu.oandras.ksvg.compat.setWordSpacingCompat
 import hu.oandras.ksvg.compat.supportsWordSpacing
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.animation.CalcMode
@@ -419,7 +418,7 @@ private fun applyFloatAnimation(
             if (base != newVal) {
                 val newStrokeWidth = CSSLength(newVal)
                 builder.strokeWidth = newStrokeWidth
-                state.strokePaint.strokeWidth = newStrokeWidth.floatValueInContext()
+                state.strokeConfig.setStrokeWidth(newStrokeWidth.floatValueInContext())
                 changed = true
             }
         }
@@ -446,7 +445,7 @@ private fun applyFloatAnimation(
             val newVal = if (additiveSum) base + valAt else valAt
             if (base != newVal) {
                 builder.strokeMiterLimit = newVal
-                state.strokePaint.strokeMiter = newVal
+                state.strokeConfig.setStrokeMiter(newVal)
                 changed = true
             }
         }
@@ -494,8 +493,8 @@ private fun applyFloatAnimation(
                 val newFontSize = CSSLength(newVal)
                 builder.fontSize = newFontSize
                 val currentFontSize = renderContext.currentFontSize
-                state.fillPaint.textSize = newFontSize.floatValueInContext(currentFontSize)
-                state.strokePaint.textSize = newFontSize.floatValueInContext(currentFontSize)
+                state.fillConfig.setTextSize(newFontSize.floatValueInContext(currentFontSize))
+                state.strokeConfig.setTextSize(newFontSize.floatValueInContext(currentFontSize))
                 changed = true
             }
         }
@@ -513,8 +512,8 @@ private fun applyFloatAnimation(
                         spacing /= currentFontSize
                     }
                 }
-                state.fillPaint.letterSpacing = spacing
-                state.strokePaint.letterSpacing = spacing
+                state.fillConfig.setLetterSpacing(spacing)
+                state.strokeConfig.setLetterSpacing(spacing)
                 changed = true
             }
         }
@@ -527,8 +526,8 @@ private fun applyFloatAnimation(
                     val newSpacing = CSSLength(newVal)
                     builder.wordSpacing = newSpacing
                     val spacing = newSpacing.floatValueInContext()
-                    state.fillPaint.setWordSpacingCompat(spacing)
-                    state.strokePaint.setWordSpacingCompat(spacing)
+                    state.fillConfig.setWordSpacing(spacing)
+                    state.strokeConfig.setWordSpacing(spacing)
                     changed = true
                 }
             }
@@ -562,19 +561,19 @@ private fun applyColorAnimation(
     var changed = false
     when (attributeName) {
         SVGAttr.fill -> {
-            if (state.fillPaint.color != color) {
+            if (state.fillConfig.color != color) {
                 builder.fill = ColorValue.of(color)
                 builder.addSpecifiedFlag(Style.SPECIFIED_FILL)
-                state.fillPaint.color = color
+                state.fillConfig.setColor(color)
                 changed = true
             }
         }
 
         SVGAttr.stroke -> {
-            if (state.strokePaint.color != color) {
+            if (state.strokeConfig.color != color) {
                 builder.stroke = ColorValue.of(color)
                 builder.addSpecifiedFlag(Style.SPECIFIED_STROKE)
-                state.strokePaint.color = color
+                state.strokeConfig.setColor(color)
                 changed = true
             }
         }

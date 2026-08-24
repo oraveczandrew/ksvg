@@ -93,6 +93,12 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 
 ## Rendering
 - Drawables must be renderable off the main thread.
+- **No capturing lambdas / local function references in hot paths.** In render
+  and animation-update code, a lambda that captures locals, a `::localFun`
+  reference, or any non-inline higher-order call allocates Function objects on
+  EVERY invocation. Use private methods with explicit parameters, inline
+  helpers (`forEachElement`, pools), or pre-allocated state instead.
+  (`forEachElement` is inline and safe.)
 - Do not introduce mutable shared or global state.
 - Do not use mutable singleton (`object`) helpers for allocation avoidance.
 - Reusable state must be owned by the current rendering operation and must not be shared between threads.

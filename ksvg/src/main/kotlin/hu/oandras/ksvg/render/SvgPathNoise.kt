@@ -79,10 +79,10 @@ internal class SvgPathNoise(lcg: LcgRandom) {
 
         // With a positive period the lattice wraps so that the noise tiles
         // seamlessly every `period` lattice cells (feTurbulence stitchTiles).
-        if (periodX > 0) {
-            bx0 = Math.floorMod(bx0, periodX)
+        bx0 = if (periodX > 0) {
+            Math.floorMod(bx0, periodX)
         } else {
-            bx0 = bx0 and BM
+            bx0 and BM
         }
         val bx1 = if (periodX > 0) (bx0 + 1) % periodX else (bx0 + 1) and BM
 

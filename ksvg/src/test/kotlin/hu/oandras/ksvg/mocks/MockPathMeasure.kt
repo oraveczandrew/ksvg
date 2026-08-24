@@ -20,6 +20,7 @@ import android.graphics.Path
 import android.graphics.PathMeasure
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
+import kotlin.math.hypot
 
 @Suppress("unused", "TestFunctionName")
 @Implements(PathMeasure::class)
@@ -64,7 +65,7 @@ class MockPathMeasure {
                 "L" -> {
                     val x = parts[1].toFloat()
                     val y = parts[2].toFloat()
-                    totalLength += Math.hypot((x - lastX).toDouble(), (y - lastY).toDouble()).toFloat()
+                    totalLength += hypot(x - lastX, y - lastY)
                     lastX = x
                     lastY = y
                 }
@@ -92,9 +93,9 @@ class MockPathMeasure {
                 "L" -> {
                     val x = parts[1].toFloat()
                     val y = parts[2].toFloat()
-                    val segLen = Math.hypot((x - lastX).toDouble(), (y - lastY).toDouble()).toFloat()
+                    val segLen = hypot(x - lastX, y - lastY)
                     if (segLen > 0 && currentDist + segLen >= distance) {
-                        val t = if (segLen == 0f) 0f else (distance - currentDist) / segLen
+                        val t = (distance - currentDist) / segLen
                         pos?.let {
                             it[0] = lastX + (x - lastX) * t
                             it[1] = lastY + (y - lastY) * t

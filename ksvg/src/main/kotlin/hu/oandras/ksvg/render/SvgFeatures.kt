@@ -17,8 +17,6 @@
 
 package hu.oandras.ksvg.render
 
-import hu.oandras.ksvg.utils.forEachElement
-
 /**
  * Checks if all the given SVG features are supported by the renderer.
  */

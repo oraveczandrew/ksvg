@@ -85,7 +85,7 @@ class VerificationRenderTest(
             val root = File(VERIFICATION_ROOT_PATH)
             if (!root.exists()) return emptyList()
 
-            return root.listSvgs().map { arrayOf<Any>(it) }
+            return root.listSvgs().map { arrayOf(it) }
         }
     }
 }
