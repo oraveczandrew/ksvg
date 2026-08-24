@@ -35,6 +35,13 @@ public object KotlinKernels {
     private fun clamp255(value: Float): Int =
             Math.round(value).coerceIn(0, 255)
 
+    private fun sampleCoordinate(coordinate: Int, limit: Int, edgeMode: Int): Int =
+            if (coordinate in 0 until limit) coordinate else when (edgeMode) {
+                2 -> -1
+                1 -> coordinate % limit.let { if (it < 0) it + limit else it }
+                else -> if (coordinate < 0) 0 else limit - 1
+            }
+
     // ---------------------------------------------------------------- convolve
 
     /**
@@ -57,13 +64,6 @@ public object KotlinKernels {
             preserveAlpha: Boolean,
             edgeMode: Int,
     ) {
-        fun sampleCoordinate(coordinate: Int, limit: Int): Int =
-                if (coordinate in 0 until limit) coordinate else when (edgeMode) {
-                    2 -> -1
-                    1 -> coordinate % limit.let { if (it < 0) it + limit else it }
-                    else -> if (coordinate < 0) 0 else limit - 1
-                }
-
         for (y in 0 until height) {
             val rowOffset = y * width
             for (x in 0 until width) {
@@ -74,8 +74,8 @@ public object KotlinKernels {
 
                 for (ky in 0 until orderY) {
                     for (kx in 0 until orderX) {
-                        val srcX = sampleCoordinate(x + kx - targetX, width)
-                        val srcY = sampleCoordinate(y + ky - targetY, height)
+                        val srcX = sampleCoordinate(x + kx - targetX, width, edgeMode)
+                        val srcY = sampleCoordinate(y + ky - targetY, height, edgeMode)
                         val pixel = if (srcX < 0 || srcY < 0) 0 else srcPixels[srcY * width + srcX]
                         val weight = kernel[ky * orderX + kx]
 
@@ -194,6 +194,19 @@ public object KotlinKernels {
 
     // ---------------------------------------------------- arithmetic composite
 
+    private fun arithmeticChannel(
+            in1: Int,
+            in2: Int,
+            k1: Float,
+            k2: Float,
+            k3: Float,
+            k4: Float,
+    ): Int {
+        val a = in1 / 255f
+        val b = in2 / 255f
+        return clamp255((k1 * a * b + k2 * a + k3 * b + k4) * 255f)
+    }
+
     /** sRGB->linear for one 0..255 component (matches ColorUtils.sRgbToLinear). */
     private fun sRgbToLinear(c: Int): Int {
         val a = c / 255f
@@ -235,12 +248,6 @@ public object KotlinKernels {
             k4: Float,
             useLinear: Boolean,
     ) {
-        fun channel(in1: Int, in2: Int): Int {
-            val a = in1 / 255f
-            val b = in2 / 255f
-            return clamp255((k1 * a * b + k2 * a + k3 * b + k4) * 255f)
-        }
-
         for (y in clipTop until clipBottom) {
             val rowOffset = y * width
             for (x in clipLeft until clipRight) {
@@ -248,15 +255,15 @@ public object KotlinKernels {
                 val p = inputPixels[i]
                 val q = in2Pixels[i]
                 if (useLinear) {
-                    outPixels[i] = ((channel(p ushr 24 and 0xFF, q ushr 24 and 0xFF)) shl 24) or
-                            ((linearToSRgb(channel(sRgbToLinear(p ushr 16 and 0xFF), sRgbToLinear(q ushr 16 and 0xFF)))) shl 16) or
-                            ((linearToSRgb(channel(sRgbToLinear(p ushr 8 and 0xFF), sRgbToLinear(q ushr 8 and 0xFF)))) shl 8) or
-                            linearToSRgb(channel(sRgbToLinear(p and 0xFF), sRgbToLinear(q and 0xFF)))
+                    outPixels[i] = ((arithmeticChannel(p ushr 24 and 0xFF, q ushr 24 and 0xFF, k1, k2, k3, k4)) shl 24) or
+                            ((linearToSRgb(arithmeticChannel(sRgbToLinear(p ushr 16 and 0xFF), sRgbToLinear(q ushr 16 and 0xFF), k1, k2, k3, k4))) shl 16) or
+                            ((linearToSRgb(arithmeticChannel(sRgbToLinear(p ushr 8 and 0xFF), sRgbToLinear(q ushr 8 and 0xFF), k1, k2, k3, k4))) shl 8) or
+                            linearToSRgb(arithmeticChannel(sRgbToLinear(p and 0xFF), sRgbToLinear(q and 0xFF), k1, k2, k3, k4))
                 } else {
-                    outPixels[i] = ((channel(p ushr 24 and 0xFF, q ushr 24 and 0xFF)) shl 24) or
-                            ((channel(p ushr 16 and 0xFF, q ushr 16 and 0xFF)) shl 16) or
-                            ((channel(p ushr 8 and 0xFF, q ushr 8 and 0xFF)) shl 8) or
-                            channel(p and 0xFF, q and 0xFF)
+                    outPixels[i] = ((arithmeticChannel(p ushr 24 and 0xFF, q ushr 24 and 0xFF, k1, k2, k3, k4)) shl 24) or
+                            ((arithmeticChannel(p ushr 16 and 0xFF, q ushr 16 and 0xFF, k1, k2, k3, k4)) shl 16) or
+                            ((arithmeticChannel(p ushr 8 and 0xFF, q ushr 8 and 0xFF, k1, k2, k3, k4)) shl 8) or
+                            arithmeticChannel(p and 0xFF, q and 0xFF, k1, k2, k3, k4)
                 }
             }
         }
