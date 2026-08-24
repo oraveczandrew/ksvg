@@ -16,9 +16,8 @@
 
 package hu.oandras.ksvg.dom.text
 
-import hu.oandras.ksvg.parser.parseLength
-
 import hu.oandras.ksvg.css.CSSLength
+import hu.oandras.ksvg.parser.parseLength
 
 internal class BaselineShift(
     @JvmField

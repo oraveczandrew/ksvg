@@ -27,10 +27,10 @@ import hu.oandras.ksvg.parser.TextScanner
 import hu.oandras.ksvg.utils.CubicBezier
 import hu.oandras.ksvg.utils.charCount
 import hu.oandras.ksvg.utils.clamp
+import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.optimizeReadOnlyList
 import kotlin.math.abs
 import kotlin.math.sqrt
-import hu.oandras.ksvg.utils.forEachElement
 
 internal fun interpolate(from: Float, to: Float, progress: Float): Float {
     return from + (to - from) * progress

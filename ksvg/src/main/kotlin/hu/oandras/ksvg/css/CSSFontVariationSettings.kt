@@ -21,7 +21,7 @@ package hu.oandras.ksvg.css
 import hu.oandras.ksvg.parser.TextScanner
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
-import java.util.Locale
+import java.util.*
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 

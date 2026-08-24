@@ -17,7 +17,6 @@
 package hu.oandras.ksvg.dom.filter
 
 import androidx.annotation.IntDef
-import java.util.Locale
 
 /**
  * SVG `color-interpolation` / `color-interpolation-filters`.

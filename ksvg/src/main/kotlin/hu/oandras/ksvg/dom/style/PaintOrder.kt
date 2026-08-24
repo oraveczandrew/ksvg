@@ -17,7 +17,7 @@
 package hu.oandras.ksvg.dom.style
 
 import androidx.annotation.IntDef
-import java.util.Locale
+import java.util.*
 
 /**
  * SVG2 `paint-order`: the order in which fill, stroke and markers are painted.

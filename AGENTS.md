@@ -11,6 +11,7 @@ KSVG is a high-performance SVG rendering library for Android, written in Kotlin.
 
 1.  **DOM (`hu.oandras.ksvg.dom`)**: A light-weight representation of the SVG XML structure.
 2.  **Render Tree (`hu.oandras.ksvg.render.KSVGRenderNode`)**: Created from the DOM. This phase resolves CSS styles, inherits properties, and pre-calculates geometry.
+3.  **Scene (`hu.oandras.ksvg.render.RenderScene`)**: Wraps the built tree and owns the viewport geometry: `node.viewPort` / `node.viewBoxTransform` are written ONLY by `RenderScene.applyViewport` (never by the builder). Drawable bounds changes update the scene in place - do not reintroduce viewport writes into `RenderTreeBuilder`.
 3.  **Renderer (`hu.oandras.ksvg.render.SVGAndroidRenderer`)**: Traverses the Render Tree and executes `canvas` operations.
 4.  **Animations**: Centralized in `AnimationRenderer.kt` and `AnimationUtils.kt`. Uses a SMIL-based timing model.
 

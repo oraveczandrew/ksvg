@@ -17,13 +17,16 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.Matrix
+import android.graphics.PathMeasure
 import android.graphics.Rect
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.PreserveAspectRatio
-import android.graphics.PathMeasure
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
-import hu.oandras.ksvg.dom.core.ConditionalContainer
+import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.core.Svg
+import hu.oandras.ksvg.dom.core.ViewBoxContainer
 import hu.oandras.ksvg.dom.shapes.CircleShape
 import hu.oandras.ksvg.dom.shapes.EllipseShape
 import hu.oandras.ksvg.dom.shapes.LineShape
@@ -31,16 +34,7 @@ import hu.oandras.ksvg.dom.shapes.PathShape
 import hu.oandras.ksvg.dom.shapes.PolyLineShape
 import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.dom.shapes.Shape
-import hu.oandras.ksvg.dom.text.TRef
-import hu.oandras.ksvg.dom.text.Text
 import hu.oandras.ksvg.dom.text.TextPath
-import hu.oandras.ksvg.dom.text.TSpan
-import hu.oandras.ksvg.dom.core.SvgObject
-import hu.oandras.ksvg.dom.SVGImpl
-import hu.oandras.ksvg.dom.core.Box
-import hu.oandras.ksvg.dom.core.Svg
-import hu.oandras.ksvg.dom.core.View
-import hu.oandras.ksvg.dom.core.ViewBoxContainer
 import hu.oandras.ksvg.render.PaintConfiguration.Companion.DEFAULT_TEXT_SIZE
 import hu.oandras.ksvg.render.pool.BitmapPool
 import hu.oandras.ksvg.render.pool.PoolOwner

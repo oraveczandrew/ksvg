@@ -61,7 +61,6 @@ import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.core.Switch
 import hu.oandras.ksvg.dom.core.Symbol
 import hu.oandras.ksvg.dom.core.Use
-import hu.oandras.ksvg.dom.core.View
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.filter.FeBlend
 import hu.oandras.ksvg.dom.filter.FeColorMatrix

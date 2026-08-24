@@ -24,7 +24,6 @@ import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.core.Box
-import hu.oandras.ksvg.dom.style.FillRule
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.SvgPaint
 import hu.oandras.ksvg.render.pool.FloatArrayBucket
