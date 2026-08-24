@@ -23,7 +23,7 @@ package hu.oandras.ksvg.filtering
  * distant/point/spot light vectors incl. cone attenuation, specular via
  * double pow).
  *
- * [params] packing: distant → [azimuthDeg, elevationDeg];
+ * params packing: distant → [azimuthDeg, elevationDeg];
  * point → [x, y, z]; spot → [x, y, z, pointsAtX, pointsAtY, pointsAtZ,
  * limitingConeAngleDeg] (NaN = no cone).
  *

@@ -73,7 +73,8 @@ internal class FilterPipelineImpl31 : FilterBackend {
                     buildColorMatrix(element.type, element.values)
                 )
             )
-            chain = if (chain == null) effect else RenderEffect.createChainEffect(effect, chain!!)
+            val previous = chain
+            chain = if (previous == null) effect else RenderEffect.createChainEffect(effect, previous)
             previousResult = element.result
             first = false
         }

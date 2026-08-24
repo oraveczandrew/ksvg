@@ -19,8 +19,8 @@ package hu.oandras.ksvg.filtering
 /**
  * feConvolveMatrix kernel over ARGB_8888 IntArrays — bit-exact port of the
  * Kotlin reference loop (same accumulation order, half-up rounding, identical
- * edge-mode handling). Supports arbitrary kernel order and anchor; [edgeMode]
- * uses the `ConvolveMatrixEdgeMode` ordinal: 0=duplicate, 1=none, 2=wrap.
+ * edge-mode handling). Supports arbitrary kernel order and anchor; edgeMode
+ * uses the `ConvolveMatrixEdgeMode` ordinal: 0=duplicate, 1=wrap, 2=none.
  *
  * Stateless: caller-owned pixel/kernel arrays, no shared state. Availability
  * follows `libksvgblur` ([NativeGaussianBlur.isAvailable]).

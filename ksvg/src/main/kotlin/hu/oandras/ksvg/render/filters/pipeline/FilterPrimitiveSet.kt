@@ -16,29 +16,9 @@
 
 package hu.oandras.ksvg.render.filters.pipeline
 
-import hu.oandras.ksvg.render.FilterRenderNode
-import hu.oandras.ksvg.render.FeBlendRenderNode
-import hu.oandras.ksvg.render.FeColorMatrixRenderNode
-import hu.oandras.ksvg.render.FeComponentTransferRenderNode
-import hu.oandras.ksvg.render.FeCompositeRenderNode
-import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
-import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
-import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
-import hu.oandras.ksvg.render.FeDropShadowRenderNode
-import hu.oandras.ksvg.render.FeFloodRenderNode
-import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
-import hu.oandras.ksvg.render.FeImageRenderNode
-import hu.oandras.ksvg.render.FeMergeRenderNode
-import hu.oandras.ksvg.render.FeMorphologyRenderNode
-import hu.oandras.ksvg.render.FeOffsetRenderNode
-import hu.oandras.ksvg.render.FeSpecularLightingRenderNode
-import hu.oandras.ksvg.render.FeTileRenderNode
-import hu.oandras.ksvg.render.FeTurbulenceRenderNode
-import hu.oandras.ksvg.utils.forEachElement
-
 /**
  * Bit-set of the primitive kinds contained by one filter graph. Collected once
- * per [FilterRenderNode] and handed to [FilterBackend.supports] for the
+ * per filter node and handed to [FilterBackend.supports] for the
  * graph-level backend decision.
  */
 @JvmInline
@@ -50,54 +30,6 @@ internal value class FilterPrimitiveSet private constructor(@JvmField internal v
             FilterPrimitiveSet(bits or other.bits)
 
     internal companion object {
-        internal const val FLAG_FLOOD: Int = 1 shl 0
-        internal const val FLAG_BLEND: Int = 1 shl 1
-        internal const val FLAG_TILE: Int = 1 shl 2
-        internal const val FLAG_DROP_SHADOW: Int = 1 shl 3
-        internal const val FLAG_GAUSSIAN_BLUR: Int = 1 shl 4
         internal const val FLAG_COLOR_MATRIX: Int = 1 shl 5
-        internal const val FLAG_OFFSET: Int = 1 shl 6
-        internal const val FLAG_MERGE: Int = 1 shl 7
-        internal const val FLAG_CONVOLVE_MATRIX: Int = 1 shl 8
-        internal const val FLAG_MORPHOLOGY: Int = 1 shl 9
-        internal const val FLAG_COMPONENT_TRANSFER: Int = 1 shl 10
-        internal const val FLAG_COMPOSITE: Int = 1 shl 11
-        internal const val FLAG_TURBULENCE: Int = 1 shl 12
-        internal const val FLAG_DISPLACEMENT_MAP: Int = 1 shl 13
-        internal const val FLAG_DIFFUSE_LIGHTING: Int = 1 shl 14
-        internal const val FLAG_SPECULAR_LIGHTING: Int = 1 shl 15
-        internal const val FLAG_IMAGE: Int = 1 shl 16
-
-        internal val EMPTY: FilterPrimitiveSet = FilterPrimitiveSet(0)
-
-        /** Walks the primitive list of [filterNode] exactly once. */
-        internal fun collect(filterNode: FilterRenderNode): FilterPrimitiveSet {
-            var bits = 0
-            filterNode.primitives.forEachElement { primitive ->
-                bits = bits or flagOf(primitive)
-            }
-            return FilterPrimitiveSet(bits)
-        }
-
-        private fun flagOf(primitive: Any?): Int = when (primitive) {
-            is FeFloodRenderNode -> FLAG_FLOOD
-            is FeBlendRenderNode -> FLAG_BLEND
-            is FeTileRenderNode -> FLAG_TILE
-            is FeDropShadowRenderNode -> FLAG_DROP_SHADOW
-            is FeGaussianBlurRenderNode -> FLAG_GAUSSIAN_BLUR
-            is FeColorMatrixRenderNode -> FLAG_COLOR_MATRIX
-            is FeOffsetRenderNode -> FLAG_OFFSET
-            is FeMergeRenderNode -> FLAG_MERGE
-            is FeConvolveMatrixRenderNode -> FLAG_CONVOLVE_MATRIX
-            is FeMorphologyRenderNode -> FLAG_MORPHOLOGY
-            is FeComponentTransferRenderNode -> FLAG_COMPONENT_TRANSFER
-            is FeCompositeRenderNode -> FLAG_COMPOSITE
-            is FeTurbulenceRenderNode -> FLAG_TURBULENCE
-            is FeDisplacementMapRenderNode -> FLAG_DISPLACEMENT_MAP
-            is FeDiffuseLightingRenderNode -> FLAG_DIFFUSE_LIGHTING
-            is FeSpecularLightingRenderNode -> FLAG_SPECULAR_LIGHTING
-            is FeImageRenderNode -> FLAG_IMAGE
-            else -> 0
-        }
     }
 }

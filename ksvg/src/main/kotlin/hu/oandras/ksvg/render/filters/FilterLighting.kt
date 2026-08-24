@@ -108,7 +108,7 @@ private inline fun doLightingFilter(
 
     if (LightingNative.isAvailable) {
         val params = DoubleArray(8)
-        var lightType = 0
+        var lightType: Int
         when (lightSource) {
             is FeDistantLight -> {
                 lightType = 0

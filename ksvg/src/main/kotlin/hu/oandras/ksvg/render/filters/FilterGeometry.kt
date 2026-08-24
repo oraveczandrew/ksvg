@@ -22,7 +22,6 @@ import android.graphics.Paint
 import android.graphics.RectF
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.css.CSSLength
-import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
@@ -33,15 +32,8 @@ import hu.oandras.ksvg.render.withClip
 import hu.oandras.ksvg.filtering.ConvolveNative
 import hu.oandras.ksvg.filtering.KotlinKernels
 import hu.oandras.ksvg.filtering.MorphologyNative
-import hu.oandras.ksvg.utils.alpha
-import hu.oandras.ksvg.utils.argb
-import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp
-import hu.oandras.ksvg.utils.green
-import hu.oandras.ksvg.utils.red
-import kotlin.math.max
-import kotlin.math.min
 
 context(renderContext: RenderContext)
 internal fun doFeOffsetFilter(
@@ -185,7 +177,7 @@ internal fun doFeMorphologyFilter(
     val primitive = primitiveNode.sourceElement
     val radiusX = (primitive.radiusX * primitiveScaleX).ceilToInt()
     val radiusY = (primitive.radiusY * primitiveScaleY).ceilToInt()
-    return applyMorphology(inputBitmap, radiusX, radiusY, primitiveNode.erode, primitiveNode, primitiveRegion, filterRegion, canvasScaleX, canvasScaleY)
+    return applyMorphology(inputBitmap, radiusX, radiusY, primitiveNode.erode, primitiveNode, primitiveRegion, filterRegion)
 }
 
 context(renderContext: RenderContext)
@@ -245,8 +237,6 @@ private fun applyMorphology(
     primitiveNode: FeMorphologyRenderNode,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     if (radiusX <= 0 && radiusY <= 0) {
         return input
@@ -263,8 +253,6 @@ private fun applyMorphology(
     val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
     val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
     val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
-
-    val channelInitialValue = if (erode) 255 else 0
 
     dst.fill(0) // Initialize with transparent
 

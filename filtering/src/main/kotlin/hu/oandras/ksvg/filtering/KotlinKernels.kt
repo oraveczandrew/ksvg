@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.filtering
 
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 /**
  * Pure-Kotlin reference kernels over unpremultiplied ARGB_8888 IntArrays.
@@ -33,7 +34,7 @@ import kotlin.math.pow
 public object KotlinKernels {
 
     private fun clamp255(value: Float): Int =
-            Math.round(value).coerceIn(0, 255)
+            value.roundToInt().coerceIn(0, 255)
 
     private fun sampleCoordinate(coordinate: Int, limit: Int, edgeMode: Int): Int =
             if (coordinate in 0 until limit) coordinate else when (edgeMode) {
@@ -168,7 +169,6 @@ public object KotlinKernels {
             src: IntArray,
             dst: IntArray,
             width: Int,
-            height: Int,
             clipLeft: Int,
             clipTop: Int,
             clipRight: Int,
@@ -237,7 +237,6 @@ public object KotlinKernels {
             in2Pixels: IntArray,
             outPixels: IntArray,
             width: Int,
-            height: Int,
             clipLeft: Int,
             clipTop: Int,
             clipRight: Int,

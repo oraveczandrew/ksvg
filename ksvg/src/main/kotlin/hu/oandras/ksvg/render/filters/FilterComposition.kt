@@ -35,17 +35,9 @@ import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.createBitmapSameAs
 import hu.oandras.ksvg.render.isBitmapTransparent
 import hu.oandras.ksvg.render.pool.withPooledObject
-import hu.oandras.ksvg.utils.alpha
-import hu.oandras.ksvg.utils.argb
-import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp
-import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.forEachElement
-import hu.oandras.ksvg.utils.green
-import hu.oandras.ksvg.utils.linearToSRgb
-import hu.oandras.ksvg.utils.red
-import hu.oandras.ksvg.utils.sRgbToLinear
 
 context(renderContext: RenderContext)
 internal fun doFeCompositeFilter(
@@ -144,7 +136,7 @@ private fun applyArithmeticComposite(
     
     val outPixels = IntArray(size) // We need a clean output
     KotlinKernels.arithmeticComposite(
-        inputPixels, in2Pixels, outPixels, width, height,
+        inputPixels, in2Pixels, outPixels, width,
         clipLeft, clipTop, clipRight, clipBottom,
         k1, k2, k3, k4,
         primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
@@ -153,12 +145,6 @@ private fun applyArithmeticComposite(
     val res = createBitmapSameAs(input)
     res.setPixels(outPixels, 0, width, 0, 0, width, height)
     return res
-}
-
-private fun arithmeticChannel(in1: Int, in2: Int, k1: Float, k2: Float, k3: Float, k4: Float): Int {
-    val a = in1 / 255f
-    val b = in2 / 255f
-    return clamp255((k1 * a * b + k2 * a + k3 * b + k4) * 255f)
 }
 
 context(renderContext: RenderContext)

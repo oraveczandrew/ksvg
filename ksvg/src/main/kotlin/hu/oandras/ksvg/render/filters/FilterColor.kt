@@ -35,14 +35,9 @@ import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_BLUE
 import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_GREEN
 import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_RED
 import hu.oandras.ksvg.render.pool.withPooledObject
-import hu.oandras.ksvg.utils.alpha
-import hu.oandras.ksvg.utils.argb
-import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.clamp255
-import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.linearToSRgb
-import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.sRgbToLinear
 import hu.oandras.ksvg.utils.toRadians
 import kotlin.math.cos
@@ -206,7 +201,6 @@ internal fun doFeComponentTransferFilter(
             src = pixels,
             dst = outPixels,
             width = width,
-            height = height,
             clipLeft = clipLeft,
             clipTop = clipTop,
             clipRight = clipRight,
