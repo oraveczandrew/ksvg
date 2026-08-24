@@ -119,8 +119,12 @@ struct StitchInfo {
     int32_t wrapY = 0;
 };
 
-inline int32_t adjustForStitch(const int32_t v, const int32_t wrap, const int32_t period) {
-    return v >= wrap ? v - period : v;
+// True mathematical modulo (result in [0, period)): a single subtraction is
+// NOT enough - sample coordinates can be many periods in, and the leftover
+// offset produced visible seams every period pixels.
+inline int32_t wrapPeriod(int32_t v, const int32_t period) {
+    v %= period;
+    return v < 0 ? v + period : v;
 }
 
 inline void noise2(
@@ -142,10 +146,10 @@ inline void noise2(
 
     int32_t bx0 = b0xRaw, by0 = b0yRaw, bx1 = b0xRaw + 1, by1 = b0yRaw + 1;
     if (stitchEnabled && stitch.width > 0 && stitch.height > 0) {
-        bx0 = adjustForStitch(bx0, stitch.wrapX, stitch.width);
-        bx1 = adjustForStitch(bx1, stitch.wrapX, stitch.width);
-        by0 = adjustForStitch(by0, stitch.wrapY, stitch.height);
-        by1 = adjustForStitch(by1, stitch.wrapY, stitch.height);
+        bx0 = wrapPeriod(bx0, stitch.width);
+        bx1 = wrapPeriod(bx1, stitch.width);
+        by0 = wrapPeriod(by0, stitch.height);
+        by1 = wrapPeriod(by1, stitch.height);
     } else {
         bx0 &= S_BM; bx1 &= S_BM;
         by0 &= S_BM; by1 &= S_BM;
@@ -196,10 +200,10 @@ inline void noise2Vec(
 
     int32_t bx0 = b0xRaw, by0 = b0yRaw, bx1 = b0xRaw + 1, by1 = b0yRaw + 1;
     if (stitchEnabled && stitch.width > 0 && stitch.height > 0) {
-        bx0 = adjustForStitch(bx0, stitch.wrapX, stitch.width);
-        bx1 = adjustForStitch(bx1, stitch.wrapX, stitch.width);
-        by0 = adjustForStitch(by0, stitch.wrapY, stitch.height);
-        by1 = adjustForStitch(by1, stitch.wrapY, stitch.height);
+        bx0 = wrapPeriod(bx0, stitch.width);
+        bx1 = wrapPeriod(bx1, stitch.width);
+        by0 = wrapPeriod(by0, stitch.height);
+        by1 = wrapPeriod(by1, stitch.height);
     } else {
         bx0 &= S_BM; bx1 &= S_BM;
         by0 &= S_BM; by1 &= S_BM;
@@ -250,10 +254,10 @@ inline void noise2Vec(
 
     int32_t bx0 = b0xRaw, by0 = b0yRaw, bx1 = b0xRaw + 1, by1 = b0yRaw + 1;
     if (stitchEnabled && stitch.width > 0 && stitch.height > 0) {
-        bx0 = adjustForStitch(bx0, stitch.wrapX, stitch.width);
-        bx1 = adjustForStitch(bx1, stitch.wrapX, stitch.width);
-        by0 = adjustForStitch(by0, stitch.wrapY, stitch.height);
-        by1 = adjustForStitch(by1, stitch.wrapY, stitch.height);
+        bx0 = wrapPeriod(bx0, stitch.width);
+        bx1 = wrapPeriod(bx1, stitch.width);
+        by0 = wrapPeriod(by0, stitch.height);
+        by1 = wrapPeriod(by1, stitch.height);
     } else {
         bx0 &= S_BM; bx1 &= S_BM;
         by0 &= S_BM; by1 &= S_BM;
