@@ -224,32 +224,9 @@ internal class RenderTreeBuilder(
         }
 
         val node = try {
-            val viewBox: Box?
-            val preserveAspectRatio: PreserveAspectRatio?
-
-            if (renderOptions.hasView()) {
-                val obj = document.getElementById(renderOptions.viewId)
-                if (obj !is View) {
-                    return null
-                }
-                if (obj.viewBox == null) {
-                    return null
-                }
-                viewBox = obj.viewBox
-                preserveAspectRatio = obj.preserveAspectRatio
-            } else {
-                viewBox = if (renderOptions.hasViewBox()) {
-                    renderOptions.viewBox
-                } else {
-                    rootObj.viewBox
-                }
-
-                preserveAspectRatio = if (renderOptions.hasPreserveAspectRatio()) {
-                    renderOptions.preserveAspectRatio
-                } else {
-                    rootObj.preserveAspectRatio
-                }
-            }
+            val overrides = resolveRootViewOverrides(document, renderOptions as RenderOptionsImpl) ?: return null
+            val viewBox: Box? = overrides.viewBoxOverride
+            val preserveAspectRatio: PreserveAspectRatio? = overrides.parOverride
 
             var viewPort = renderOptions.viewPort!!
             // The established (external) viewport is decisive. Root width/height only refine it
@@ -730,16 +707,12 @@ internal class RenderTreeBuilder(
 
         val children = buildChildren(obj)
         val node = GroupRenderNode(obj, children)
-        node.viewPort = viewPort
         if (effectiveViewport == null) {
             // Nested <svg>: remember the length sources so RenderScene can
-            // re-resolve this viewport when the drawable bounds change.
+            // resolve this viewport when the drawable bounds change.
             node.viewportSpec = ViewportSpec(obj.x, obj.y, obj.width, obj.height)
         }
-        // The viewBox->viewport fit is stored separately from the element's own (animated)
-        // transform. updateAnimations() re-derives node.transform from the element each frame,
-        // so keeping the fit here prevents it from being clobbered.
-        node.viewBoxTransform = transform
+        // node.viewPort / node.viewBoxTransform are owned by RenderScene.applyViewport.
         node.transform = obj.getTransform()?.copy()
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
@@ -781,9 +754,8 @@ internal class RenderTreeBuilder(
 
         val children = buildChildren(obj)
         val node = GroupRenderNode(obj, children)
-        node.viewPort = viewPort
         node.viewportSpec = ViewportSpec(null, null, useWidth, useHeight)
-        node.viewBoxTransform = transform
+        // node.viewPort / node.viewBoxTransform are owned by RenderScene.applyViewport.
         node.renderState.apply(state)
         updateParentBoundingBox(obj)
         node.boundingBox = obj.boundingBox
@@ -1794,13 +1766,8 @@ internal class RenderTreeBuilder(
         width: CSSLength?,
         height: CSSLength?
     ): Box {
-        val viewPortUser = effectiveViewPortInUserUnits
-        return Box(
-            minX = x?.floatValueXInContext() ?: 0f,
-            minY = y?.floatValueYInContext() ?: 0f,
-            width = width?.floatValueXInContext() ?: viewPortUser.width,
-            height = height?.floatValueYInContext() ?: viewPortUser.height
-        )
+        // Shared implementation lives next to calculateViewBoxTransform.
+        return makeViewportInContext(x, y, width, height)
     }
 
     private fun updateParentBoundingBox(obj: Element) {

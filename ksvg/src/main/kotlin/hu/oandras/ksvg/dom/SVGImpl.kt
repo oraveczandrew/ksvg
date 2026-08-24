@@ -54,7 +54,7 @@ import hu.oandras.ksvg.render.GroupRenderNode
 import hu.oandras.ksvg.render.PathConverter
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RenderOptionsImpl
-import hu.oandras.ksvg.render.RenderTreeBuilder
+import hu.oandras.ksvg.render.RenderScene
 import hu.oandras.ksvg.render.Renderer
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
@@ -327,13 +327,25 @@ internal class SVGImpl internal constructor(
 
         val pools = PoolOwner()
 
-        val builder = RenderTreeBuilder(
+        val options = renderOptions as? RenderOptionsImpl ?: RenderOptionsImpl(renderOptions)
+        val scene = RenderScene.build(
             document = this,
             dPI = renderDPI,
             externalFileResolver = externalFileResolver,
             pools = pools,
+            options = options,
+            modificationCount = modificationCount,
+            optionsFingerprint = RenderScene.computeOptionsFingerprint(options),
         )
-        val node = builder.build(renderOptions) ?: return
+        val node = scene.rootNode ?: return
+        val vp = options.viewPort
+        if (vp != null) {
+            val bounds = android.graphics.Rect(
+                vp.minX.toInt(), vp.minY.toInt(),
+                (vp.minX + vp.width).toInt(), (vp.minY + vp.height).toInt()
+            )
+            scene.applyViewport(bounds, options, pools)
+        }
 
         val renderer = Renderer(
             document = this,

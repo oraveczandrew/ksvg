@@ -19,9 +19,84 @@ package hu.oandras.ksvg.render
 
 import android.graphics.Matrix
 import hu.oandras.ksvg.PreserveAspectRatio
+import hu.oandras.ksvg.dom.core.View
+import hu.oandras.ksvg.css.CSSLength
+import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Box
 import kotlin.math.max
 import kotlin.math.min
+
+/**
+ * Root-level viewBox/preserveAspectRatio overrides resolved from
+ * render-options (`view()` / `viewBox()` / `preserveAspectRatio()`) or the
+ * document root element. `null` means "no override, use element values".
+ */
+internal class RootViewOverrides(
+    @JvmField val viewBoxOverride: Box?,
+    @JvmField val parOverride: PreserveAspectRatio?,
+)
+
+/**
+ * Resolves the effective root view overrides from render options.
+ * Returns null when `options.view()` names an invalid <view> element
+ * (the build must fail in that case).
+ */
+internal fun resolveRootViewOverrides(document: SVGImpl, options: RenderOptionsImpl): RootViewOverrides? {
+    val rootObj = document.rootElement ?: return RootViewOverrides(null, null)
+    if (options.hasView()) {
+        val obj = document.getElementById(options.viewId)
+        if (obj !is View) return null
+        if (obj.viewBox == null) return null
+        return RootViewOverrides(obj.viewBox, obj.preserveAspectRatio)
+    }
+    val viewBoxOverride = if (options.hasViewBox()) options.viewBox else rootObj.viewBox
+    val parOverride = if (options.hasPreserveAspectRatio()) {
+        options.preserveAspectRatio
+    } else {
+        rootObj.preserveAspectRatio
+    }
+    return RootViewOverrides(viewBoxOverride, parOverride)
+}
+
+/**
+ * Builds a viewport Box from x/y/width/height lengths resolved in the current
+ * [RenderContext]; missing width/height fall back to the effective viewport.
+ */
+context(renderContext: RenderContext)
+internal fun makeViewportInContext(
+    x: CSSLength?,
+    y: CSSLength?,
+    width: CSSLength?,
+    height: CSSLength?
+): Box {
+    val viewPortUser = renderContext.effectiveViewPortInUserUnits
+    return Box(
+        minX = x?.floatValueXInContext() ?: 0f,
+        minY = y?.floatValueYInContext() ?: 0f,
+        width = width?.floatValueXInContext() ?: viewPortUser.width,
+        height = height?.floatValueYInContext() ?: viewPortUser.height
+    )
+}
+
+/**
+ * Writes the viewBox->viewport fit for one viewport container into [outMatrix]
+ * and returns the coordinate context the container's CONTENT lives in
+ * (the viewBox when present, null otherwise = the viewport itself is user space).
+ */
+internal fun applyViewportTransform(
+    viewPort: Box,
+    viewBox: Box?,
+    positioning: PreserveAspectRatio?,
+    outMatrix: Matrix,
+): Box? {
+    return if (viewBox != null) {
+        calculateViewBoxTransform(viewPort, viewBox, positioning, outMatrix)
+        viewBox
+    } else {
+        outMatrix.preTranslate(viewPort.minX, viewPort.minY)
+        null
+    }
+}
 
 /*
    * Calculate the transform required to fit the supplied viewBox into the current viewPort.

@@ -50,11 +50,11 @@ internal class RenderScene private constructor(
 ) {
 
     /** Last applied drawable bounds. */
-    @JvmField var viewport: Rect? = null
+    @JvmField
+    var viewport: Rect? = null
 
-    // Root-level view overrides resolved at build time (options.view / options.viewBox).
-    private var rootViewBoxOverride: Box? = null
-    private var rootParOverride: PreserveAspectRatio? = null
+    // Root-level view overrides resolved at build time (shared helper with the builder).
+    private var rootOverrides: RootViewOverrides = RootViewOverrides(null, null)
 
     fun isUpToDate(modificationCount: Int, fingerprint: Long): Boolean {
         return this.modificationCount == modificationCount &&
@@ -91,7 +91,7 @@ internal class RenderScene private constructor(
             }
         }
 
-        updateViewportContainer(root, rootSvg, vp, rootViewBoxOverride, rootParOverride, ctx)
+        updateViewportContainer(root, rootSvg, vp, rootOverrides.viewBoxOverride, rootOverrides.parOverride, ctx)
         viewport = Rect(bounds)
     }
 
@@ -120,16 +120,10 @@ internal class RenderScene private constructor(
         val matrix = Matrix()
         val viewBox = viewBoxOverride ?: container.viewBox
         val positioning = parOverride
-                ?: container.preserveAspectRatio
-                ?: PreserveAspectRatio.LETTERBOX
+            ?: container.preserveAspectRatio
+            ?: PreserveAspectRatio.LETTERBOX
 
-        if (viewBox != null) {
-            calculateViewBoxTransform(viewPort, viewBox, positioning, matrix)
-            ctx.walkViewBox = viewBox
-        } else {
-            matrix.preTranslate(viewPort.minX, viewPort.minY)
-            ctx.walkViewBox = null
-        }
+        ctx.walkViewBox = applyViewportTransform(viewPort, viewBox, positioning, matrix)
 
         if (node.viewBoxTransform != matrix) {
             node.viewBoxTransform = matrix
@@ -148,25 +142,22 @@ internal class RenderScene private constructor(
         for (i in children.indices) {
             val child = children[i]
             if (child !is GroupRenderNode<*>) continue
-            val spec = child.viewportSpec ?: continue
-            val container = child.sourceElement as? ViewBoxContainer ?: continue
 
-            val vp = resolveViewport(spec, ctx)
-            updateViewportContainer(child, container, vp, null, null, ctx)
+            val container = child.sourceElement as? ViewBoxContainer
+            if (child.viewportSpec != null && container != null) {
+                // Nested viewport container (<svg>/<symbol>): re-resolve its box
+                // and transform; recursion continues with the pushed context.
+                val vp = resolveViewport(child.viewportSpec!!, ctx)
+                updateViewportContainer(child, container, vp, null, null, ctx)
+            } else {
+                // Plain group: keep walking - nested viewports can sit at any depth.
+                updateChildren(child, ctx)
+            }
         }
     }
 
-    /** Mirrors RenderTreeBuilder.makeViewPort with the current walk context. */
     private fun resolveViewport(spec: ViewportSpec, ctx: SceneUpdateContext): Box {
-        val contextBox = ctx.effectiveViewPortInUserUnits
-        return with(ctx) {
-            Box(
-                minX = spec.x?.floatValueXInContext() ?: 0f,
-                minY = spec.y?.floatValueYInContext() ?: 0f,
-                width = spec.width?.floatValueXInContext() ?: contextBox.width,
-                height = spec.height?.floatValueYInContext() ?: contextBox.height
-            )
-        }
+        return with(ctx) { makeViewportInContext(spec.x, spec.y, spec.width, spec.height) }
     }
 
     internal companion object {
@@ -187,7 +178,7 @@ internal class RenderScene private constructor(
             )
             val node = builder.build(options)
             val scene = RenderScene(node, dPI, modificationCount, optionsFingerprint)
-            scene.resolveRootOverrides(document, options)
+            scene.rootOverrides = resolveRootViewOverrides(document, options) ?: RootViewOverrides(null, null)
             return scene
         }
 
@@ -202,25 +193,6 @@ internal class RenderScene private constructor(
             result = 31L * result + options.viewBox.hashCode()
             result = 31L * result + options.viewId.hashCode()
             return result
-        }
-    }
-
-    /** Mirrors the root view/viewBox/preserveAspectRatio resolution of build(renderOptions). */
-    private fun resolveRootOverrides(document: SVGImpl, options: RenderOptionsImpl) {
-        val rootObj = document.rootElement ?: return
-        if (options.hasView()) {
-            val obj = document.getElementById(options.viewId)
-            if (obj is View && obj.viewBox != null) {
-                rootViewBoxOverride = obj.viewBox
-                rootParOverride = obj.preserveAspectRatio
-            }
-        } else {
-            rootViewBoxOverride = if (options.hasViewBox()) options.viewBox else rootObj.viewBox
-            rootParOverride = if (options.hasPreserveAspectRatio()) {
-                options.preserveAspectRatio
-            } else {
-                rootObj.preserveAspectRatio
-            }
         }
     }
 }
