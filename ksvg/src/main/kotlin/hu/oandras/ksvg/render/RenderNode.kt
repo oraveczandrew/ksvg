@@ -542,6 +542,10 @@ internal class FeComponentTransferRenderNode(
 ) : FilterPrimitiveRenderNode<FeComponentTransfer>(sourceElement) {
     @JvmField val srcPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
+
+    // Lazily built [A,R,G,B] 256-entry LUTs; null until first use. The tables
+    // depend only on build-time transfer functions, so they are computed once.
+    @JvmField var lutTables: Array<ByteArray>? = null
 }
 
 internal class FeCompositeRenderNode(

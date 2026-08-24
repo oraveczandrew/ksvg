@@ -164,6 +164,24 @@ convolve (3×3/5×5) + LUT kernels; optionally blend/colorMatrix.
 
 ### feComponentTransfer → LUT (highest-value toolkit match)
 
+**STATUS: DONE (Phase 1a). Implementation deviation from the original plan (documented):**
+the current Kotlin path uses `Bitmap.getPixels`, which returns **unpremultiplied**
+components — so the spec-semantics are already correct without any premultiply handling.
+The toolkit `Lut` kernel (premultiplied ByteArray RGBA) would have needed extra
+conversion passes; instead a compact custom kernel
+(`filtering/src/main/cpp/component_transfer.cpp` + `ComponentTransferNative`) operates
+directly on the existing pooled `IntArray`s:
+- Kotlin precomputes 4×256 byte LUTs replicating `applyTransferFunction` exactly,
+  including sRGB→linear→transfer→sRGB folding for linearRGB (`buildTransferLutTables`),
+  cached on `FeComponentTransferRenderNode.lutTables` (computed once per node).
+- Native side is a pure table-gather over the clip region; outside-clip pixels are set to
+  transparent black (bit-exact with the old `outPixels.fill(0)` semantics).
+- Kotlin scalar loop retained as fallback (`doComponentTransferKotlin`) when the native
+  lib is unavailable (JVM/Robolectric determinism preserved).
+- Device parity test: `ComponentTransferNativeDeviceTest` (androidTest).
+- Gates run: full unit suite + `-PverifyFilter=component_transfer` visual suites green
+  (JVM exercises the fallback; native path verified by device test / device goldens).
+
 - Build-time: compute four 256-entry tables (`table`/`discrete`/`linear`/`gamma`) per
   channel exactly as today's Kotlin does, then one JNI call over the whole bitmap.
 - **linearRGB/color-interpolation-filters**: fold sRGB→linear into table construction only

@@ -25,8 +25,10 @@ import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.filter.FeColorMatrixType
 import hu.oandras.ksvg.dom.filter.FeFunc
 import hu.oandras.ksvg.dom.filter.FeFuncType
+import hu.oandras.ksvg.filtering.ComponentTransferNative
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeComponentTransferRenderNode
+import hu.oandras.ksvg.render.ComponentTransferFunctions
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_BLUE
 import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_GREEN
@@ -172,15 +174,77 @@ internal fun doFeComponentTransferFilter(
     val pixels = primitiveNode.srcPixels.getWithSize(size)
     inputBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
     val outPixels = primitiveNode.outPixels.getWithSize(size)
-    
+
     val clipLeft = clamp(((primitiveRegion.left - filterRegion.left)).toInt(), 0, width)
     val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
     val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
     val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
 
-    outPixels.fill(0) // Initialize with transparent
-    val useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+    if (ComponentTransferNative.isAvailable) {
+        val tables = primitiveNode.lutTables ?: buildTransferLutTables(
+            transferFunctions,
+            primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+        ).also { primitiveNode.lutTables = it }
+        ComponentTransferNative.apply(
+            pixels, outPixels, width, height,
+            clipLeft, clipTop, clipRight, clipBottom,
+            tables[0], tables[1], tables[2], tables[3]
+        )
+    } else {
+        doComponentTransferKotlin(
+            pixels, outPixels, width, height,
+            clipLeft, clipTop, clipRight, clipBottom,
+            transferFunctions,
+            primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+        )
+    }
 
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
+    res.setPixels(outPixels, 0, width, 0, 0, width, height)
+    return res
+}
+
+/**
+ * Precomputes the four per-channel 256-entry LUTs for [ComponentTransferNative].
+ * Each entry replicates [applyTransferFunction] exactly (including the
+ * sRGB->linear->transfer->sRGB folding used by the linearRGB color
+ * interpolation path), so native output is bit-identical to the Kotlin loop.
+ */
+private fun buildTransferLutTables(
+    transferFunctions: ComponentTransferFunctions,
+    useLinearRgb: Boolean,
+): Array<ByteArray> = arrayOf(
+    buildChannelLut(transferFunctions.a, useLinearRgb, isAlpha = true),
+    buildChannelLut(transferFunctions.r, useLinearRgb, isAlpha = false),
+    buildChannelLut(transferFunctions.g, useLinearRgb, isAlpha = false),
+    buildChannelLut(transferFunctions.b, useLinearRgb, isAlpha = false),
+)
+
+private fun buildChannelLut(func: FeFunc?, useLinearRgb: Boolean, isAlpha: Boolean): ByteArray {
+    val table = ByteArray(256)
+    for (v in 0..255) {
+        table[v] = (if (useLinearRgb && !isAlpha) {
+            linearToSRgb(applyTransferFunction(sRgbToLinear(v), func))
+        } else {
+            applyTransferFunction(v, func)
+        }).toByte()
+    }
+    return table
+}
+
+private fun doComponentTransferKotlin(
+    pixels: IntArray,
+    outPixels: IntArray,
+    width: Int,
+    height: Int,
+    clipLeft: Int,
+    clipTop: Int,
+    clipRight: Int,
+    clipBottom: Int,
+    transferFunctions: ComponentTransferFunctions,
+    useLinear: Boolean,
+) {
+    outPixels.fill(0) // Initialize with transparent, matching the native kernel
     for (y in clipTop until clipBottom) {
         val rowOffset = y * width
         for (x in clipLeft until clipRight) {
@@ -203,10 +267,6 @@ internal fun doFeComponentTransferFilter(
             }
         }
     }
-
-    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
-    res.setPixels(outPixels, 0, width, 0, 0, width, height)
-    return res
 }
 
 private fun applyTransferFunction(value: Int, transferFunction: FeFunc?): Int {

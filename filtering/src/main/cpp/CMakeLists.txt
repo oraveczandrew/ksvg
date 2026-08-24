@@ -30,7 +30,7 @@ if(ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
     set(BLUR_SOURCES x86.cpp)
 endif()
 
-add_library(ksvgblur SHARED gaussian_blur.cpp ${BLUR_SOURCES})
+add_library(ksvgblur SHARED gaussian_blur.cpp component_transfer.cpp ${BLUR_SOURCES})
 
 # The ARM32 kernels use NEON instructions; enable the FPU for the C++ side too.
 if(BLUR_NEEDS_NEON)
