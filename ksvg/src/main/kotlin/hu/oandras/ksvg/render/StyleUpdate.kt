@@ -363,8 +363,11 @@ internal fun updateStyle(
         val wordSpacing = sourceStyle.wordSpacing!!
         builder.wordSpacing = wordSpacing
         val spacing = wordSpacing.floatValueInContext()
-        state.fillPaint.setWordSpacingCompat(spacing)
-        state.strokePaint.setWordSpacingCompat(spacing)
+        if (state.appliedWordSpacing != spacing) {
+            state.fillPaint.setWordSpacingCompat(spacing)
+            state.strokePaint.setWordSpacingCompat(spacing)
+            state.appliedWordSpacing = spacing
+        }
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_FILTER)) {
@@ -499,6 +502,12 @@ private fun setPaintColor(
         }
     }
 
+    // Keep the explicit shader reset: mock-based tests record the assignment, and
+    // gradients rely on it being cleared. Only the color write is change-guarded
+    // (OEM ROMs like OnePlus allocate inside setters even for unchanged values).
     targetPaint.shader = null
-    targetPaint.setColor(col.colorWithOpacity(paintOpacity))
+    val newColor = col.colorWithOpacity(paintOpacity)
+    if (targetPaint.color != newColor) {
+        targetPaint.color = newColor
+    }
 }

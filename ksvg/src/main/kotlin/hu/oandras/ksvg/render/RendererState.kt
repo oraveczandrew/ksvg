@@ -64,9 +64,7 @@ internal class RendererState private constructor(
         flags = Paint.ANTI_ALIAS_FLAG or Paint.LINEAR_TEXT_FLAG or Paint.SUBPIXEL_TEXT_FLAG
         hinting = Paint.HINTING_OFF
         style = Paint.Style.FILL
-        setTypeface(
-            Typeface.DEFAULT
-        )
+        setTypeface(Typeface.DEFAULT)
     }
 
     val fillPaint: Paint
@@ -138,6 +136,19 @@ internal class RendererState private constructor(
     @JvmField
     var dashLengthScale: Float = 1f
 
+    // Last values written to these paints by the font styler. Some OEM ROMs
+    // (OnePlus PaintExtImpl.replaceTypeface) hook paint setters and allocate on
+    // EVERY call even for unchanged values, so callers skip redundant writes
+    // using these caches instead of reading them back from Paint.
+    @JvmField
+    internal var appliedTypeface: Typeface? = null
+    @JvmField
+    internal var appliedFontVariationSettings: String? = null
+    @JvmField
+    internal var appliedFontFeatureSettings: String? = null
+    @JvmField
+    internal var appliedWordSpacing: Float = Float.NaN
+
     private var lastDashIntervals: FloatArray? = null
     private var lastDashOffset: Float = 0f
     private var lastPathEffect: DashPathEffect? = null
@@ -197,6 +208,11 @@ internal class RendererState private constructor(
             strokePaintDirty = other.strokePaintDirty
             strokePaint.set(other.strokePaint)
         }
+
+        appliedTypeface = null
+        appliedFontVariationSettings = null
+        appliedFontFeatureSettings = null
+        appliedWordSpacing = Float.NaN
 
         viewPort = other.viewPort
         viewBox = other.viewBox
