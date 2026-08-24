@@ -150,6 +150,7 @@ Audit:
 - `currentColor`
 - color interpolation
 - color spaces
+- ICC profiles (SVG 2 `color-profile` / `@color-profile`) if targeted
 - gamut handling
 
 Implementation policy must explicitly state the supported color model. A renderer can intentionally support a subset; it must not silently claim full CSS Color support.
@@ -227,6 +228,7 @@ Audit:
 
 Primitive inventory:
 
+- `feDropShadow`
 - `feBlend`
 - `feColorMatrix`
 - `feComponentTransfer`
@@ -275,6 +277,8 @@ Audit:
 - `mix-blend-mode`
 - isolation
 - group compositing
+- `mix-blend-mode` + `isolation`: blending is scoped to the nearest stacking
+  context / isolated group; group opacity applies AFTER child blending
 - opacity
 - premultiplied-alpha behavior
 - stacking/compositing contexts
@@ -370,6 +374,8 @@ Audit:
 - `preserveAspectRatio`
 - viewport creation
 - nested viewport creation
+- `<use>` shadow-tree semantics: cloned content vs shared state (bounding
+  boxes, cached paths), style inheritance through the shadow tree
 - user coordinate system
 - viewport coordinate system
 - default viewport
@@ -640,7 +646,9 @@ Audit:
 - `y`
 - `preserveAspectRatio`
 - image decoding
+- `image-rendering` quality hints
 - image color/alpha
+- ICC/color-profile metadata inside raster images
 - clipping
 - filtering
 - opacity
@@ -860,6 +868,7 @@ At minimum, audit these SVG-relevant groups.
 
 ## Geometry-related CSS
 
+- `transform-origin` / `transform-box` interaction with SVG elements
 - `x`
 - `y`
 - `cx`
@@ -904,6 +913,8 @@ Core concepts:
 - `<clipPath>`
 - `clipPathUnits`
 - `clip-rule`
+- legacy `clip` property (viewport-establishing elements only) and its
+  distinction from `clip-path`
 - basic shapes
 - referenced paths/shapes
 - nested clip paths
@@ -1119,6 +1130,13 @@ Audit SVG conditional constructs where targeted:
 - system language
 - conditional rendering
 
+For `<switch>` selection order matters: the FIRST acceptable direct child wins,
+never a merge. `systemLanguage` uses BCP 47 matching with region-fallback
+semantics (`en-US` request matches `en` tag); document whether the
+implementation performs prefix fallback or exact tag comparison only.
+`requiredExtensions` with any non-empty value must evaluate to false unless the
+extension is recognized.
+
 Document unsupported conditional-processing behavior explicitly.
 
 ---
@@ -1293,6 +1311,8 @@ These are deliberately listed because they are easy to miss in AI-generated SVG 
 
 ## Rendering
 
+- `shape-rendering`
+- `text-rendering`
 - `overflow`
 - `display`
 - `visibility`
