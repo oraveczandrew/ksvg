@@ -35,10 +35,11 @@ import kotlin.math.min
 
 context(renderContext: AnimationContext)
 internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathRenderNode? = null): Boolean {
-    val objWidth = obj.width!!
-    val objHeight = obj.height!!
-    var x: Float = obj.x?.floatValueXInContext() ?: 0f
-    var y: Float = obj.y?.floatValueYInContext() ?: 0f
+    // Missing width/height makes the <rect> invalid -> not rendered (spec).
+    val objWidth = obj.width ?: return false
+    val objHeight = obj.height ?: return false
+    var x: Float = obj.x.floatValueXInContext()
+    var y: Float = obj.y.floatValueYInContext()
     var w: Float = objWidth.floatValueXInContext()
     var h: Float = objHeight.floatValueYInContext()
     
@@ -80,7 +81,9 @@ context(renderContext: AnimationContext)
 internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: PathRenderNode? = null): Boolean {
     var cx = obj.cx?.floatValueXInContext() ?: 0f
     var cy = obj.cy?.floatValueYInContext() ?: 0f
-    var r = obj.r!!.floatValueInContext()
+    // Missing r makes the <circle> invalid -> not rendered (spec).
+    val rLength = obj.r ?: return false
+    var r = rLength.floatValueInContext()
 
     if (node != null) {
         cx = animatedFloat(node, SVGAttr.cx, cx)
@@ -104,8 +107,11 @@ context(renderContext: AnimationContext)
 internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: PathRenderNode? = null): Boolean {
     var cx = obj.cx?.floatValueXInContext() ?: 0f
     var cy = obj.cy?.floatValueYInContext() ?: 0f
-    var rx = obj.rx!!.floatValueXInContext()
-    var ry = obj.ry!!.floatValueYInContext()
+    // Missing rx/ry make the <ellipse> invalid -> not rendered (spec).
+    val rxLength = obj.rx ?: return false
+    val ryLength = obj.ry ?: return false
+    var rx = rxLength.floatValueXInContext()
+    var ry = ryLength.floatValueYInContext()
 
     if (node != null) {
         cx = animatedFloat(node, SVGAttr.cx, cx)

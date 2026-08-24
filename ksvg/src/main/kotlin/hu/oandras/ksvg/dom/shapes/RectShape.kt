@@ -31,10 +31,11 @@ internal class RectShape(
     baseParams: BaseParams,
     conditionalBundle: Conditional,
     transform: Matrix?,
+    // Per spec x/y default to 0.
     @JvmField
-    val x: CSSLength?,
+    val x: CSSLength,
     @JvmField
-    val y: CSSLength?,
+    val y: CSSLength,
     @JvmField
     val width: CSSLength?,
     @JvmField
@@ -87,8 +88,8 @@ internal class RectShape(
                 baseParams = getBaseParams(),
                 conditionalBundle = getSvgConditionalBundle(),
                 transform = getTransform(),
-                x = x,
-                y = y,
+                x = x ?: CSSLength.ZERO,
+                y = y ?: CSSLength.ZERO,
                 width = width,
                 height = height,
                 rx = rx,
