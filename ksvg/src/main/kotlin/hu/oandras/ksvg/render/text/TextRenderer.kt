@@ -69,21 +69,22 @@ internal abstract class TextProcessor {
     }
 
     protected fun applyPositioning() {
-        var absX: Float? = null
-        var absY: Float? = null
-        var relX = 0f
-        var relY = 0f
+        // Primitive locals: Float? would box every assignment on this hot path.
+        var absX = Float.NaN
+        var absY = Float.NaN
 
         for (i in positioningStack.size - 1 downTo 0) {
             val p = positioningStack[i]
-            if (absX == null && p.x != null && p.index < p.x.size) {
+            if (absX.isNaN() && p.x != null && p.index < p.x.size) {
                 absX = p.x[p.index]
             }
-            if (absY == null && p.y != null && p.index < p.y.size) {
+            if (absY.isNaN() && p.y != null && p.index < p.y.size) {
                 absY = p.y[p.index]
             }
         }
 
+        var relX = 0f
+        var relY = 0f
         positioningStack.forEachElement { p ->
             if (p.dx != null && p.index < p.dx.size) {
                 relX += p.dx[p.index]
@@ -94,8 +95,8 @@ internal abstract class TextProcessor {
             p.index++
         }
 
-        if (absX != null) x = absX
-        if (absY != null) y = absY
+        if (!absX.isNaN()) x = absX
+        if (!absY.isNaN()) y = absY
         x += relX
         y += relY
     }

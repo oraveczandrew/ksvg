@@ -42,15 +42,16 @@ internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathR
     var w: Float = objWidth.floatValueXInContext()
     var h: Float = objHeight.floatValueYInContext()
     
-    var rx = obj.rx?.floatValueXInContext()
-    var ry = obj.ry?.floatValueYInContext()
+    // Keep these as primitive locals: a `Float?` intermediate would box every
+    // value (java.lang.Float) on each render pass.
+    val rxLength = obj.rx
+    val ryLength = obj.ry
+    var rxVal = if (rxLength != null) rxLength.floatValueXInContext() else 0f
+    var ryVal = if (ryLength != null) ryLength.floatValueYInContext() else 0f
 
     // Per SVG spec, if one of rx/ry is omitted it defaults to the other.
-    if (rx != null && ry == null) ry = rx
-    if (ry != null && rx == null) rx = ry
-
-    var rxVal = rx ?: 0f
-    var ryVal = ry ?: 0f
+    if (ryLength == null && rxLength != null) ryVal = rxVal
+    if (rxLength == null && ryLength != null) rxVal = ryVal
 
     if (node != null) {
         x = animatedFloat(node, SVGAttr.x, x)
