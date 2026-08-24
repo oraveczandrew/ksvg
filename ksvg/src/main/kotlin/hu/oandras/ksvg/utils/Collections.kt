@@ -137,3 +137,20 @@ internal inline fun <T> List<T>.mapToFloatArray(r: (T) -> Float): FloatArray {
         r(get(it))
     }
 }
+
+internal inline fun <T> List<T>?.anyElement(predicate: (T) -> Boolean): Boolean {
+    if (this == null) return false
+    for (i in indices) {
+        if (predicate(get(i))) {
+            return true
+        }
+    }
+    return false
+}
+
+internal fun FloatArray?.contentEquals(other: FloatArray?): Boolean {
+    if (this === other) return true
+    if (this == null || other == null || size != other.size) return false
+    for (i in indices) if (this[i] != other[i]) return false
+    return true
+}

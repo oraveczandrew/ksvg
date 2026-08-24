@@ -38,6 +38,7 @@ import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.render.PaintConfiguration.Companion.DEFAULT_TEXT_SIZE
 import hu.oandras.ksvg.render.pool.BitmapPool
 import hu.oandras.ksvg.render.pool.PoolOwner
+import hu.oandras.ksvg.utils.anyElement
 
 /**
  * Owns a built render-node tree together with the state that decides when the
@@ -198,8 +199,8 @@ internal class RenderScene private constructor(
                     val y = obj.y?.map { it.floatValueYInContext() }?.toFloatArray()
                     val dx = obj.dx?.map { it.floatValueXInContext() }?.toFloatArray()
                     val dy = obj.dy?.map { it.floatValueYInContext() }?.toFloatArray()
-                    if (!contentEquals(x, node.x) || !contentEquals(y, node.y) ||
-                            !contentEquals(dx, node.dx) || !contentEquals(dy, node.dy)) {
+                    if (!x.contentEquals(node.x) || !y.contentEquals(node.y) ||
+                            !dx.contentEquals(node.dx) || !dy.contentEquals(node.dy)) {
                         node.x = x; node.y = y; node.dx = dx; node.dy = dy
                         node.notifyChange(true)
                     }
@@ -226,8 +227,8 @@ internal class RenderScene private constructor(
                     val y = obj.y?.map { it.floatValueYInContext() }?.toFloatArray()
                     val dx = obj.dx?.map { it.floatValueXInContext() }?.toFloatArray()
                     val dy = obj.dy?.map { it.floatValueYInContext() }?.toFloatArray()
-                    if (!contentEquals(x, node.x) || !contentEquals(y, node.y) ||
-                            !contentEquals(dx, node.dx) || !contentEquals(dy, node.dy)) {
+                    if (!x.contentEquals(node.x) || !y.contentEquals(node.y) ||
+                            !dx.contentEquals(node.dx) || !dy.contentEquals(node.dy)) {
                         node.x = x; node.y = y; node.dx = dx; node.dy = dy
                         node.notifyChange(true)
                     }
@@ -263,8 +264,9 @@ internal class RenderScene private constructor(
         }
     }
 
+    private fun CSSLength?.isPercent(): Boolean = this != null && unit == CssUnit.percent
+
     private fun shapeUsesPercentUnits(shape: Shape): Boolean {
-        fun CSSLength?.isPercent(): Boolean = this != null && unit == CssUnit.percent
         return when (shape) {
             is RectShape -> shape.x.isPercent() || shape.y.isPercent() ||
                     shape.width.isPercent() || shape.height.isPercent() ||
@@ -275,7 +277,6 @@ internal class RenderScene private constructor(
             is LineShape -> shape.x1.isPercent() || shape.y1.isPercent() ||
                     shape.x2.isPercent() || shape.y2.isPercent()
             is PolyLineShape, is PathShape -> false // point lists / path data contain no lengths
-            else -> false
         }
     }
 
@@ -292,15 +293,7 @@ internal class RenderScene private constructor(
 
     private fun TextPath.hasViewportDependentLengths(): Boolean = startOffset?.unit == CssUnit.percent
 
-    private fun hasPercent(lengths: List<CSSLength>?): Boolean =
-        lengths?.any { it.unit == CssUnit.percent } == true
-
-    private fun contentEquals(a: FloatArray?, b: FloatArray?): Boolean {
-        if (a === b) return true
-        if (a == null || b == null || a.size != b.size) return false
-        for (i in a.indices) if (a[i] != b[i]) return false
-        return true
-    }
+    private fun hasPercent(lengths: List<CSSLength>?): Boolean = lengths.anyElement { it.unit == CssUnit.percent }
 
     private fun resolveViewport(spec: ViewportSpec, ctx: SceneUpdateContext): Box {
         return with(ctx) { makeViewportInContext(spec.x, spec.y, spec.width, spec.height) }
