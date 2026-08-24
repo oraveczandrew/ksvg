@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.filtering
 
 import kotlin.math.pow
+import kotlin.math.sqrt
 import kotlin.math.roundToInt
 
 /**
@@ -35,6 +36,9 @@ public object KotlinKernels {
 
     private fun clamp255(value: Float): Int =
             value.roundToInt().coerceIn(0, 255)
+
+    private fun clamp(v: Float, min: Float, max: Float): Float =
+            v.coerceIn(min, max)
 
     private fun sampleCoordinate(coordinate: Int, limit: Int, edgeMode: Int): Int =
             if (coordinate in 0 until limit) coordinate else when (edgeMode) {
@@ -188,6 +192,131 @@ public object KotlinKernels {
                                 ((tableR[(c shr 16) and 0xFF].toInt() and 0xFF) shl 16) or
                                 ((tableG[(c shr 8) and 0xFF].toInt() and 0xFF) shl 8) or
                                 (tableB[c and 0xFF].toInt() and 0xFF)
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- lighting
+
+    /**
+     * feDiffuseLighting / feSpecularLighting. [params] packing matches
+     * [LightingNative.apply]: distant -> [azimuthDeg, elevationDeg];
+     * point -> [x, y, z]; spot -> [x, y, z, pointsAtX/Y/Z, coneAngleDeg]
+     * (NaN = no cone). Bit-exact reference for `lighting.cpp`.
+     */
+    public fun lighting(
+            pix: IntArray,
+            out: IntArray,
+            width: Int,
+            height: Int,
+            clipLeft: Int,
+            clipTop: Int,
+            clipRight: Int,
+            clipBottom: Int,
+            surfaceScaleNormalized: Float,
+            invCanvasScaleX: Double,
+            invCanvasScaleY: Double,
+            userLeft: Double,
+            userTop: Double,
+            originX: Double,
+            originY: Double,
+            unitSizeX: Double,
+            unitSizeY: Double,
+            canvasScaleX: Float,
+            canvasScaleY: Float,
+            lightType: Int,
+            specular: Boolean,
+            k: Float,
+            exponent: Float,
+            lightR: Int,
+            lightG: Int,
+            lightB: Int,
+            params: DoubleArray,
+    ) {
+        fun heightAt(x: Int, y: Int): Float {
+            val cx = x.coerceIn(0, width - 1)
+            val cy = y.coerceIn(0, height - 1)
+            return ((pix[cy * width + cx] shr 24) and 0xff) * surfaceScaleNormalized
+        }
+
+        for (y in clipTop until clipBottom) {
+            val userY = userTop + y * invCanvasScaleY
+            val uy = ((userY - originY) / unitSizeY).toFloat()
+            val rowOffset = y * width
+            for (x in clipLeft until clipRight) {
+                val userX = userLeft + x * invCanvasScaleX
+                val ux = ((userX - originX) / unitSizeX).toFloat()
+
+                val surfaceZ = heightAt(x, y)
+
+                var lx = 0f; var ly = 0f; var lz = 0f; var factor = 0f
+                when (lightType) {
+                    0 -> {
+                        val az = Math.toRadians(params[0])
+                        val el = Math.toRadians(params[1])
+                        lx = (Math.cos(az) * Math.cos(el)).toFloat()
+                        ly = (Math.sin(az) * Math.cos(el)).toFloat()
+                        lz = Math.sin(el).toFloat()
+                        factor = 1f
+                    }
+                    1 -> {
+                        val vx = params[0].toFloat() - ux
+                        val vy = params[1].toFloat() - uy
+                        val vz = params[2].toFloat() - surfaceZ
+                        val len = sqrt(vx * vx + vy * vy + vz * vz)
+                        if (len == 0f) { factor = 0f }
+                        else { lx = vx / len; ly = vy / len; lz = vz / len; factor = 1f }
+                    }
+                    else -> {
+                        val vx = params[0].toFloat() - ux
+                        val vy = params[1].toFloat() - uy
+                        val vz = params[2].toFloat() - surfaceZ
+                        val len = sqrt(vx * vx + vy * vy + vz * vz)
+                        if (len == 0f) { factor = 0f }
+                        else {
+                            lx = vx / len; ly = vy / len; lz = vz / len; factor = 1f
+                            val tx = params[3] - params[0]
+                            val ty = params[4] - params[1]
+                            val tz = params[5] - params[2]
+                            val tLen = sqrt((tx * tx + ty * ty + tz * tz).toFloat()).toDouble()
+                            if (tLen == 0.0) {
+                                factor = 1f
+                            } else {
+                                val sx = tx / tLen; val sy = ty / tLen; val sz = tz / tLen
+                                var dot = (sx * -lx + sy * -ly + sz * -lz)
+                                if (dot < -1.0) dot = -1.0 else if (dot > 1.0) dot = 1.0
+                                var f = dot.toFloat()
+                                if (!params[6].isNaN() && f.toDouble() < Math.cos(params[6] * Math.PI / 180.0)) f = 0f
+                                factor = f.coerceAtLeast(0f)
+                            }
+                        }
+                    }
+                }
+
+                val dzdx = (heightAt(x + 1, y - 1) + 2 * heightAt(x + 1, y) + heightAt(x + 1, y + 1) -
+                        (heightAt(x - 1, y - 1) + 2 * heightAt(x - 1, y) + heightAt(x - 1, y + 1))) / (4f / canvasScaleX)
+                val dzdy = (heightAt(x - 1, y + 1) + 2 * heightAt(x, y + 1) + heightAt(x + 1, y + 1) -
+                        (heightAt(x - 1, y - 1) + 2 * heightAt(x, y - 1) + heightAt(x + 1, y - 1))) / (4f / canvasScaleY)
+
+                var nx = -dzdx; var ny = -dzdy; var nz = 1f
+                val nLen = sqrt(nx * nx + ny * ny + nz * nz)
+                if (nLen != 0f) { nx /= nLen; ny /= nLen; nz /= nLen }
+
+                val intensity: Float = if (!specular) {
+                    clamp((nx * lx + ny * ly + nz * lz).coerceAtLeast(0f) * k * factor, 0f, 1f)
+                } else {
+                    var hx = lx; var hy = ly; var hz = lz + 1f
+                    val hLen = sqrt(hx * hx + hy * hy + hz * hz)
+                    if (hLen != 0f) { hx /= hLen; hy /= hLen; hz /= hLen }
+                    val ndoth = (nx * hx + ny * hy + nz * hz).coerceAtLeast(0f)
+                    clamp((k * ndoth.toDouble().pow(exponent.toDouble()).toFloat() * factor), 0f, 1f)
+                }
+
+                val outR = clamp255(lightR * intensity)
+                val outG = clamp255(lightG * intensity)
+                val outB = clamp255(lightB * intensity)
+                val outA = if (specular) maxOf(outR, outG, outB) else 255
+                out[rowOffset + x] = (outA shl 24) or (outR shl 16) or (outG shl 8) or outB
             }
         }
     }
