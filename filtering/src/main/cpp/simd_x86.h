@@ -51,6 +51,13 @@ void ksvgConvolveApplyInteriorAvx512(
         const jint targetX, const jint targetY,
         const jfloat divisor, const jfloat bias, const jboolean preserveAlpha);
 
+// blur_x86.cpp / gaussian_blur.cpp — vertical separable blur pass over byte
+// pixels, 8 columns per iteration (horizontal pass stays SSE: the float4-
+// interleaved intermediate would need gathers/transposes that eat the gain).
+void ksvgBlurVerticalAvx2(
+        void* dst, const void* pin, const int stride, const void* gptr,
+        const int rct, int x1, int x2);
+
 // component_transfer.cpp — full clip-region LUT pass.
 void ksvgComponentTransferApplyAvx2(
         const jint* src, jint* dst, const jint width, const jint height,

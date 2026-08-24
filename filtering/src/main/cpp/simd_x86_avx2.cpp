@@ -270,6 +270,57 @@ void ksvgComponentTransferApplyAvx2(
     }
 }
 
+
+void ksvgBlurVerticalAvx2(
+        void* dst, const void* pin, const int stride, const void* gptr,
+        const int rct, int x1, int x2) {
+    const __m256i maskFF = _mm256_set1_epi32(0xFF);
+    const char* base = static_cast<const char*>(pin);
+
+    for (; x1 + 8 <= x2; x1 += 8) {
+        __m256 accB = _mm256_setzero_ps();
+        __m256 accG = _mm256_setzero_ps();
+        __m256 accR = _mm256_setzero_ps();
+        __m256 accA = _mm256_setzero_ps();
+
+        const char* pi = base + (x1 << 2);
+        for (int r = 0; r < rct; ++r) {
+            const __m256 w = _mm256_set1_ps(
+                    static_cast<const float*>(gptr)[r]);
+            const __m256i p = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pi));
+            const __m256i tb = _mm256_and_si256(p, maskFF);
+            const __m256i tg = _mm256_and_si256(_mm256_srli_epi32(p, 8), maskFF);
+            const __m256i tr = _mm256_and_si256(_mm256_srli_epi32(p, 16), maskFF);
+            const __m256i ta = _mm256_srli_epi32(p, 24);
+            accB = _mm256_add_ps(accB, _mm256_mul_ps(_mm256_cvtepi32_ps(tb), w));
+            accG = _mm256_add_ps(accG, _mm256_mul_ps(_mm256_cvtepi32_ps(tg), w));
+            accR = _mm256_add_ps(accR, _mm256_mul_ps(_mm256_cvtepi32_ps(tr), w));
+            accA = _mm256_add_ps(accA, _mm256_mul_ps(_mm256_cvtepi32_ps(ta), w));
+            pi += stride;
+        }
+
+        // Transpose 4 channels x 8 columns -> 8 float4 groups.
+        const __m256 t0 = _mm256_unpacklo_ps(accB, accG); // [B0,G0,B1,G1|B4,G4,B5,G5]
+        const __m256 t1 = _mm256_unpackhi_ps(accB, accG); // [B2,G2,B3,G3|B6,G6,B7,G7]
+        const __m256 t2 = _mm256_unpacklo_ps(accR, accA);
+        const __m256 t3 = _mm256_unpackhi_ps(accR, accA);
+        const __m256 o01 = _mm256_shuffle_ps(t0, t2, _MM_SHUFFLE(1, 0, 1, 0));
+        const __m256 o23 = _mm256_shuffle_ps(t0, t2, _MM_SHUFFLE(3, 2, 3, 2));
+        const __m256 o45 = _mm256_shuffle_ps(t1, t3, _MM_SHUFFLE(1, 0, 1, 0));
+        const __m256 o67 = _mm256_shuffle_ps(t1, t3, _MM_SHUFFLE(3, 2, 3, 2));
+
+        float* f = static_cast<float*>(dst) + static_cast<size_t>(x1) * 4;
+        _mm_storeu_ps(f + 0 * 4, _mm256_castps256_ps128(o01));
+        _mm_storeu_ps(f + 1 * 4, _mm256_castps256_ps128(o23));
+        _mm_storeu_ps(f + 2 * 4, _mm256_castps256_ps128(o45));
+        _mm_storeu_ps(f + 3 * 4, _mm256_castps256_ps128(o67));
+        _mm_storeu_ps(f + 4 * 4, _mm256_extractf128_ps(o01, 1));
+        _mm_storeu_ps(f + 5 * 4, _mm256_extractf128_ps(o23, 1));
+        _mm_storeu_ps(f + 6 * 4, _mm256_extractf128_ps(o45, 1));
+        _mm_storeu_ps(f + 7 * 4, _mm256_extractf128_ps(o67, 1));
+    }
+}
+
 } // extern "C"
 
 #endif // __i386__ || __x86_64__

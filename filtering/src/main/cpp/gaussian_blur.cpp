@@ -34,6 +34,9 @@ extern "C" void rsdIntrinsicBlurU4_K(uint8_t* out, const uint8_t* in,
                                      size_t y, size_t count, size_t r,
                                      const uint16_t* tab);
 #elif defined(__i386__) || defined(__x86_64__)
+#include "cpu_dispatch.h"
+#include "simd_x86.h"
+
 extern "C" void rsdIntrinsicBlurVFU4_K(void* dst, const void* pin, int stride,
                                        const void* gptr, int rct, int x1, int x2);
 extern "C" void rsdIntrinsicBlurHFU4_K(void* dst, const void* pin,
@@ -199,10 +202,19 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
         const uint8_t* inTop = in.data() + static_cast<size_t>((y - r) * pw) * 4;
 
         // Vertical pass -> float4 per column (fbuf_mid[0..pw)).
-        int pwEven = pw & ~1;
-        if (pwEven > 0)
-            rsdIntrinsicBlurVFU4_K(fbuf_mid, inTop, (int)stride, gptr, rct, 0, pwEven);
-        for (int xx = pwEven; xx < pw; ++xx) {
+        // AVX2 path handles 8 columns per iteration; the SSE kernel covers
+        // pairs; the remaining <=7 tail runs scalar either way.
+        int vEnd;
+        if (detectSimdLevel() >= SIMD_AVX2) {
+            vEnd = pw & ~7;
+            if (vEnd > 0)
+                ksvgBlurVerticalAvx2(fbuf_mid, inTop, (int)stride, gptr, rct, 0, vEnd);
+        } else {
+            vEnd = pw & ~1;
+            if (vEnd > 0)
+                rsdIntrinsicBlurVFU4_K(fbuf_mid, inTop, (int)stride, gptr, rct, 0, vEnd);
+        }
+        for (int xx = vEnd; xx < pw; ++xx) {
             float a = 0.0f, rr = 0.0f, g = 0.0f, b = 0.0f;
             for (int k = -r; k <= r; ++k) {
                 const uint8_t* p = in.data() + static_cast<size_t>((y + k) * pw + xx) * 4;
