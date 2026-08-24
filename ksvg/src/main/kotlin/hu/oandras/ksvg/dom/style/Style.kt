@@ -597,6 +597,13 @@ internal class Style internal constructor(
     @JvmField
     val specifiedFlags2: Long,
 
+    // Third flag group: holds the SAME concrete SPECIFIED_* bit values, marking
+    // properties whose winning declaration was a CSS-wide keyword (inherit/unset/
+    // initial/revert). While a bit is set here, isSpecified() reports the property
+    // as unspecified so the inherited (parent computed) value survives.
+    @JvmField
+    val cssWideKeywordFlags: Long,
+
     @JvmField val fill: SvgPaint?,
     @JvmField val fillRule: FillRule?,
     @JvmField val fillOpacity: Float,
@@ -700,9 +707,19 @@ internal class Style internal constructor(
     @JvmField val paintOrder: PaintOrder?,
 ) {
 
+    /**
+     * Transient, tree-build-time only: concrete SPECIFIED_* flags that lost to a
+     * higher-priority CSS-wide keyword declaration. Set around each source style
+     * during application and consulted by [isSpecified]/[isSpecified2]. Never part
+     * of equality, copy or build; always reset back to zero after use.
+     */
+    @JvmField
+    internal var suppressedFlags: Long = 0L
+
     constructor() : this(
         specifiedFlags = 0,
         specifiedFlags2 = 0,
+        cssWideKeywordFlags = 0,
         fill = null,
         fillRule = null,
         fillOpacity = Float.NaN,
@@ -780,6 +797,8 @@ internal class Style internal constructor(
         var specifiedFlags: Long = 0
         @JvmField
         var specifiedFlags2: Long = 0
+        @JvmField
+        var cssWideKeywordFlags: Long = 0
         @JvmField
         var fill: SvgPaint? = null
         @JvmField
@@ -952,34 +971,49 @@ internal class Style internal constructor(
 
         fun addSpecifiedFlag(@SpecifiedFlags flag: Long) {
             specifiedFlags = specifiedFlags or flag
+            // A concrete declaration beats an earlier CSS-wide keyword.
+            cssWideKeywordFlags = cssWideKeywordFlags and flag.inv()
         }
 
-        // Group-2 flags use a distinct name: @LongDef annotations are source-only and
-        // cannot disambiguate same-signature overloads.
         fun addSpecifiedFlag2(@SpecifiedFlags2 flag: Long) {
             specifiedFlags2 = specifiedFlags2 or flag
+            cssWideKeywordFlags = cssWideKeywordFlags and flag.inv()
         }
 
-        fun resetNonInheritingProperties(isRootSVG: Boolean): Builder {
-            this.display = true
-            this.overflow = isRootSVG
-            this.clip = null
-            this.clipPath = null
-            this.opacity = 1f
-            this.stopColor = ColorValue.BLACK
-            this.stopOpacity = 1f
-            this.mask = null
-            this.maskType = MaskType.luminance
-            this.filter = null
-            this.floodColor = ColorValue.BLACK
-            this.floodOpacity = 1f
-            this.solidColor = null
-            this.solidOpacity = 1f
-            this.viewportFill = null
-            this.viewportFillOpacity = 1f
-            this.vectorEffect = VectorEffect.None
-            this.isolation = Isolation.auto
-            this.mixBlendMode = CSSBlendMode.normal
+        /**
+         * Records that the winning declaration for this property was a CSS-wide
+         * keyword (inherit/unset/initial/revert). While the flag is set,
+         * [Style.isSpecified] reports the property as unspecified, so the style
+         * application keeps the parent's computed value instead.
+         */
+        fun markCssWideKeyword(@SpecifiedFlags flag: Long) {
+            cssWideKeywordFlags = cssWideKeywordFlags or flag
+        }
+
+        fun resetNonInheritingProperties(isRootSVG: Boolean, cssWideOverrides: Long = 0L): Builder {
+            // A property whose winning declaration was a CSS-wide keyword (either on
+            // this element or inherited as such from the parent) must keep the value
+            // inherited from the parent, so its default reset is skipped.
+            val kw = cssWideKeywordFlags or cssWideOverrides
+            if (kw and SPECIFIED_DISPLAY == 0L) this.display = true
+            if (kw and SPECIFIED_OVERFLOW == 0L) this.overflow = isRootSVG
+            if (kw and SPECIFIED_CLIP == 0L) this.clip = null
+            if (kw and SPECIFIED_CLIP_PATH == 0L) this.clipPath = null
+            if (kw and SPECIFIED_OPACITY == 0L) this.opacity = 1f
+            if (kw and SPECIFIED_STOP_COLOR == 0L) this.stopColor = ColorValue.BLACK
+            if (kw and SPECIFIED_STOP_OPACITY == 0L) this.stopOpacity = 1f
+            if (kw and SPECIFIED_MASK == 0L) this.mask = null
+            if (kw and SPECIFIED_MASK_TYPE == 0L) this.maskType = MaskType.luminance
+            if (kw and SPECIFIED_FILTER == 0L) this.filter = null
+            if (kw and SPECIFIED_FLOOD_COLOR == 0L) this.floodColor = ColorValue.BLACK
+            if (kw and SPECIFIED_FLOOD_OPACITY == 0L) this.floodOpacity = 1f
+            if (kw and SPECIFIED_SOLID_COLOR == 0L) this.solidColor = null
+            if (kw and SPECIFIED_SOLID_OPACITY == 0L) this.solidOpacity = 1f
+            if (kw and SPECIFIED_VIEWPORT_FILL == 0L) this.viewportFill = null
+            if (kw and SPECIFIED_VIEWPORT_FILL_OPACITY == 0L) this.viewportFillOpacity = 1f
+            if (kw and SPECIFIED_VECTOR_EFFECT == 0L) this.vectorEffect = VectorEffect.None
+            if (kw and SPECIFIED_ISOLATION == 0L) this.isolation = Isolation.auto
+            if (kw and SPECIFIED_MIX_BLEND_MODE == 0L) this.mixBlendMode = CSSBlendMode.normal
             return this
         }
 
@@ -987,6 +1021,7 @@ internal class Style internal constructor(
             this.original = original
             this.specifiedFlags = original.specifiedFlags
             this.specifiedFlags2 = original.specifiedFlags2
+            this.cssWideKeywordFlags = original.cssWideKeywordFlags
             this.fill = original.fill
             this.fillRule = original.fillRule
             this.fillOpacity = original.fillOpacity
@@ -1074,6 +1109,7 @@ internal class Style internal constructor(
             return Style(
                 specifiedFlags = specifiedFlags,
                 specifiedFlags2 = specifiedFlags2,
+                cssWideKeywordFlags = cssWideKeywordFlags,
                 fill = fill,
                 fillRule = fillRule,
                 fillOpacity = fillOpacity,
@@ -1157,6 +1193,7 @@ internal class Style internal constructor(
 
             return original != null && specifiedFlags == original.specifiedFlags &&
                     specifiedFlags2 == original.specifiedFlags2 &&
+                    cssWideKeywordFlags == original.cssWideKeywordFlags &&
                     paintOrder == original.paintOrder &&
                     fill == original.fill &&
                     fillRule == original.fillRule &&
@@ -1308,13 +1345,18 @@ internal class Style internal constructor(
     )
     annotation class SpecifiedFlags2
 
-    fun isSpecified(@SpecifiedFlags flag: Long): Boolean = (specifiedFlags and flag) != 0L
+    fun isSpecified(@SpecifiedFlags flag: Long): Boolean =
+        (specifiedFlags and flag) != 0L &&
+                (cssWideKeywordFlags or suppressedFlags) and flag == 0L
 
-    fun isSpecified2(@SpecifiedFlags2 flag: Long): Boolean = (specifiedFlags2 and flag) != 0L
+    fun isSpecified2(@SpecifiedFlags2 flag: Long): Boolean =
+        (specifiedFlags2 and flag) != 0L &&
+                (cssWideKeywordFlags or suppressedFlags) and flag == 0L
 
     fun copy(
         specifiedFlags: Long = this.specifiedFlags,
         specifiedFlags2: Long = this.specifiedFlags2,
+        cssWideKeywordFlags: Long = this.cssWideKeywordFlags,
         fill: SvgPaint? = this.fill,
         fillRule: FillRule? = this.fillRule,
         fillOpacity: Float = this.fillOpacity,
@@ -1385,6 +1427,7 @@ internal class Style internal constructor(
         return Style(
             specifiedFlags = specifiedFlags,
             specifiedFlags2 = specifiedFlags2,
+            cssWideKeywordFlags = cssWideKeywordFlags,
             fill = fill,
             fillRule = fillRule,
             fillOpacity = fillOpacity,
@@ -1763,14 +1806,21 @@ internal class Style internal constructor(
             isFromAttribute: Boolean
         ) {
             if (value.isEmpty()) return
-            // CSS-wide keywords: inherit/unset/initial are handled by leaving the property
-            // unspecified (the render-tree builder inherits from the parent, or resets
-            // non-inherited properties to their default). Note: 'initial' is only correct for
+            // CSS-wide keywords: inherit/unset/initial/revert must override any lower-
+            // priority declaration (presentation attribute or earlier source), taking
+            // the parent's computed value (or the initial one). We record the property
+            // in cssWideKeywordFlags so updateStyle skips it and the value inherited
+            // from the parent state survives. Note: 'initial' is only correct for
             // non-inherited properties; inherited ones currently fall back to inherit.
             if (value.equals("inherit", ignoreCase = true)
                 || value.equals("unset", ignoreCase = true)
                 || value.equals("initial", ignoreCase = true)
-                || value.equals("revert", ignoreCase = true)) return
+                || value.equals("revert", ignoreCase = true)) {
+                specifiedFlagForAttr(SVGAttr.fromString(localName))?.let {
+                    builder.markCssWideKeyword(it)
+                }
+                return
+            }
 
             when (SVGAttr.fromString(localName)) {
                 SVGAttr.fill -> {
@@ -2239,5 +2289,78 @@ internal class Style internal constructor(
                 else -> {}
             }
         }
+
+        /**
+         * The SPECIFIED_* flag of properties that support CSS-wide keywords, used by
+         * the inherit/unset/initial/revert handling in [processStyleProperty]. Multi-
+         * property shorthands and properties without a dedicated flag return null.
+         */
+        private fun specifiedFlagForAttr(attr: SVGAttr): Long? = when (attr) {
+            SVGAttr.alignment_baseline -> SPECIFIED_ALIGNMENT_BASELINE
+            SVGAttr.baseline_shift -> SPECIFIED_BASELINE_SHIFT
+            SVGAttr.clip -> SPECIFIED_CLIP
+            SVGAttr.clip_path -> SPECIFIED_CLIP_PATH
+            SVGAttr.clip_rule -> SPECIFIED_CLIP_RULE
+            SVGAttr.color -> SPECIFIED_COLOR
+            SVGAttr.color_interpolation_filters -> SPECIFIED_COLOR_INTERPOLATION_FILTERS
+            SVGAttr.direction -> SPECIFIED_DIRECTION
+            SVGAttr.display -> SPECIFIED_DISPLAY
+            SVGAttr.dominant_baseline -> SPECIFIED_DOMINANT_BASELINE
+            SVGAttr.fill -> SPECIFIED_FILL
+            SVGAttr.fill_opacity -> SPECIFIED_FILL_OPACITY
+            SVGAttr.fill_rule -> SPECIFIED_FILL_RULE
+            SVGAttr.filter -> SPECIFIED_FILTER
+            SVGAttr.flood_color -> SPECIFIED_FLOOD_COLOR
+            SVGAttr.flood_opacity -> SPECIFIED_FLOOD_OPACITY
+            SVGAttr.font_family -> SPECIFIED_FONT_FAMILY
+            SVGAttr.font_feature_settings -> SPECIFIED_FONT_FEATURE_SETTINGS
+            SVGAttr.font_kerning -> SPECIFIED_FONT_KERNING
+            SVGAttr.font_size -> SPECIFIED_FONT_SIZE
+            SVGAttr.font_stretch -> SPECIFIED_FONT_WIDTH
+            SVGAttr.font_style -> SPECIFIED_FONT_STYLE
+            SVGAttr.font_variant_caps -> SPECIFIED_FONT_VARIANT_CAPS
+            SVGAttr.font_variant_east_asian -> SPECIFIED_FONT_VARIANT_EAST_ASIAN
+            SVGAttr.font_variant_ligatures -> SPECIFIED_FONT_VARIANT_LIGATURES
+            SVGAttr.font_variant_numeric -> SPECIFIED_FONT_VARIANT_NUMERIC
+            SVGAttr.font_variant_position -> SPECIFIED_FONT_VARIANT_POSITION
+            SVGAttr.font_variation_settings -> SPECIFIED_FONT_VARIATION_SETTINGS
+            SVGAttr.font_weight -> SPECIFIED_FONT_WEIGHT
+            SVGAttr.font_width -> SPECIFIED_FONT_WIDTH
+            SVGAttr.image_rendering -> SPECIFIED_IMAGE_RENDERING
+            SVGAttr.isolation -> SPECIFIED_ISOLATION
+            SVGAttr.letter_spacing -> SPECIFIED_LETTER_SPACING
+            SVGAttr.lighting_color -> SPECIFIED_LIGHTING_COLOR
+            SVGAttr.marker_end -> SPECIFIED_MARKER_END
+            SVGAttr.marker_mid -> SPECIFIED_MARKER_MID
+            SVGAttr.marker_start -> SPECIFIED_MARKER_START
+            SVGAttr.mask -> SPECIFIED_MASK
+            SVGAttr.mask_type -> SPECIFIED_MASK_TYPE
+            SVGAttr.mix_blend_mode -> SPECIFIED_MIX_BLEND_MODE
+            SVGAttr.opacity -> SPECIFIED_OPACITY
+            SVGAttr.overflow -> SPECIFIED_OVERFLOW
+            SVGAttr.paint_order -> SPECIFIED_PAINT_ORDER
+            SVGAttr.solid_color -> SPECIFIED_SOLID_COLOR
+            SVGAttr.solid_opacity -> SPECIFIED_SOLID_OPACITY
+            SVGAttr.stop_color -> SPECIFIED_STOP_COLOR
+            SVGAttr.stop_opacity -> SPECIFIED_STOP_OPACITY
+            SVGAttr.stroke -> SPECIFIED_STROKE
+            SVGAttr.stroke_dasharray -> SPECIFIED_STROKE_DASHARRAY
+            SVGAttr.stroke_dashoffset -> SPECIFIED_STROKE_DASHOFFSET
+            SVGAttr.stroke_linecap -> SPECIFIED_STROKE_LINECAP
+            SVGAttr.stroke_linejoin -> SPECIFIED_STROKE_LINEJOIN
+            SVGAttr.stroke_miterlimit -> SPECIFIED_STROKE_MITERLIMIT
+            SVGAttr.stroke_opacity -> SPECIFIED_STROKE_OPACITY
+            SVGAttr.stroke_width -> SPECIFIED_STROKE_WIDTH
+            SVGAttr.text_anchor -> SPECIFIED_TEXT_ANCHOR
+            SVGAttr.text_decoration -> SPECIFIED_TEXT_DECORATION
+            SVGAttr.text_transform -> SPECIFIED_TEXT_TRANSFORM
+            SVGAttr.vector_effect -> SPECIFIED_VECTOR_EFFECT
+            SVGAttr.viewport_fill -> SPECIFIED_VIEWPORT_FILL
+            SVGAttr.viewport_fill_opacity -> SPECIFIED_VIEWPORT_FILL_OPACITY
+            SVGAttr.visibility -> SPECIFIED_VISIBILITY
+            SVGAttr.word_spacing -> SPECIFIED_WORD_SPACING
+            else -> null
+        }
     }
 }
+

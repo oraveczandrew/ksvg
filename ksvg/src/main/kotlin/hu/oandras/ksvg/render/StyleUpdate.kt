@@ -382,8 +382,24 @@ internal fun updateStyle(
         builder.paintOrder = sourceStyle.paintOrder
     }
 
-    builder.addSpecifiedFlag(sourceStyle.specifiedFlags)
+    builder.addSpecifiedFlag(sourceStyle.specifiedFlags and sourceStyle.suppressedFlags.inv())
     builder.addSpecifiedFlag2(sourceStyle.specifiedFlags2)
+}
+
+/**
+ * Computes which properties' WINNING declaration (highest-priority source that
+ * declares them at all) is a CSS-wide keyword (inherit/unset/initial/revert).
+ * [sources] must be in ascending priority order (presentation attributes,
+ * CSS rules, inline style). The returned mask holds concrete SPECIFIED_* bits.
+ */
+internal fun resolveCssWideKeywordMask(sources: List<Style?>): Long {
+    var keywordWinners = 0L
+    for (source in sources) {
+        if (source == null) continue
+        val declared = source.specifiedFlags or source.cssWideKeywordFlags
+        keywordWinners = (keywordWinners and declared.inv()) or source.cssWideKeywordFlags
+    }
+    return keywordWinners
 }
 
 internal fun reapplyDynamicPaints(state: RendererState) {

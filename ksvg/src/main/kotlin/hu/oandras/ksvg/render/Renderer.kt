@@ -622,20 +622,30 @@ internal class Renderer internal constructor(
         animationNodes: List<AnimationNode>?
     ) {
         val isRootSVG = obj.parent == null
-        builder.resetNonInheritingProperties(isRootSVG)
 
-        // Apply the styles defined by style attributes on the element
-        obj.baseStyle?.let { updateStyle(state, builder, it) }
-
-        // Apply the styles from any CSS files or <style> elements
+        // Pass 1: resolve CSS-wide keyword winners (see RenderTreeBuilder).
+        val matchingRules = ArrayList<Style>()
         document.cSSRules.forEachElement { rule ->
             if (CSSParser.ruleMatch(ruleMatchContext, rule.selector, obj)) {
-                updateStyle(state, builder, rule.style)
+                matchingRules.add(rule.style)
             }
         }
+        val cssWideOverrides = resolveCssWideKeywordMask(
+            listOf(obj.baseStyle) + matchingRules + listOf(obj.style)
+        )
 
-        // Apply the styles defined by the 'style' attribute. They have the highest precedence.
-        obj.style?.let { updateStyle(state, builder, it) }
+        builder.resetNonInheritingProperties(isRootSVG, cssWideOverrides)
+
+        // Pass 2: apply sources in ascending priority.
+        fun apply(source: Style?) {
+            if (source == null) return
+            source.suppressedFlags = cssWideOverrides
+            updateStyle(state, builder, source)
+            source.suppressedFlags = 0L
+        }
+        apply(obj.baseStyle)
+        matchingRules.forEach { apply(it) }
+        apply(obj.style)
 
         applyAnimatedStyle(state, builder, animationNodes)
     }
