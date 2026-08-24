@@ -31,6 +31,7 @@ import hu.oandras.ksvg.dom.style.LineJoin
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.SvgPaint
 import hu.oandras.ksvg.utils.colorWithOpacity
+import hu.oandras.ksvg.utils.forEachElement
 
 context(renderContext: RenderContext)
 internal fun updateStyle(
@@ -58,7 +59,7 @@ internal fun updateStyle(
         builder.fillOpacity = sourceStyle.fillOpacity
     }
 
-    if (sourceStyle.isSpecified(Style.SPECIFIED_FILL or Style.SPECIFIED_FILL_OPACITY or Style.SPECIFIED_COLOR or Style.SPECIFIED_OPACITY)) {
+    if (sourceStyle.isSpecifiedAny(Style.SPECIFIED_FILL or Style.SPECIFIED_FILL_OPACITY or Style.SPECIFIED_COLOR or Style.SPECIFIED_OPACITY)) {
         setFillPaintColor(state, builder, builder.fill)
     }
 
@@ -76,7 +77,7 @@ internal fun updateStyle(
         builder.strokeOpacity = sourceStyle.strokeOpacity
     }
 
-    if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE or Style.SPECIFIED_STROKE_OPACITY or Style.SPECIFIED_COLOR or Style.SPECIFIED_OPACITY)) {
+    if (sourceStyle.isSpecifiedAny(Style.SPECIFIED_STROKE or Style.SPECIFIED_STROKE_OPACITY or Style.SPECIFIED_COLOR or Style.SPECIFIED_OPACITY)) {
         setStrokePaintColor(state, builder, builder.stroke)
     }
 
@@ -387,18 +388,33 @@ internal fun updateStyle(
 }
 
 /**
- * Computes which properties' WINNING declaration (highest-priority source that
- * declares them at all) is a CSS-wide keyword (inherit/unset/initial/revert).
- * [sources] must be in ascending priority order (presentation attributes,
- * CSS rules, inline style). The returned mask holds concrete SPECIFIED_* bits.
+ * Computes which properties' WINNING declaration (highest-priority tier that
+ * declares them) is a CSS-wide keyword (inherit/unset/initial/revert). Tiers in
+ * ascending priority: presentation attributes < normal CSS rules < normal inline
+ * style < '!important' CSS rules < '!important' inline style. The returned mask
+ * holds concrete SPECIFIED_* bits.
  */
-internal fun resolveCssWideKeywordMask(sources: List<Style?>): Long {
+internal fun resolveCssWideKeywordMask(base: Style?, rules: List<Style>, inlineStyle: Style?): Long {
     var keywordWinners = 0L
-    for (source in sources) {
-        if (source == null) continue
-        val declared = source.specifiedFlags or source.cssWideKeywordFlags
-        keywordWinners = (keywordWinners and declared.inv()) or source.cssWideKeywordFlags
+
+    fun consider(declared: Long, keyword: Long) {
+        keywordWinners = (keywordWinners and declared.inv()) or keyword
     }
+
+    fun considerSource(s: Style?) {
+        if (s == null) return
+        val declared = s.specifiedFlags or s.specifiedFlags2 or s.cssWideKeywordFlags or s.importantFlags
+        val imp = s.importantFlags
+        // Normal tier.
+        consider(declared and imp.inv(), s.cssWideKeywordFlags and imp.inv())
+        // Important tier beats every normal declaration, but only declares the
+        // properties actually marked '!important'.
+        consider(imp, s.cssWideKeywordFlags and imp)
+    }
+
+    considerSource(base)
+    rules.forEachElement { considerSource(it) }
+    considerSource(inlineStyle)
     return keywordWinners
 }
 

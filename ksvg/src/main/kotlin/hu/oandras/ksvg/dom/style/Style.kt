@@ -604,6 +604,11 @@ internal class Style internal constructor(
     @JvmField
     val cssWideKeywordFlags: Long,
 
+    // Fourth flag group: same concrete SPECIFIED_* bit values, marking properties
+    // whose winning declaration carried '!important' (author level).
+    @JvmField
+    val importantFlags: Long,
+
     @JvmField val fill: SvgPaint?,
     @JvmField val fillRule: FillRule?,
     @JvmField val fillOpacity: Float,
@@ -720,6 +725,7 @@ internal class Style internal constructor(
         specifiedFlags = 0,
         specifiedFlags2 = 0,
         cssWideKeywordFlags = 0,
+        importantFlags = 0,
         fill = null,
         fillRule = null,
         fillOpacity = Float.NaN,
@@ -799,6 +805,12 @@ internal class Style internal constructor(
         var specifiedFlags2: Long = 0
         @JvmField
         var cssWideKeywordFlags: Long = 0
+        @JvmField
+        var importantFlags: Long = 0
+        // Last property flag touched by processStyleProperty for this declaration
+        // (used by the CSS parser to attach '!important').
+        @JvmField
+        var lastTouchedFlag: Long = 0L
         @JvmField
         var fill: SvgPaint? = null
         @JvmField
@@ -973,11 +985,13 @@ internal class Style internal constructor(
             specifiedFlags = specifiedFlags or flag
             // A concrete declaration beats an earlier CSS-wide keyword.
             cssWideKeywordFlags = cssWideKeywordFlags and flag.inv()
+            lastTouchedFlag = flag
         }
 
         fun addSpecifiedFlag2(@SpecifiedFlags2 flag: Long) {
             specifiedFlags2 = specifiedFlags2 or flag
             cssWideKeywordFlags = cssWideKeywordFlags and flag.inv()
+            lastTouchedFlag = flag
         }
 
         /**
@@ -988,6 +1002,12 @@ internal class Style internal constructor(
          */
         fun markCssWideKeyword(@SpecifiedFlags flag: Long) {
             cssWideKeywordFlags = cssWideKeywordFlags or flag
+            lastTouchedFlag = flag
+        }
+
+        /** Records '!important' on the property last processed by this builder. */
+        fun markImportant(@SpecifiedFlags flag: Long) {
+            importantFlags = importantFlags or flag
         }
 
         fun resetNonInheritingProperties(isRootSVG: Boolean, cssWideOverrides: Long = 0L): Builder {
@@ -1022,6 +1042,8 @@ internal class Style internal constructor(
             this.specifiedFlags = original.specifiedFlags
             this.specifiedFlags2 = original.specifiedFlags2
             this.cssWideKeywordFlags = original.cssWideKeywordFlags
+            this.importantFlags = original.importantFlags
+            this.lastTouchedFlag = 0L
             this.fill = original.fill
             this.fillRule = original.fillRule
             this.fillOpacity = original.fillOpacity
@@ -1110,6 +1132,7 @@ internal class Style internal constructor(
                 specifiedFlags = specifiedFlags,
                 specifiedFlags2 = specifiedFlags2,
                 cssWideKeywordFlags = cssWideKeywordFlags,
+                importantFlags = importantFlags,
                 fill = fill,
                 fillRule = fillRule,
                 fillOpacity = fillOpacity,
@@ -1194,6 +1217,7 @@ internal class Style internal constructor(
             return original != null && specifiedFlags == original.specifiedFlags &&
                     specifiedFlags2 == original.specifiedFlags2 &&
                     cssWideKeywordFlags == original.cssWideKeywordFlags &&
+                    importantFlags == original.importantFlags &&
                     paintOrder == original.paintOrder &&
                     fill == original.fill &&
                     fillRule == original.fillRule &&
@@ -1349,6 +1373,14 @@ internal class Style internal constructor(
         (specifiedFlags and flag) != 0L &&
                 (cssWideKeywordFlags or suppressedFlags) and flag == 0L
 
+    /**
+     * True when ANY property in [mask] is specified and not suppressed/keyword-won.
+     * Unlike OR-ing several [isSpecified] calls, this stays correct for combined
+     * masks where some constituents may be suppressed.
+     */
+    fun isSpecifiedAny(@SpecifiedFlags mask: Long): Boolean =
+        (specifiedFlags and cssWideKeywordFlags.inv() and suppressedFlags.inv() and mask) != 0L
+
     fun isSpecified2(@SpecifiedFlags2 flag: Long): Boolean =
         (specifiedFlags2 and flag) != 0L &&
                 (cssWideKeywordFlags or suppressedFlags) and flag == 0L
@@ -1357,6 +1389,7 @@ internal class Style internal constructor(
         specifiedFlags: Long = this.specifiedFlags,
         specifiedFlags2: Long = this.specifiedFlags2,
         cssWideKeywordFlags: Long = this.cssWideKeywordFlags,
+        importantFlags: Long = this.importantFlags,
         fill: SvgPaint? = this.fill,
         fillRule: FillRule? = this.fillRule,
         fillOpacity: Float = this.fillOpacity,
@@ -1428,6 +1461,7 @@ internal class Style internal constructor(
             specifiedFlags = specifiedFlags,
             specifiedFlags2 = specifiedFlags2,
             cssWideKeywordFlags = cssWideKeywordFlags,
+            importantFlags = importantFlags,
             fill = fill,
             fillRule = fillRule,
             fillOpacity = fillOpacity,

@@ -292,16 +292,20 @@ internal class CSSParser internal constructor(
             val propertyValue = scan.nextPropertyValue() ?: throw CSSParseException("Expected property value")
             // Check for !important flag.
             scan.skipWhitespace()
+            var important = false
             if (scan.consume('!')) {
                 scan.skipWhitespace()
                 checkCssState(scan.consume("important")) { "Malformed rule set: found unexpected '!'" }
-                // We don't do anything with these. We just ignore them. TODO
+                important = true
                 scan.skipWhitespace()
             }
             scan.consume(';')
             // 'inherit', 'unset' and 'initial' are handled in Style.processStyleProperty.
-            // TODO: 'revert' could reuse the same early-return (≈ 'unset'); full spec compliance would require origin-aware cascade resolution, which is heavy and rarely needed in SVG.
+            styleBuilder.lastTouchedFlag = 0L
             Style.processStyleProperty(styleBuilder, propertyName, propertyValue, false)
+            if (important && styleBuilder.lastTouchedFlag != 0L) {
+                styleBuilder.markImportant(styleBuilder.lastTouchedFlag)
+            }
             scan.skipWhitespace()
         } while (!scan.empty() && !scan.consume('}'))
         return styleBuilder.build()

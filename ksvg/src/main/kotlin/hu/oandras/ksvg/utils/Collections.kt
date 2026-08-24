@@ -89,6 +89,12 @@ internal inline fun<K, V> SimpleArrayMap<K, V>.forEachKey(r: (K) -> Unit) {
     }
 }
 
+internal inline fun<K, V> SimpleArrayMap<K, V>.forEachValue(r: (V) -> Unit) {
+    for (i in 0 until size()) {
+        r(valueAt(i))
+    }
+}
+
 internal fun FloatList.toFloatArray(): FloatArray {
     return FloatArray(size) {
         get(it)

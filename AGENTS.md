@@ -25,6 +25,7 @@ The rendering loop (`render()` methods) and animation updates (`updateAnimations
     ```
 *   **XFerModes**: Never create `PorterDuffXfermode` instances. Use the pre-allocated constants in `hu.oandras.ksvg.utils.XFerModes`.
 *   **Method count**: Use `@JvmField`-s, if possible, to reduce method count.
+*   **Collections** Prefer non-allocating functions in `hu.oandras.ksvg.utils.Collections`, such as `forEachElement`.
 
 ### 2. Compatibility & PaintCompat
 The project `minSdk` is 26, but some features (like `wordSpacing` or `BlendMode`) require higher APIs.

@@ -1742,23 +1742,24 @@ internal class RenderTreeBuilder(
                 matchingRules.add(rule.style)
             }
         }
-        val cssWideOverrides = resolveCssWideKeywordMask(
-            listOf(obj.baseStyle) + matchingRules + listOf(obj.style)
-        )
+        val cssWideOverrides = resolveCssWideKeywordMask(obj.baseStyle, matchingRules, obj.style)
 
         builder.resetNonInheritingProperties(isRootSVG, cssWideOverrides)
 
-        // Pass 2: apply sources in ascending priority; suppressedFlags hides concrete
-        // declarations that lost to a CSS-wide keyword.
-        fun apply(source: Style?) {
+        // Pass 2: apply tiers in ascending priority; suppressedFlags hides concrete
+        // declarations that lost to a CSS-wide keyword or to '!important'.
+        fun apply(source: Style?, importantOnly: Boolean) {
             if (source == null) return
-            source.suppressedFlags = cssWideOverrides
+            source.suppressedFlags = cssWideOverrides or
+                    if (importantOnly) source.importantFlags.inv() else source.importantFlags
             updateStyle(state, builder, source)
             source.suppressedFlags = 0L
         }
-        apply(obj.baseStyle)
-        matchingRules.forEach { apply(it) }
-        apply(obj.style)
+        apply(obj.baseStyle, false)
+        matchingRules.forEachElement { apply(it, false) }
+        apply(obj.style, false)
+        matchingRules.forEachElement { apply(it, true) }
+        apply(obj.style, true)
 
         // Note: we don't apply animations during tree building,
         // they will be applied later using updateAnimations()

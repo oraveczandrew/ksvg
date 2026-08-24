@@ -630,29 +630,30 @@ internal class Renderer internal constructor(
                 matchingRules.add(rule.style)
             }
         }
-        val cssWideOverrides = resolveCssWideKeywordMask(
-            listOf(obj.baseStyle) + matchingRules + listOf(obj.style)
-        )
+        val cssWideOverrides = resolveCssWideKeywordMask(obj.baseStyle, matchingRules, obj.style)
 
         builder.resetNonInheritingProperties(isRootSVG, cssWideOverrides)
 
-        // Pass 2: apply sources in ascending priority.
-        fun apply(source: Style?) {
+        // Pass 2: apply tiers in ascending priority (see RenderTreeBuilder).
+        fun apply(source: Style?, importantOnly: Boolean) {
             if (source == null) return
-            source.suppressedFlags = cssWideOverrides
+            source.suppressedFlags = cssWideOverrides or
+                    if (importantOnly) source.importantFlags.inv() else source.importantFlags
             updateStyle(state, builder, source)
             source.suppressedFlags = 0L
         }
-        apply(obj.baseStyle)
-        matchingRules.forEach { apply(it) }
-        apply(obj.style)
+        apply(obj.baseStyle, false)
+        matchingRules.forEachElement { apply(it, false) }
+        apply(obj.style, false)
+        matchingRules.forEachElement { apply(it, true) }
+        apply(obj.style, true)
 
         applyAnimatedStyle(state, builder, animationNodes)
     }
 
     /*
-    * Fill a path with either the given paint or if a pattern is set, with the pattern.
-    */
+     * Fill a path with either the given paint or if a pattern is set, with the pattern.
+     */
     private fun doFilledPath(node: PathRenderNode, path: Path) {
         val s = state
 
@@ -2522,7 +2523,7 @@ internal class Renderer internal constructor(
                 }
 
                 // If either fill or its opacity has changed, update the fillPaint
-                if (baseStyle.isSpecified(Style.SPECIFIED_SOLID_COLOR or Style.SPECIFIED_SOLID_OPACITY)) {
+                if (baseStyle.isSpecifiedAny(Style.SPECIFIED_SOLID_COLOR or Style.SPECIFIED_SOLID_OPACITY)) {
                     setFillPaintColor(state, builder, builder.fill)
                 }
             } else {
@@ -2537,7 +2538,7 @@ internal class Renderer internal constructor(
                 }
 
                 // If either fill or its opacity has changed, update the fillPaint
-                if (baseStyle.isSpecified(Style.SPECIFIED_SOLID_COLOR or Style.SPECIFIED_SOLID_OPACITY)) {
+                if (baseStyle.isSpecifiedAny(Style.SPECIFIED_SOLID_COLOR or Style.SPECIFIED_SOLID_OPACITY)) {
                     setStrokePaintColor(state, builder, builder.stroke)
                 }
             }

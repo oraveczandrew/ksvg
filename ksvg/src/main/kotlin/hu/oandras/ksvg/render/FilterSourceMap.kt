@@ -21,7 +21,7 @@ import androidx.collection.ArrayMap
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.forEachKey
-import hu.oandras.ksvg.utils.forEachKeyValue
+import hu.oandras.ksvg.utils.forEachValue
 
 internal class FilterSourceMap(
     private val poolOwner: PoolOwner,
@@ -66,7 +66,7 @@ internal class FilterSourceMap(
     fun recycle(exclude: Bitmap? = null) {
         val bitmapPool = poolOwner.bitmapPool
 
-        results.forEachKeyValue { _, bitmap ->
+        results.forEachValue { bitmap ->
             // `sourceGraphic` is owned by the element that hosts the filter (its cached
             // source content), not by this map. Releasing it here would hand a live,
             // referenced bitmap back to the pool, where `clear()` could recycle it and

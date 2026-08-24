@@ -183,16 +183,27 @@ internal abstract class ElementBase(
                 // Empty value. Just ignore this property and keep parsing
 
                 scan.skipWhitespace()
+                var important = false
+                if (scan.consume('!')) {
+                    scan.skipWhitespace()
+                    // Be forgiving about malformed '!important' in inline styles.
+                    important = scan.consume("important")
+                    scan.skipWhitespace()
+                }
                 if (scan.empty() || scan.consume(';')) {
                     val styleBuilder = this.styleBuilder ?: Style().toBuilder().also {
                         this.styleBuilder = it
                     }
+                    styleBuilder.lastTouchedFlag = 0L
                     Style.processStyleProperty(
                         builder = styleBuilder,
                         localName = propertyName,
                         value = propertyValue,
                         isFromAttribute = false
                     )
+                    if (important && styleBuilder.lastTouchedFlag != 0L) {
+                        styleBuilder.markImportant(styleBuilder.lastTouchedFlag)
+                    }
                     scan.skipWhitespace()
                 }
             }

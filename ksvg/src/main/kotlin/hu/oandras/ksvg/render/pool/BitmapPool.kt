@@ -19,8 +19,8 @@ package hu.oandras.ksvg.render.pool
 import android.graphics.Bitmap
 import androidx.collection.ArrayMap
 import hu.oandras.ksvg.render.createBitmap
-import hu.oandras.ksvg.utils.forEachKeyValue
-import java.util.*
+import hu.oandras.ksvg.utils.forEachElement
+import hu.oandras.ksvg.utils.forEachValue
 
 /**
  * A pool of reusable [Bitmap]s keyed by width, height and config, used to avoid
@@ -163,8 +163,8 @@ internal class BitmapPool {
      * is no longer needed).
      */
     fun clear() {
-        pools.forEachKeyValue { _, bitmaps ->
-            bitmaps.forEach { it.recycle() }
+        pools.forEachValue { bitmaps ->
+            bitmaps.forEachElement { it.recycle() }
         }
         pools.clear()
     }
@@ -172,7 +172,7 @@ internal class BitmapPool {
     override fun toString(): String {
         var imageCount = 0
         var imageBytes = 0
-        pools.forEachKeyValue { _, bitmapQueues ->
+        pools.forEachValue { bitmapQueues ->
             imageCount += bitmapQueues.size
             imageBytes += bitmapQueues.sumOf { it.allocationByteCount }
         }
