@@ -87,10 +87,11 @@ import hu.oandras.ksvg.render.filters.doFeOffsetFilter
 import hu.oandras.ksvg.render.filters.doFeSpecularLightingFilter
 import hu.oandras.ksvg.render.filters.doFeTileFilter
 import hu.oandras.ksvg.render.filters.doFeTurbulenceFilter
-import hu.oandras.ksvg.filtering.pipeline.FilterBackend
-import hu.oandras.ksvg.filtering.pipeline.FilterPipeline
-import hu.oandras.ksvg.render.filters.filterGraphInfo
 import hu.oandras.ksvg.render.filters.getFilterInput
+import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
+import hu.oandras.ksvg.render.filters.pipeline.FilterGraphInfo
+import hu.oandras.ksvg.render.filters.pipeline.FilterPipeline
+import hu.oandras.ksvg.render.filters.pipeline.FilterPrimitiveSet
 import hu.oandras.ksvg.render.filters.luminanceToAlphaFloatArray
 import hu.oandras.ksvg.render.pool.Pool
 import hu.oandras.ksvg.render.pool.PoolOwner
@@ -960,7 +961,7 @@ internal class Renderer internal constructor(
         val effectChain = if (hardwareCanvas) {
             val backend = obtainFilterBackend(canvas)
             backend.buildEffectChain(
-                filterGraphInfo(filterNode)
+                FilterGraphInfo(FilterPrimitiveSet.collect(filterNode))
             )
         } else {
             null
@@ -1341,6 +1342,8 @@ internal class Renderer internal constructor(
                 inputBitmap = inputBitmap,
                 primitiveRegion = primitiveRegion,
                 filterRegion = region,
+                canvasScaleX = canvasScaleX,
+                canvasScaleY = canvasScaleY,
             )
 
             is FeCompositeRenderNode -> doFeCompositeFilter(
@@ -1396,6 +1399,8 @@ internal class Renderer internal constructor(
                 inputBitmap = inputBitmap,
                 primitiveRegion = primitiveRegion,
                 filterRegion = region,
+                canvasScaleX = canvasScaleX,
+                canvasScaleY = canvasScaleY,
             )
 
             is FeGaussianBlurRenderNode -> doFeGaussianBlurFilter(

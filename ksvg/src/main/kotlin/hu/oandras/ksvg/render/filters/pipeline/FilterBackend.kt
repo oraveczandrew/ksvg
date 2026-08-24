@@ -14,21 +14,17 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.filtering.pipeline
+package hu.oandras.ksvg.render.filters.pipeline
 
 import android.graphics.RenderEffect
 
 /**
- * Minimal description of one filter graph handed to
- * [FilterBackend.buildEffectChain]. An interface deliberately: the SVG module
- * can expose richer internal graph data through its own implementations later
- * (GPU phases need per-primitive parameters) without widening this module's
- * public surface.
+ * Minimal description of one filter graph handed to [FilterBackend.buildEffectChain].
  */
-public interface FilterGraphInfo {
-
-    /** Capability set of every primitive contained by the graph. */
-    public val primitives: FilterPrimitiveSet
+internal class FilterGraphInfo internal constructor(
+    internal val primitives: FilterPrimitiveSet,
+) {
+    internal fun has(flag: Int): Boolean = primitives.contains(flag)
 }
 
 /**
@@ -39,18 +35,18 @@ public interface FilterGraphInfo {
  * [supports] or none of it — mixed CPU/GPU execution would need per-primitive
  * bitmap readback which costs more than software execution.
  */
-public interface FilterBackend {
+internal interface FilterBackend {
 
     /** True if this backend can execute a graph composed of [primitives]. */
-    public fun supports(primitives: FilterPrimitiveSet): Boolean
+    fun supports(primitives: FilterPrimitiveSet): Boolean
 
     /**
      * Whole-graph GPU chain; null = "cannot represent this graph as an effect
      * chain". Non-null results let the caller skip all intermediate bitmaps and
      * draw the source once with `paint.setRenderEffect(chain)`.
      */
-    public fun buildEffectChain(graph: FilterGraphInfo): RenderEffect? = null
+    fun buildEffectChain(graph: FilterGraphInfo): RenderEffect? = null
 
     /** Drops backend-owned state (shaders, effects, scratch handles). */
-    public fun release() {}
+    fun release() {}
 }

@@ -14,20 +14,18 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.filtering.pipeline
-
-import android.graphics.RenderEffect
+package hu.oandras.ksvg.render.filters.pipeline
 
 /**
  * CPU backend driving the existing Kotlin/native kernel path. Currently claims
  * every primitive set: it is both the software-canvas workhorse and the final
- * fallback of [FilterPipeline]. Kernel dispatch lives in the SVG module's
- * renderer; successive phases move individual kernels behind this class
- * (toolkit LUT/convolve, then native morphology/turbulence).
+ * fallback of [FilterPipeline]. Kernel dispatch still lives in
+ * `Renderer.applyPrimitive`; successive phases move individual kernels behind
+ * this class (toolkit LUT/convolve, then native morphology/turbulence).
  */
-public class FilterPipelineNativeImpl : FilterBackend {
+internal class FilterPipelineNativeImpl : FilterBackend {
 
     override fun supports(primitives: FilterPrimitiveSet): Boolean = true
 
-    override fun buildEffectChain(graph: FilterGraphInfo): RenderEffect? = null
+    override fun buildEffectChain(graph: FilterGraphInfo): android.graphics.RenderEffect? = null
 }
