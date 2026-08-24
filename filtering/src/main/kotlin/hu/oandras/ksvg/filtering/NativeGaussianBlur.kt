@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.nativeblur
+package hu.oandras.ksvg.filtering
 
 import kotlin.math.max
 

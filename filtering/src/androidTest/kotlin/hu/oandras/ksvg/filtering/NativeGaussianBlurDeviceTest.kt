@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.nativeblur
+package hu.oandras.ksvg.filtering
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertTrue

@@ -128,7 +128,7 @@ dependencies.apply {
     implementation("com.google.guava:guava:33.7.1-android")
     implementation("androidx.collection:collection:1.6.0")
 
-    implementation(project(":nativeblur"))
+    implementation(project(":filtering"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 

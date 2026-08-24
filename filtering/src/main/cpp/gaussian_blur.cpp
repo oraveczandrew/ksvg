@@ -255,19 +255,19 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
 }  // namespace
 
 extern "C"
-JNIEXPORT jlong JNICALL Java_hu_oandras_ksvg_nativeblur_NativeGaussianBlur_createScratch(
+JNIEXPORT jlong JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_createScratch(
         JNIEnv*, jclass) {
     return reinterpret_cast<jlong>(new GaussianScratch());
 }
 
 extern "C"
-JNIEXPORT void JNICALL Java_hu_oandras_ksvg_nativeblur_NativeGaussianBlur_destroyScratch(
+JNIEXPORT void JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_destroyScratch(
         JNIEnv*, jclass, const jlong handle) {
     delete reinterpret_cast<GaussianScratch*>(handle);
 }
 
 extern "C"
-JNIEXPORT void JNICALL Java_hu_oandras_ksvg_nativeblur_NativeGaussianBlur_nativeBlur(
+JNIEXPORT void JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_nativeBlur(
         JNIEnv* env, jclass, const jlong scratchHandle, const jintArray pixels, const jint width,
         const jint height, const jfloat stdDeviationX, const jfloat stdDeviationY) {
     GaussianScratch* const s = reinterpret_cast<GaussianScratch*>(scratchHandle);

@@ -23,7 +23,7 @@ kotlin {
 }
 
 android {
-    namespace = "hu.oandras.nativeblur"
+    namespace = "hu.oandras.filtering"
     compileSdk = 37
 
     defaultConfig.apply {

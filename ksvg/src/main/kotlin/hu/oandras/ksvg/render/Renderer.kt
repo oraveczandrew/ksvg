@@ -88,6 +88,10 @@ import hu.oandras.ksvg.render.filters.doFeSpecularLightingFilter
 import hu.oandras.ksvg.render.filters.doFeTileFilter
 import hu.oandras.ksvg.render.filters.doFeTurbulenceFilter
 import hu.oandras.ksvg.render.filters.getFilterInput
+import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
+import hu.oandras.ksvg.render.filters.pipeline.FilterGraphInfo
+import hu.oandras.ksvg.render.filters.pipeline.FilterPipeline
+import hu.oandras.ksvg.render.filters.pipeline.FilterPrimitiveSet
 import hu.oandras.ksvg.render.filters.luminanceToAlphaFloatArray
 import hu.oandras.ksvg.render.pool.Pool
 import hu.oandras.ksvg.render.pool.PoolOwner
@@ -127,6 +131,10 @@ internal class Renderer internal constructor(
 ): AnimationContext, PoolOwner by pools {
     // Renderer state
     private var state: RendererState = RendererState()
+
+    // Filter-pipeline backend, resolved per render operation (canvas capability).
+    private var filterBackend: FilterBackend? = null
+    private var filterBackendHardware: Boolean = false
 
     // Reused across text renders to avoid per-element allocation in the render loop.
     private val plainTextDrawer = PlainTextDrawer(state)
@@ -947,6 +955,23 @@ internal class Renderer internal constructor(
         }
         val boundingBox = node.boundingBox ?: Box.EMPTY
 
+        // GPU effect-chain attempt. The native CPU backend answers null and the
+        // primitive walk below is skipped entirely on the software path.
+        val hardwareCanvas = canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31
+        val effectChain = if (hardwareCanvas) {
+            val backend = obtainFilterBackend(canvas)
+            backend.buildEffectChain(
+                FilterGraphInfo(FilterPrimitiveSet.collect(filterNode))
+            )
+        } else {
+            null
+        }
+        if (effectChain != null) {
+            // GPU fast path lands with FilterPipelineImpl31/Impl33; the native
+            // backend never produces a chain.
+            return
+        }
+
         rectFPool.withPooledObject { region ->
             calculateRegion(filter, boundingBox, region)
             if (region.width() > 0f && region.height() > 0f) {
@@ -1156,6 +1181,18 @@ internal class Renderer internal constructor(
         } finally {
             statePop(canvas)
         }
+    }
+
+    private fun obtainFilterBackend(canvas: Canvas): FilterBackend {
+        val hardware = canvas.isHardwareAccelerated
+        val existing = filterBackend
+        if (existing != null && filterBackendHardware == hardware) {
+            return existing
+        }
+        val created = FilterPipeline.create(canvas)
+        filterBackend = created
+        filterBackendHardware = hardware
+        return created
     }
 
     @JvmSynthetic

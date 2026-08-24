@@ -63,7 +63,7 @@ import hu.oandras.ksvg.dom.text.TSpan
 import hu.oandras.ksvg.dom.text.Text
 import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextPath
-import hu.oandras.ksvg.nativeblur.StackBlurScratch
+import hu.oandras.ksvg.filtering.StackBlurScratch
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.filters.LightVector
 import hu.oandras.ksvg.render.filters.NormalVector

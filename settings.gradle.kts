@@ -43,7 +43,7 @@ dependencyResolutionManagement {
 
 include(listOf(
     ":ksvg",
-    ":nativeblur",
+    ":filtering",
     ":glide",
     ":showcase",
 ))
