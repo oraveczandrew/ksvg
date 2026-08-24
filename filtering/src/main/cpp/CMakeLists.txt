@@ -35,6 +35,12 @@ add_library(ksvgblur SHARED gaussian_blur.cpp component_transfer.cpp convolve_ma
 # Bit-exact float parity with the Kotlin reference loops: forbid FMA contraction.
 target_compile_options(ksvgblur PRIVATE -ffp-contract=off)
 
+# SSSE3 is required for the x86 pshufb LUT path (component_transfer.cpp).
+# Every known Android x86 device satisfies this.
+if(ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
+    target_compile_options(ksvgblur PRIVATE -mssse3)
+endif()
+
 # The ARM32 kernels use NEON instructions; enable the FPU for the C++ side too.
 if(BLUR_NEEDS_NEON)
     target_compile_options(ksvgblur PRIVATE -mfpu=neon)

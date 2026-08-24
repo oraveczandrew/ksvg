@@ -246,6 +246,105 @@ void applyNeonInterior(
 
 #endif // __aarch64__
 
+#if !defined(__aarch64__) && defined(__SSE2__)
+#include <emmintrin.h>
+
+/**
+ * x86 SSE2 mirror of applyNeonInterior: duplicate-edge interior 4 px/iter,
+ * borders scalar. Rounding via _mm_cvttps_epi32(x + 0.5f): truncation equals
+ * floor(+0.5) for positives and negatives clamp to 0 either way — bit-exact
+ * with the scalar reference.
+ */
+inline __m128i clamp255Sse(__m128i v) {
+    const __m128i zero = _mm_setzero_si128();
+    const __m128i isPos = _mm_cmpgt_epi32(v, zero);
+    v = _mm_and_si128(v, isPos);
+    const __m128i over = _mm_cmpgt_epi32(v, _mm_set1_epi32(255));
+    return _mm_or_si128(_mm_andnot_si128(over, v), _mm_and_si128(over, _mm_set1_epi32(255)));
+}
+
+void applySseInterior(
+        jint* dst, const jint* src, jint width, jint height,
+        const jfloat* kernel, jint orderX, jint orderY, jint targetX, jint targetY,
+        jfloat divisor, jfloat bias, bool preserve) {
+    const __m128 vDivisor = _mm_set1_ps(divisor);
+    const __m128 vBias255 = _mm_mul_ps(_mm_set1_ps(bias), _mm_set1_ps(255.0f));
+    const __m128 vHalf = _mm_set1_ps(0.5f);
+    const __m128i maskFF = _mm_set1_epi32(0xFF);
+
+    const jint yLo = targetY;
+    const jint yHi = height - orderY + 1 + targetY;
+    const jint xLo = targetX;
+    const jint xHi = width - orderX + 1 + targetX;
+
+    for (jint y = yLo; y < yHi; y++) {
+        const jint rowOffset = y * width;
+
+        for (jint x = 0; x < xLo; x++) {
+            convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY,
+                                targetX, targetY, divisor, bias, preserve, 0, x, y);
+        }
+
+        jint x = xLo;
+        const jint vecEnd = xLo + ((xHi - xLo) & ~3);
+        for (; x < vecEnd; x += 4) {
+            __m128 accR = _mm_setzero_ps();
+            __m128 accG = _mm_setzero_ps();
+            __m128 accB = _mm_setzero_ps();
+            __m128 accA = _mm_setzero_ps();
+
+            for (jint ky = 0; ky < orderY; ky++) {
+                const jint* row = src + (y + ky - targetY) * width;
+                for (jint kx = 0; kx < orderX; kx++) {
+                    const __m128 w = _mm_set1_ps(kernel[ky * orderX + kx]);
+                    const __m128i p = _mm_loadu_si128(
+                            reinterpret_cast<const __m128i*>(row + x));
+                    const __m128i tb = _mm_and_si128(p, maskFF);
+                    const __m128i tg = _mm_and_si128(_mm_srli_epi32(p, 8), maskFF);
+                    const __m128i tr = _mm_and_si128(_mm_srli_epi32(p, 16), maskFF);
+                    const __m128i ta = _mm_srli_epi32(p, 24);
+                    accB = _mm_add_ps(accB, _mm_mul_ps(_mm_cvtepi32_ps(tb), w));
+                    accG = _mm_add_ps(accG, _mm_mul_ps(_mm_cvtepi32_ps(tg), w));
+                    accR = _mm_add_ps(accR, _mm_mul_ps(_mm_cvtepi32_ps(tr), w));
+                    accA = _mm_add_ps(accA, _mm_mul_ps(_mm_cvtepi32_ps(ta), w));
+                }
+            }
+
+            __m128 oR = _mm_add_ps(_mm_div_ps(accR, vDivisor), vBias255);
+            __m128 oG = _mm_add_ps(_mm_div_ps(accG, vDivisor), vBias255);
+            __m128 oB = _mm_add_ps(_mm_div_ps(accB, vDivisor), vBias255);
+            __m128 oA = _mm_add_ps(_mm_div_ps(accA, vDivisor), vBias255);
+            __m128i iR = _mm_cvttps_epi32(_mm_add_ps(oR, vHalf));
+            __m128i iG = _mm_cvttps_epi32(_mm_add_ps(oG, vHalf));
+            __m128i iB = _mm_cvttps_epi32(_mm_add_ps(oB, vHalf));
+            __m128i iA = _mm_cvttps_epi32(_mm_add_ps(oA, vHalf));
+
+            if (!preserve) {
+                iR = clamp255Sse(iR);
+                iG = clamp255Sse(iG);
+                iB = clamp255Sse(iB);
+                iA = clamp255Sse(iA);
+            } else {
+                const __m128i ps = _mm_loadu_si128(
+                        reinterpret_cast<const __m128i*>(src + rowOffset + x));
+                iA = _mm_srli_epi32(ps, 24);
+            }
+
+            const __m128i out = _mm_or_si128(
+                    _mm_or_si128(_mm_slli_epi32(iA, 24), _mm_slli_epi32(iR, 16)),
+                    _mm_or_si128(_mm_slli_epi32(iG, 8), iB));
+            _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + rowOffset + x), out);
+        }
+
+        for (jint xr = x; xr < xHi; xr++) {
+            convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY,
+                                targetX, targetY, divisor, bias, preserve, 0, xr, y);
+        }
+    }
+}
+
+#endif // !__aarch64__ && __SSE2__
+
 } // namespace
 
 extern "C" JNIEXPORT void JNICALL
@@ -265,32 +364,33 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
         return;
     }
 
-#ifdef __aarch64__
-    if (edgeMode == 0) { // duplicate: borders scalar, interior vectorized
-        jfloat* kernel = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(jKernel, nullptr));
+#if defined(__aarch64__) || (!defined(__aarch64__) && defined(__SSE2__))
+    if (edgeMode == 0 && height >= orderY && width >= orderX) {
+        // duplicate edge: top/bottom border rows scalar, middle rows via the
+        // vectorized interior pass.
+        auto* kernel = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(jKernel, nullptr));
         if (kernel != nullptr) {
             const bool preserve = preserveAlpha == JNI_TRUE;
             const jint yLo = targetY;
             const jint yHi = height - orderY + 1 + targetY;
-            const jint xLo = targetX;
-            const jint xHi = width - orderX + 1 + targetX;
 
-            // Top border rows.
             for (jint y = 0; y < yLo; y++) {
                 for (jint x = 0; x < width; x++) convolveScalarPixel(
                         src, dst, width, height, kernel, orderX, orderY,
                         targetX, targetY, divisor, bias, preserve, 0, x, y);
             }
-            // Bottom border rows.
             for (jint y = yHi; y < height; y++) {
                 for (jint x = 0; x < width; x++) convolveScalarPixel(
                         src, dst, width, height, kernel, orderX, orderY,
                         targetX, targetY, divisor, bias, preserve, 0, x, y);
             }
-            // Middle rows: left/right borders scalar inside applyNeonInterior,
-            // interior vectorized.
+#ifdef __aarch64__
             applyNeonInterior(dst, src, width, height, kernel, orderX, orderY,
                               targetX, targetY, divisor, bias, preserve);
+#else
+            applySseInterior(dst, src, width, height, kernel, orderX, orderY,
+                             targetX, targetY, divisor, bias, preserve);
+#endif
             env->ReleasePrimitiveArrayCritical(jKernel, kernel, JNI_ABORT);
             env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
             env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);

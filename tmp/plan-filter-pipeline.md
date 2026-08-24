@@ -208,6 +208,18 @@ reference loop (`doConvolveMatrixKotlin`, kept as JVM fallback):
 - edge-mode ordinals match `ConvolveMatrixEdgeMode` (duplicate=0, wrap=1, none=2),
 - **AArch64 NEON**: duplicate-edge interior vectorized 4 px/iteration (f32x4
   accumulation, vcvtq u8→f32, vmin/vmax clamp); borders + other modes scalar.
+- **x86 SSE2**: same interior vectorization as NEON (`applySseInterior`); rounding via
+  `_mm_cvttps_epi32(x+0.5)` = floor(+0.5) for positives, negatives clamp to 0 anyway.
+  Module compiled with `-mssse3` on x86 ABIs.
+- **feComponentTransfer SIMD coverage**:
+  - AArch64: `vld4q_u8` channel de-interleave + `vqtbl4q_u8` full-table gathers,
+    16 px/iter.
+  - x86 SSSE3: pshufb 16-row selection scheme (entry = rows[hi][lo]), 4 px/iter +
+    unpacklo re-pack; requires `-mssse3` (universal on Android x86 devices).
+  - armv7 NEON: identical 16-row scheme with `vtbl2_u8`, 8 px/iter full-width rows.
+  - All paths are pure byte permutation → bit-exact with scalar by construction.
+- armv7 convolve stays scalar: ARM32 NEON has no integer divide and a
+  reciprocal-multiply would break bit-exact rounding (documented decision).
 - armv7 / x86: scalar (documented; SSSE3/armv7-NEON can follow if profiling justifies).
 - Device parity test: `ConvolveNativeDeviceTest` (3 edge modes × preserveAlpha,
   non-square kernel, off-center anchor, non-multiple-of-4 width).
