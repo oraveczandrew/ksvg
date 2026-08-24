@@ -31,5 +31,7 @@ internal value class FilterPrimitiveSet private constructor(@JvmField internal v
 
     internal companion object {
         internal const val FLAG_COLOR_MATRIX: Int = 1 shl 5
+        internal const val FLAG_GAUSSIAN_BLUR: Int = 1 shl 4
+        internal const val FLAG_OFFSET: Int = 1 shl 6
     }
 }

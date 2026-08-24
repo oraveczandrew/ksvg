@@ -388,6 +388,8 @@ internal class FilterRenderNode(
     @JvmField var gpuScaleY: Float = 0f
     @JvmField var gpuWidth: Int = 0
     @JvmField var gpuHeight: Int = 0
+    @JvmField var gpuPadX: Int = 0
+    @JvmField var gpuPadY: Int = 0
     @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
     @JvmField val renderState: RendererState = RendererState()
 

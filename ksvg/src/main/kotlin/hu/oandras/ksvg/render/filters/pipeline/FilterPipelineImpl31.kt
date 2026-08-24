@@ -17,69 +17,127 @@
 package hu.oandras.ksvg.render.filters.pipeline
 
 import android.graphics.RenderEffect
-import android.os.Build
-import androidx.annotation.RequiresApi
+import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
+import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
+import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.filters.buildColorMatrix
 import hu.oandras.ksvg.utils.forEachElement
 
 /**
  * RenderEffect GPU backend (API 31+, hardware canvas only).
  *
- * First slice: strictly linear feColorMatrix chains (each primitive's `in`
- * refers to the previous result or is the implicit source). These map 1:1 onto
- * [RenderEffect.createColorFilterEffect] because the CPU path composes exactly
- * the same ColorMatrixColorFilter — pixel parity by construction.
+ * Supports strictly linear single-input chains of feColorMatrix,
+ * feGaussianBlur and feOffset (each primitive's `in` refers to the previous
+ * result or is the implicit source). ColorMatrix maps 1:1 onto
+ * [RenderEffect.createColorFilterEffect] (same [buildColorMatrix] as the CPU
+ * path). GaussianBlur uses [RenderEffect.createBlurEffect] with CLAMP edge
+ * mode; the caller must record the source with a transparent pad of
+ * [Chain.padX]/[Chain.padY] device pixels on every side so the clamp reads
+ * transparent black — matching the CPU kernel's transparent-black pedestal.
+ * Offset maps to [RenderEffect.createOffsetEffect] with device-pixel deltas
+ * resolved by the caller (CSSLength needs renderer context).
  *
- * Deliberately NOT claimed yet (falls back to the CPU backend):
- * - GaussianBlur: CPU path pads transparent black, createBlurEffect(CLAMP)
- *   clamps edge pixels -> halo differences until pad handling is added;
- * - Offset: needs CSSLength resolution with renderer context (planned);
- * - everything two-input or canvas-drawn (Blend/Composite/Merge/Flood/Image).
+ * Deliberately NOT claimed yet: two-input or canvas-drawn primitives
+ * (Blend/Composite/Merge/Flood/Image), displacement, lighting.
  */
-@RequiresApi(Build.VERSION_CODES.S)
 internal class FilterPipelineImpl31 : FilterBackend {
 
+    /** Effect chain plus the transparent recording pad it requires. */
+    internal class Chain internal constructor(
+        @JvmField internal val effect: RenderEffect,
+        @JvmField internal val padX: Int,
+        @JvmField internal val padY: Int,
+    )
+
     override fun supports(primitives: FilterPrimitiveSet): Boolean {
-        val supportedMask = FilterPrimitiveSet.FLAG_COLOR_MATRIX
+        val supportedMask = FilterPrimitiveSet.FLAG_COLOR_MATRIX or
+                FilterPrimitiveSet.FLAG_GAUSSIAN_BLUR or
+                FilterPrimitiveSet.FLAG_OFFSET
         return primitives.bits != 0 && (primitives.bits and supportedMask.inv()) == 0
     }
 
     /**
-     * Builds the whole-graph effect chain for a strict linear ColorMatrix
-     * sequence; null otherwise. Cheap object graph — rebuilt per frame until
-     * the node-keyed effect cache lands.
+     * Builds the whole-graph effect chain; null when the graph is not a
+     * strict linear sequence of supported primitives.
+     *
+     * [scaleX]/[scaleY] are the CPU-path primitive scales (canvas scale for
+     * userSpaceOnUse units, bounding-box based otherwise) used to convert
+     * blur stdDeviation to device pixels; [resolveLength] resolves offset
+     * CSSLengths to device pixels.
      */
-    fun tryBuildChain(filterNode: FilterRenderNode): RenderEffect? {
+    fun tryBuildChain(
+            filterNode: FilterRenderNode,
+            scaleX: Float,
+            scaleY: Float,
+            resolveLength: (CSSLength?, Boolean) -> Float,
+    ): Chain? {
         var chain: RenderEffect? = null
         var previousResult: String? = null
         var first = true
+        var padX = 0
+        var padY = 0
 
         filterNode.primitives.forEachElement { primitive ->
-            if (primitive !is FeColorMatrixRenderNode) return null
-            val element = primitive.sourceElement
-
-            val input = element.`in`
-            if (first) {
-                // First input may be implicit or the explicit source graphic.
-                if (input != null && input != "SourceGraphic") return null
-            } else {
-                if (input == null || input != previousResult) return null
+            val effect = when (primitive) {
+                is FeColorMatrixRenderNode -> {
+                    val element = primitive.sourceElement
+                    checkLinearInput(element.`in`, previousResult, first) ?: return null
+                    previousResult = element.result
+                    first = false
+                    RenderEffect.createColorFilterEffect(
+                        android.graphics.ColorMatrixColorFilter(
+                            buildColorMatrix(element.type, element.values)
+                        )
+                    )
+                }
+                is FeGaussianBlurRenderNode -> {
+                    checkLinearInput(primitive.sourceElement.`in`, previousResult, first) ?: return null
+                    previousResult = primitive.sourceElement.result
+                    first = false
+                    val sigmaX = primitive.stdDeviationX * scaleX
+                    val sigmaY = primitive.stdDeviationY * scaleY
+                    if (sigmaX <= 0f && sigmaY <= 0f) {
+                        null // matches the CPU path: identity when both sigmas are zero
+                    } else {
+                        // Transparent pad so CLAMP reads transparent black,
+                        // matching the CPU kernel's pedestal (3 sigma rule).
+                        padX = maxOf(padX, kotlin.math.ceil(sigmaX * 3f).toInt())
+                        padY = maxOf(padY, kotlin.math.ceil(sigmaY * 3f).toInt())
+                        RenderEffect.createBlurEffect(sigmaX, sigmaY,
+                            android.graphics.Shader.TileMode.CLAMP)
+                    }
+                }
+                is FeOffsetRenderNode -> {
+                    checkLinearInput(primitive.sourceElement.`in`, previousResult, first) ?: return null
+                    previousResult = primitive.sourceElement.result
+                    first = false
+                    val dx = resolveLength(primitive.sourceElement.dx, true)
+                    val dy = resolveLength(primitive.sourceElement.dy, false)
+                    if (dx == 0f && dy == 0f) null else RenderEffect.createOffsetEffect(dx, dy)
+                }
+                else -> return null
             }
 
-            val effect = RenderEffect.createColorFilterEffect(
-                android.graphics.ColorMatrixColorFilter(
-                    buildColorMatrix(element.type, element.values)
-                )
-            )
-            val previous = chain
-            chain = if (previous == null) effect else RenderEffect.createChainEffect(effect, previous)
-            previousResult = element.result
-            first = false
+            if (effect != null) {
+                val previous = chain
+                chain = if (previous == null) effect else RenderEffect.createChainEffect(effect, previous)
+            }
         }
 
-        return chain
+        val result = chain ?: return null
+        return Chain(result, padX, padY)
+    }
+
+    private fun checkLinearInput(input: String?, previousResult: String?, first: Boolean): Unit? {
+        if (first) {
+            // First input may be implicit or the explicit source graphic.
+            if (input != null && input != "SourceGraphic") return null
+        } else {
+            if (input == null || input != previousResult) return null
+        }
+        return Unit
     }
 
     override fun release() {}

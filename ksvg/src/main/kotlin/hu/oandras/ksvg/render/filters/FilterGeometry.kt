@@ -196,7 +196,7 @@ internal fun doFeTileFilter(
 )
 
 context(renderContext: RenderContext)
-private fun filterPrimitiveLengthX(
+internal fun filterPrimitiveLengthX(
     length: CSSLength?,
     primitiveUnitsAreUser: Boolean,
     primitiveScaleX: Float,
@@ -214,7 +214,7 @@ private fun filterPrimitiveLengthX(
 }
 
 context(renderContext: RenderContext)
-private fun filterPrimitiveLengthY(
+internal fun filterPrimitiveLengthY(
     length: CSSLength?,
     primitiveUnitsAreUser: Boolean,
     primitiveScaleY: Float,

@@ -87,6 +87,8 @@ import hu.oandras.ksvg.render.filters.doFeOffsetFilter
 import hu.oandras.ksvg.render.filters.doFeSpecularLightingFilter
 import hu.oandras.ksvg.render.filters.doFeTileFilter
 import hu.oandras.ksvg.render.filters.doFeTurbulenceFilter
+import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
+import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.filters.getFilterInput
 import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
 import hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31
@@ -980,7 +982,13 @@ internal class Renderer internal constructor(
                             ) {
                                 val backend = obtainFilterBackend(canvas)
                                 if (backend is FilterPipelineImpl31) {
-                                    val chain = backend.tryBuildChain(filterNode)
+                                    val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
+                                    val pScaleX = if (primitiveUnitsAreUser) sx else boundingBox.width * sx
+                                    val pScaleY = if (primitiveUnitsAreUser) sy else boundingBox.height * sy
+                                    val chain = backend.tryBuildChain(filterNode, pScaleX, pScaleY) { length, isX ->
+                                        if (isX) filterPrimitiveLengthX(length, primitiveUnitsAreUser, pScaleX, sx)
+                                        else filterPrimitiveLengthY(length, primitiveUnitsAreUser, pScaleY, sy)
+                                    }
                                     if (chain != null) {
                                         drawGpuFiltered(
                                             canvas, filterNode, chain, sx, sy,
@@ -1186,7 +1194,7 @@ internal class Renderer internal constructor(
     private inline fun drawGpuFiltered(
         canvas: Canvas,
         filterNode: FilterRenderNode,
-        chain: android.graphics.RenderEffect,
+        chain: FilterPipelineImpl31.Chain,
         sx: Float,
         sy: Float,
         width: Int,
@@ -1196,17 +1204,20 @@ internal class Renderer internal constructor(
         record: (Canvas, RendererState) -> Unit,
         state: RendererState,
     ) {
+        val padX = chain.padX
+        val padY = chain.padY
         val contentVersion = filterNode.contentVersion
         var gpuNode = filterNode.gpuNode
         val valid = gpuNode != null &&
                 filterNode.gpuSourceVersion == contentVersion &&
                 filterNode.gpuFilterVersion == filterNode.version &&
                 filterNode.gpuScaleX == sx && filterNode.gpuScaleY == sy &&
-                filterNode.gpuWidth == width && filterNode.gpuHeight == height
+                filterNode.gpuWidth == width && filterNode.gpuHeight == height &&
+                filterNode.gpuPadX == padX && filterNode.gpuPadY == padY
         if (!valid || gpuNode == null) {
             gpuNode = gpuNode ?: android.graphics.RenderNode("ksvg-filter-source")
-            val recording = gpuNode.beginRecording(width, height)
-            recording.translate(-deviceRegion.left, -deviceRegion.top)
+            val recording = gpuNode.beginRecording(width + 2 * padX, height + 2 * padY)
+            recording.translate(padX - deviceRegion.left, padY - deviceRegion.top)
             recording.concat(matrix)
             try {
                 record(recording, state)
@@ -1220,11 +1231,14 @@ internal class Renderer internal constructor(
             filterNode.gpuScaleY = sy
             filterNode.gpuWidth = width
             filterNode.gpuHeight = height
+            filterNode.gpuPadX = padX
+            filterNode.gpuPadY = padY
         }
 
-        gpuNode.setRenderEffect(chain)
+        gpuNode.setRenderEffect(chain.effect)
         canvas.withSave {
             canvas.setMatrix(null)
+            canvas.translate(-padX.toFloat(), -padY.toFloat())
             canvas.drawRenderNode(gpuNode)
         }
         gpuNode.setRenderEffect(null)
