@@ -69,8 +69,6 @@ internal fun doFeColorMatrixFilter(
     inputBitmap: Bitmap,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     val paint = primitiveNode.paint
         ?: createFilterPaint(
@@ -163,8 +161,6 @@ internal fun doFeComponentTransferFilter(
     primitiveNode: FeComponentTransferRenderNode,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     val transferFunctions = primitiveNode.transferFunctions
 

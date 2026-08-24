@@ -83,15 +83,21 @@ Filter execution today lives entirely in `ksvg` module:
 ## 2. Target architecture
 
 ```
-hu.oandras.ksvg.filtering            (new package inside :filtering module)
-├─ FilterPipeline.kt                 object-ish factory → internal class, create(...)
-├─ FilterBackend.kt                  internal interface
-├─ FilterPrimitiveSet.kt             bit-set of required primitives for graph-level decision
-├─ impls/
-│  ├─ FilterPipelineImpl33.kt        AGSL RuntimeShader chain   (API 33+, HW canvas)
-│  ├─ FilterPipelineImpl31.kt        RenderEffect chain         (API 31+, HW canvas)
-│  └─ FilterPipelineNativeImpl.kt    CPU kernels                (all APIs)
+hu.oandras.ksvg.filtering.pipeline    (in the :filtering module — MOVED here, public
+│                                      explicit-API surface; Kotlin `internal` is
+│                                      module-scoped so backend infra must live with
+│                                      the kernels it will drive)
+├─ FilterPipeline.kt                 capability-based factory, create(canvas)
+├─ FilterBackend.kt                  public interface + FilterGraphInfo interface
+│                                    (interface on purpose: :ksvg can expose richer
+│                                    internal graph data via its own impls later)
+├─ FilterPrimitiveSet.kt             @JvmInline value class over Int, flag constants
+├─ FilterPipelineNativeImpl.kt       CPU backend, claims every set for now
 └─ jni/                              C++ sources, CMakeLists.txt
+
+:ksvg bridge (internal): render/filters/FilterPipelineBridge.kt maps the
+`:ksvg`-internal FeXxxRenderNode types to FilterPrimitiveSet flags and builds the
+FilterGraphInfo — this is why collect() cannot live in :filtering (reverse dep).
 ```
 
 ### Backend interface (explicit API mode: everything `internal`)

@@ -14,9 +14,8 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.render.filters.pipeline
+package hu.oandras.ksvg.filtering.pipeline
 
-import android.graphics.Canvas
 import android.os.Build
 
 /**
@@ -30,10 +29,10 @@ import android.os.Build
  * 3. API ≥ 31                     → Impl31 (RenderEffect) — future phase
  * 4. otherwise                    → [FilterPipelineNativeImpl]
  */
-internal object FilterPipeline {
+public object FilterPipeline {
 
     @JvmStatic
-    internal fun create(canvas: Canvas): FilterBackend {
+    public fun create(canvas: android.graphics.Canvas): FilterBackend {
         if (!canvas.isHardwareAccelerated || Build.VERSION.SDK_INT < 31) {
             return FilterPipelineNativeImpl()
         }
