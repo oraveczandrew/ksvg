@@ -29,6 +29,7 @@ import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.render.RenderTreeBuilder
 import hu.oandras.ksvg.render.Renderer
 import hu.oandras.ksvg.render.pool.PoolOwner
+import hu.oandras.ksvg.utils.forEachElement
 
 /**
  * A [Drawable] backed by an [SVG] document.
@@ -271,7 +272,7 @@ public open class KSVGDrawable @JvmOverloads public constructor(
             }
         }
         if (node is GroupRenderNode<*>) {
-            for (child in node.children) {
+            node.children.forEachElement { child ->
                 collectHitRegionsRecursive(child, regions)
             }
         }

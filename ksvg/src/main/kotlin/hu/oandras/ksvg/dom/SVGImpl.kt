@@ -184,7 +184,7 @@ internal class SVGImpl internal constructor(
         }
 
         if (node is GroupRenderNode<*>) {
-            for (child in node.children) {
+            node.children.forEachElement { child ->
                 collectHitRegionsRecursive(child, regions)
             }
         }

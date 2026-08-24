@@ -143,7 +143,7 @@ internal fun RendererState.getAnchorPosition(): TextAnchor? {
 context(renderContext: RenderContext)
 internal fun calculateTextWidth(children: List<TextNode>, parentState: RendererState): Float {
     var width = 0f
-    for (child in children) {
+    children.forEachElement { child ->
         width += when (child) {
             is TextSequenceNode -> measureText(child.text, parentState.fillPaint, parentState.textWidthBuffer)
             is TSpanRenderNode -> {
@@ -166,7 +166,7 @@ internal fun calculateTextBounds(
     proc: TextBoundsCalculator,
     parentState: RendererState
 ) {
-    for (child in children) {
+    children.forEachElement { child ->
         when (child) {
             is TextSequenceNode -> {
                 // For sequence nodes we use parent state because they don't have their own
@@ -440,7 +440,7 @@ internal fun calculateTextPath(
     proc: PlainTextToPath,
     parentState: RendererState
 ) {
-    for (child in children) {
+    children.forEachElement { child ->
         when (child) {
             is TextSequenceNode -> {
                 proc.processText(child.text, parentState)

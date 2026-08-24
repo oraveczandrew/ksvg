@@ -30,6 +30,7 @@ import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.optimizeReadOnlyList
 import kotlin.math.abs
 import kotlin.math.sqrt
+import hu.oandras.ksvg.utils.forEachElement
 
 internal fun interpolate(from: Float, to: Float, progress: Float): Float {
     return from + (to - from) * progress
@@ -351,7 +352,7 @@ internal fun normalizeDashArrays(keyframes: List<FloatArray>): Pair<Int, FloatLi
     if (maxLen == 0) return 0 to mutableFloatListOf()
 
     val result = MutableFloatList(maxLen * keyframes.size)
-    for (keyframe in keyframes) {
+    keyframes.forEachElement { keyframe ->
         for (i in 0 until maxLen) {
             result.add(keyframe[i % keyframe.size])
         }

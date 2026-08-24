@@ -834,6 +834,7 @@ internal class RenderTreeBuilder(
         if (reqFormats.isEmpty() || externalFileResolver == null) {
             return true
         }
+        // Build-time only; DOM stores these as Set<String>.
         for (format in reqFormats) {
             if (externalFileResolver.isFormatSupported(format)) {
                 return true
