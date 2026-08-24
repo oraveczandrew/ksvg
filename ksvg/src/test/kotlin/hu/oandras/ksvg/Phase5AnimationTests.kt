@@ -61,7 +61,7 @@ class Phase5AnimationTests {
         assertTrue("t=0 must be transparent", start < 20)
         assertInRange("mid must be between endpoints", 90, 165, mid)
         assertTrue("frozen end must be opaque", end > 235)
-        assertTrue(mid > start && end > mid)
+        assertStrictlyIncreasing("opacity must increase over time", start, mid, end)
     }
 
     // --- animateTransform with fill=freeze keeps the final transform ---
