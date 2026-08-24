@@ -64,7 +64,6 @@ import hu.oandras.ksvg.dom.style.ColorValue
 import hu.oandras.ksvg.dom.style.CurrentColor
 import hu.oandras.ksvg.dom.style.Isolation
 import hu.oandras.ksvg.dom.style.MaskType
-import hu.oandras.ksvg.dom.style.PaintOrder
 import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.RenderQuality
 import hu.oandras.ksvg.dom.style.Style
@@ -656,14 +655,8 @@ internal class Renderer internal constructor(
     }
 
     private fun drawPathContent(canvas: Canvas, node: PathRenderNode, state: RendererState) {
-        val order = when (state.style.paintOrder) {
-            PaintOrder.StrokeFillMarkers -> STROKE_FILL_MARKERS
-            PaintOrder.FillMarkersStroke -> FILL_MARKERS_STROKE
-            PaintOrder.MarkersFillStroke -> MARKERS_FILL_STROKE
-            PaintOrder.StrokeMarkersFill -> STROKE_MARKERS_FILL
-            PaintOrder.MarkersStrokeFill -> MARKERS_STROKE_FILL
-            else -> FILL_STROKE_MARKERS
-        }
+        // paintOrder is stored already encoded as three 2-bit digits; 0 = normal.
+        val order = state.style.paintOrder.takeIf { it != 0 } ?: FILL_STROKE_MARKERS
         for (shift in 4 downTo 0 step 2) {
             when ((order shr shift) and 3) {
                 COMPONENT_FILL -> if (state.hasFill) {

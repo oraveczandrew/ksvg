@@ -61,7 +61,7 @@ internal fun RenderNode<*>.obtainStrokePaint(cfg: PaintConfiguration): Paint {
         appliedStrokeConfig = PaintConfiguration().also { it.setFromQuietly(cfg) }
         return p
     }
-    val applied = appliedFillConfig!!
+    val applied = appliedStrokeConfig!!
     writeConfigDiff(p, applied, cfg)
     applied.setFromQuietly(cfg)
     return p

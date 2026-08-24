@@ -704,12 +704,11 @@ internal class Style internal constructor(
     @JvmField val letterSpacing: CSSLength?,
     @JvmField val wordSpacing: CSSLength?,
 
-    // SVG2 paint-order. `null` means "normal" (fill, stroke, markers).
-    // Note: no SPECIFIED_* flag exists for this property — all 64 bits of
-    // specifiedFlags are taken. Inheritance works via Builder.reset() since the
-    // value is only overwritten when explicitly parsed, and paint-order is not
-    // animatable so StyleUpdate/AnimationRenderer never need to test it.
-    @JvmField val paintOrder: PaintOrder?,
+    // SVG2 paint-order as a packed 3-digit base-4 code (see PaintOrder).
+    // `0` means unspecified ("normal": fill, stroke, markers).
+    @JvmField
+    @PaintOrder
+    val paintOrder: Int,
 ) {
 
     /**
@@ -792,7 +791,7 @@ internal class Style internal constructor(
         colorInterpolationFilters = null,
         letterSpacing = null,
         wordSpacing = null,
-        paintOrder = null,
+        paintOrder = PaintOrder.FillStrokeMarkers,
     )
 
     fun toBuilder(): Builder = Builder().apply { reset(this@Style) }
@@ -979,7 +978,8 @@ internal class Style internal constructor(
         @JvmField
         var wordSpacing: CSSLength? = null
         @JvmField
-        var paintOrder: PaintOrder? = null
+        @PaintOrder
+        var paintOrder: Int = 0
 
         fun addSpecifiedFlag(@SpecifiedFlags flag: Long) {
             specifiedFlags = specifiedFlags or flag
@@ -2310,14 +2310,13 @@ internal class Style internal constructor(
                 }
 
                 SVGAttr.paint_order -> {
-                    if (value.equals(NORMAL, ignoreCase = true)) {
-                        builder.paintOrder = PaintOrder.FillStrokeMarkers
-                        builder.addSpecifiedFlag2(SPECIFIED_PAINT_ORDER)
+                    val paintOrder = if (value.equals(NORMAL, ignoreCase = true)) {
+                        PaintOrder.FillStrokeMarkers
                     } else {
-                        val paintOrder = PaintOrder.parse(value)
-                        builder.paintOrder = paintOrder
-                        if (paintOrder != null) builder.addSpecifiedFlag2(SPECIFIED_PAINT_ORDER)
+                        PaintOrder.parse(value)
                     }
+                    builder.paintOrder = paintOrder
+                    if (paintOrder != 0) builder.addSpecifiedFlag2(SPECIFIED_PAINT_ORDER)
                 }
 
                 else -> {}
