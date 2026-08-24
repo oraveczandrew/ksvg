@@ -337,7 +337,6 @@ internal class SVGImpl internal constructor(
 
         val renderer = Renderer(
             document = this,
-            canvas = canvas,
             dPI = renderDPI,
             pools = pools,
         )

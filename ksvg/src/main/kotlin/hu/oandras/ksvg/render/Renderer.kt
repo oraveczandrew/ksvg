@@ -122,7 +122,6 @@ private val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean  = Build.VERSION.SDK_IN
 @Suppress("LocalVariableName")
 internal class Renderer internal constructor(
     internal val document: SVGImpl,
-    private var canvas: Canvas,
     // dots per inch. Needed for accurate conversion of length values that have real world units, such as "cm".
     override val dPI: Float,
     pools: PoolOwner,
@@ -131,7 +130,7 @@ internal class Renderer internal constructor(
     private var state: RendererState = RendererState()
 
     // Reused across text renders to avoid per-element allocation in the render loop.
-    private val plainTextDrawer = PlainTextDrawer(canvas, state)
+    private val plainTextDrawer = PlainTextDrawer(state)
 
     private val stateStack: Stack<SavedRendererState> = Stack() // Keeps track of render state as we render
 
@@ -192,7 +191,7 @@ internal class Renderer internal constructor(
             return s.viewBox ?: checkNotNull(s.viewPort) { "Viewport is null" }
         }
 
-    private fun resetState() {
+    private fun resetState(canvas: Canvas) {
         val oldState = state
         val state = renderStatePool.pull()
         this.state = state
@@ -230,7 +229,6 @@ internal class Renderer internal constructor(
      * Render the whole document starting from a RenderNode tree.
     */
     internal fun renderDocument(canvas: Canvas, rootNode: RenderNode<*>, renderOptions: RenderOptions) {
-        this.canvas = canvas
 
         val css = renderOptions.css
         if (css != null) {
@@ -244,18 +242,18 @@ internal class Renderer internal constructor(
         }
 
         // Initialize the state
-        resetState()
+        resetState(canvas)
 
         if (document.animationsEnabled) {
             rootNode.updateAnimations(document.animationTimeMs)
         }
 
-        withNewRootContextState {
+        withNewRootContextState(canvas) { canvas, _ ->
             val viewPort = (rootNode as? GroupRenderNode)?.viewPort ?: renderOptions.viewPort
             if (viewPort != null && rootNode.renderState.style.overflow == false) {
-                setClipRect(viewPort)
+                setClipRect(canvas, viewPort)
             }
-            rootNode.render(this)
+            rootNode.render(this@Renderer, canvas)
         }
 
         if (renderOptions.hasCss()) {
@@ -264,73 +262,66 @@ internal class Renderer internal constructor(
     }
 
 
-    internal fun renderGroupNode(node: GroupRenderNode<*>) {
-        withNewNodeState(node, saveCanvas = true) {
+    internal fun renderGroupNode(canvas: Canvas, node: GroupRenderNode<*>) {
+        withNewNodeState(canvas, node, saveCanvas = true) { canvas, _ ->
             val sourceElement = node.sourceElement
             if (sourceElement is Svg && node.renderState.style.overflow == false) {
-                node.viewPort?.let { setClipRect(it) }
+                node.viewPort?.let { setClipRect(canvas, it) }
             }
 
             node.applyTransformTo(canvas)
             node.viewBoxTransform?.let { canvas.concat(it) }
 
-            parentPush(sourceElement)
+            parentPush(sourceElement, canvas)
 
             try {
-                if (checkForClipPath(node)) {
-                    withNewRenderLayer(node) {
-                        // Static groups are captured whole: one replay call per frame.
-                        when (node.beginDisplayList()) {
-                            DisplayListMode.REPLAYED -> {}
-                            DisplayListMode.RECORD -> {
-                                renderNodeChildren(node)
-                                node.endDisplayList()
-                            }
-                            DisplayListMode.SKIP -> node.children.forEachElement {
-                                it.render(this)
-                            }
+                if (checkForClipPath(node, canvas)) {
+                    withNewRenderLayer(canvas, node) { canvas, _ ->
+                        // Static groups are captured whole: one replay per frame.
+                        node.withNodeDisplayList(canvas) { nodeCanvas ->
+                            node.children.forEachElement { it.render(this@Renderer, nodeCanvas) }
                         }
                     }
                 }
 
-                updateParentBoundingBox(sourceElement)
+                updateParentBoundingBox(canvas, sourceElement)
             } finally {
-                parentPop()
+                parentPop(canvas)
             }
         }
     }
 
-    internal fun renderSwitchNode(node: SwitchRenderNode) {
-        withNewNodeState(node, saveCanvas = true) {
+    internal fun renderSwitchNode(canvas: Canvas, node: SwitchRenderNode) {
+        withNewNodeState(canvas, node, saveCanvas = true) { canvas, _ ->
             node.applyTransformTo(canvas)
 
             val sourceElement = node.sourceElement
-            parentPush(sourceElement)
+            parentPush(sourceElement, canvas)
 
             try {
-                if (checkForClipPath(node)) {
-                    withNewRenderLayer(node) {
-                        node.selectedChild?.render(this)
+                if (checkForClipPath(node, canvas)) {
+                    withNewRenderLayer(canvas, node) { canvas, _ ->
+                        node.selectedChild?.render(this@Renderer, canvas)
                     }
                 }
 
-                updateParentBoundingBox(node.sourceElement)
+                updateParentBoundingBox(canvas, node.sourceElement)
             } finally {
-                parentPop()
+                parentPop(canvas)
             }
         }
     }
 
-    internal fun renderPathNode(node: PathRenderNode) {
-        withNewNodeState(node, requireVisible = true, saveCanvas = true) {
+    internal fun renderPathNode(canvas: Canvas, node: PathRenderNode) {
+        withNewNodeState(canvas, node, requireVisible = true, saveCanvas = true) { canvas, _ ->
             node.applyTransformTo(canvas)
 
             val sourceElement = node.sourceElement
-            updateParentBoundingBox(sourceElement)
+            updateParentBoundingBox(canvas, sourceElement)
 
-            checkForGradientsAndPatterns(node, sourceElement)
-            if (checkForClipPath(node)) {
-                withNewRenderLayer(node) { state ->
+            checkForGradientsAndPatterns(canvas, node, sourceElement)
+            if (checkForClipPath(node, canvas)) {
+                withNewRenderLayer(canvas, node) { canvas, state ->
                     val hasMarkers = node.markers != null || state.style.markerStart != null ||
                             state.style.markerMid != null || state.style.markerEnd != null
                     // Static, plain fill/stroke paths are drawn through the
@@ -341,15 +332,10 @@ internal class Renderer internal constructor(
                             state.style.vectorEffect == VectorEffect.None
 
                     if (!pathCacheable) {
-                        drawPathContent(node, state)
+                        drawPathContent(canvas, node, state)
                     } else {
-                        when (node.beginDisplayList()) {
-                            DisplayListMode.REPLAYED -> {}
-                            DisplayListMode.RECORD -> {
-                                drawPathContent(node, state)
-                                node.endDisplayList()
-                            }
-                            DisplayListMode.SKIP -> drawPathContent(node, state)
+                        node.withNodeDisplayList(canvas) { nodeCanvas ->
+                            drawPathContent(nodeCanvas, node, state)
                         }
                     }
                 }
@@ -357,28 +343,27 @@ internal class Renderer internal constructor(
         }
     }
 
-    internal fun renderTextNode(node: TextRenderNode) {
-        withNewNodeState(node, saveCanvas = true) {
+    internal fun renderTextNode(canvas: Canvas, node: TextRenderNode) {
+        withNewNodeState(canvas, node, saveCanvas = true) { canvas, _ ->
             node.applyTransformTo(canvas)
 
             val sourceElement = node.sourceElement
 
-            checkForGradientsAndPatterns(node, sourceElement)
-            if (checkForClipPath(node)) {
-                withNewRenderLayer(node) {
+            checkForGradientsAndPatterns(canvas, node, sourceElement)
+            if (checkForClipPath(node, canvas)) {
+                withNewRenderLayer(canvas, node) { canvas, state ->
                     val processor = plainTextDrawer
-                    processor.canvas = canvas
                     processor.state = state
                     processor.x = node.x + node.dx
                     processor.y = node.y + node.dy
-                    renderTextContainer(node, processor)
+                    renderTextContainer(canvas, node, processor)
                 }
             }
         }
     }
 
-    internal fun renderTSpanNode(node: TSpanRenderNode, processor: TextProcessor) {
-        withNewNodeState(node) {
+    internal fun renderTSpanNode(canvas: Canvas, node: TSpanRenderNode, processor: TextProcessor) {
+        withNewNodeState(canvas, node) { canvas, state ->
             // The shared PlainTextDrawer holds a reference to the parent text's
             // renderer state, so temporarily point it at this tspan's styled state
             // so the tspan's own font styling is applied to its text.
@@ -390,10 +375,10 @@ internal class Renderer internal constructor(
                 }
                 processor.pushPositioning(node.x, node.y, node.dx, node.dy)
 
-                checkForGradientsAndPatterns(node, node.sourceElement.textRoot as Element)
+                checkForGradientsAndPatterns(canvas, node, node.sourceElement.textRoot as Element)
 
-                withNewRenderLayer(node) {
-                    renderTextContainer(node, processor)
+                withNewRenderLayer(canvas, node) { canvas, _ ->
+                    renderTextContainer(canvas, node, processor)
                 }
             } finally {
                 processor.popPositioning()
@@ -402,16 +387,16 @@ internal class Renderer internal constructor(
         }
     }
 
-    internal fun renderTextPathNode(node: TextPathRenderNode) {
-        withNewNodeState(node, requireVisible = true) {
-            checkForGradientsAndPatterns(node, node.sourceElement.textRoot as Element)
+    internal fun renderTextPathNode(canvas: Canvas, node: TextPathRenderNode) {
+        withNewNodeState(canvas, node, requireVisible = true) { canvas, _ ->
+            checkForGradientsAndPatterns(canvas, node, node.sourceElement.textRoot as Element)
 
-            withNewRenderLayer(node) {
+            withNewRenderLayer(canvas, node) { canvas, _ ->
                 renderTextContainer(
+                    canvas = canvas,
                     node = node,
                     processor = PathTextDrawer(
                         path = node.path,
-                        canvas = canvas,
                         state = state
                     ).apply {
                         x = node.startOffset
@@ -422,9 +407,9 @@ internal class Renderer internal constructor(
         }
     }
 
-    internal fun renderTRefNode(node: TRefRenderNode, processor: TextProcessor) {
-        withNewNodeState(node) {
-            checkForGradientsAndPatterns(node, node.sourceElement.textRoot as Element)
+    internal fun renderTRefNode(canvas: Canvas, node: TRefRenderNode, processor: TextProcessor) {
+        withNewNodeState(canvas, node) { canvas, state ->
+            checkForGradientsAndPatterns(canvas, node, node.sourceElement.textRoot as Element)
 
             // The shared PlainTextDrawer holds a reference to the parent text's
             // renderer state, so temporarily point it at this tref's styled state
@@ -436,7 +421,7 @@ internal class Renderer internal constructor(
                     plainDrawer.state = state
                 }
                 processor.pushPositioning(node.x, node.y, node.dx, node.dy)
-                processor.processText(node.text)
+                processor.processText(canvas, node.text)
             } finally {
                 processor.popPositioning()
                 if (plainDrawer != null) plainDrawer.state = processorState ?: state
@@ -444,28 +429,32 @@ internal class Renderer internal constructor(
         }
     }
 
-    private fun renderTextContainer(node: KSVGTextContainerRenderNode<*>, processor: TextProcessor) {
+    private fun renderTextContainer(
+        canvas: Canvas,
+        node: KSVGTextContainerRenderNode<*>,
+        processor: TextProcessor,
+    ) {
         node.children.forEachElement { child ->
             when (child) {
-                is TextSequenceNode -> processor.processText(child.text)
-                is TSpanRenderNode -> renderTSpanNode(child, processor)
-                is TextPathRenderNode -> renderTextPathNode(child)
-                is TRefRenderNode -> renderTRefNode(child, processor)
+                is TextSequenceNode -> processor.processText(canvas, child.text)
+                is TSpanRenderNode -> renderTSpanNode(canvas, child, processor)
+                is TextPathRenderNode -> renderTextPathNode(canvas, child)
+                is TRefRenderNode -> renderTRefNode(canvas, child, processor)
                 else -> {}
             }
         }
     }
 
-    internal fun renderImageNode(node: ImageRenderNode) {
-        withNewNodeState(node, requireVisible = true, saveCanvas = true) {
+    internal fun renderImageNode(canvas: Canvas, node: ImageRenderNode) {
+        withNewNodeState(canvas, node, requireVisible = true, saveCanvas = true) { canvas, _ ->
             node.applyTransformTo(canvas)
 
             val sourceElement = node.sourceElement
-            updateParentBoundingBox(sourceElement)
+            updateParentBoundingBox(canvas, sourceElement)
 
-            if (checkForClipPath(node)) {
-                withNewRenderLayer(node) {
-                    viewportFill()
+            if (checkForClipPath(node, canvas)) {
+                withNewRenderLayer(canvas, node) { canvas, _ ->
+                    viewportFill(canvas)
 
                     val image = node.bitmap ?: return@withNewRenderLayer
                     val imageNaturalSize = node.imageNaturalSize ?: return@withNewRenderLayer
@@ -499,26 +488,30 @@ internal class Renderer internal constructor(
         }
     }
 
-    private inline fun withNewRootContextState(r: (RendererState) -> Unit) {
-        val state = statePush(true)
+    private inline fun withNewRootContextState(canvas: Canvas, r: (Canvas, RendererState) -> Unit) {
+        val state = statePush(canvas, isRootContext = true)
         try {
-            r.invoke(state)
+            r(canvas, state)
         } finally {
-            statePop()
+            statePop(canvas)
         }
     }
 
-    private inline fun <T> withNewState(saveCanvas: Boolean = true, r: (RendererState) -> T): T {
+    private inline fun <T> withNewState(
+        canvas: Canvas,
+        saveCanvas: Boolean = true,
+        r: (state: RendererState) -> T
+    ): T {
         val stateStackState = if (BuildConfig.DEBUG) {
             stateStack.size
         } else {
             0
         }
-        val state = statePush(false, saveCanvas)
+        val state = statePush(canvas = canvas, saveCanvas = saveCanvas)
         return try {
             r.invoke(state)
         } finally {
-            statePop()
+            statePop(canvas)
             if (BuildConfig.DEBUG) {
                 check(stateStack.size == stateStackState) {
                     "Stack size mismatch expected: $stateStackState, was: ${stateStack.size}!"
@@ -531,13 +524,12 @@ internal class Renderer internal constructor(
     private val statePushRectF = Rect()
     @JvmSynthetic
     internal fun statePush(
+        canvas: Canvas,
         isRootContext: Boolean = false,
         saveCanvas: Boolean = true,
         applyFrom: RendererState = state,
-        host: RenderNode<*>? = null
+        host: RenderNode<*>? = null,
     ): RendererState {
-        val canvas = canvas
-
         val savedCount = if (saveCanvas) {
             if (isRootContext) {
                 // Root SVG context should be transparent. So we need to saveLayer
@@ -568,21 +560,22 @@ internal class Renderer internal constructor(
     }
 
     private inline fun withNewNodeState(
+        canvas: Canvas,
         node: RenderNode<*>,
         requireVisible: Boolean = false,
         saveCanvas: Boolean = false,
-        r: () -> Unit
+        r: (Canvas, RendererState) -> Unit,
     ) {
-        val newState = statePush(saveCanvas = saveCanvas, applyFrom = node.renderState, host = node)
+        val newState = statePush(canvas, saveCanvas = saveCanvas, applyFrom = node.renderState, host = node)
         val oldState = stateStack.peek().state
         if (newState.contextStroke == null) newState.contextStroke = oldState.contextStroke
         if (newState.contextFill == null) newState.contextFill = oldState.contextFill
         reapplyDynamicPaints(newState)
         try {
             if (!display() || requireVisible && !visible()) return
-            r.invoke()
+            r(canvas, newState)
         } finally {
-            statePop()
+            statePop(canvas)
         }
     }
 
@@ -593,7 +586,7 @@ internal class Renderer internal constructor(
     private fun angleFromTangent(dx: Float, dy: Float): Float = atan2(dy, dx).toDegrees()
 
     @JvmSynthetic
-    internal fun statePop() {
+    internal fun statePop(canvas: Canvas) {
         val oldState = state
         val poppedState = stateStack.pop()
         if (poppedState.canvasSaveCount != -1) {
@@ -612,67 +605,49 @@ internal class Renderer internal constructor(
     }
 
 
-    private enum class DisplayListMode { SKIP, REPLAYED, RECORD }
-
-    /** Returns the display-list mode for this node and prepares recording if needed. */
-    private fun RenderNode<*>.beginDisplayList(): DisplayListMode {
-        // Software targets (offscreen bitmaps, screenshots, mocks) cannot play
-        // back display lists -- especially not drawRenderNode -- so never cache
-        // or replay against them, even if a recorder was created earlier on an
-        // HW canvas.
-        if (!canvas.isHardwareAccelerated) return DisplayListMode.SKIP
+    /**
+     * Inline: zero allocation. Decides between replaying a cached display list,
+     * recording new content into one, or drawing directly -- then invokes
+     * [content] with the correct target canvas.
+     */
+    private inline fun RenderNode<*>.withNodeDisplayList(
+        canvas: Canvas,
+        content: (Canvas) -> Unit,
+    ) {
+        // Software targets cannot play back display lists.
+        if (!canvas.isHardwareAccelerated) { content(canvas); return }
         // Animated subtrees change every frame; caching would be pure overhead.
-        if (hasAnimationsInSubtree) return DisplayListMode.SKIP
-        val bb = boundingBox ?: return DisplayListMode.SKIP
+        if (hasAnimationsInSubtree) { content(canvas); return }
+        val bb = boundingBox ?: run { content(canvas); return }
 
         var rec = displayList
         if (rec == null) {
             rec = CanvasRenderNodeCompatFactory.create(canvas)
             displayList = rec
         }
-        if (!rec.isSupported) return DisplayListMode.SKIP
+        if (!rec.isSupported) { content(canvas); return }
 
         val key = displayListKey(this)
-        if (rec.replay(canvas, key)) return DisplayListMode.REPLAYED
 
+        // Replay existing capture if the content hasn't changed.
+        if (rec.replay(canvas, key)) return
+
+        // Record fresh content, then replay it once onto the real canvas.
         val pad = 16f
         val w = (bb.width + 2 * pad).toInt().coerceAtLeast(1)
         val h = (bb.height + 2 * pad).toInt().coerceAtLeast(1)
         val ox = bb.minX - pad
         val oy = bb.minY - pad
-
-        displayListCanvasStack.addLast(canvas)
-        canvas = rec.beginRecord(key, w, h, ox, oy)
-        return DisplayListMode.RECORD
     }
-
-    /** Finishes recording started by [beginDisplayList] and replays the result. */
-    private fun RenderNode<*>.endDisplayList() {
-        val rec = displayList ?: return
-        rec.endRecord()
-        canvas = displayListCanvasStack.removeLast()
-        rec.replay(canvas, displayListKey(this))
-    }
-
-    // Recording target canvases saved while display lists are being recorded.
-    // A stack is required: nested static groups each record into their own
-    // display list, and the inner end must restore the OUTER recorder canvas,
-    // not just the most recently saved one.
-    private val displayListCanvasStack = ArrayDeque<Canvas>()
-
 
     private fun displayListKey(node: RenderNode<*>): Long {
-        // Deliberately excludes the canvas matrix: recorded content is vector
-        // data replayed through the live matrix, so scale changes need no
-        // re-record. Nodes whose output DOES depend on scale (vector-effect)
-        // are excluded from caching instead.
         var k = node.contentVersion.toLong() * 31
         k = k * 31 + node.renderState.fillConfig.version
         k = k * 31 + node.renderState.strokeConfig.version
         return k
     }
 
-    private fun drawPathContent(node: PathRenderNode, state: RendererState) {
+    private fun drawPathContent(canvas: Canvas, node: PathRenderNode, state: RendererState) {
         val order = when (state.style.paintOrder) {
             PaintOrder.StrokeFillMarkers -> STROKE_FILL_MARKERS
             PaintOrder.FillMarkersStroke -> FILL_MARKERS_STROKE
@@ -685,22 +660,22 @@ internal class Renderer internal constructor(
             when ((order shr shift) and 3) {
                 COMPONENT_FILL -> if (state.hasFill) {
                     node.path.fillType = state.fillType
-                    doFilledPath(node, node.path)
+                    doFilledPath(node, node.path, canvas)
                 }
                 COMPONENT_STROKE -> if (state.hasStroke) {
-                    doStroke(node.path, node)
+                    doStroke(node.path, node, canvas)
                 }
-                COMPONENT_MARKERS -> renderMarkers(node)
+                COMPONENT_MARKERS -> renderMarkers(canvas, node)
             }
         }
     }
 
-    private fun renderNodeChildren(node: GroupRenderNode<*>) {
-        node.children.forEachElement { it.render(this) }
+    private fun renderNodeChildren(canvas: Canvas, node: GroupRenderNode<*>) {
+        node.children.forEachElement { it.render(this@Renderer, canvas) }
     }
 
     //==============================================================================
-    private fun parentPush(obj: Container) {
+    private fun parentPush(obj: Container, canvas: Canvas) {
         parentStack.push(obj)
 
         val matrixToPush = matrixPool.pull()
@@ -709,7 +684,7 @@ internal class Renderer internal constructor(
         matrixStack.push(matrixToPush)
     }
 
-    private fun parentPop() {
+    private fun parentPop(canvas: Canvas) {
         parentStack.pop()
         matrixPool.release(matrixStack.pop())
     }
@@ -755,12 +730,12 @@ internal class Renderer internal constructor(
     /*
      * Fill a path with either the given paint or if a pattern is set, with the pattern.
      */
-    private fun doFilledPath(node: PathRenderNode, path: Path) {
+    private fun doFilledPath(node: PathRenderNode, path: Path, canvas: Canvas) {
         val s = state
 
         val fillPatternNode = node.fillPatternNode
         if (fillPatternNode != null) {
-            fillWithPattern(node, path, fillPatternNode)
+            fillWithPattern(node, path, fillPatternNode, canvas)
             return
         }
 
@@ -768,14 +743,14 @@ internal class Renderer internal constructor(
         canvas.drawPath(path, s.fillPaint)
     }
 
-    private fun doStroke(path: Path, node: PathRenderNode) {
+    private fun doStroke(path: Path, node: PathRenderNode, canvas: Canvas) {
         val state = state
 
         val strokePatternNode = node.strokePatternNode
         if (strokePatternNode != null) {
             pathPool.withPooledObject { strokedPath ->
                 state.strokePaint.getFillPath(path, strokedPath)
-                fillWithPattern(node, strokedPath, strokePatternNode)
+                fillWithPattern(node, strokedPath, strokePatternNode, canvas)
             }
             return
         }
@@ -808,7 +783,7 @@ internal class Renderer internal constructor(
                         }
 
                         // Render the transformed path. The stroke width used will be in unscaled device units.
-                        drawStrokePath(transformedPath)
+                        drawStrokePath(transformedPath, canvas)
 
                         // Return the current canvas transform to what it was before all this happened
                         canvas.setMatrix(currentMatrix)
@@ -818,21 +793,21 @@ internal class Renderer internal constructor(
                 }
             }
         } else {
-            drawStrokePath(path)
+            drawStrokePath(path, canvas)
         }
     }
 
-    private fun drawStrokePath(path: Path) {
+    private fun drawStrokePath(path: Path, canvas: Canvas) {
         val strokePaint = state.strokePaint
         canvas.drawPath(path, strokePaint)
         if (strokePaint.strokeCap != Paint.Cap.BUTT) {
-            renderDegeneratePath(path)
+            renderDegeneratePath(path, canvas)
         }
     }
 
     private val degeneratePathMeasure = PathMeasure()
     private val degeneratePathPos = FloatArray(2)
-    private fun renderDegeneratePath(path: Path) {
+    private fun renderDegeneratePath(path: Path, canvas: Canvas) {
         val pm = degeneratePathMeasure
         pm.setPath(path, false)
         val pos = degeneratePathPos
@@ -853,7 +828,7 @@ internal class Renderer internal constructor(
     * but the parent needs it in the parent's coordinate space.
     */
     private val tempFloatArrayForPts = FloatArray(8)
-    private fun updateParentBoundingBox(obj: Element) {
+    private fun updateParentBoundingBox(canvas: Canvas, obj: Element) {
         if (obj.parent == null)  // skip this if obj is root element
             return
 
@@ -926,14 +901,15 @@ internal class Renderer internal constructor(
 
     private val getValuesFloatArray = FloatArray(9)
     private inline fun withNewRenderLayer(
+        canvas: Canvas,
         node: RenderNode<*>,
         opacityAdjustment: Float = 1f,
         isMaskContent: Boolean = false,
-        r: (RendererState) -> Unit
+        r: (Canvas, RendererState) -> Unit,
     ) {
         val filterNode = node.filterNode
         if (filterNode != null) {
-            renderWithFilter(node, filterNode, r)
+            renderWithFilter(canvas, node, filterNode, r)
             return
         }
 
@@ -942,12 +918,12 @@ internal class Renderer internal constructor(
         } else {
             0
         }
-        val pushed = pushLayer(node, opacityAdjustment)
+        val pushed = pushLayer(canvas, node, opacityAdjustment)
         try {
-            r.invoke(state)
+            r(canvas, state)
         } finally {
             if (pushed) {
-                popLayer(node, isMaskContent)
+                popLayer(canvas, node, isMaskContent)
             }
             if (BuildConfig.DEBUG) {
                 val sourceElement = node.sourceElement
@@ -959,9 +935,10 @@ internal class Renderer internal constructor(
     }
 
     private inline fun renderWithFilter(
+        canvas: Canvas,
         node: RenderNode<*>,
         filterNode: FilterRenderNode,
-        r: (RendererState) -> Unit
+        r: (Canvas, RendererState) -> Unit,
     ) {
         val filter = filterNode.sourceElement
         if (node.boundingBox == null) {
@@ -980,9 +957,8 @@ internal class Renderer internal constructor(
                 matrixPool.withPooledObject { matrix ->
                     matrixPool.withPooledObject { newMatrix ->
                         rectFPool.withPooledObject { deviceRegion ->
-                            val oldCanvas = canvas
                             @Suppress("DEPRECATION")
-                            oldCanvas.getMatrix(matrix)
+                            canvas.getMatrix(matrix)
 
                             matrix.mapRect(deviceRegion, region)
 
@@ -1004,9 +980,9 @@ internal class Renderer internal constructor(
                                 cachedFilterOutput.height == height
                             ) {
 
-                                oldCanvas.withSave {
-                                    oldCanvas.setMatrix(null)
-                                    oldCanvas.drawBitmap(cachedFilterOutput, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
+                                canvas.withSave {
+                                    canvas.setMatrix(null)
+                                    canvas.drawBitmap(cachedFilterOutput, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
                                 }
                                 return
                             }
@@ -1046,16 +1022,14 @@ internal class Renderer internal constructor(
 
                                 canvasPool.withPooledObject { c ->
                                     c.setBitmap(sourceBitmap)
-                                    canvas = c
                                     newMatrix.set(matrix)
                                     newMatrix.postTranslate(-deviceRegion.left, -deviceRegion.top)
                                     c.setMatrix(newMatrix)
 
                                     val stateStackState = stateStack.size
                                     try {
-                                        r.invoke(state)
+                                        r.invoke(c, state)
                                     } finally {
-                                        canvas = oldCanvas
                                         if (BuildConfig.DEBUG) {
                                             val sourceElement = node.sourceElement
                                             check(stateStack.size == stateStackState) {
@@ -1076,6 +1050,7 @@ internal class Renderer internal constructor(
                             }
 
                             val filteredBitmap = applyFilterToBitmap(
+                                canvas = canvas,
                                 sourceBitmap = sourceBitmap,
                                 region = deviceRegion,
                                 sx = sx,
@@ -1090,9 +1065,9 @@ internal class Renderer internal constructor(
                             node.lastScaleY = sy
 
                             if (filteredBitmap != null) {
-                                oldCanvas.withSave {
-                                    oldCanvas.setMatrix(null)
-                                    oldCanvas.drawBitmap(filteredBitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
+                                canvas.withSave {
+                                    canvas.setMatrix(null)
+                                    canvas.drawBitmap(filteredBitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
                                 }
                             }
                         }
@@ -1105,7 +1080,11 @@ internal class Renderer internal constructor(
     //==============================================================================
     private val saveLayerPaint = Paint()
     @JvmSynthetic
-    internal fun pushLayer(node: RenderNode<*>, opacityAdjustment: Float = 1f): Boolean {
+    internal fun pushLayer(
+        canvas: Canvas,
+        node: RenderNode<*>,
+        opacityAdjustment: Float = 1f,
+    ): Boolean {
         // opacityAdjustment is used by fillWithPattern() to apply the fillOpacity for the
         // pattern
 
@@ -1144,7 +1123,7 @@ internal class Renderer internal constructor(
      * @param node The node we are compositing. Compositing happens if the node is not fully opaque or if it has a mask.
      */
     @JvmSynthetic
-    internal fun popLayer(node: RenderNode<*>, isMaskContent: Boolean = false) {
+    internal fun popLayer(canvas: Canvas, node: RenderNode<*>, isMaskContent: Boolean = false) {
         try {
             // If this is masked content, apply the mask now
             val maskNode = if (isMaskContent) null else node.maskNode
@@ -1163,27 +1142,28 @@ internal class Renderer internal constructor(
                 if (maskType == MaskType.luminance) {
                     // Step 1: convert the mask luminance to alpha.
                     val layer2Count = canvas.saveLayer(originalObjBBox, luminanceToAlphaPaint)
-                    renderMask(maskNode, node)
+                    renderMask(canvas, maskNode, node)
                     canvas.restoreToCount(layer2Count)
                     // Step 2: multiply the luminance alpha by the source alpha.
                     val layer3Count = canvas.saveLayer(originalObjBBox, dstInPaint)
-                    renderMask(maskNode, node)
+                    renderMask(canvas, maskNode, node)
                     canvas.restoreToCount(layer3Count)
                 } else {
                     // For mask-type: alpha, the mask's alpha channel is the final mask.
-                    renderMask(maskNode, node)
+                    renderMask(canvas, maskNode, node)
                 }
 
                 // Apply the final mask to the original object waiting in the open layer created in pushLayer()
                 canvas.restoreToCount(layer1Count)
             }
         } finally {
-            statePop()
+            statePop(canvas)
         }
     }
 
     @JvmSynthetic
     internal fun applyFilterToBitmap(
+        canvas: Canvas,
         sourceBitmap: Bitmap,
         region: RectF,
         sx: Float,
@@ -1227,6 +1207,7 @@ internal class Renderer internal constructor(
                     )
 
                     else -> applyPrimitive(
+                        canvas = canvas,
                         primitiveNode = primitiveNode,
                         results = results,
                         lastResult = lastResult,
@@ -1254,6 +1235,7 @@ internal class Renderer internal constructor(
     }
 
     private fun applyPrimitive(
+        canvas: Canvas,
         primitiveNode: FilterPrimitiveRenderNode<*>,
         results: FilterSourceMap,
         lastResult: Bitmap?,
@@ -1404,6 +1386,7 @@ internal class Renderer internal constructor(
             )
 
             is FeFloodRenderNode -> doFeFloodFilter(
+                canvas = canvas,
                 primitiveNode = primitiveNode,
                 inputBitmap = inputBitmap,
                 primitiveRegion = primitiveRegion,
@@ -1430,6 +1413,7 @@ internal class Renderer internal constructor(
             )
 
             is FeDropShadowRenderNode -> doFeDropShadowFilter(
+                canvas = canvas,
                 primitiveNode = primitiveNode,
                 inputBitmap = inputBitmap,
                 results = results,
@@ -1455,12 +1439,13 @@ internal class Renderer internal constructor(
     }
 
     internal fun doFeFloodFilter(
+        canvas: Canvas,
         primitiveNode: FeFloodRenderNode,
         inputBitmap: Bitmap,
         primitiveRegion: RectF,
         filterRegion: RectF,
     ): Bitmap {
-        val color = withNewState { state ->
+        val color = withNewState(canvas) { state ->
             styleBuilderPool.withPooledObject { builder ->
                 builder.reset(state.style)
                 updateStyleForElement(state, builder, primitiveNode.sourceElement, primitiveNode.animationNodes)
@@ -1492,6 +1477,7 @@ internal class Renderer internal constructor(
     }
 
     internal fun doFeDropShadowFilter(
+        canvas: Canvas,
         primitiveNode: FeDropShadowRenderNode,
         inputBitmap: Bitmap,
         results: FilterSourceMap,
@@ -1537,7 +1523,7 @@ internal class Renderer internal constructor(
         )
 
         // 3. Resolve the flood color/opacity from the element's style.
-        val floodColorInt = withNewState { state ->
+        val floodColorInt = withNewState(canvas = canvas) { state ->
             styleBuilderPool.withPooledObject { builder ->
                 builder.reset(state.style)
                 updateStyleForElement(state, builder, primitive, primitiveNode.animationNodes)
@@ -1631,8 +1617,8 @@ internal class Renderer internal constructor(
         updateStyle(state, builder, sourceStyle, this.currentFontSize, resolvedFontWeight)
     }
 
-    private fun setClipRect(box: Box) {
-        setClipRect(
+    private fun setClipRect(canvas: Canvas, box: Box) {
+        setClipRect(canvas,
             minX = box.minX,
             minY = box.minY,
             width = box.width,
@@ -1640,7 +1626,7 @@ internal class Renderer internal constructor(
         )
     }
 
-    private fun setClipRect(minX: Float, minY: Float, width: Float, height: Float) {
+    private fun setClipRect(canvas: Canvas, minX: Float, minY: Float, width: Float, height: Float) {
         var left = minX
         var top = minY
         var right = minX + width
@@ -1660,7 +1646,7 @@ internal class Renderer internal constructor(
     /*
     * Viewport fill color. A new feature in SVG 1.2.
     */
-    private fun viewportFill() {
+    private fun viewportFill(canvas: Canvas) {
         val style = state.style
 
         var col: Int = when (val viewportFill = style.viewportFill) {
@@ -1685,7 +1671,7 @@ internal class Renderer internal constructor(
         canvas.drawColor(col)
     }
 
-    private fun renderMarkers(node: PathRenderNode) {
+    private fun renderMarkers(canvas: Canvas, node: PathRenderNode) {
         val obj = node.sourceElement
 
         val markerStartNode = node.markerStartNode
@@ -1710,7 +1696,7 @@ internal class Renderer internal constructor(
         if (markerCount == 0) return
 
         if (markerStartNode != null) {
-            renderMarker(markerStartNode, markers[0], isStartMarker = true)
+            renderMarker(canvas, markerStartNode, markers[0], isStartMarker = true)
         }
 
         if (midMarkerNode != null && markers.size > 2) {
@@ -1722,21 +1708,21 @@ internal class Renderer internal constructor(
                 if (thisPos.isAmbiguous) {
                     thisPos = realignMarkerMid(lastPos, thisPos, nextPos)
                 }
-                renderMarker(midMarkerNode, thisPos, isStartMarker = false)
+                renderMarker(canvas, midMarkerNode, thisPos, isStartMarker = false)
                 lastPos = thisPos
                 thisPos = nextPos
             }
         }
 
         if (markerEndNode != null) {
-            renderMarker(markerEndNode, markers[markerCount - 1], isStartMarker = false)
+            renderMarker(canvas, markerEndNode, markers[markerCount - 1], isStartMarker = false)
         }
     }
 
     /*
     * Render the given marker type at the given position
     */
-    private fun renderMarker(markerNode: MarkerRenderNode, pos: MarkerVector, isStartMarker: Boolean) {
+    private fun renderMarker(canvas: Canvas, markerNode: MarkerRenderNode, pos: MarkerVector, isStartMarker: Boolean) {
         val marker = markerNode.sourceElement
         val oldState = state
         val savedCount = canvas.save()
@@ -1843,7 +1829,7 @@ internal class Renderer internal constructor(
                     }
 
                     if (!state.style.overflow!!) {
-                        setClipRect(xOffset, yOffset, _markerWidth, _markerHeight)
+                        setClipRect(canvas, xOffset, yOffset, _markerWidth, _markerHeight)
                     }
 
                     m.reset()
@@ -1856,20 +1842,20 @@ internal class Renderer internal constructor(
                     canvas.concat(m)
 
                     if (!state.style.overflow!!) {
-                        setClipRect(0f, 0f, _markerWidth, _markerHeight)
+                        setClipRect(canvas, 0f, 0f, _markerWidth, _markerHeight)
                     }
                 }
             }
 
-            withNewRenderLayer(markerNode) {
+            withNewRenderLayer(canvas, markerNode) { canvas, _ ->
                 // context-stroke / context-fill resolve to the paint of the element
                 // that references this marker.
                 state.contextStroke = oldState.style.stroke
                 state.contextFill = oldState.style.fill
-                markerNode.children.forEachElement { it.render(this) }
+                markerNode.children.forEachElement { it.render(this@Renderer, canvas) }
             }
         } finally {
-            statePop()
+            statePop(canvas)
         }
     }
 
@@ -1929,11 +1915,11 @@ internal class Renderer internal constructor(
     * to the object, so can't be preconfigured. They have to be initialized at the
     * time each object is rendered.
     */
-    private fun checkForGradientsAndPatterns(node: RenderNode<*>, obj: Element) {
+    private fun checkForGradientsAndPatterns(canvas: Canvas, node: RenderNode<*>, obj: Element) {
         val boundingBox = obj.boundingBox ?: return
 
-        node.fillPaintRef?.let { applyPaint(true, boundingBox, it) }
-        node.strokePaintRef?.let { applyPaint(false, boundingBox, it) }
+        node.fillPaintRef?.let { applyPaint(canvas, true, boundingBox, it) }
+        node.strokePaintRef?.let { applyPaint(canvas, false, boundingBox, it) }
     }
 
     /*
@@ -1942,6 +1928,7 @@ internal class Renderer internal constructor(
     * state-dependent parts) are constructed here, at render time.
     */
     private fun applyPaint(
+        canvas: Canvas,
         isFill: Boolean,
         boundingBox: Box,
         resolved: ResolvedPaint
@@ -1949,9 +1936,9 @@ internal class Renderer internal constructor(
         when (resolved) {
             is ResolvedPaint.Solid -> setSolidColor(state, isFill, resolved.ref)
 
-            is ResolvedPaint.Linear -> makeLinearGradient(isFill, boundingBox, resolved)
+            is ResolvedPaint.Linear -> makeLinearGradient(canvas, isFill, boundingBox, resolved)
 
-            is ResolvedPaint.Radial -> makeRadialGradient(isFill, boundingBox, resolved)
+            is ResolvedPaint.Radial -> makeRadialGradient(canvas, isFill, boundingBox, resolved)
 
             is ResolvedPaint.Missing -> {
                 val paintRef = (if (isFill) state.style.fill else state.style.stroke) as? PaintReference
@@ -1984,6 +1971,7 @@ internal class Renderer internal constructor(
     }
 
     private fun makeLinearGradient(
+        canvas: Canvas,
         isFill: Boolean,
         boundingBox: Box,
         resolved: ResolvedPaint.Linear
@@ -2019,7 +2007,7 @@ internal class Renderer internal constructor(
         }
 
         // Push the state
-        statePush()
+        statePush(canvas)
 
         try {
             // Set the style for the gradient (inherits from its own ancestors, not from callee's state)
@@ -2072,7 +2060,7 @@ internal class Renderer internal constructor(
                         positions[i] = lastOffset
                     }
 
-                    withNewState { state ->
+                    withNewState(canvas) { state ->
                         stop.styleBuilder.also { builder ->
                             builder.reset(state.style)
                             updateStyleForElement(state, builder, stop, stopNode.animationNodes)
@@ -2116,11 +2104,12 @@ internal class Renderer internal constructor(
                 paint.alpha = clamp255(paintOpacity * 255f)
             }
         } finally {
-            statePop()
+            statePop(canvas)
         }
     }
 
     private fun makeRadialGradient(
+        canvas: Canvas,
         isFill: Boolean,
         boundingBox: Box,
         resolved: ResolvedPaint.Radial
@@ -2172,7 +2161,7 @@ internal class Renderer internal constructor(
         // 'focus' point that is different from cx,cy.
 
         // Push the state
-        statePush()
+        statePush(canvas)
 
         try {
             // Set the style for the gradient (inherits from its own ancestors, not from callee's state)
@@ -2226,7 +2215,7 @@ internal class Renderer internal constructor(
                         positions[i] = lastOffset
                     }
 
-                    withNewState { st5 ->
+                    withNewState(canvas) { st5 ->
                         styleBuilderPool.withPooledObject { builder ->
                             builder.reset(st5.style)
                             updateStyleForElement(st5, builder, stop, stopNode.animationNodes)
@@ -2296,7 +2285,7 @@ internal class Renderer internal constructor(
                 paint.alpha = clamp255(paintOpacity * 255f)
             }
         } finally {
-            statePop()
+            statePop(canvas)
         }
     }
 
@@ -2307,7 +2296,7 @@ internal class Renderer internal constructor(
     /**
      * Returns true if the drawing operation is not fully clipped out
      */
-    private fun checkForClipPath(node: RenderNode<*>): Boolean {
+    private fun checkForClipPath(node: RenderNode<*>, canvas: Canvas): Boolean {
         return node.clipPathNode == null || pathPool.withPooledObject { combinedPath ->
             if (calculateClipPath(node, combinedPath)) {
                 canvas.clipPath(combinedPath)
@@ -2418,7 +2407,12 @@ internal class Renderer internal constructor(
     }
 
 
-    private fun fillWithPattern(node: PathRenderNode, path: Path, patternNode: PatternRenderNode) {
+    private fun fillWithPattern(
+        node: PathRenderNode,
+        path: Path,
+        patternNode: PatternRenderNode,
+        canvas: Canvas,
+    ) {
         val obj = node.sourceElement
         val pattern = patternNode.sourceElement
         val patternUnitsAreUser = pattern.patternUnitsAreUser == true
@@ -2450,7 +2444,7 @@ internal class Renderer internal constructor(
         // \"If attribute 'preserveAspectRatio' is not specified, then the effect is as if a value of xMidYMid meet were specified.\"
         val positioning: PreserveAspectRatio = pattern.preserveAspectRatio ?: PreserveAspectRatio.LETTERBOX
 
-        withNewState {
+        withNewState(canvas) {
             // Set path as the clip region
             canvas.clipPath(path)
 
@@ -2504,9 +2498,10 @@ internal class Renderer internal constructor(
                 val bottom = areaMaxY
 
                 withNewRenderLayer(
+                    canvas = canvas,
                     node = patternNode,
                     opacityAdjustment = objFillOpacity
-                ) {
+                ) { canvas, _ ->
                     var stepY = originY
                     while (stepY < bottom) {
                         var stepX = originX
@@ -2514,10 +2509,10 @@ internal class Renderer internal constructor(
                             val minX = stepX
                             val minY = stepY
 
-                            withNewState { st6 ->
+                            withNewState(canvas) { st6 ->
                                 // Set pattern clip rectangle if appropriate
                                 if (st6.style.overflow == false && patternNode.hasOverflow) {
-                                    setClipRect(minX, minY, w, h)
+                                    setClipRect(canvas, minX, minY, w, h)
                                 }
                                 // Calculate and set the viewport for each instance of the pattern
                                 val viewBox = pattern.viewBox
@@ -2551,7 +2546,7 @@ internal class Renderer internal constructor(
                                 }
 
                                 // Render the pattern node content
-                                patternNode.children.forEachElement { it.render(this) }
+                                patternNode.children.forEachElement { it.render(this@Renderer, canvas) }
                             }
 
                             stepX += w
@@ -2560,19 +2555,19 @@ internal class Renderer internal constructor(
                     }
                 }
             } finally {
-                statePop()
+                statePop(canvas)
             }
         }
     }
 
-    private fun renderMask(maskNode: MaskRenderNode, node: RenderNode<*>) {
+    private fun renderMask(canvas: Canvas, maskNode: MaskRenderNode, node: RenderNode<*>) {
         val mask = maskNode.sourceElement
         val originalObjBBox = node.boundingBox!!
         rectFPool.withPooledObject { maskRegion ->
             calculateRegion(mask, originalObjBBox, maskRegion)
             if (maskRegion.width() <= 0f || maskRegion.height() <= 0f) return
 
-            withNewState {
+            withNewState(canvas) {
                 val oldState = state
                 val newState = renderStatePool.pull()
                 newState.apply(maskNode.renderState)
@@ -2586,7 +2581,7 @@ internal class Renderer internal constructor(
                     canvas.withSave {
                         canvas.clipRect(maskRegion)
 
-                        withNewRenderLayer(node, isMaskContent = true) {
+                        withNewRenderLayer(canvas,node, isMaskContent = true) { canvas, _ ->
                             canvas.withSave {
                                 val maskContentUnitsAreUser = mask.maskContentUnitsAreUser != false
                                 if (!maskContentUnitsAreUser) {
@@ -2596,12 +2591,12 @@ internal class Renderer internal constructor(
                                     state.viewBox = null
                                 }
 
-                                maskNode.children.forEachElement { it.render(this@Renderer) }
+                                maskNode.children.forEachElement { it.render(this@Renderer, canvas) }
                             }
                         }
                     }
                 } finally {
-                    statePop()
+                    statePop(canvas)
                 }
             }
         }

@@ -106,7 +106,7 @@ internal abstract class TextProcessor {
     }
 
     context(renderContext: RenderContext)
-    abstract fun processText(text: String)
+    abstract fun processText(canvas: Canvas, text: String)
 }
 
 private class TextPositioning(
@@ -163,6 +163,7 @@ internal fun calculateTextWidth(children: List<TextNode>, parentState: RendererS
 
 context(renderContext: RenderContext)
 internal fun calculateTextBounds(
+    canvas: Canvas,
     children: List<TextNode>,
     proc: TextBoundsCalculator,
     parentState: RendererState
@@ -171,18 +172,18 @@ internal fun calculateTextBounds(
         when (child) {
             is TextSequenceNode -> {
                 // For sequence nodes we use parent state because they don't have their own
-                proc.processText(child.text, parentState)
+                proc.processText(canvas, child.text, parentState)
             }
 
             is TSpanRenderNode -> {
                 proc.pushPositioning(child.x, child.y, child.dx, child.dy)
-                calculateTextBounds(child.children, proc, child.renderState)
+                calculateTextBounds(canvas, child.children, proc, child.renderState)
                 proc.popPositioning()
             }
 
             is TRefRenderNode -> {
                 proc.pushPositioning(child.x, child.y, child.dx, child.dy)
-                proc.processText(child.text, child.renderState)
+                proc.processText(canvas, child.text, child.renderState)
                 proc.popPositioning()
             }
 
@@ -210,7 +211,7 @@ internal class TextBoundsCalculator : TextProcessor() {
     }
 
     context(renderContext: RenderContext)
-    override fun processText(text: String) {
+    override fun processText(canvas: Canvas, text: String) {
         if (state.style.visibility != false) {
             val rect = Rect()
             val paint = state.fillPaint
@@ -240,13 +241,13 @@ internal class TextBoundsCalculator : TextProcessor() {
 
     // Needed for calculateTextBounds calls that pass state
     context(renderContext: RenderContext)
-    fun processText(text: String, state: RendererState) {
+    fun processText(canvas: Canvas, text: String, state: RendererState) {
         // Wrap state so processText can access it
         // Actually, TextBoundsCalculator seems to be used without an initial state 
         // in calculateTextBounds, but it uses the passed state for each call.
         // Let's adjust TextBoundsCalculator to hold current state.
         this.state = state
-        processText(text)
+        processText(canvas, text)
     }
 
     @JvmField
@@ -254,13 +255,12 @@ internal class TextBoundsCalculator : TextProcessor() {
 }
 
 internal open class PlainTextDrawer(
-    internal var canvas: Canvas,
     @JvmField
     internal var state: RendererState,
 ) : TextProcessor() {
 
     context(renderContext: RenderContext)
-    override fun processText(text: String) {
+    override fun processText(canvas: Canvas, text: String) {
         val style = state.style
         if (style.visibility == false) {
             updatePositionAfterText(text)
@@ -271,9 +271,9 @@ internal open class PlainTextDrawer(
 
         val writingMode = style.writingMode ?: WritingMode.horizontal_tb
         if (writingMode.isVertical) {
-            processTextVertical(transformedText)
+            processTextVertical(canvas, transformedText)
         } else {
-            processTextHorizontal(transformedText)
+            processTextHorizontal(canvas, transformedText)
         }
     }
 
@@ -289,7 +289,7 @@ internal open class PlainTextDrawer(
     }
 
     context(renderContext: RenderContext)
-    private fun processTextHorizontal(text: String) {
+    private fun processTextHorizontal(canvas: Canvas, text: String) {
         val letterspacingAdj = state.style.letterSpacing!!.floatValueInContext() / 2
         val paint = state.fillPaint
         val strokePaint = state.strokePaint
@@ -357,7 +357,7 @@ internal open class PlainTextDrawer(
 
     @SuppressLint("UseKtx")
     context(renderContext: RenderContext)
-    private fun processTextVertical(text: String) {
+    private fun processTextVertical(canvas: Canvas, text: String) {
         val orientation = state.style.textOrientation ?: TextOrientation.mixed
 
         if (orientation == TextOrientation.sideways) {
@@ -365,7 +365,7 @@ internal open class PlainTextDrawer(
             val oldY = y
             canvas.save()
             canvas.rotate(90f, x, y)
-            processTextHorizontal(text)
+            processTextHorizontal(canvas, text)
             canvas.restore()
 
             val advance = x - oldX
@@ -397,12 +397,11 @@ internal open class PlainTextDrawer(
 
 internal class PathTextDrawer(
     private val path: Path,
-    canvas: Canvas,
     state: RendererState
-) : PlainTextDrawer(canvas, state) {
+) : PlainTextDrawer(state) {
 
     context(renderContext: RenderContext)
-    override fun processText(text: String) {
+    override fun processText(canvas: Canvas, text: String) {
         if (state.style.visibility != false) {
             val transformedText = applyTextTransform(text, state.style.textTransform)
             // Android/Skia divides letterspacing and puts half before and after each letter.
@@ -478,7 +477,7 @@ internal class PlainTextToPath(
     }
 
     context(renderContext: RenderContext)
-    override fun processText(text: String) {
+    override fun processText(canvas: Canvas, text: String) {
         // Should not be called without state
     }
 

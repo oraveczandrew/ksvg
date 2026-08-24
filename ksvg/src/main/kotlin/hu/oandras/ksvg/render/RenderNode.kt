@@ -16,6 +16,8 @@
 
 package hu.oandras.ksvg.render
 
+import android.graphics.Canvas
+
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -145,7 +147,7 @@ internal sealed class RenderNode<T: SvgObject>(
         return animationNodes?.isNotEmpty() == true
     }
 
-    abstract fun render(renderer: Renderer)
+    abstract fun render(renderer: Renderer, canvas: Canvas)
 
     open fun recycle(bitmapPool: BitmapPool) {
         cachedFilterOutput?.let { 
@@ -180,8 +182,8 @@ internal open class GroupRenderNode<T: ConditionalContainer>(
         return super.computeHasAnimations() || children.any { it.hasAnimations() }
     }
 
-    override fun render(renderer: Renderer) {
-        renderer.renderGroupNode(this)
+    override fun render(renderer: Renderer, canvas: Canvas) {
+        renderer.renderGroupNode(canvas, this)
     }
 
     override fun recycle(bitmapPool: BitmapPool) {
@@ -199,8 +201,8 @@ internal class MaskRenderNode(
     children: List<RenderNode<*>>
 ) : GroupRenderNode<Mask>(sourceElement, children) {
 
-    override fun render(renderer: Renderer) {
-        renderer.renderGroupNode(this)
+    override fun render(renderer: Renderer, canvas: Canvas) {
+        renderer.renderGroupNode(canvas, this)
     }
 
     override fun toString(): String {
@@ -213,8 +215,8 @@ internal class MarkerRenderNode(
     children: List<RenderNode<*>>
 ) : GroupRenderNode<Marker>(sourceElement, children) {
 
-    override fun render(renderer: Renderer) {
-        renderer.renderGroupNode(this)
+    override fun render(renderer: Renderer, canvas: Canvas) {
+        renderer.renderGroupNode(canvas, this)
     }
 
     override fun toString(): String {
@@ -230,7 +232,7 @@ internal class ClipPathRenderNode(
         return super.computeHasAnimations() || children.any { it.hasAnimations() }
     }
 
-    override fun render(renderer: Renderer) {
+    override fun render(renderer: Renderer, canvas: Canvas) {
         error("ClipPaths are not rendered directly")
     }
 
@@ -247,8 +249,8 @@ internal class SwitchRenderNode(
         return super.computeHasAnimations() || selectedChild?.hasAnimations() == true
     }
 
-    override fun render(renderer: Renderer) {
-        renderer.renderSwitchNode(this)
+    override fun render(renderer: Renderer, canvas: Canvas) {
+        renderer.renderSwitchNode(canvas, this)
     }
 
     override fun toString(): String {
@@ -263,8 +265,8 @@ internal class PathRenderNode(
 ) : RenderNode<Shape>(sourceElement) {
     @JvmField val pointsBuffer = FloatArrayBucket()
 
-    override fun render(renderer: Renderer) {
-        renderer.renderPathNode(this)
+    override fun render(renderer: Renderer, canvas: Canvas) {
+        renderer.renderPathNode(canvas, this)
     }
 
     override fun toString(): String {
@@ -285,8 +287,8 @@ internal class TextRenderNode(
     @JvmField val dy: Float,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<Text>(sourceElement, children) {
-    override fun render(renderer: Renderer) {
-        renderer.renderTextNode(this)
+    override fun render(renderer: Renderer, canvas: Canvas) {
+        renderer.renderTextNode(canvas, this)
     }
 }
 
@@ -298,7 +300,7 @@ internal class TSpanRenderNode(
     @JvmField val dy: FloatArray?,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<TSpan>(sourceElement, children) {
-    override fun render(renderer: Renderer) {
+    override fun render(renderer: Renderer, canvas: Canvas) {
         error("TSpan is rendered via renderTSpanNode(node, processor) during text traversal")
     }
 }
@@ -309,7 +311,7 @@ internal class TextPathRenderNode(
     @JvmField val startOffset: Float,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<TextPath>(sourceElement, children) {
-    override fun render(renderer: Renderer) {
+    override fun render(renderer: Renderer, canvas: Canvas) {
         error("TextPath is rendered via renderTextPathNode(node, processor) during text traversal")
     }
 }
@@ -322,7 +324,7 @@ internal class TRefRenderNode(
     @JvmField val dx: FloatArray?,
     @JvmField val dy: FloatArray?,
 ) : RenderNode<TRef>(sourceElement), TextNode {
-    override fun render(renderer: Renderer) {
+    override fun render(renderer: Renderer, canvas: Canvas) {
         error("TRef is rendered via renderTRefNode(node, processor) during text traversal")
     }
 }
@@ -333,8 +335,8 @@ internal class ImageRenderNode(
     @JvmField val bitmap: Bitmap?,
     @JvmField val imageNaturalSize: Box?
 ) : RenderNode<Image>(sourceElement) {
-    override fun render(renderer: Renderer) {
-        renderer.renderImageNode(this)
+    override fun render(renderer: Renderer, canvas: Canvas) {
+        renderer.renderImageNode(canvas, this)
     }
 }
 
@@ -349,7 +351,7 @@ internal class PatternRenderNode(
         return super.computeHasAnimations() || children.any { it.hasAnimations() }
     }
 
-    override fun render(renderer: Renderer) {
+    override fun render(renderer: Renderer, canvas: Canvas) {
         error("Patterns are rendered via fillWithPattern in Renderer")
     }
 

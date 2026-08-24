@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.PathMeasure
@@ -1063,7 +1064,8 @@ internal class RenderTreeBuilder(
                 this.x = x
                 this.y = y
             }
-            calculateTextBounds(children, proc, state)
+            // Measurement only: TextBoundsCalculator never draws, so a throwaway canvas is fine (build time, not hot path).
+            calculateTextBounds(canvas = Canvas(), children = children, proc = proc, parentState = state)
             obj.boundingBox = Box(proc.boundingBox)
         }
 

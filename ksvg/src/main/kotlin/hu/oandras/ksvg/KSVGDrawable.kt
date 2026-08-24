@@ -51,7 +51,6 @@ public open class KSVGDrawable @JvmOverloads public constructor(
 
     private val renderer = Renderer(
         document = svg as SVGImpl,
-        canvas = Canvas(),
         dPI = svg.renderDPI,
         pools = pools,
     )
