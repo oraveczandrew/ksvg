@@ -18,5 +18,5 @@ package hu.oandras.ksvg.showcase
 
 enum class Category(val assetPath: String) {
     METEOCONS("meteocons/fill"),
-    VERIFICATION("visual")
+    VISUAL("visual")
 }

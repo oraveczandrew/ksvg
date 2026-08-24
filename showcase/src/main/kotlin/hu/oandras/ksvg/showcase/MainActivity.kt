@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
                 R.id.menu_verification -> {
-                    viewModel.currentCategory.value = Category.VERIFICATION
+                    viewModel.currentCategory.value = Category.VISUAL
                     true
                 }
                 else -> false

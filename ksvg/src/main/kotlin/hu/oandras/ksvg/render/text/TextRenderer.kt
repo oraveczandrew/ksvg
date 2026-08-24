@@ -40,7 +40,8 @@ import hu.oandras.ksvg.render.TextNode
 import hu.oandras.ksvg.render.TextPathRenderNode
 import hu.oandras.ksvg.render.TextSequenceNode
 import hu.oandras.ksvg.utils.capitalizeStr
-import java.util.Locale
+import hu.oandras.ksvg.utils.forEachElement
+import java.util.*
 
 internal abstract class TextProcessor {
     @JvmField
@@ -61,7 +62,7 @@ internal abstract class TextProcessor {
     }
 
     protected fun hasPositioning(): Boolean {
-        for (p in positioningStack) {
+        positioningStack.forEachElement { p ->
             if (p.hasPending()) return true
         }
         return false
@@ -83,7 +84,7 @@ internal abstract class TextProcessor {
             }
         }
 
-        for (p in positioningStack) {
+        positioningStack.forEachElement { p ->
             if (p.dx != null && p.index < p.dx.size) {
                 relX += p.dx[p.index]
             }
