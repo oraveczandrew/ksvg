@@ -21,9 +21,12 @@
 // byte permutation lose nothing, float paths keep the exact op sequence.
 
 #include <jni.h>
-#include <immintrin.h>
 #include <cstring>
-#include "simd_x86.h"
+// Only compiled on x86/x86_64 (per-file ISA flags in CMakeLists.txt);
+// included in every ABI's target so IDEs don't flag it as orphaned.
+#if defined(__i386__) || defined(__x86_64__)
+
+#include <immintrin.h>
 
 namespace {
 
@@ -268,3 +271,5 @@ void ksvgComponentTransferApplyAvx2(
 }
 
 } // extern "C"
+
+#endif // __i386__ || __x86_64__

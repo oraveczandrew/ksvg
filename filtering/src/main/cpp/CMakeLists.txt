@@ -34,13 +34,17 @@ target_compile_options(ksvgblur PRIVATE -ffp-contract=off)
 # Every known Android x86 device satisfies this.
 if(ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
     target_compile_options(ksvgblur PRIVATE -mssse3)
-    # Wide ISA paths as separate TUs: the per-file flags make <immintrin.h>
-    # declare the AVX2/AVX-512 intrinsics; the baseline code stays SSE2 and
-    # calls into these only after runtime detection (cpu_dispatch.h).
-    target_sources(ksvgblur PRIVATE simd_x86_avx2.cpp simd_x86_avx512.cpp)
+    # Per-file flags make <immintrin.h> declare the AVX2/AVX-512 intrinsics
+    # (invalid options on ARM ABIs, hence the guard).
     set_source_files_properties(simd_x86_avx2.cpp PROPERTIES COMPILE_OPTIONS "-mavx2")
     set_source_files_properties(simd_x86_avx512.cpp PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw")
 endif()
+
+# Wide ISA paths as separate TUs; baseline code stays SSE2 and calls into these
+# only after runtime detection (cpu_dispatch.h). The TUs are preprocessor-
+# guarded, so joining every ABI's target is safe (empty on non-x86) and keeps
+# IDEs happy.
+target_sources(ksvgblur PRIVATE simd_x86_avx2.cpp simd_x86_avx512.cpp)
 
 # The ARM32 kernels use NEON instructions; enable the FPU for the C++ side too.
 if(BLUR_NEEDS_NEON)
