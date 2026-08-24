@@ -226,6 +226,15 @@ reference loop (`doConvolveMatrixKotlin`, kept as JVM fallback):
   - All paths are pure byte permutation → bit-exact with scalar by construction.
 - armv7 convolve stays scalar: ARM32 NEON has no integer divide and a
   reciprocal-multiply would break bit-exact rounding (documented decision).
+- **x86 wide ISA paths (AVX2 + AVX-512)**: `simd_x86_avx2.cpp` (-mavx2) and
+  `simd_x86_avx512.cpp` (-mavx512f -mavx512bw) as separate translation units —
+  per-file flags make <immintrin.h> expose the wide intrinsics while baseline
+  code stays SSE2. Runtime dispatch via `cpu_dispatch.h`
+  (`__builtin_cpu_supports`, cached static): SSE2 → SSSE3 → AVX2 → AVX512.
+  - morphology: 32/64-byte byte-min/max folds (bit-exact at any width),
+  - convolve: f32×8 / f32×16 interior accumulation, same op sequence,
+  - componentTransfer: AVX2 `vpshufb` LUT (8 px/iter); AVX-512 runs the AVX2
+    path — a vpermb two-level 256-entry gather was judged not worth the complexity.
 - armv7 / x86: scalar (documented; SSSE3/armv7-NEON can follow if profiling justifies).
 - Device parity test: `ConvolveNativeDeviceTest` (3 edge modes × preserveAlpha,
   non-square kernel, off-center anchor, non-multiple-of-4 width).

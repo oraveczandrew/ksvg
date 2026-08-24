@@ -16,6 +16,8 @@
 
 #include <jni.h>
 #include <cmath>
+#include "cpu_dispatch.h"
+#include "simd_x86.h"
 
 // feConvolveMatrix kernel over ARGB_8888 IntArrays (Bitmap.getPixels layout).
 //
@@ -388,8 +390,19 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
             applyNeonInterior(dst, src, width, height, kernel, orderX, orderY,
                               targetX, targetY, divisor, bias, preserve);
 #else
-            applySseInterior(dst, src, width, height, kernel, orderX, orderY,
-                             targetX, targetY, divisor, bias, preserve);
+            switch (detectSimdLevel()) {
+                case SIMD_AVX512:
+                    ksvgConvolveApplyInteriorAvx512(dst, src, width, height, kernel,
+                        orderX, orderY, targetX, targetY, divisor, bias, preserve);
+                    break;
+                case SIMD_AVX2:
+                    ksvgConvolveApplyInteriorAvx2(dst, src, width, height, kernel,
+                        orderX, orderY, targetX, targetY, divisor, bias, preserve);
+                    break;
+                default:
+                    applySseInterior(dst, src, width, height, kernel, orderX, orderY,
+                                     targetX, targetY, divisor, bias, preserve);
+            }
 #endif
             env->ReleasePrimitiveArrayCritical(jKernel, kernel, JNI_ABORT);
             env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);

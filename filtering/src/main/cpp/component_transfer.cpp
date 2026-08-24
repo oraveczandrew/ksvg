@@ -16,6 +16,8 @@
 
 #include <jni.h>
 #include <cstring>
+#include "cpu_dispatch.h"
+#include "simd_x86.h"
 
 // feComponentTransfer kernel over unpremultiplied ARGB_8888 IntArrays.
 //
@@ -312,8 +314,13 @@ Java_hu_oandras_ksvg_filtering_ComponentTransferNative_apply(
     applyNeon64(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 tableA, tableR, tableG, tableB);
 #elif defined(__SSSE3__)
-    applySsse3(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
-               tableA, tableR, tableG, tableB);
+    if (detectSimdLevel() >= SIMD_AVX2) {
+        ksvgComponentTransferApplyAvx2(src, dst, width, height,
+            clipLeft, clipTop, clipRight, clipBottom, tableA, tableR, tableG, tableB);
+    } else {
+        applySsse3(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                   tableA, tableR, tableG, tableB);
+    }
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     applyNeon32(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 tableA, tableR, tableG, tableB);

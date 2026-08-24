@@ -16,6 +16,8 @@
 
 #include <jni.h>
 #include <cstring>
+#include "cpu_dispatch.h"
+#include "simd_x86.h"
 
 // feMorphology (erode/dilate) over unpremultiplied ARGB_8888 IntArrays.
 //
@@ -193,7 +195,20 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
         }
         for (jint x = vxLo; x < vxHi; x++) {
+#if defined(__i386__) || defined(__x86_64__)
+            switch (detectSimdLevel()) {
+                case SIMD_AVX512:
+                    ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
+                    break;
+                case SIMD_AVX2:
+                    ksvgMorphologyApplyPixelAvx2(src, dst, width, radiusX, radiusY, erode, x, y);
+                    break;
+                default:
+                    applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
+            }
+#else
             applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
+#endif
         }
         for (jint x = vxHi; x < xHi; x++) {
             applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
