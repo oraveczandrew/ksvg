@@ -17,6 +17,9 @@
 
 package hu.oandras.ksvg.dom.text
 
+import hu.oandras.ksvg.dom.style.NONE
+import hu.oandras.ksvg.parser.TextScanner
+
 internal class TextDecoration(val mask: Int) {
     fun hasUnderline(): Boolean = (mask and UNDERLINE) != 0
     fun hasOverline(): Boolean = (mask and OVERLINE) != 0
@@ -45,4 +48,23 @@ internal class TextDecoration(val mask: Int) {
     override fun hashCode(): Int = mask
 
     override fun toString(): String = "TextDecoration($mask)"
+}
+
+// Parse a text decoration keyword list
+internal fun parseTextDecoration(value: String): TextDecoration? {
+    if (value.equals(NONE, ignoreCase = true)) return TextDecoration.None
+    var mask = 0
+    val scanner = TextScanner(value)
+    while (!scanner.empty()) {
+        scanner.skipWhitespace()
+        val token = scanner.nextToken() ?: break
+        when {
+            token.equals("underline", ignoreCase = true) -> mask = mask or TextDecoration.UNDERLINE
+            token.equals("overline", ignoreCase = true) -> mask = mask or TextDecoration.OVERLINE
+            token.equals("line-through", ignoreCase = true) -> mask = mask or TextDecoration.LINE_THROUGH
+            token.equals("blink", ignoreCase = true) -> mask = mask or TextDecoration.BLINK
+        }
+        scanner.skipWhitespace()
+    }
+    return if (mask != 0) TextDecoration(mask) else null
 }

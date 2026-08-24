@@ -16,6 +16,8 @@
 
 package hu.oandras.ksvg.dom.text
 
+import hu.oandras.ksvg.parser.parseLength
+
 import hu.oandras.ksvg.css.CSSLength
 
 internal class BaselineShift(
@@ -29,5 +31,18 @@ internal class BaselineShift(
         Sub,
         Super,
         Length
+    }
+}
+
+// Parse a baseline shift
+internal fun parseBaselineShift(value: String): BaselineShift? {
+    return when {
+        value.equals("baseline", ignoreCase = true) -> BaselineShift(null, BaselineShift.Type.Baseline)
+        value.equals("sub", ignoreCase = true) -> BaselineShift(null, BaselineShift.Type.Sub)
+        value.equals("super", ignoreCase = true) -> BaselineShift(null, BaselineShift.Type.Super)
+        else -> {
+            val length = parseLength(value)
+            BaselineShift(length, BaselineShift.Type.Length)
+        }
     }
 }
