@@ -179,7 +179,7 @@ internal fun doFeComponentTransferFilter(
     val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
 
     outPixels.fill(0) // Initialize with transparent
-    val useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LinearRGB
+    val useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
 
     for (y in clipTop until clipBottom) {
         val rowOffset = y * width

@@ -32,3 +32,24 @@ internal enum class DominantBaseline {
     TextTop,
     TextBottom
 }
+
+// Parse a dominant baseline keyword
+internal fun parseDominantBaseline(value: String): DominantBaseline? {
+    return when {
+        value.equals("auto", ignoreCase = true) -> DominantBaseline.Auto
+        value.equals("use-script", ignoreCase = true) -> DominantBaseline.UseScript
+        value.equals("no-change", ignoreCase = true) -> DominantBaseline.NoChange
+        value.equals("reset-size", ignoreCase = true) -> DominantBaseline.ResetSize
+        value.equals("alphabetic", ignoreCase = true) -> DominantBaseline.Alphabetic
+        value.equals("ideographic", ignoreCase = true) -> DominantBaseline.Ideographic
+        value.equals("mathematical", ignoreCase = true) -> DominantBaseline.Mathematical
+        value.equals("hanging", ignoreCase = true) -> DominantBaseline.Hanging
+        value.equals("text-after-edge", ignoreCase = true) -> DominantBaseline.TextAfterEdge
+        value.equals("text-before-edge", ignoreCase = true) -> DominantBaseline.TextBeforeEdge
+        value.equals("central", ignoreCase = true) -> DominantBaseline.Central
+        value.equals("middle", ignoreCase = true) -> DominantBaseline.Middle
+        value.equals("text-top", ignoreCase = true) -> DominantBaseline.TextTop
+        value.equals("text-bottom", ignoreCase = true) -> DominantBaseline.TextBottom
+        else -> null
+    }
+}

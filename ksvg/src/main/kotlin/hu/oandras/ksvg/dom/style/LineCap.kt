@@ -41,3 +41,14 @@ public annotation class LineCap {
         public const val SQUARE: Int = 2
     }
 }
+
+// Parse stroke-line-cap
+@LineCap
+internal fun parseStrokeLineCap(value: String?): Int {
+    return when {
+        value.equals("butt", ignoreCase = true) -> LineCap.BUTT
+        value.equals("round", ignoreCase = true) -> LineCap.ROUND
+        value.equals("square", ignoreCase = true) -> LineCap.SQUARE
+        else -> LineCap.UNSPECIFIED
+    }
+}

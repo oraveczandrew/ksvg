@@ -30,3 +30,22 @@ internal enum class AlignmentBaseline {
     Hanging,
     Mathematical
 }
+
+// Parse an alignment baseline keyword
+internal fun parseAlignmentBaseline(value: String): AlignmentBaseline? {
+    return when {
+        value.equals("auto", ignoreCase = true) -> AlignmentBaseline.Auto
+        value.equals("baseline", ignoreCase = true) -> AlignmentBaseline.Baseline
+        value.equals("before-edge", ignoreCase = true) -> AlignmentBaseline.BeforeEdge
+        value.equals("text-before-edge", ignoreCase = true) -> AlignmentBaseline.TextBeforeEdge
+        value.equals("middle", ignoreCase = true) -> AlignmentBaseline.Middle
+        value.equals("central", ignoreCase = true) -> AlignmentBaseline.Central
+        value.equals("after-edge", ignoreCase = true) -> AlignmentBaseline.AfterEdge
+        value.equals("text-after-edge", ignoreCase = true) -> AlignmentBaseline.TextAfterEdge
+        value.equals("ideographic", ignoreCase = true) -> AlignmentBaseline.Ideographic
+        value.equals("alphabetic", ignoreCase = true) -> AlignmentBaseline.Alphabetic
+        value.equals("hanging", ignoreCase = true) -> AlignmentBaseline.Hanging
+        value.equals("mathematical", ignoreCase = true) -> AlignmentBaseline.Mathematical
+        else -> null
+    }
+}

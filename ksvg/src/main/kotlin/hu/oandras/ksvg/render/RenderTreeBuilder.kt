@@ -1531,14 +1531,19 @@ internal class RenderTreeBuilder(
         val node = FilterRenderNode(filter, primitives)
         node.renderState.apply(state)
         val filterMode = filter.style?.colorInterpolationFilters
+            ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
             ?: filter.baseStyle?.colorInterpolationFilters
+                ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
             ?: state.style.colorInterpolationFilters
-            ?: ColorInterpolation.LinearRGB
+                .takeIf { it != ColorInterpolation.UNSPECIFIED }
+            ?: ColorInterpolation.LINEAR_RGB
         node.colorInterpolationFilters = filterMode
         primitives.forEachElement { primitive ->
             val source = primitive.sourceElement
             primitive.colorInterpolationFilters = source.style?.colorInterpolationFilters
+                ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
                 ?: source.baseStyle?.colorInterpolationFilters
+                    ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
                 ?: filterMode
         }
         filterNodeCache[filter] = node

@@ -23,3 +23,13 @@ internal enum class RenderQuality {
     optimizeQuality,
     optimizeSpeed
 }
+
+// Parse a rendering quality property
+internal fun parseRenderQuality(value: String): RenderQuality? {
+    return when {
+        value.equals("auto", ignoreCase = true) -> RenderQuality.auto
+        value.equals("optimizeQuality", ignoreCase = true) -> RenderQuality.optimizeQuality
+        value.equals("optimizeSpeed", ignoreCase = true) -> RenderQuality.optimizeSpeed
+        else -> null
+    }
+}

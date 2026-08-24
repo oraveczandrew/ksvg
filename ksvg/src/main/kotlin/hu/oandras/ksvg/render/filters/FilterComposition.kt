@@ -142,7 +142,7 @@ private fun applyArithmeticComposite(
     val k4 = primitive.k4
     
     val outPixels = IntArray(size) // We need a clean output
-    val useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LinearRGB
+    val useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
 
     val cTop: Int = clipTop
     val cBottom: Int = clipBottom

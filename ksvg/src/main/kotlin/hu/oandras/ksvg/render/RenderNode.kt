@@ -365,7 +365,7 @@ internal class FilterRenderNode(
     @JvmField val sourceElement: Filter,
     @JvmField val primitives: List<FilterPrimitiveRenderNode<*>>
 ) {
-    @JvmField var colorInterpolationFilters: ColorInterpolation = ColorInterpolation.LinearRGB
+    @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
     @JvmField val renderState: RendererState = RendererState()
 
     @JvmField var filterSourceMap: FilterSourceMap? = null
@@ -389,7 +389,7 @@ internal class FilterRenderNode(
 internal sealed class FilterPrimitiveRenderNode<T: FilterPrimitive>(
     @JvmField val sourceElement: T
 ) {
-    @JvmField var colorInterpolationFilters: ColorInterpolation = ColorInterpolation.LinearRGB
+    @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
     @JvmField var x: Float? = null
     @JvmField var y: Float? = null
     @JvmField var width: Float? = null

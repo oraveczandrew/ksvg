@@ -41,3 +41,14 @@ public annotation class LineJoin {
         public const val BEVEL: Int = 2
     }
 }
+
+// Parse stroke-line-join
+@LineJoin
+internal fun parseStrokeLineJoin(value: String?): Int {
+    return when {
+        value.equals("miter", ignoreCase = true) -> LineJoin.MITER
+        value.equals("round", ignoreCase = true) -> LineJoin.ROUND
+        value.equals("bevel", ignoreCase = true) -> LineJoin.BEVEL
+        else -> LineJoin.UNSPECIFIED
+    }
+}

@@ -34,6 +34,11 @@ import hu.oandras.ksvg.dom.text.TextDecoration
 import hu.oandras.ksvg.dom.text.TextDirection
 import hu.oandras.ksvg.dom.text.TextOrientation
 import hu.oandras.ksvg.dom.text.TextTransform
+import hu.oandras.ksvg.dom.text.parseAlignmentBaseline
+import hu.oandras.ksvg.dom.text.parseDominantBaseline
+import hu.oandras.ksvg.dom.text.parseTextAnchor
+import hu.oandras.ksvg.dom.text.parseTextDirection
+import hu.oandras.ksvg.dom.text.parseTextTransform
 import hu.oandras.ksvg.parser.ColorParser
 import hu.oandras.ksvg.parser.FontSizeKeywords
 import hu.oandras.ksvg.parser.FontWeightKeywords
@@ -64,36 +69,6 @@ private fun parseFunctionalIRI(value: String): String? {
                 value.substring(4)
             }.trimLowerThanSpace()
         }
-    }
-}
-
-// Parse a vector effect keyword
-private fun parseVectorEffect(value: String): VectorEffect? {
-    return when {
-        value.equals(NONE, ignoreCase = true) -> VectorEffect.None
-        value.equals("non-scaling-stroke", ignoreCase = true) -> VectorEffect.NonScalingStroke
-        else -> null
-    }
-}
-
-
-// Parse a rendering quality property
-private fun parseRenderQuality(value: String): RenderQuality? {
-    return when {
-        value.equals("auto", ignoreCase = true) -> RenderQuality.auto
-        value.equals("optimizeQuality", ignoreCase = true) -> RenderQuality.optimizeQuality
-        value.equals("optimizeSpeed", ignoreCase = true) -> RenderQuality.optimizeSpeed
-        else -> null
-    }
-}
-
-
-// Parse an isolation property
-private fun parseIsolation(value: String): Isolation? {
-    return when {
-        value.equals("auto", ignoreCase = true) -> Isolation.auto
-        value.equals("isolate", ignoreCase = true) -> Isolation.isolate
-        else -> null
     }
 }
 
@@ -140,8 +115,7 @@ private fun parseClip(value: String): CSSClipRect? {
     }
 }
 
-
-// Parse a text anchor keyword
+// Parse overflow
 private fun parseOverflow(value: String): Boolean? {
     return when {
         value.equals("visible", ignoreCase = true) ||
@@ -330,7 +304,6 @@ private fun parseColorSpecifier(value: String): SvgColor {
     }
 }
 
-
 // Parse a font family list
 internal fun parseFontFamily(value: String?): List<String>? {
     if (value == null) return null
@@ -351,7 +324,6 @@ internal fun parseFontFamily(value: String?): List<String>? {
     return fonts
 }
 
-
 // Parse a font size keyword or numerical value
 private fun parseFontSize(value: String): CSSLength? {
     return try {
@@ -360,7 +332,6 @@ private fun parseFontSize(value: String): CSSLength? {
         null
     }
 }
-
 
 // Parse a font weight keyword or numerical value
 private fun parseFontWeight(value: String): Float {
@@ -380,7 +351,6 @@ private fun parseFontWeight(value: String): Float {
     return num
 }
 
-
 // Parse a font width/stretch keyword or numerical value
 private fun parseFontWidth(value: String): Float {
     val result = FontWidthKeywords.get(value)
@@ -396,19 +366,6 @@ private fun parseFontWidth(value: String): Float {
     if (num < Style.FONT_WIDTH_MIN) return Float.NaN // Invalid
     return num
 }
-
-
-// Parse a font style keyword
-private fun parseFontStyle(value: String): FontStyle? {
-    // Italic is probably the most common, so test that first :)
-    return when {
-        value.equals("italic", ignoreCase = true) -> FontStyle.italic
-        value.equals("normal", ignoreCase = true) -> FontStyle.normal
-        value.equals("oblique", ignoreCase = true) -> FontStyle.oblique
-        else -> null
-    }
-}
-
 
 // Parse a text decoration keyword list
 private fun parseTextDecoration(value: String): TextDecoration? {
@@ -428,52 +385,6 @@ private fun parseTextDecoration(value: String): TextDecoration? {
     }
     return if (mask != 0) TextDecoration(mask) else null
 }
-
-
-// Parse a text decoration keyword
-private fun parseTextDirection(value: String): TextDirection? {
-    return when {
-        value.equals("ltr", ignoreCase = true) -> TextDirection.LTR
-        value.equals("rtl", ignoreCase = true) -> TextDirection.RTL
-        else -> null
-    }
-}
-
-
-// Parse fill rule
-@FillRule
-private fun parseFillRule(value: String?): Int {
-    return when {
-        value.equals("nonzero", ignoreCase = true) -> FillRule.NON_ZERO
-        value.equals("evenodd", ignoreCase = true) -> FillRule.EVEN_ODD
-        else -> FillRule.UNSPECIFIED
-    }
-}
-
-
-// Parse stroke-line-cap
-@LineCap
-private fun parseStrokeLineCap(value: String?): Int {
-    return when {
-        value.equals("butt", ignoreCase = true) -> LineCap.BUTT
-        value.equals("round", ignoreCase = true) -> LineCap.ROUND
-        value.equals("square", ignoreCase = true) -> LineCap.SQUARE
-        else -> LineCap.UNSPECIFIED
-    }
-}
-
-
-// Parse stroke-line-join
-@LineJoin
-private fun parseStrokeLineJoin(value: String?): Int {
-    return when {
-        value.equals("miter", ignoreCase = true) -> LineJoin.MITER
-        value.equals("round", ignoreCase = true) -> LineJoin.ROUND
-        value.equals("bevel", ignoreCase = true) -> LineJoin.BEVEL
-        else -> LineJoin.UNSPECIFIED
-    }
-}
-
 
 // Parse stroke-dash-array
 private fun parseStrokeDashArray(value: String): Array<CSSLength>? {
@@ -506,57 +417,6 @@ private fun parseStrokeDashArray(value: String): Array<CSSLength>? {
     }
 }
 
-
-// Parse a text anchor keyword
-private fun parseTextAnchor(value: String): TextAnchor? {
-    return when {
-        value.equals("start", ignoreCase = true) -> TextAnchor.Start
-        value.equals("middle", ignoreCase = true) -> TextAnchor.Middle
-        value.equals("end", ignoreCase = true) -> TextAnchor.End
-        else -> null
-    }
-}
-
-// Parse a dominant baseline keyword
-private fun parseDominantBaseline(value: String): DominantBaseline? {
-    return when {
-        value.equals("auto", ignoreCase = true) -> DominantBaseline.Auto
-        value.equals("use-script", ignoreCase = true) -> DominantBaseline.UseScript
-        value.equals("no-change", ignoreCase = true) -> DominantBaseline.NoChange
-        value.equals("reset-size", ignoreCase = true) -> DominantBaseline.ResetSize
-        value.equals("alphabetic", ignoreCase = true) -> DominantBaseline.Alphabetic
-        value.equals("ideographic", ignoreCase = true) -> DominantBaseline.Ideographic
-        value.equals("mathematical", ignoreCase = true) -> DominantBaseline.Mathematical
-        value.equals("hanging", ignoreCase = true) -> DominantBaseline.Hanging
-        value.equals("text-after-edge", ignoreCase = true) -> DominantBaseline.TextAfterEdge
-        value.equals("text-before-edge", ignoreCase = true) -> DominantBaseline.TextBeforeEdge
-        value.equals("central", ignoreCase = true) -> DominantBaseline.Central
-        value.equals("middle", ignoreCase = true) -> DominantBaseline.Middle
-        value.equals("text-top", ignoreCase = true) -> DominantBaseline.TextTop
-        value.equals("text-bottom", ignoreCase = true) -> DominantBaseline.TextBottom
-        else -> null
-    }
-}
-
-// Parse an alignment baseline keyword
-private fun parseAlignmentBaseline(value: String): AlignmentBaseline? {
-    return when {
-        value.equals("auto", ignoreCase = true) -> AlignmentBaseline.Auto
-        value.equals("baseline", ignoreCase = true) -> AlignmentBaseline.Baseline
-        value.equals("before-edge", ignoreCase = true) -> AlignmentBaseline.BeforeEdge
-        value.equals("text-before-edge", ignoreCase = true) -> AlignmentBaseline.TextBeforeEdge
-        value.equals("middle", ignoreCase = true) -> AlignmentBaseline.Middle
-        value.equals("central", ignoreCase = true) -> AlignmentBaseline.Central
-        value.equals("after-edge", ignoreCase = true) -> AlignmentBaseline.AfterEdge
-        value.equals("text-after-edge", ignoreCase = true) -> AlignmentBaseline.TextAfterEdge
-        value.equals("ideographic", ignoreCase = true) -> AlignmentBaseline.Ideographic
-        value.equals("alphabetic", ignoreCase = true) -> AlignmentBaseline.Alphabetic
-        value.equals("hanging", ignoreCase = true) -> AlignmentBaseline.Hanging
-        value.equals("mathematical", ignoreCase = true) -> AlignmentBaseline.Mathematical
-        else -> null
-    }
-}
-
 // Parse a baseline shift
 private fun parseBaselineShift(value: String): BaselineShift? {
     return when {
@@ -567,27 +427,6 @@ private fun parseBaselineShift(value: String): BaselineShift? {
             val length = parseLength(value)
             BaselineShift(length, BaselineShift.Type.Length)
         }
-    }
-}
-
-// Parse a text transform keyword
-private fun parseTextTransform(value: String): TextTransform? {
-    return when {
-        value.equals(NONE, ignoreCase = true) -> TextTransform.None
-        value.equals("capitalize", ignoreCase = true) -> TextTransform.Capitalize
-        value.equals("uppercase", ignoreCase = true) -> TextTransform.Uppercase
-        value.equals("lowercase", ignoreCase = true) -> TextTransform.Lowercase
-        else -> null
-    }
-}
-
-// Parse a color interpolation keyword
-private fun parseColorInterpolation(value: String): ColorInterpolation? {
-    return when {
-        value.equals("auto", ignoreCase = true) -> ColorInterpolation.Auto
-        value.equals("sRGB", ignoreCase = true) -> ColorInterpolation.SRGB
-        value.equals("linearRGB", ignoreCase = true) -> ColorInterpolation.LinearRGB
-        else -> null
     }
 }
 
@@ -711,7 +550,9 @@ internal class Style internal constructor(
     @JvmField val glyphOrientationVertical: GlypOrientationVertical?,
     @JvmField val textOrientation: TextOrientation?,
 
-    @JvmField val colorInterpolationFilters: ColorInterpolation?,
+    @JvmField
+    @ColorInterpolation
+    val colorInterpolationFilters: Int,
     @JvmField val letterSpacing: CSSLength?,
     @JvmField val wordSpacing: CSSLength?,
 
@@ -799,7 +640,7 @@ internal class Style internal constructor(
         writingMode = null,
         glyphOrientationVertical = null,
         textOrientation = null,
-        colorInterpolationFilters = null,
+        colorInterpolationFilters = ColorInterpolation.UNSPECIFIED,
         letterSpacing = null,
         wordSpacing = null,
         paintOrder = PaintOrder.FILL_STROKE_MARKERS,
@@ -987,7 +828,8 @@ internal class Style internal constructor(
         @JvmField
         var textOrientation: TextOrientation? = null
         @JvmField
-        var colorInterpolationFilters: ColorInterpolation? = null
+        @ColorInterpolation
+        var colorInterpolationFilters: Int = ColorInterpolation.UNSPECIFIED
         @JvmField
         var letterSpacing: CSSLength? = null
         @JvmField
@@ -1472,7 +1314,8 @@ internal class Style internal constructor(
         writingMode: WritingMode? = this.writingMode,
         glyphOrientationVertical: GlypOrientationVertical? = this.glyphOrientationVertical,
         textOrientation: TextOrientation? = this.textOrientation,
-        colorInterpolationFilters: ColorInterpolation? = this.colorInterpolationFilters,
+        @ColorInterpolation
+        colorInterpolationFilters: Int = this.colorInterpolationFilters,
         letterSpacing: CSSLength? = this.letterSpacing,
         wordSpacing: CSSLength? = this.wordSpacing,
     ): Style {
@@ -2166,9 +2009,11 @@ internal class Style internal constructor(
                 }
 
                 SVGAttr.color_interpolation_filters -> {
-                    val mode = parseColorInterpolation(value)
-                    builder.colorInterpolationFilters = mode
-                    if (mode != null) builder.addSpecifiedFlag(SPECIFIED_COLOR_INTERPOLATION_FILTERS)
+                    val mode = ColorInterpolation.parse(value)
+                    if (mode != ColorInterpolation.UNSPECIFIED) {
+                        builder.colorInterpolationFilters = mode
+                        builder.addSpecifiedFlag(SPECIFIED_COLOR_INTERPOLATION_FILTERS)
+                    }
                 }
 
                 SVGAttr.filter -> {

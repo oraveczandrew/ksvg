@@ -21,3 +21,12 @@ internal enum class TextDirection {
     LTR,
     RTL
 }
+
+// Parse a text decoration keyword
+internal fun parseTextDirection(value: String): TextDirection? {
+    return when {
+        value.equals("ltr", ignoreCase = true) -> TextDirection.LTR
+        value.equals("rtl", ignoreCase = true) -> TextDirection.RTL
+        else -> null
+    }
+}

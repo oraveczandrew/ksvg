@@ -39,3 +39,13 @@ public annotation class FillRule {
         public const val EVEN_ODD: Int = 1
     }
 }
+
+// Parse fill rule
+@FillRule
+internal fun parseFillRule(value: String?): Int {
+    return when {
+        value.equals("nonzero", ignoreCase = true) -> FillRule.NON_ZERO
+        value.equals("evenodd", ignoreCase = true) -> FillRule.EVEN_ODD
+        else -> FillRule.UNSPECIFIED
+    }
+}

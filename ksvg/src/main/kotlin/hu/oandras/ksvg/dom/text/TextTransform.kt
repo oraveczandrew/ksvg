@@ -22,3 +22,14 @@ internal enum class TextTransform {
     Uppercase,
     Lowercase
 }
+
+// Parse a text transform keyword
+internal fun parseTextTransform(value: String): TextTransform? {
+    return when {
+        value.equals("none", ignoreCase = true) -> TextTransform.None
+        value.equals("capitalize", ignoreCase = true) -> TextTransform.Capitalize
+        value.equals("uppercase", ignoreCase = true) -> TextTransform.Uppercase
+        value.equals("lowercase", ignoreCase = true) -> TextTransform.Lowercase
+        else -> null
+    }
+}

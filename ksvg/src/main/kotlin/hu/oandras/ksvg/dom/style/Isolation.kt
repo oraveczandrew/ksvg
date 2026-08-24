@@ -22,3 +22,12 @@ internal enum class Isolation {
     auto,
     isolate
 }
+
+// Parse an isolation property
+internal fun parseIsolation(value: String): Isolation? {
+    return when {
+        value.equals("auto", ignoreCase = true) -> Isolation.auto
+        value.equals("isolate", ignoreCase = true) -> Isolation.isolate
+        else -> null
+    }
+}

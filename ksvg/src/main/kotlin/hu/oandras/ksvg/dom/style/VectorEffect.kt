@@ -21,3 +21,12 @@ internal enum class VectorEffect {
     None,
     NonScalingStroke
 }
+
+// Parse a vector effect keyword
+internal fun parseVectorEffect(value: String): VectorEffect? {
+    return when {
+        value.equals(NONE, ignoreCase = true) -> VectorEffect.None
+        value.equals("non-scaling-stroke", ignoreCase = true) -> VectorEffect.NonScalingStroke
+        else -> null
+    }
+}

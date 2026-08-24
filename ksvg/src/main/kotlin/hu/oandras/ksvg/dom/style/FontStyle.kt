@@ -23,3 +23,14 @@ internal enum class FontStyle {
     italic,
     oblique
 }
+
+// Parse a font style keyword
+internal fun parseFontStyle(value: String): FontStyle? {
+    // Italic is probably the most common, so test that first :)
+    return when {
+        value.equals("italic", ignoreCase = true) -> FontStyle.italic
+        value.equals("normal", ignoreCase = true) -> FontStyle.normal
+        value.equals("oblique", ignoreCase = true) -> FontStyle.oblique
+        else -> null
+    }
+}

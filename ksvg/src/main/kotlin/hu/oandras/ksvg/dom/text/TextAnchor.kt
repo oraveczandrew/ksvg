@@ -22,3 +22,13 @@ internal enum class TextAnchor {
     Middle,
     End
 }
+
+// Parse a text anchor keyword
+internal fun parseTextAnchor(value: String): TextAnchor? {
+    return when {
+        value.equals("start", ignoreCase = true) -> TextAnchor.Start
+        value.equals("middle", ignoreCase = true) -> TextAnchor.Middle
+        value.equals("end", ignoreCase = true) -> TextAnchor.End
+        else -> null
+    }
+}
