@@ -31,6 +31,7 @@ import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withClip
 import hu.oandras.ksvg.filtering.ConvolveNative
+import hu.oandras.ksvg.filtering.MorphologyNative
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.blue
@@ -316,6 +317,41 @@ private fun applyMorphology(
 
     dst.fill(0) // Initialize with transparent
 
+    if (MorphologyNative.isAvailable) {
+        MorphologyNative.apply(
+            src, dst, width, height, radiusX, radiusY, erode,
+            clipLeft, clipTop, clipRight, clipBottom
+        )
+    } else {
+        doMorphologyKotlin(
+            src, dst, width, height, radiusX, radiusY, erode,
+            channelInitialValue, clipLeft, clipTop, clipRight, clipBottom
+        )
+    }
+
+    val res = renderContext.bitmapPool.acquireSameAs(input)
+    res.setPixels(dst, 0, width, 0, 0, width, height)
+    return res
+}
+
+/**
+ * Reference scalar loop kept as the JVM/Robolectric fallback; the native kernel
+ * in `morphology.cpp` must stay bit-exact with this implementation.
+ */
+private fun doMorphologyKotlin(
+    src: IntArray,
+    dst: IntArray,
+    width: Int,
+    height: Int,
+    radiusX: Int,
+    radiusY: Int,
+    erode: Boolean,
+    channelInitialValue: Int,
+    clipLeft: Int,
+    clipTop: Int,
+    clipRight: Int,
+    clipBottom: Int,
+) {
     for (y in clipTop until clipBottom) {
         val rowOffset = y * width
         val top = max(0, y - radiusY)
@@ -354,10 +390,6 @@ private fun applyMorphology(
             dst[rowOffset + x] = argb(a, r, g, b)
         }
     }
-
-    val res = renderContext.bitmapPool.acquireSameAs(input)
-    res.setPixels(dst, 0, width, 0, 0, width, height)
-    return res
 }
 
 context(renderContext: RenderContext)

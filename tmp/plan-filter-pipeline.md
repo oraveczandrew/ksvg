@@ -256,14 +256,27 @@ reference loop (`doConvolveMatrixKotlin`, kept as JVM fallback):
 
 ### feMorphology (source: go-images/images, BSD-3)
 
-- Port van Herk/Gil–Werman O(1)-radius separated min/max from `internal/kernels/kernels.go:973+`.
-- Reference NEON asm exists (`simd_arm64.s` vmin/vmax) — treat as reference only; implement
-  C++ intrinsics.
-- **Spec adaptation** (verified against source, two changes needed):
-  1. clamp-to-edge padding → SVG transparent-black padding;
-  2. go-images copies alpha through ("preserve alpha") — the port must min/max all four
-     channels including alpha (spec), i.e. extend both passes to the alpha channel.
+**STATUS: DONE (Phase 2a). Deviation from plan (documented):** instead of porting van
+Herk/Gil–Werman separable sliding windows, a direct-fold kernel
+(`filtering/src/main/cpp/morphology.cpp` + `MorphologyNative`) replicates the existing
+Kotlin semantics bit-exactly; van Herk remains a future optimization only if large-radius
+profiling demands it. Rationale: bit-exactness is structural (integer min/max, no
+rounding), no intermediate buffer is needed, and typical SVG morphology radii are small.
+- SIMD on ALL ISAs as requested: interior-window tap folds run on 16-byte vectors of raw
+  pixel bytes — `vmin/vmaxq_u8` (ARM32 NEON + AArch64), `_mm_min/max_epu8` (x86 SSE2).
+  Lane positions map to fixed channels (chunks start on pixel boundaries: B,G,R,A),
+  so vector output is exactly the scalar per-channel result.
+- Semantics preserved bit-exactly: min/max over all four channels incl. alpha,
+  transparent-black padding, erosion border short-circuit, clip-region-only output.
+- Kotlin reference loop kept (`doMorphologyKotlin`, JVM fallback);
+  device parity test: `MorphologyNativeDeviceTest` (both operators × radii 1/2/5,
+  non-square footprint, non-aligned sizes).
+- Gates run: full unit suite + `-PverifyFilter=morphology` green.
+
+Original van Herk source notes (kept for the possible future optimization):
 - Port structure including per-worker `morphScratch` (`pad/pref/suf`) as caller-owned scratch.
+- go-images pads clamp-to-edge and preserves alpha — both would need spec adaptation
+  (transparent-black pad; alpha participates in min/max).
 
 ### feTurbulence (source: Mozilla gfx SVGTurbulenceRenderer-inl.h, MPL-2.0)
 
