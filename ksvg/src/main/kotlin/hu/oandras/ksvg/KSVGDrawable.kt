@@ -26,7 +26,7 @@ import hu.oandras.ksvg.dom.text.A
 import hu.oandras.ksvg.render.GroupRenderNode
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RenderOptionsImpl
-import hu.oandras.ksvg.render.RenderTreeBuilder
+import hu.oandras.ksvg.render.RenderScene
 import hu.oandras.ksvg.render.Renderer
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
@@ -55,10 +55,7 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         pools = pools,
     )
 
-    private var renderNode: RenderNode<*>? = null
-    private var lastRenderNodeViewPort: Rect? = null
-    private var lastModificationCount: Int = -1
-    private var lastRenderOptions: RenderOptionsImpl? = null
+    private var scene: RenderScene? = null
 
     // Hit region support (lazily computed on hitTest)
     private var hitRegions: List<HitRegion>? = null
@@ -107,26 +104,29 @@ public open class KSVGDrawable @JvmOverloads public constructor(
 
         val svgImpl = svg as SVGImpl
 
-        var node = renderNode
+        var node = scene?.rootNode
         val modCount = svgImpl.modificationCount
-        if (node == null || 
-            lastRenderNodeViewPort != bounds || 
-            lastModificationCount != modCount ||
-            lastRenderOptions != options) {
-            
-            node?.recycle(pools.bitmapPool)
+        val fingerprint = RenderScene.computeOptionsFingerprint(options)
+        val currentScene = scene
+        val upToDate = currentScene != null &&
+                currentScene.viewport?.equals(bounds) == true &&
+                currentScene.isUpToDate(modCount, fingerprint)
 
-            val builder = RenderTreeBuilder(
+        if (!upToDate) {
+            scene?.recycle(pools.bitmapPool)
+
+            val newScene = RenderScene.build(
                 document = svgImpl,
                 dPI = svg.renderDPI,
                 externalFileResolver = svg.externalFileResolver,
                 pools = pools,
+                options = options,
+                modificationCount = modCount,
+                optionsFingerprint = fingerprint,
             )
-            node = builder.build(options)
-            renderNode = node
-            lastRenderNodeViewPort = Rect(bounds)
-            lastModificationCount = modCount
-            lastRenderOptions = RenderOptionsImpl(options)
+            newScene.viewport = Rect(bounds)
+            scene = newScene
+            node = newScene.rootNode
             hitRegionsDirty = true
         }
 
@@ -230,11 +230,12 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         if (!hitRegionsDirty) return
         hitRegionsDirty = false
 
-        val node = renderNode ?: run {
+        val node = scene?.rootNode ?: run {
             hitRegions = emptyList()
             screenToSvgTransform = null
             return
         }
+
 
         val regions = mutableListOf<HitRegion>()
         collectHitRegionsRecursive(node, regions)
@@ -244,7 +245,7 @@ public open class KSVGDrawable @JvmOverloads public constructor(
             val inverse = Matrix()
             screenToSvgTransform = if (rootTransform.invert(inverse)) inverse else null
         } else {
-            val vp = lastRenderNodeViewPort
+            val vp = scene?.viewport
             if (vp != null) {
                 val identity = Matrix()
                 identity.setTranslate(-vp.left.toFloat(), -vp.top.toFloat())
