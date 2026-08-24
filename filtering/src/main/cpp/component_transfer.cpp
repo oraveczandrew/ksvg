@@ -344,10 +344,12 @@ Java_hu_oandras_ksvg_filtering_ComponentTransferNative_apply(
                 tableA, tableR, tableG, tableB);
 #endif
 
+    // Release the critical sections FIRST: every Release* call is a JNI call
+    // and is forbidden while a critical get is still active.
+    env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
     env->ReleaseByteArrayElements(jTableB, tableB, JNI_ABORT);
     env->ReleaseByteArrayElements(jTableG, tableG, JNI_ABORT);
     env->ReleaseByteArrayElements(jTableR, tableR, JNI_ABORT);
     env->ReleaseByteArrayElements(jTableA, tableA, JNI_ABORT);
-    env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
-    env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
 }

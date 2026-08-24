@@ -120,7 +120,6 @@ void applyScalar(
                     (outA << 24) | (outR << 16) | (outG << 8) | outB;
         }
     }
-    env->ReleasePrimitiveArrayCritical(jKernel, kernel, JNI_ABORT);
 }
 
 #ifdef __aarch64__
