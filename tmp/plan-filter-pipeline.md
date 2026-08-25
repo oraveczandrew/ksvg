@@ -370,15 +370,23 @@ Implemented:
   matrix with the effect attached.
 - All other graphs fall back to the CPU kernel path unchanged.
 
-Deliberately NOT claimed yet:
-- GaussianBlur: CPU pads transparent black vs createBlurEffect(CLAMP) edge clamp
-  -> halo differences until pad handling is added;
-- Offset: needs CSSLength resolution with renderer context;
-- two-input/canvas-drawn primitives (Blend/Composite/Merge/Flood/Image);
-- node-keyed RenderEffect caching (chain rebuilt per frame for now — cheap).
+**STATUS updates (Phase 3b + 3c DONE):**
+- GaussianBlur: SOLVED via transparent recording pad (ceil(3*sigma) device px
+  per side, part of the per-node cache key; draw compensates with -pad
+  translation) so createBlurEffect(CLAMP) reads transparent black - matching
+  the CPU pedestal.
+- Offset: SOLVED via caller-side CSSLength resolution (length helpers are
+  internal in FilterGeometry.kt; Renderer resolves with its context).
+- Chain cache (3c): the built Chain (effect + pad) is cached per filter node,
+  keyed by filterNode.version + primitive scales (content version NOT part of
+  the key - the chain is content-independent, only the RenderNode recording
+  depends on it). Stored in gpuChain* fields next to gpuNode.
+- Still NOT claimed: two-input/canvas-drawn primitives (Blend/Composite/
+  Merge/Flood/Image), displacement, lighting (CPU kernels cover them;
+  lighting/turbulence may move to AGSL in Phase 4).
 
-Remaining mapping work (next slices): blur with transparent-pad wrapper, offset,
-then AGSL (Phase 4) for turbulence/lighting/composite-arithmetic.
+Device gate remains: API 31+ visual suite for blur/offset/colormatrix GPU
+paths (JVM exercises only the CPU path).
 
 ## Phase 4 — `FilterPipelineImpl33` (AGSL RuntimeShader)
 
