@@ -390,6 +390,12 @@ internal class FilterRenderNode(
     @JvmField var gpuHeight: Int = 0
     @JvmField var gpuPadX: Int = 0
     @JvmField var gpuPadY: Int = 0
+    // Built effect chain cache: depends on the filter's attributes (version)
+    // and the primitive scales, not on the rendered content.
+    @JvmField var gpuChain: hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31.Chain? = null
+    @JvmField var gpuChainVersion: Int = -1
+    @JvmField var gpuChainScaleX: Float = 0f
+    @JvmField var gpuChainScaleY: Float = 0f
     @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
     @JvmField val renderState: RendererState = RendererState()
 

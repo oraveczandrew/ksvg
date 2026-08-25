@@ -17,6 +17,8 @@
 package hu.oandras.ksvg.render.filters.pipeline
 
 import android.graphics.RenderEffect
+import android.os.Build
+import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
@@ -42,6 +44,7 @@ import hu.oandras.ksvg.utils.forEachElement
  * Deliberately NOT claimed yet: two-input or canvas-drawn primitives
  * (Blend/Composite/Merge/Flood/Image), displacement, lighting.
  */
+@RequiresApi(Build.VERSION_CODES.S)
 internal class FilterPipelineImpl31 : FilterBackend {
 
     /** Effect chain plus the transparent recording pad it requires. */
@@ -73,6 +76,18 @@ internal class FilterPipelineImpl31 : FilterBackend {
             scaleY: Float,
             resolveLength: (CSSLength?, Boolean) -> Float,
     ): Chain? {
+        // Node-keyed chain cache: the chain depends only on the filter's
+        // attributes (version) and the primitive scales - not on the rendered
+        // content - so it survives across frames while the keys match.
+        val cached = filterNode.gpuChain
+        if (cached != null &&
+            filterNode.gpuChainVersion == filterNode.version &&
+            filterNode.gpuChainScaleX == scaleX &&
+            filterNode.gpuChainScaleY == scaleY
+        ) {
+            return cached
+        }
+
         var chain: RenderEffect? = null
         var previousResult: String? = null
         var first = true
@@ -127,7 +142,12 @@ internal class FilterPipelineImpl31 : FilterBackend {
         }
 
         val result = chain ?: return null
-        return Chain(result, padX, padY)
+        val built = Chain(result, padX, padY)
+        filterNode.gpuChain = built
+        filterNode.gpuChainVersion = filterNode.version
+        filterNode.gpuChainScaleX = scaleX
+        filterNode.gpuChainScaleY = scaleY
+        return built
     }
 
     private fun checkLinearInput(input: String?, previousResult: String?, first: Boolean): Unit? {
