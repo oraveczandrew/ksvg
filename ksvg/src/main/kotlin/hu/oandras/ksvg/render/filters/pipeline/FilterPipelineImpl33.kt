@@ -30,9 +30,19 @@ import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
 import hu.oandras.ksvg.dom.filter.FeDisplacementMap
 import hu.oandras.ksvg.dom.filter.FeChannelSelector
+import hu.oandras.ksvg.dom.filter.FeMorphology
+import hu.oandras.ksvg.dom.filter.FeConvolveMatrix
+import hu.oandras.ksvg.dom.filter.FeMorphologyOperator
+import hu.oandras.ksvg.dom.filter.FeBlendMode
+import hu.oandras.ksvg.dom.filter.FeCompositeOperator
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
+import hu.oandras.ksvg.render.FeMorphologyRenderNode
+import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
+import hu.oandras.ksvg.render.FeComponentTransferRenderNode
+import hu.oandras.ksvg.render.FeBlendRenderNode
+import hu.oandras.ksvg.render.FeCompositeRenderNode
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
@@ -59,7 +69,12 @@ internal class FilterPipelineImpl33 internal constructor(
                 FilterPrimitiveSet.FLAG_GAUSSIAN_BLUR or
                 FilterPrimitiveSet.FLAG_OFFSET or
                 FilterPrimitiveSet.FLAG_TURBULENCE or
-                FilterPrimitiveSet.FLAG_DISPLACEMENT_MAP
+                FilterPrimitiveSet.FLAG_DISPLACEMENT_MAP or
+                FilterPrimitiveSet.FLAG_MORPHOLOGY or
+                FilterPrimitiveSet.FLAG_CONVOLVE_MATRIX or
+                FilterPrimitiveSet.FLAG_COMPONENT_TRANSFER or
+                FilterPrimitiveSet.FLAG_BLEND or
+                FilterPrimitiveSet.FLAG_COMPOSITE
         
         return primitives.bits != 0 && (primitives.bits and supportedMask.inv()) == 0
     }
@@ -125,6 +140,66 @@ internal class FilterPipelineImpl33 internal constructor(
                     
                     RenderEffect.createRuntimeShaderEffect(shader, "uInput")
                 }
+                is FeMorphologyRenderNode -> {
+                    val morphology = primitive.sourceElement
+                    checkLinearInput(morphology.`in`, previousResult, first) ?: return null
+                    
+                    val rx = morphology.radiusX * scaleX
+                    val ry = morphology.radiusY * scaleY
+                    val erode = morphology.operator == FeMorphologyOperator.erode
+                    
+                    // Horizontal pass
+                    val hShader = RuntimeShader(MORPHOLOGY_SHADER)
+                    hShader.setFloatUniform("uRadius", rx, 0f)
+                    hShader.setIntUniform("uErode", if (erode) 1 else 0)
+                    val hEffect = RenderEffect.createRuntimeShaderEffect(hShader, "uInput")
+                    
+                    // Vertical pass
+                    val vShader = RuntimeShader(MORPHOLOGY_SHADER)
+                    vShader.setFloatUniform("uRadius", 0f, ry)
+                    vShader.setIntUniform("uErode", if (erode) 1 else 0)
+                    val vEffect = RenderEffect.createRuntimeShaderEffect(vShader, "uInput")
+                    
+                    RenderEffect.createChainEffect(vEffect, hEffect)
+                }
+                is FeConvolveMatrixRenderNode -> {
+                    checkLinearInput(element.`in`, previousResult, first) ?: return null
+                    
+                    val shader = buildConvolveMatrixShader(primitive) ?: return null
+                    currentShader = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                }
+                is FeComponentTransferRenderNode -> {
+                    checkLinearInput(element.`in`, previousResult, first) ?: return null
+                    
+                    val shader = buildComponentTransferShader(primitive)
+                    currentShader = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                }
+                is FeBlendRenderNode -> {
+                    val blend = primitive.sourceElement
+                    // For now, only support when 'in' is previous result and 'in2' is SourceGraphic
+                    // or vice-versa.
+                    if (blend.`in` != previousResult && !first) return null
+                    if (blend.in2 != "SourceGraphic" && blend.in2 != null) return null
+                    
+                    val shader = RuntimeShader(BLEND_SHADER)
+                    shader.setIntUniform("uMode", blend.mode.ordinal)
+                    currentShader = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uIn2") // uIn2 is SourceGraphic
+                }
+                is FeCompositeRenderNode -> {
+                    val composite = primitive.sourceElement
+                    if (composite.`in` != previousResult && !first) return null
+                    if (composite.in2 != "SourceGraphic" && composite.in2 != null) return null
+                    
+                    val shader = RuntimeShader(COMPOSITE_SHADER)
+                    shader.setIntUniform("uOperator", composite.operator.ordinal)
+                    shader.setFloatUniform("uK", composite.k1, composite.k2)
+                    shader.setFloatUniform("uK34", composite.k3, composite.k4)
+                    currentShader = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uIn2")
+                }
                 is FeColorMatrixRenderNode -> {
                     val colorMatrix = primitive.sourceElement
                     checkLinearInput(colorMatrix.`in`, previousResult, first) ?: return null
@@ -180,6 +255,56 @@ internal class FilterPipelineImpl33 internal constructor(
         filterNode.gpuChainScaleX = scaleX
         filterNode.gpuChainScaleY = scaleY
         return built
+    }
+
+    private fun buildComponentTransferShader(
+        node: FeComponentTransferRenderNode,
+    ): RuntimeShader {
+        val shader = RuntimeShader(COMPONENT_TRANSFER_SHADER)
+        
+        // Build LUT texture
+        // node.lutTables is Array<ByteArray>(4) [R, G, B, A]
+        // Wait! FeComponentTransferRenderNode says [A, R, G, B] in the comment?
+        // Let's check RenderNode.kt.
+        // Line 562: // Lazily built [A,R,G,B] 256-entry LUTs
+        
+        val lut = node.lutTables ?: Array(4) { ByteArray(256) { it.toByte() } }
+        val bitmap = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(256)
+        for (i in 0 until 256) {
+            val a = lut[0][i].toInt() and 0xFF
+            val r = lut[1][i].toInt() and 0xFF
+            val g = lut[2][i].toInt() and 0xFF
+            val b = lut[3][i].toInt() and 0xFF
+            pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
+        }
+        bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 1)
+        
+        val lutShader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        shader.setInputShader("uLut", lutShader)
+        
+        return shader
+    }
+
+    private fun buildConvolveMatrixShader(
+        node: FeConvolveMatrixRenderNode,
+    ): RuntimeShader? {
+        val element = node.sourceElement
+        val size = node.orderX * node.orderY
+        if (size > 25) return null // AGSL uniform array size limit safety
+        
+        val shader = RuntimeShader(CONVOLVE_MATRIX_SHADER)
+        shader.setFloatUniform("uKernel", node.kernel ?: FloatArray(size))
+        shader.setIntUniform("uOrderX", node.orderX)
+        shader.setIntUniform("uOrderY", node.orderY)
+        shader.setIntUniform("uTargetX", node.targetX)
+        shader.setIntUniform("uTargetY", node.targetY)
+        shader.setFloatUniform("uDivisor", node.divisor)
+        shader.setFloatUniform("uBias", node.bias)
+        shader.setIntUniform("uPreserveAlpha", if (node.preserveAlpha) 1 else 0)
+        shader.setIntUniform("uEdgeMode", element.edgeMode.ordinal)
+
+        return shader
     }
 
     private fun buildDisplacementMapShader(
@@ -285,6 +410,131 @@ internal class FilterPipelineImpl33 internal constructor(
     }
 
     companion object {
+        private const val BLEND_SHADER = """
+            uniform shader uInput;
+            uniform shader uIn2;
+            uniform int uMode;
+
+            half4 main(float2 fragCoord) {
+                float4 src = uIn2.eval(fragCoord); // SourceGraphic
+                float4 dst = uInput.eval(fragCoord); // Previous result
+                
+                // standard feBlend modes (simplified)
+                if (uMode == 0) return half4(dst); // normal
+                if (uMode == 1) return half4(src * dst + src * (1.0 - dst.a) + dst * (1.0 - src.a)); // multiply
+                if (uMode == 2) return half4(src + dst - src * dst); // screen
+                if (uMode == 3) return half4(min(src * dst.a, dst * src.a) + src * (1.0 - dst.a) + dst * (1.0 - src.a)); // darken
+                if (uMode == 4) return half4(max(src * dst.a, dst * src.a) + src * (1.0 - dst.a) + dst * (1.0 - src.a)); // lighten
+                return half4(dst);
+            }
+        """
+
+        private const val COMPOSITE_SHADER = """
+            uniform shader uInput;
+            uniform shader uIn2;
+            uniform int uOperator;
+            uniform float2 uK; // k1, k2
+            uniform float2 uK34; // k3, k4
+
+            half4 main(float2 fragCoord) {
+                float4 src = uIn2.eval(fragCoord);
+                float4 dst = uInput.eval(fragCoord);
+                
+                if (uOperator == 0) return half4(src + dst * (1.0 - src.a)); // over
+                if (uOperator == 1) return half4(src * dst.a); // in
+                if (uOperator == 2) return half4(src * (1.0 - dst.a)); // out
+                if (uOperator == 3) return half4(src * dst.a + dst * (1.0 - src.a)); // atop
+                if (uOperator == 4) return half4(src * (1.0 - dst.a) + dst * (1.0 - src.a)); // xor
+                if (uOperator == 5) { // arithmetic
+                    float4 res = uK.x * src * dst + uK.y * src + uK34.x * dst + uK34.y;
+                    return half4(clamp(res, 0.0, 1.0));
+                }
+                return half4(dst);
+            }
+        """
+
+        private const val COMPONENT_TRANSFER_SHADER = """
+            uniform shader uInput;
+            uniform shader uLut;
+
+            half4 main(float2 fragCoord) {
+                float4 color = uInput.eval(fragCoord);
+                
+                // Unpremultiply for transfer (standard SVG requirement)
+                float alpha = color.a;
+                if (alpha > 0.0) {
+                    color.rgb /= alpha;
+                }
+                
+                // Lookup per channel
+                float r = uLut.eval(float2(color.r * 255.0 + 0.5, 0.5)).r;
+                float g = uLut.eval(float2(color.g * 255.0 + 0.5, 0.5)).g;
+                float b = uLut.eval(float2(color.b * 255.0 + 0.5, 0.5)).b;
+                float a = uLut.eval(float2(color.a * 255.0 + 0.5, 0.5)).a;
+                
+                // Premultiply back
+                return half4(r * a, g * a, b * a, a);
+            }
+        """
+
+        private const val CONVOLVE_MATRIX_SHADER = """
+            uniform shader uInput;
+            uniform float uKernel[25];
+            uniform int uOrderX;
+            uniform int uOrderY;
+            uniform int uTargetX;
+            uniform int uTargetY;
+            uniform float uDivisor;
+            uniform float uBias;
+            uniform int uPreserveAlpha;
+            uniform int uEdgeMode;
+
+            float4 sampleEdge(float2 coord) {
+                // TODO: implement edge mode (clamp/wrap/none)
+                return uInput.eval(coord);
+            }
+
+            half4 main(float2 fragCoord) {
+                float4 sum = float4(0.0);
+                for (int ky = 0; ky < 5; ++ky) {
+                    if (ky >= uOrderY) break;
+                    for (int kx = 0; kx < 5; ++kx) {
+                        if (kx >= uOrderX) break;
+                        float2 offset = float2(float(kx - uTargetX), float(ky - uTargetY));
+                        float4 color = sampleEdge(fragCoord + offset);
+                        sum += color * uKernel[ky * uOrderX + kx];
+                    }
+                }
+                
+                float4 res = sum / uDivisor + uBias;
+                if (uPreserveAlpha != 0) {
+                    res.a = uInput.eval(fragCoord).a;
+                }
+                return half4(res);
+            }
+        """
+
+        private const val MORPHOLOGY_SHADER = """
+            uniform shader uInput;
+            uniform float2 uRadius;
+            uniform int uErode;
+
+            half4 main(float2 fragCoord) {
+                float2 r = abs(uRadius);
+                int steps = int(max(r.x, r.y));
+                float2 dir = sign(uRadius);
+                
+                float4 res = uInput.eval(fragCoord);
+                for (int i = 1; i <= 20; ++i) {
+                    if (i > steps) break;
+                    res = (uErode != 0) 
+                        ? min(res, min(uInput.eval(fragCoord + float(i) * dir), uInput.eval(fragCoord - float(i) * dir)))
+                        : max(res, max(uInput.eval(fragCoord + float(i) * dir), uInput.eval(fragCoord - float(i) * dir)));
+                }
+                return half4(res);
+            }
+        """
+
         private const val DISPLACEMENT_MAP_SHADER = """
             uniform shader uInput;
             uniform shader uMap;
