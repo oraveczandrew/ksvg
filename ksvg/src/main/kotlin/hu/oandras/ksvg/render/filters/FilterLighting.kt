@@ -125,38 +125,68 @@ private inline fun doLightingFilter(
 
     if (LightingNative.isAvailable) {
         LightingNative.apply(
-            pix, out, width, height,
-            clipLeft, clipTop, clipRight, clipBottom,
-            surfaceScaleNormalized,
-            invCanvasScaleX, invCanvasScaleY,
-            userLeft, userTop, originX, originY,
-            primitiveUnitSizeX, primitiveUnitSizeY,
-            canvasScaleX, canvasScaleY,
-            lightType, alphaIsMaxOfChannels,
-            k, exponent,
-            lightR, lightG, lightB,
-            params
+            pix = pix,
+            out = out,
+            width = width,
+            height = height,
+            clipLeft = clipLeft,
+            clipTop = clipTop,
+            clipRight = clipRight,
+            clipBottom = clipBottom,
+            surfaceScaleNormalized = surfaceScaleNormalized,
+            invCanvasScaleX = invCanvasScaleX,
+            invCanvasScaleY = invCanvasScaleY,
+            userLeft = userLeft,
+            userTop = userTop,
+            originX = originX,
+            originY = originY,
+            unitSizeX = primitiveUnitSizeX,
+            unitSizeY = primitiveUnitSizeY,
+            canvasScaleX = canvasScaleX,
+            canvasScaleY = canvasScaleY,
+            lightType = lightType,
+            specular = alphaIsMaxOfChannels,
+            k = k,
+            exponent = exponent,
+            lightR = lightR,
+            lightG = lightG,
+            lightB = lightB,
+            params = params
         )
     } else {
         KotlinKernels.lighting(
-            pix, out, width, height,
-            clipLeft, clipTop, clipRight, clipBottom,
-            surfaceScaleNormalized,
-            invCanvasScaleX, invCanvasScaleY,
-            userLeft, userTop, originX, originY,
-            primitiveUnitSizeX, primitiveUnitSizeY,
-            canvasScaleX, canvasScaleY,
-            lightType, alphaIsMaxOfChannels,
-            k, exponent,
-            lightR, lightG, lightB,
-            params
+            pix = pix,
+            out = out,
+            width = width,
+            height = height,
+            clipLeft = clipLeft,
+            clipTop = clipTop,
+            clipRight = clipRight,
+            clipBottom = clipBottom,
+            surfaceScaleNormalized = surfaceScaleNormalized,
+            invCanvasScaleX = invCanvasScaleX,
+            invCanvasScaleY = invCanvasScaleY,
+            userLeft = userLeft,
+            userTop = userTop,
+            originX = originX,
+            originY = originY,
+            unitSizeX = primitiveUnitSizeX,
+            unitSizeY = primitiveUnitSizeY,
+            canvasScaleX = canvasScaleX,
+            canvasScaleY = canvasScaleY,
+            lightType = lightType,
+            specular = alphaIsMaxOfChannels,
+            k = k,
+            exponent = exponent,
+            lightR = lightR,
+            lightG = lightG,
+            lightB = lightB,
+            params = params
         )
     }
     res.setPixels(out, 0, width, 0, 0, width, height)
     return res
 }
-
-
 
 context(renderContext: RenderContext)
 internal fun doFeDiffuseLightingFilter(
@@ -269,13 +299,3 @@ internal class NormalVector(
         z = 0f,
     )
 }
-
-
-
-
-
-
-
-
-
-
