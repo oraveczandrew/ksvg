@@ -962,7 +962,7 @@ internal class Renderer internal constructor(
                             val width = stabilizeDimension(deviceRegion.width().ceilToInt())
                             val height = stabilizeDimension(deviceRegion.height().ceilToInt())
 
-                            val backend = obtainFilterBackend(canvas, filterNode, sx, sy, boundingBox)
+                            val backend = obtainFilterBackend(canvas, filterNode, sx, sy, region, deviceRegion, boundingBox)
                             val recCanvas = backend.beginRecording(
                                 node = node,
                                 filterNode = filterNode,
@@ -972,6 +972,7 @@ internal class Renderer internal constructor(
                                 sy = sy,
                                 matrix = matrix,
                                 newMatrix = newMatrix,
+                                filterRegion = region,
                                 deviceRegion = deviceRegion,
                                 boundingBox = boundingBox
                             )
@@ -1001,6 +1002,7 @@ internal class Renderer internal constructor(
                                 height = height,
                                 sx = sx,
                                 sy = sy,
+                                filterRegion = region,
                                 deviceRegion = deviceRegion,
                                 boundingBox = boundingBox,
                                 state = state
@@ -1101,6 +1103,8 @@ internal class Renderer internal constructor(
         filterNode: FilterRenderNode,
         sx: Float,
         sy: Float,
+        filterRegion: RectF,
+        deviceRegion: RectF,
         boundingBox: Box,
     ): FilterBackend {
         // GPU effect-chain attempt (RenderEffect + RenderNode recording).
@@ -1119,9 +1123,11 @@ internal class Renderer internal constructor(
                 val primitives = filterNode.collectPrimitives()
                 if (gpu.supports(primitives)) {
                     // Specific check for Impl31/33 linear chains + attributes.
-                    // (Implementation detail: they both use tryBuildChain for this).
                     val supported = when (gpu) {
-                        is FilterPipelineImpl31 -> gpu.tryBuildChain(filterNode, pScaleX, pScaleY) != null
+                        is FilterPipelineImpl31 -> gpu.tryBuildChain(
+                            filterNode, pScaleX, pScaleY, 
+                            filterRegion, deviceRegion, sx, sy, boundingBox
+                        ) != null
                         else -> false
                     }
                     if (supported) {

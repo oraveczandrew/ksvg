@@ -28,8 +28,11 @@ import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
+import hu.oandras.ksvg.dom.filter.FeDisplacementMap
+import hu.oandras.ksvg.dom.filter.FeChannelSelector
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
+import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
@@ -55,7 +58,8 @@ internal class FilterPipelineImpl33 internal constructor(
         val supportedMask = FilterPrimitiveSet.FLAG_COLOR_MATRIX or
                 FilterPrimitiveSet.FLAG_GAUSSIAN_BLUR or
                 FilterPrimitiveSet.FLAG_OFFSET or
-                FilterPrimitiveSet.FLAG_TURBULENCE
+                FilterPrimitiveSet.FLAG_TURBULENCE or
+                FilterPrimitiveSet.FLAG_DISPLACEMENT_MAP
         
         return primitives.bits != 0 && (primitives.bits and supportedMask.inv()) == 0
     }
@@ -65,6 +69,11 @@ internal class FilterPipelineImpl33 internal constructor(
         filterNode: FilterRenderNode,
         scaleX: Float,
         scaleY: Float,
+        filterRegion: RectF,
+        deviceRegion: RectF,
+        sx: Float,
+        sy: Float,
+        boundingBox: Box,
     ): Chain? {
         val cached = filterNode.gpuChain
         if (cached != null &&
@@ -77,38 +86,56 @@ internal class FilterPipelineImpl33 internal constructor(
 
         var chain: RenderEffect? = null
         var previousResult: String? = null
+        val namedShaders = mutableMapOf<String, RuntimeShader>()
         var first = true
         var padX = 0
         var padY = 0
 
+        val filter = filterNode.sourceElement
+        val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
+
         filterNode.primitives.forEachElement { primitive ->
+            val element = primitive.sourceElement
+            var currentShader: RuntimeShader? = null
+
             val effect = when (primitive) {
                 is FeTurbulenceRenderNode -> {
-                    val element = primitive.sourceElement
                     if (!first) return null // Turbulence must be the first primitive (it ignores input)
-                    previousResult = element.result
-                    first = false
+                    val shader = buildTurbulenceShader(
+                        primitive, scaleX, scaleY, 
+                        filterRegion, sx, sy, boundingBox,
+                        padX, padY,
+                        primitiveUnitsAreUser
+                    )
+                    currentShader = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "in_source")
+                }
+                is FeDisplacementMapRenderNode -> {
+                    val displacementMap = primitive.sourceElement
+                    // in2: displacement map (must be a named shader we already saw, e.g. turbulence)
+                    val in2Map = namedShaders[displacementMap.in2] ?: return null
                     
-                    // Note: mapping uniforms are set with dummy values here;
-                    // they could be updated during draw if they were dynamic, 
-                    // but they depend on scales which are already part of the cache key.
-                    buildTurbulenceEffect(primitive, scaleX, scaleY, padX, padY)
+                    val shader = buildDisplacementMapShader(primitive, scaleX, scaleY, in2Map)
+                    currentShader = shader
+                    
+                    // in: image to displace (must be previous or SourceGraphic)
+                    if (displacementMap.`in` != null && displacementMap.`in` != "SourceGraphic" && displacementMap.`in` != previousResult) {
+                        return null
+                    }
+                    
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
                 }
                 is FeColorMatrixRenderNode -> {
-                    val element = primitive.sourceElement
-                    checkLinearInput(element.`in`, previousResult, first) ?: return null
-                    previousResult = element.result
-                    first = false
+                    val colorMatrix = primitive.sourceElement
+                    checkLinearInput(colorMatrix.`in`, previousResult, first) ?: return null
                     RenderEffect.createColorFilterEffect(
                         ColorMatrixColorFilter(
-                            buildColorMatrix(element.type, element.values)
+                            buildColorMatrix(colorMatrix.type, colorMatrix.values)
                         )
                     )
                 }
                 is FeGaussianBlurRenderNode -> {
-                    checkLinearInput(primitive.sourceElement.`in`, previousResult, first) ?: return null
-                    previousResult = primitive.sourceElement.result
-                    first = false
+                    checkLinearInput(element.`in`, previousResult, first) ?: return null
                     val sigmaX = primitive.stdDeviationX * scaleX
                     val sigmaY = primitive.stdDeviationY * scaleY
                     if (sigmaX <= 0f && sigmaY <= 0f) {
@@ -120,12 +147,11 @@ internal class FilterPipelineImpl33 internal constructor(
                     }
                 }
                 is FeOffsetRenderNode -> {
-                    checkLinearInput(primitive.sourceElement.`in`, previousResult, first) ?: return null
-                    previousResult = primitive.sourceElement.result
-                    first = false
-                    val dx = filterPrimitiveLengthX(primitive.sourceElement.dx,
+                    val offset = primitive.sourceElement
+                    checkLinearInput(offset.`in`, previousResult, first) ?: return null
+                    val dx = filterPrimitiveLengthX(offset.dx,
                         primitiveUnitsAreUser = true, primitiveScaleX = scaleX, canvasScaleX = 1f)
-                    val dy = filterPrimitiveLengthY(primitive.sourceElement.dy,
+                    val dy = filterPrimitiveLengthY(offset.dy,
                         primitiveUnitsAreUser = true, primitiveScaleY = scaleY, canvasScaleY = 1f)
                     if (dx == 0f && dy == 0f) null else RenderEffect.createOffsetEffect(dx, dy)
                 }
@@ -133,9 +159,18 @@ internal class FilterPipelineImpl33 internal constructor(
             }
 
             if (effect != null) {
-                val previous = chain
-                chain = if (previous == null) effect else RenderEffect.createChainEffect(effect, previous)
+                chain = if (chain == null || (first && primitive !is FeDisplacementMapRenderNode)) {
+                    effect
+                } else {
+                    RenderEffect.createChainEffect(effect, chain)
+                }
+                element.result?.let { resultName ->
+                    currentShader?.let { namedShaders[resultName] = it }
+                }
             }
+            
+            previousResult = element.result
+            first = false
         }
 
         val result = chain ?: return null
@@ -147,13 +182,35 @@ internal class FilterPipelineImpl33 internal constructor(
         return built
     }
 
-    private fun buildTurbulenceEffect(
+    private fun buildDisplacementMapShader(
+        node: FeDisplacementMapRenderNode,
+        pScaleX: Float,
+        pScaleY: Float,
+        in2Map: RuntimeShader,
+    ): RuntimeShader {
+        val element = node.sourceElement
+        val shader = RuntimeShader(DISPLACEMENT_MAP_SHADER)
+        
+        shader.setInputShader("uMap", in2Map)
+        shader.setFloatUniform("uScale", element.scale * pScaleX, element.scale * pScaleY)
+        shader.setIntUniform("uXChannel", element.xChannelSelector.ordinal)
+        shader.setIntUniform("uYChannel", element.yChannelSelector.ordinal)
+
+        return shader
+    }
+
+    private fun buildTurbulenceShader(
         node: FeTurbulenceRenderNode,
-        scaleX: Float,
-        scaleY: Float,
+        pScaleX: Float,
+        pScaleY: Float,
+        filterRegion: RectF,
+        sx: Float,
+        sy: Float,
+        boundingBox: Box,
         padX: Int,
         padY: Int,
-    ): RenderEffect {
+        primitiveUnitsAreUser: Boolean,
+    ): RuntimeShader {
         val element = node.sourceElement
         val shader = RuntimeShader(TURBULENCE_SHADER)
 
@@ -167,26 +224,26 @@ internal class FilterPipelineImpl33 internal constructor(
         shader.setFloatUniform("uBaseFrequency", element.baseFrequencyX, element.baseFrequencyY)
         shader.setIntUniform("uNumOctaves", octaves)
         shader.setIntUniform("uIsFractal", if (isFractal) 1 else 0)
-        
-        // Mapping uniforms. 
-        // Note: these depend on the canvas matrix and primitive region, which 
-        // are not directly available here in tryBuildChain.
-        // However, scaleX/scaleY are passed and they incorporate the canvas scale.
-        // We'll use them to set the frequencies correctly.
-        // For the absolute origin and unit sizes, we might need to pass them 
-        // through FilterRenderNode if they change.
-        
-        // Placeholder values for now:
-        shader.setFloatUniform("uInvCanvasScale", 1f, 1f)
-        shader.setFloatUniform("uUserLeftTop", 0f, 0f)
-        shader.setFloatUniform("uOrigin", 0f, 0f)
-        shader.setFloatUniform("uPrimitiveUnitSize", 1f, 1f)
+
+        val invCanvasScaleX = 1f / sx
+        val invCanvasScaleY = 1f / sy
+        val userLeft = filterRegion.left
+        val userTop = filterRegion.top
+        val originX = if (primitiveUnitsAreUser) 0f else boundingBox.minX
+        val originY = if (primitiveUnitsAreUser) 0f else boundingBox.minY
+        val primitiveUnitSizeX = pScaleX / sx
+        val primitiveUnitSizeY = pScaleY / sy
+
+        shader.setFloatUniform("uInvCanvasScale", invCanvasScaleX, invCanvasScaleY)
+        shader.setFloatUniform("uUserLeftTop", userLeft, userTop)
+        shader.setFloatUniform("uOrigin", originX, originY)
+        shader.setFloatUniform("uPrimitiveUnitSize", primitiveUnitSizeX, primitiveUnitSizeY)
         shader.setFloatUniform("uPad", padX.toFloat(), padY.toFloat())
 
         // For now, no stitch support in AGSL (period=0)
         shader.setFloatUniform("uTilePeriod", 0f, 0f)
 
-        return RenderEffect.createRuntimeShaderEffect(shader, "in_source")
+        return shader
     }
 
     private fun obtainLatticeBitmap(node: FeTurbulenceRenderNode): Bitmap {
@@ -228,6 +285,28 @@ internal class FilterPipelineImpl33 internal constructor(
     }
 
     companion object {
+        private const val DISPLACEMENT_MAP_SHADER = """
+            uniform shader uInput;
+            uniform shader uMap;
+            uniform float2 uScale;
+            uniform int uXChannel;
+            uniform int uYChannel;
+            
+            float getChannel(float4 color, int selector) {
+                if (selector == 0) return color.r;
+                if (selector == 1) return color.g;
+                if (selector == 2) return color.b;
+                return color.a;
+            }
+
+            half4 main(float2 fragCoord) {
+                float4 mapColor = uMap.eval(fragCoord);
+                float dx = (getChannel(mapColor, uXChannel) - 0.5) * uScale.x;
+                float dy = (getChannel(mapColor, uYChannel) - 0.5) * uScale.y;
+                return uInput.eval(fragCoord + float2(dx, dy));
+            }
+        """
+
         private const val TURBULENCE_SHADER = """
             uniform shader uLattice;
             uniform shader in_source;

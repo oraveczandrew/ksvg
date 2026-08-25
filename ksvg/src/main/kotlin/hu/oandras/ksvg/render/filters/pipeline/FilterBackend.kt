@@ -16,24 +16,19 @@
 
 package hu.oandras.ksvg.render.filters.pipeline
 
-import android.graphics.RenderEffect
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.RectF
+import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.render.FilterRenderNode
+import hu.oandras.ksvg.render.RenderNode
+import hu.oandras.ksvg.render.RendererState
 
 /**
- * Minimal description of one filter graph handed to [FilterBackend.buildEffectChain].
- */
-internal class FilterGraphInfo internal constructor(
-    internal val primitives: FilterPrimitiveSet,
-) {
-    internal fun has(flag: Int): Boolean = primitives.contains(flag)
-}
-
-/**
- * One selectable filter-execution backend. Instances are owned by the render
- * operation (never shared between threads); [release] is called on teardown.
- *
- * Graph-level decision: a backend either claims the WHOLE graph via
- * [supports] or none of it — mixed CPU/GPU execution would need per-primitive
- * bitmap readback which costs more than software execution.
+ * One selectable filter-execution backend. Both backends (GPU and software)
+ * expose the SAME external API through this interface; the renderer only sees
+ * these generic calls. Instances are owned by the render operation (never
+ * shared between threads); [release] is called on teardown.
  */
 internal interface FilterBackend {
 
@@ -41,12 +36,47 @@ internal interface FilterBackend {
     fun supports(primitives: FilterPrimitiveSet): Boolean
 
     /**
-     * Whole-graph GPU chain; null = "cannot represent this graph as an effect
-     * chain". Non-null results let the caller skip all intermediate bitmaps and
-     * draw the source once with `paint.setRenderEffect(chain)`.
+     * Starts producing the backend-specific representation of the unfiltered
+     * source content. Returns the canvas the caller must record the source
+     * into, or null when nothing has to be recorded (cached representation is
+     * still valid). Must be followed by [endRecording] when non-null was
+     * returned.
      */
-    fun buildEffectChain(graph: FilterGraphInfo): RenderEffect? = null
+    fun beginRecording(
+        node: RenderNode<*>,
+        filterNode: FilterRenderNode,
+        width: Int,
+        height: Int,
+        sx: Float,
+        sy: Float,
+        matrix: Matrix,
+        newMatrix: Matrix,
+        filterRegion: RectF,
+        deviceRegion: RectF,
+        boundingBox: Box,
+    ): Canvas?
+
+    /** Finishes the recording started by a non-null [beginRecording] result. */
+    fun endRecording(filterNode: FilterRenderNode)
+
+    /**
+     * Draws the filtered result of the recorded source onto [canvas],
+     * executing any pending filter work first.
+     */
+    fun drawFiltered(
+        canvas: Canvas,
+        node: RenderNode<*>,
+        filterNode: FilterRenderNode,
+        width: Int,
+        height: Int,
+        sx: Float,
+        sy: Float,
+        filterRegion: RectF,
+        deviceRegion: RectF,
+        boundingBox: Box,
+        state: RendererState,
+    )
 
     /** Drops backend-owned state (shaders, effects, scratch handles). */
-    fun release() {}
+    fun release()
 }

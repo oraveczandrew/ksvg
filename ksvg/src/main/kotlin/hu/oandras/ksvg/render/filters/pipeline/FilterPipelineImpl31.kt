@@ -90,6 +90,11 @@ internal open class FilterPipelineImpl31 internal constructor(
             filterNode: FilterRenderNode,
             scaleX: Float,
             scaleY: Float,
+            filterRegion: RectF,
+            deviceRegion: RectF,
+            sx: Float,
+            sy: Float,
+            boundingBox: Box,
     ): Chain? {
         // Node-keyed chain cache: the chain depends only on the filter's
         // attributes (version) and the primitive scales - not on the rendered
@@ -176,10 +181,11 @@ internal open class FilterPipelineImpl31 internal constructor(
         sy: Float,
         matrix: Matrix,
         newMatrix: Matrix,
+        filterRegion: RectF,
         deviceRegion: RectF,
         boundingBox: Box,
     ): Canvas? {
-        val chain = obtainChain(filterNode, sx, sy) ?: return null
+        val chain = obtainChain(filterNode, sx, sy, filterRegion, deviceRegion, boundingBox) ?: return null
         if (recordingActive) return null
 
         val padX = chain.padX
@@ -229,6 +235,7 @@ internal open class FilterPipelineImpl31 internal constructor(
         height: Int,
         sx: Float,
         sy: Float,
+        filterRegion: RectF,
         deviceRegion: RectF,
         boundingBox: Box,
         state: RendererState,
@@ -245,8 +252,23 @@ internal open class FilterPipelineImpl31 internal constructor(
         gpuNode.setRenderEffect(null)
     }
 
-    protected open fun obtainChain(filterNode: FilterRenderNode, scaleX: Float, scaleY: Float): Chain? =
-        with(renderContext) { tryBuildChain(filterNode, scaleX, scaleY) }
+    protected open fun obtainChain(
+        filterNode: FilterRenderNode, 
+        sx: Float, 
+        sy: Float,
+        filterRegion: RectF,
+        deviceRegion: RectF,
+        boundingBox: Box,
+    ): Chain? =
+        with(renderContext) {
+            val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
+            val pScaleX = if (primitiveUnitsAreUser) sx else boundingBox.width * sx
+            val pScaleY = if (primitiveUnitsAreUser) sy else boundingBox.height * sy
+            tryBuildChain(
+                filterNode, pScaleX, pScaleY, 
+                filterRegion, deviceRegion, sx, sy, boundingBox
+            ) 
+        }
 
     protected fun checkLinearInput(input: String?, previousResult: String?, first: Boolean): Unit? {
         if (first) {
