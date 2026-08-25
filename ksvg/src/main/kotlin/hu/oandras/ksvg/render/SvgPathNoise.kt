@@ -25,8 +25,8 @@ import kotlin.math.sqrt
  * Uses Double precision for internal calculations to minimize rounding errors.
  */
 internal class SvgPathNoise(lcg: LcgRandom) {
-    private val p: IntArray = IntArray(B_SIZE + B_SIZE + 2)
-    private val g2: Array<DoubleArray> = Array(B_SIZE + B_SIZE + 2) {
+    @JvmField internal val p: IntArray = IntArray(B_SIZE + B_SIZE + 2)
+    @JvmField internal val g2: Array<DoubleArray> = Array(B_SIZE + B_SIZE + 2) {
         DoubleArray(2)
     }
 

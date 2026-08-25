@@ -16,14 +16,22 @@
 
 package hu.oandras.ksvg.render.filters.pipeline
 
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.os.Build
 import androidx.annotation.RequiresApi
-import hu.oandras.ksvg.css.CSSLength
+import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
+import hu.oandras.ksvg.render.RenderContext
+import hu.oandras.ksvg.render.RenderNode
+import hu.oandras.ksvg.render.RendererState
+import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
+import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.filters.buildColorMatrix
 import hu.oandras.ksvg.utils.forEachElement
 
@@ -35,24 +43,31 @@ import hu.oandras.ksvg.utils.forEachElement
  * result or is the implicit source). ColorMatrix maps 1:1 onto
  * [RenderEffect.createColorFilterEffect] (same [buildColorMatrix] as the CPU
  * path). GaussianBlur uses [RenderEffect.createBlurEffect] with CLAMP edge
- * mode; the caller must record the source with a transparent pad of
+ * mode; the source is recorded with a transparent pad of
  * [Chain.padX]/[Chain.padY] device pixels on every side so the clamp reads
  * transparent black — matching the CPU kernel's transparent-black pedestal.
- * Offset maps to [RenderEffect.createOffsetEffect] with device-pixel deltas
- * resolved by the caller (CSSLength needs renderer context).
+ * Offset maps to [RenderEffect.createOffsetEffect] with device-pixel deltas.
  *
  * Deliberately NOT claimed yet: two-input or canvas-drawn primitives
  * (Blend/Composite/Merge/Flood/Image), displacement, lighting.
  */
 @RequiresApi(Build.VERSION_CODES.S)
-internal class FilterPipelineImpl31 : FilterBackend {
+internal open class FilterPipelineImpl31 internal constructor(
+    protected val renderContext: RenderContext,
+) : FilterBackend {
 
     /** Effect chain plus the transparent recording pad it requires. */
-    internal class Chain internal constructor(
+    internal open class Chain internal constructor(
         @JvmField internal val effect: RenderEffect,
         @JvmField internal val padX: Int,
         @JvmField internal val padY: Int,
+        @JvmField internal val scaleX: Float,
+        @JvmField internal val scaleY: Float,
     )
+
+    // Caller-owned mutable state; a backend instance is owned by a single
+    // render operation and never shared between threads.
+    private var recordingActive: Boolean = false
 
     override fun supports(primitives: FilterPrimitiveSet): Boolean {
         val supportedMask = FilterPrimitiveSet.FLAG_COLOR_MATRIX or
@@ -62,19 +77,19 @@ internal class FilterPipelineImpl31 : FilterBackend {
     }
 
     /**
-     * Builds the whole-graph effect chain; null when the graph is not a
-     * strict linear sequence of supported primitives.
+     * Builds (or returns the cached) whole-graph effect chain; null when the
+     * graph is not a strict linear sequence of supported primitives.
      *
-     * [scaleX]/[scaleY] are the CPU-path primitive scales (canvas scale for
+     * [scaleX]/[scaleY] are the primitive scales (canvas scale for
      * userSpaceOnUse units, bounding-box based otherwise) used to convert
-     * blur stdDeviation to device pixels; [resolveLength] resolves offset
-     * CSSLengths to device pixels.
+     * blur stdDeviation to device pixels; offset lengths are resolved through
+     * the renderer's [renderContext].
      */
-    fun tryBuildChain(
+    context(renderContext: RenderContext)
+    internal open fun tryBuildChain(
             filterNode: FilterRenderNode,
             scaleX: Float,
             scaleY: Float,
-            resolveLength: (CSSLength?, Boolean) -> Float,
     ): Chain? {
         // Node-keyed chain cache: the chain depends only on the filter's
         // attributes (version) and the primitive scales - not on the rendered
@@ -128,8 +143,10 @@ internal class FilterPipelineImpl31 : FilterBackend {
                     checkLinearInput(primitive.sourceElement.`in`, previousResult, first) ?: return null
                     previousResult = primitive.sourceElement.result
                     first = false
-                    val dx = resolveLength(primitive.sourceElement.dx, true)
-                    val dy = resolveLength(primitive.sourceElement.dy, false)
+                    val dx = filterPrimitiveLengthX(primitive.sourceElement.dx,
+                        primitiveUnitsAreUser = true, primitiveScaleX = scaleX, canvasScaleX = 1f)
+                    val dy = filterPrimitiveLengthY(primitive.sourceElement.dy,
+                        primitiveUnitsAreUser = true, primitiveScaleY = scaleY, canvasScaleY = 1f)
                     if (dx == 0f && dy == 0f) null else RenderEffect.createOffsetEffect(dx, dy)
                 }
                 else -> return null
@@ -142,7 +159,7 @@ internal class FilterPipelineImpl31 : FilterBackend {
         }
 
         val result = chain ?: return null
-        val built = Chain(result, padX, padY)
+        val built = Chain(result, padX, padY, scaleX, scaleY)
         filterNode.gpuChain = built
         filterNode.gpuChainVersion = filterNode.version
         filterNode.gpuChainScaleX = scaleX
@@ -150,7 +167,88 @@ internal class FilterPipelineImpl31 : FilterBackend {
         return built
     }
 
-    private fun checkLinearInput(input: String?, previousResult: String?, first: Boolean): Unit? {
+    override fun beginRecording(
+        node: RenderNode<*>,
+        filterNode: FilterRenderNode,
+        width: Int,
+        height: Int,
+        sx: Float,
+        sy: Float,
+        matrix: Matrix,
+        newMatrix: Matrix,
+        deviceRegion: RectF,
+        boundingBox: Box,
+    ): Canvas? {
+        val chain = obtainChain(filterNode, sx, sy) ?: return null
+        if (recordingActive) return null
+
+        val padX = chain.padX
+        val padY = chain.padY
+        val contentVersion = filterNode.contentVersion
+        var gpuNode = filterNode.gpuNode
+        val valid = gpuNode != null &&
+                filterNode.gpuSourceVersion == contentVersion &&
+                filterNode.gpuFilterVersion == filterNode.version &&
+                filterNode.gpuScaleX == sx && filterNode.gpuScaleY == sy &&
+                filterNode.gpuWidth == width && filterNode.gpuHeight == height &&
+                filterNode.gpuPadX == padX && filterNode.gpuPadY == padY
+        if (!valid) {
+            gpuNode = gpuNode ?: android.graphics.RenderNode("ksvg-filter-source")
+            val recording = gpuNode.beginRecording(width + 2 * padX, height + 2 * padY)
+            recording.translate(padX - deviceRegion.left, padY - deviceRegion.top)
+            recording.concat(matrix)
+            filterNode.gpuNode = gpuNode
+            filterNode.gpuSourceVersion = contentVersion
+            filterNode.gpuFilterVersion = filterNode.version
+            filterNode.gpuScaleX = sx
+            filterNode.gpuScaleY = sy
+            filterNode.gpuWidth = width
+            filterNode.gpuHeight = height
+            filterNode.gpuPadX = padX
+            filterNode.gpuPadY = padY
+            recordingActive = true
+            return recording
+        }
+
+        // Cached recording is still valid: nothing to re-record.
+        return null
+    }
+
+    override fun endRecording(filterNode: FilterRenderNode) {
+        if (recordingActive) {
+            filterNode.gpuNode?.endRecording()
+            recordingActive = false
+        }
+    }
+
+    override fun drawFiltered(
+        canvas: Canvas,
+        node: RenderNode<*>,
+        filterNode: FilterRenderNode,
+        width: Int,
+        height: Int,
+        sx: Float,
+        sy: Float,
+        deviceRegion: RectF,
+        boundingBox: Box,
+        state: RendererState,
+    ) {
+        val chain = filterNode.gpuChain ?: return
+        val gpuNode = filterNode.gpuNode ?: return
+        gpuNode.setRenderEffect(chain.effect)
+        val saveCount = canvas.save()
+        @Suppress("DEPRECATION")
+        canvas.setMatrix(null)
+        canvas.translate(-chain.padX.toFloat(), -chain.padY.toFloat())
+        canvas.drawRenderNode(gpuNode)
+        canvas.restoreToCount(saveCount)
+        gpuNode.setRenderEffect(null)
+    }
+
+    protected open fun obtainChain(filterNode: FilterRenderNode, scaleX: Float, scaleY: Float): Chain? =
+        with(renderContext) { tryBuildChain(filterNode, scaleX, scaleY) }
+
+    protected fun checkLinearInput(input: String?, previousResult: String?, first: Boolean): Unit? {
         if (first) {
             // First input may be implicit or the explicit source graphic.
             if (input != null && input != "SourceGraphic") return null
@@ -160,5 +258,7 @@ internal class FilterPipelineImpl31 : FilterBackend {
         return Unit
     }
 
-    override fun release() {}
+    override fun release() {
+        recordingActive = false
+    }
 }

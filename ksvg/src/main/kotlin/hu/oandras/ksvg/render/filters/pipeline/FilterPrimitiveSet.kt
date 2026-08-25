@@ -30,8 +30,26 @@ internal value class FilterPrimitiveSet private constructor(@JvmField internal v
             FilterPrimitiveSet(bits or other.bits)
 
     internal companion object {
-        internal const val FLAG_COLOR_MATRIX: Int = 1 shl 5
-        internal const val FLAG_GAUSSIAN_BLUR: Int = 1 shl 4
-        internal const val FLAG_OFFSET: Int = 1 shl 6
+        internal val EMPTY: FilterPrimitiveSet = FilterPrimitiveSet(0)
+
+        internal const val FLAG_COLOR_MATRIX: Int = 1 shl 0
+        internal const val FLAG_GAUSSIAN_BLUR: Int = 1 shl 1
+        internal const val FLAG_OFFSET: Int = 1 shl 2
+        internal const val FLAG_TURBULENCE: Int = 1 shl 3
+        internal const val FLAG_DISPLACEMENT_MAP: Int = 1 shl 4
+        internal const val FLAG_MORPHOLOGY: Int = 1 shl 5
+        internal const val FLAG_CONVOLVE_MATRIX: Int = 1 shl 6
+        internal const val FLAG_COMPOSITE: Int = 1 shl 7
+        internal const val FLAG_BLEND: Int = 1 shl 8
+        internal const val FLAG_DIFFUSE_LIGHTING: Int = 1 shl 9
+        internal const val FLAG_SPECULAR_LIGHTING: Int = 1 shl 10
+        internal const val FLAG_FLOOD: Int = 1 shl 11
+        internal const val FLAG_IMAGE: Int = 1 shl 12
+        internal const val FLAG_MERGE: Int = 1 shl 13
+        internal const val FLAG_TILE: Int = 1 shl 14
+        internal const val FLAG_DROP_SHADOW: Int = 1 shl 15
+        internal const val FLAG_COMPONENT_TRANSFER: Int = 1 shl 16
+
+        internal fun from(bits: Int): FilterPrimitiveSet = FilterPrimitiveSet(bits)
     }
 }

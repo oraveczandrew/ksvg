@@ -67,6 +67,7 @@ import hu.oandras.ksvg.filtering.StackBlurScratch
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.filters.LightVector
 import hu.oandras.ksvg.render.filters.NormalVector
+import hu.oandras.ksvg.render.filters.pipeline.FilterPrimitiveSet
 import hu.oandras.ksvg.render.pool.BitmapPool
 import hu.oandras.ksvg.render.pool.FloatArrayBucket
 import hu.oandras.ksvg.render.pool.IntArrayBucket
@@ -404,6 +405,14 @@ internal class FilterRenderNode(
     @JvmField var version: Int = 0
     @JvmField var contentVersion: Int = 0
 
+    fun collectPrimitives(): FilterPrimitiveSet {
+        var bits = 0
+        primitives.forEachElement { primitive ->
+            bits = bits or primitive.primitiveFlag
+        }
+        return FilterPrimitiveSet.from(bits)
+    }
+
     fun notifyChange(contentChanged: Boolean = true) {
         if (contentChanged) {
             contentVersion++
@@ -420,6 +429,7 @@ internal class FilterRenderNode(
 internal sealed class FilterPrimitiveRenderNode<T: FilterPrimitive>(
     @JvmField val sourceElement: T
 ) {
+    internal abstract val primitiveFlag: Int
     @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
     @JvmField var x: Float? = null
     @JvmField var y: Float? = null
@@ -445,18 +455,24 @@ internal sealed class FilterPrimitiveRenderNode<T: FilterPrimitive>(
 
 internal class FeFloodRenderNode(
     sourceElement: FeFlood
-) : FilterPrimitiveRenderNode<FeFlood>(sourceElement)
+) : FilterPrimitiveRenderNode<FeFlood>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_FLOOD
+}
 
 internal class FeBlendRenderNode(
     sourceElement: FeBlend,
     @JvmField val mode: FeBlendMode,
     @JvmField val in2: String?,
     @JvmField val paint: Paint,
-) : FilterPrimitiveRenderNode<FeBlend>(sourceElement)
+) : FilterPrimitiveRenderNode<FeBlend>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_BLEND
+}
 
     internal class FeTileRenderNode(
         sourceElement: FeTile
-    ) : FilterPrimitiveRenderNode<FeTile>(sourceElement)
+    ) : FilterPrimitiveRenderNode<FeTile>(sourceElement) {
+        override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_TILE
+    }
 
     internal class FeDropShadowRenderNode(
         sourceElement: FeDropShadow,
@@ -465,7 +481,9 @@ internal class FeBlendRenderNode(
         @JvmField val shadowPaint: Paint = Paint().apply {
             xfermode = XFerModes.SrcIn
         },
-    ) : FilterPrimitiveRenderNode<FeDropShadow>(sourceElement)
+    ) : FilterPrimitiveRenderNode<FeDropShadow>(sourceElement) {
+        override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_DROP_SHADOW
+    }
 
 internal class StopRenderNode(
     @JvmField val sourceElement: Stop
@@ -482,6 +500,7 @@ internal class FeGaussianBlurRenderNode(
     @JvmField var stdDeviationX: Float,
     @JvmField var stdDeviationY: Float
 ) : FilterPrimitiveRenderNode<FeGaussianBlur>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_GAUSSIAN_BLUR
     /**
      * Pixel buffer reused across renders; resized only when the input dimensions change.
      */
@@ -498,6 +517,7 @@ internal class FeColorMatrixRenderNode(
     @JvmField val type: FeColorMatrixType,
     @JvmField var values: FloatArray?
 ) : FilterPrimitiveRenderNode<FeColorMatrix>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_COLOR_MATRIX
     /**
      * Cached [Paint] used to apply the color matrix, built lazily on first use.
      */
@@ -508,12 +528,16 @@ internal class FeOffsetRenderNode(
     sourceElement: FeOffset,
     @JvmField var dx: Float,
     @JvmField var dy: Float
-) : FilterPrimitiveRenderNode<FeOffset>(sourceElement)
+) : FilterPrimitiveRenderNode<FeOffset>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_OFFSET
+}
 
 internal class FeMergeRenderNode(
     sourceElement: FeMerge,
     @JvmField val mergeNodes: List<String?>
-) : FilterPrimitiveRenderNode<FeMerge>(sourceElement)
+) : FilterPrimitiveRenderNode<FeMerge>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_MERGE
+}
 
 internal class FeConvolveMatrixRenderNode(
     sourceElement: FeConvolveMatrix,
@@ -527,6 +551,7 @@ internal class FeConvolveMatrixRenderNode(
     @JvmField val preserveAlpha: Boolean,
     @JvmField val edgeMode: ConvolveMatrixEdgeMode,
 ) : FilterPrimitiveRenderNode<FeConvolveMatrix>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_CONVOLVE_MATRIX
     /**
      * Pixel buffers reused across renders; resized only when the input dimensions change.
      */
@@ -538,6 +563,7 @@ internal class FeMorphologyRenderNode(
     sourceElement: FeMorphology,
     @JvmField val erode: Boolean,
 ) : FilterPrimitiveRenderNode<FeMorphology>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_MORPHOLOGY
     /**
      * Pixel buffers reused across renders; resized only when the input dimensions change.
      */
@@ -556,6 +582,7 @@ internal class FeComponentTransferRenderNode(
     sourceElement: FeComponentTransfer,
     @JvmField val transferFunctions: ComponentTransferFunctions,
 ) : FilterPrimitiveRenderNode<FeComponentTransfer>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_COMPONENT_TRANSFER
     @JvmField val srcPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
 
@@ -568,6 +595,7 @@ internal class FeCompositeRenderNode(
     sourceElement: FeComposite,
     @JvmField val paint: Paint,
 ) : FilterPrimitiveRenderNode<FeComposite>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_COMPOSITE
     @JvmField val inputPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val in2Pixels: IntArrayBucket = IntArrayBucket()
 }
@@ -576,12 +604,17 @@ internal class FeTurbulenceRenderNode(
     sourceElement: FeTurbulence,
     @JvmField val generators: Array<SvgPathNoise>,
 ) : FilterPrimitiveRenderNode<FeTurbulence>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_TURBULENCE
     @JvmField val pixels: IntArrayBucket = IntArrayBucket()
+
+    @JvmField var gpuLatticeBitmap: Bitmap? = null
+    @JvmField var gpuLatticeVersion: Int = -1
 }
 
 internal class FeDisplacementMapRenderNode(
     sourceElement: FeDisplacementMap,
 ) : FilterPrimitiveRenderNode<FeDisplacementMap>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_DISPLACEMENT_MAP
     @JvmField val inputPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val mapPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
@@ -590,6 +623,7 @@ internal class FeDisplacementMapRenderNode(
 internal class FeDiffuseLightingRenderNode(
     sourceElement: FeDiffuseLighting,
 ) : FilterPrimitiveRenderNode<FeDiffuseLighting>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_DIFFUSE_LIGHTING
     @JvmField val pixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val normal: NormalVector = NormalVector()
@@ -599,6 +633,7 @@ internal class FeDiffuseLightingRenderNode(
 internal class FeSpecularLightingRenderNode(
     sourceElement: FeSpecularLighting,
 ) : FilterPrimitiveRenderNode<FeSpecularLighting>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_SPECULAR_LIGHTING
     @JvmField val pixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val normal: NormalVector = NormalVector()
@@ -608,8 +643,12 @@ internal class FeSpecularLightingRenderNode(
 internal class FeImageRenderNode(
     sourceElement: FeImage,
     @JvmField val image: Bitmap?,
-) : FilterPrimitiveRenderNode<FeImage>(sourceElement)
+) : FilterPrimitiveRenderNode<FeImage>(sourceElement) {
+    override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_IMAGE
+}
 
 internal class GenericFilterPrimitiveRenderNode(
     sourceElement: FilterPrimitive
-) : FilterPrimitiveRenderNode<FilterPrimitive>(sourceElement)
+) : FilterPrimitiveRenderNode<FilterPrimitive>(sourceElement) {
+    override val primitiveFlag: Int get() = 0
+}

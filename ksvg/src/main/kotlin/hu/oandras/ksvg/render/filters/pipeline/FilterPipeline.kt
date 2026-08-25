@@ -16,29 +16,26 @@
 
 package hu.oandras.ksvg.render.filters.pipeline
 
-import android.graphics.Canvas
 import android.os.Build
+import hu.oandras.ksvg.render.Renderer
 
 /**
- * Capability-based filter-pipeline factory. Selection is graph-level: the
- * first backend whose [FilterBackend.supports] accepts the required primitive
- * set wins; the CPU/native backend is always the final fallback.
- *
- * Order (see tmp/plan-filter-pipeline.md §2):
- * 1. software canvas or API < 31  → [FilterPipelineNativeImpl]
- * 2. API ≥ 33                     → Impl33 (AGSL) — future phase
- * 3. API ≥ 31                     → Impl31 (RenderEffect) — future phase
- * 4. otherwise                    → [FilterPipelineNativeImpl]
+ * Capability-based filter-backend factory. Graph-level selection lives in
+ * `Renderer.obtainFilterBackend`: it tries the GPU backend first (which may
+ * still reject a graph while building the effect chain) and always falls back
+ * to the software backend created here.
  */
 internal object FilterPipeline {
 
     @JvmStatic
-    internal fun create(canvas: Canvas): FilterBackend {
-        if (!canvas.isHardwareAccelerated || Build.VERSION.SDK_INT < 31) {
-            return FilterPipelineNativeImpl()
+    internal fun createSoftware(renderer: Renderer): SoftwareFilterBackend =
+        SoftwareFilterBackend(renderer)
+
+    @JvmStatic
+    internal fun createGpuOrNull(renderer: Renderer): FilterBackend? =
+        when {
+            Build.VERSION.SDK_INT >= 33 -> FilterPipelineImpl33(renderer)
+            Build.VERSION.SDK_INT >= 31 -> FilterPipelineImpl31(renderer)
+            else -> null
         }
-        // FilterPipelineImpl33 / FilterPipelineImpl31 are wired up in later phases;
-        // until then every hardware canvas also takes the native backend.
-        return FilterPipelineNativeImpl()
-    }
 }

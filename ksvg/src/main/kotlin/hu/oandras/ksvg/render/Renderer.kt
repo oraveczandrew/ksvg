@@ -64,6 +64,7 @@ import hu.oandras.ksvg.dom.style.ColorValue
 import hu.oandras.ksvg.dom.style.CurrentColor
 import hu.oandras.ksvg.dom.style.Isolation
 import hu.oandras.ksvg.dom.style.MaskType
+import hu.oandras.ksvg.dom.style.PaintOrder
 import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.RenderQuality
 import hu.oandras.ksvg.dom.style.Style
@@ -72,27 +73,13 @@ import hu.oandras.ksvg.render.animation.AnimationContext
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.animation.applyAnimatedStyle
 import hu.oandras.ksvg.render.animation.updateAnimations
-import hu.oandras.ksvg.render.filters.doFeBlendFilter
-import hu.oandras.ksvg.render.filters.doFeColorMatrixFilter
-import hu.oandras.ksvg.render.filters.doFeComponentTransferFilter
-import hu.oandras.ksvg.render.filters.doFeCompositeFilter
-import hu.oandras.ksvg.render.filters.doFeConvolveMatrixFilter
-import hu.oandras.ksvg.render.filters.doFeDiffuseLightingFilter
-import hu.oandras.ksvg.render.filters.doFeDisplacementMapFilter
 import hu.oandras.ksvg.render.filters.doFeGaussianBlurFilter
-import hu.oandras.ksvg.render.filters.doFeImageFilter
-import hu.oandras.ksvg.render.filters.doFeMergeFilter
-import hu.oandras.ksvg.render.filters.doFeMorphologyFilter
 import hu.oandras.ksvg.render.filters.doFeOffsetFilter
-import hu.oandras.ksvg.render.filters.doFeSpecularLightingFilter
-import hu.oandras.ksvg.render.filters.doFeTileFilter
-import hu.oandras.ksvg.render.filters.doFeTurbulenceFilter
-import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
-import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.filters.getFilterInput
 import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
 import hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31
 import hu.oandras.ksvg.render.filters.pipeline.FilterPipeline
+import hu.oandras.ksvg.render.filters.pipeline.SoftwareFilterBackend
 import hu.oandras.ksvg.render.filters.luminanceToAlphaFloatArray
 import hu.oandras.ksvg.render.pool.Pool
 import hu.oandras.ksvg.render.pool.PoolOwner
@@ -133,9 +120,9 @@ internal class Renderer internal constructor(
     // Renderer state
     private var state: RendererState = RendererState()
 
-    // Filter-pipeline backend, resolved per render operation (canvas capability).
-    private var filterBackend: FilterBackend? = null
-    private var filterBackendHardware: Boolean = false
+    // Filter-pipeline backends, resolved per render operation (canvas capability).
+    private var softwareBackend: SoftwareFilterBackend? = null
+    private var gpuBackend: FilterBackend? = null
 
     // Reused across text renders to avoid per-element allocation in the render loop.
     private val plainTextDrawer = PlainTextDrawer(state)
@@ -665,17 +652,17 @@ internal class Renderer internal constructor(
 
     private fun drawPathContent(canvas: Canvas, node: PathRenderNode, state: RendererState) {
         // paintOrder is stored already encoded as three 2-bit digits; 0 = normal.
-        val order = state.style.paintOrder.takeIf { it != 0 } ?: FILL_STROKE_MARKERS
+        val order = state.style.paintOrder.takeIf { it != 0 } ?: PaintOrder.FILL_STROKE_MARKERS
         for (shift in 4 downTo 0 step 2) {
             when ((order shr shift) and 3) {
-                COMPONENT_FILL -> if (state.hasFill) {
+                PaintOrder.FILL -> if (state.hasFill) {
                     node.path.fillType = state.fillType
                     doFilledPath(node, node.path, canvas)
                 }
-                COMPONENT_STROKE -> if (state.hasStroke) {
+                PaintOrder.STROKE -> if (state.hasStroke) {
                     doStroke(node.path, node, canvas)
                 }
-                COMPONENT_MARKERS -> renderMarkers(canvas, node)
+                PaintOrder.MARKERS -> renderMarkers(canvas, node)
             }
         }
     }
@@ -975,131 +962,49 @@ internal class Renderer internal constructor(
                             val width = stabilizeDimension(deviceRegion.width().ceilToInt())
                             val height = stabilizeDimension(deviceRegion.height().ceilToInt())
 
-                            // GPU effect-chain attempt (RenderEffect + RenderNode
-                            // recording). Only for graphs Impl31 represents exactly.
-                            if (canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31 &&
-                                state.style.opacity == 1f && state.style.mixBlendMode == CSSBlendMode.normal
-                            ) {
-                                val backend = obtainFilterBackend(canvas)
-                                if (backend is FilterPipelineImpl31) {
-                                    val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
-                                    val pScaleX = if (primitiveUnitsAreUser) sx else boundingBox.width * sx
-                                    val pScaleY = if (primitiveUnitsAreUser) sy else boundingBox.height * sy
-                                    val chain = backend.tryBuildChain(filterNode, pScaleX, pScaleY) { length, isX ->
-                                        if (isX) filterPrimitiveLengthX(length, primitiveUnitsAreUser, pScaleX, sx)
-                                        else filterPrimitiveLengthY(length, primitiveUnitsAreUser, pScaleY, sy)
-                                    }
-                                    if (chain != null) {
-                                        drawGpuFiltered(
-                                            canvas, filterNode, chain, sx, sy,
-                                            width, height, deviceRegion, matrix, r, state
-                                        )
-                                        return
-                                    }
-                                }
-                            }
-
-                            // Cache check
-                            val cachedFilterOutput = node.cachedFilterOutput
-                            if (cachedFilterOutput != null &&
-                                node.lastSourceVersion == node.contentVersion &&
-                                node.lastFilterVersion == filterNode.version &&
-                                node.lastScaleX == sx &&
-                                node.lastScaleY == sy &&
-                                cachedFilterOutput.width == width &&
-                                cachedFilterOutput.height == height
-                            ) {
-
-                                canvas.withSave {
-                                    canvas.setMatrix(null)
-                                    canvas.drawBitmap(cachedFilterOutput, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
-                                }
-                                return
-                            }
-
-                            // Need to re-render source or re-apply filter
-                            var sourceBitmap = node.cachedSourceContent
-                            val needsSourceWidth: Int = width
-                            val needsSourceHeight: Int = height
-
-                            val canReuseSource = sourceBitmap != null &&
-                                    !sourceBitmap.isRecycled &&
-                                    sourceBitmap.allocationByteCount >= needsSourceWidth * needsSourceHeight * 4
-
-                            if (sourceBitmap == null ||
-                                node.lastSourceVersion != node.contentVersion ||
-                                node.lastScaleX != sx ||
-                                node.lastScaleY != sy ||
-                                sourceBitmap.width != needsSourceWidth ||
-                                sourceBitmap.height != needsSourceHeight
-                            ) {
-
-                                // Re-render source content
-                                if (!canReuseSource) {
-                                    if (sourceBitmap != null) {
-                                        bitmapPool.release(sourceBitmap)
-                                    }
-                                    sourceBitmap = bitmapPool.acquire(
-                                        needsSourceWidth,
-                                        needsSourceHeight,
-                                        Bitmap.Config.ARGB_8888
-                                    )
-                                    node.cachedSourceContent = sourceBitmap
+                            val backend = obtainFilterBackend(canvas, filterNode, sx, sy, boundingBox)
+                            val recCanvas = backend.beginRecording(
+                                node = node,
+                                filterNode = filterNode,
+                                width = width,
+                                height = height,
+                                sx = sx,
+                                sy = sy,
+                                matrix = matrix,
+                                newMatrix = newMatrix,
+                                deviceRegion = deviceRegion,
+                                boundingBox = boundingBox
+                            )
+                            if (recCanvas != null) {
+                                val stateStackState = if (BuildConfig.DEBUG) {
+                                    stateStack.size
                                 } else {
-                                    sourceBitmap.reconfigure(needsSourceWidth, needsSourceHeight, Bitmap.Config.ARGB_8888)
-                                    sourceBitmap.eraseColor(0)
+                                    0
                                 }
-
-                                canvasPool.withPooledObject { c ->
-                                    c.setBitmap(sourceBitmap)
-                                    newMatrix.set(matrix)
-                                    newMatrix.postTranslate(-deviceRegion.left, -deviceRegion.top)
-                                    c.setMatrix(newMatrix)
-
-                                    val stateStackState = stateStack.size
-                                    try {
-                                        r.invoke(c, state)
-                                    } finally {
-                                        if (BuildConfig.DEBUG) {
-                                            val sourceElement = node.sourceElement
-                                            check(stateStack.size == stateStackState) {
-                                                "Stack size mismatch after rendering filter source for node ${sourceElement.getNodeName()} (id: ${sourceElement.id})"
-                                            }
+                                try {
+                                    r(recCanvas, state)
+                                } finally {
+                                    backend.endRecording(filterNode)
+                                    if (BuildConfig.DEBUG) {
+                                        val sourceElement = node.sourceElement
+                                        check(stateStack.size == stateStackState) {
+                                            "Stack size mismatch after rendering filter source for node ${sourceElement.getNodeName()} (id: ${sourceElement.id})"
                                         }
                                     }
                                 }
-                                node.lastSourceVersion = node.contentVersion
                             }
-
-                            // Re-apply filter
-                            if (cachedFilterOutput != null && cachedFilterOutput !== node.cachedSourceContent) {
-                                if (cachedFilterOutput.allocationByteCount < width * height * 4) {
-                                    bitmapPool.release(cachedFilterOutput)
-                                    node.cachedFilterOutput = null
-                                }
-                            }
-
-                            val filteredBitmap = applyFilterToBitmap(
+                            backend.drawFiltered(
                                 canvas = canvas,
-                                sourceBitmap = sourceBitmap,
-                                region = deviceRegion,
+                                node = node,
+                                filterNode = filterNode,
+                                width = width,
+                                height = height,
                                 sx = sx,
                                 sy = sy,
-                                filterNode = filterNode,
-                                originalObjBBox = boundingBox
+                                deviceRegion = deviceRegion,
+                                boundingBox = boundingBox,
+                                state = state
                             )
-
-                            node.cachedFilterOutput = filteredBitmap
-                            node.lastFilterVersion = filterNode.version
-                            node.lastScaleX = sx
-                            node.lastScaleY = sy
-
-                            if (filteredBitmap != null) {
-                                canvas.withSave {
-                                    canvas.setMatrix(null)
-                                    canvas.drawBitmap(filteredBitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
-                                }
-                            }
                         }
                     }
                 }
@@ -1191,346 +1096,42 @@ internal class Renderer internal constructor(
         }
     }
 
-    private inline fun drawGpuFiltered(
+    private fun obtainFilterBackend(
         canvas: Canvas,
         filterNode: FilterRenderNode,
-        chain: FilterPipelineImpl31.Chain,
         sx: Float,
         sy: Float,
-        width: Int,
-        height: Int,
-        deviceRegion: RectF,
-        matrix: Matrix,
-        record: (Canvas, RendererState) -> Unit,
-        state: RendererState,
-    ) {
-        val padX = chain.padX
-        val padY = chain.padY
-        val contentVersion = filterNode.contentVersion
-        var gpuNode = filterNode.gpuNode
-        val valid = gpuNode != null &&
-                filterNode.gpuSourceVersion == contentVersion &&
-                filterNode.gpuFilterVersion == filterNode.version &&
-                filterNode.gpuScaleX == sx && filterNode.gpuScaleY == sy &&
-                filterNode.gpuWidth == width && filterNode.gpuHeight == height &&
-                filterNode.gpuPadX == padX && filterNode.gpuPadY == padY
-        if (!valid || gpuNode == null) {
-            gpuNode = gpuNode ?: android.graphics.RenderNode("ksvg-filter-source")
-            val recording = gpuNode.beginRecording(width + 2 * padX, height + 2 * padY)
-            recording.translate(padX - deviceRegion.left, padY - deviceRegion.top)
-            recording.concat(matrix)
-            try {
-                record(recording, state)
-            } finally {
-                gpuNode.endRecording()
-            }
-            filterNode.gpuNode = gpuNode
-            filterNode.gpuSourceVersion = contentVersion
-            filterNode.gpuFilterVersion = filterNode.version
-            filterNode.gpuScaleX = sx
-            filterNode.gpuScaleY = sy
-            filterNode.gpuWidth = width
-            filterNode.gpuHeight = height
-            filterNode.gpuPadX = padX
-            filterNode.gpuPadY = padY
-        }
+        boundingBox: Box,
+    ): FilterBackend {
+        // GPU effect-chain attempt (RenderEffect + RenderNode recording).
+        // Only for graphs Impl31 represents exactly, and only when the element
+        // would not need a separate compositing layer for the result.
+        if (canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31 &&
+            state.style.opacity == 1f && state.style.mixBlendMode == CSSBlendMode.normal
+        ) {
+            val gpu = gpuBackend ?: FilterPipeline.createGpuOrNull(this)?.also { gpuBackend = it }
+            if (gpu != null) {
+                val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
+                val pScaleX = if (primitiveUnitsAreUser) sx else boundingBox.width * sx
+                val pScaleY = if (primitiveUnitsAreUser) sy else boundingBox.height * sy
 
-        gpuNode.setRenderEffect(chain.effect)
-        canvas.withSave {
-            canvas.setMatrix(null)
-            canvas.translate(-padX.toFloat(), -padY.toFloat())
-            canvas.drawRenderNode(gpuNode)
-        }
-        gpuNode.setRenderEffect(null)
-    }
-
-    private fun obtainFilterBackend(canvas: Canvas): FilterBackend {
-        val hardware = canvas.isHardwareAccelerated
-        val existing = filterBackend
-        if (existing != null && filterBackendHardware == hardware) {
-            return existing
-        }
-        val created = FilterPipeline.create(canvas)
-        filterBackend = created
-        filterBackendHardware = hardware
-        return created
-    }
-
-    @JvmSynthetic
-    internal fun applyFilterToBitmap(
-        canvas: Canvas,
-        sourceBitmap: Bitmap,
-        region: RectF,
-        sx: Float,
-        sy: Float,
-        filterNode: FilterRenderNode,
-        originalObjBBox: Box,
-    ): Bitmap? {
-        val filter = filterNode.sourceElement
-
-        val results = filterNode.filterSourceMap ?: FilterSourceMap(this).also {
-            filterNode.filterSourceMap = it
-        }
-
-        results.reInitWith(sourceBitmap)
-
-        var lastResult: Bitmap? = sourceBitmap
-        val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
-        val primitiveScaleX = if (primitiveUnitsAreUser) sx else originalObjBBox.width * sx
-        val primitiveScaleY = if (primitiveUnitsAreUser) sy else originalObjBBox.height * sy
-        val primitiveOriginX = if (primitiveUnitsAreUser) 0f else originalObjBBox.minX
-        val primitiveOriginY = if (primitiveUnitsAreUser) 0f else originalObjBBox.minY
-
-        filterNode.primitives.forEachElement { primitiveNode ->
-            val child = primitiveNode.sourceElement
-
-            val res = rectFPool.withPooledObject { primitiveRegion ->
-                calculatePrimitiveRegion(
-                    primitive = child,
-                    filterRegion = region,
-                    unitsAreUser = primitiveUnitsAreUser,
-                    originalObjBBox = originalObjBBox,
-                    outRect = primitiveRegion
-                )
-
-                when (primitiveNode) {
-                    is FeMergeRenderNode -> doFeMergeFilter(
-                        merge = primitiveNode,
-                        results = results,
-                        lastResult = lastResult,
-                        region = primitiveRegion
-                    )
-
-                    else -> applyPrimitive(
-                        canvas = canvas,
-                        primitiveNode = primitiveNode,
-                        results = results,
-                        lastResult = lastResult,
-                        primitiveScaleX = primitiveScaleX,
-                        primitiveScaleY = primitiveScaleY,
-                        primitiveOriginX = primitiveOriginX,
-                        primitiveOriginY = primitiveOriginY,
-                        canvasScaleX = sx,
-                        canvasScaleY = sy,
-                        primitiveUnitsAreUser = primitiveUnitsAreUser,
-                        region = region,
-                        primitiveRegion = primitiveRegion,
-                    )
-                }
-            }
-
-            if (res != null) {
-                results.set(child.result, res)
-                lastResult = res
-            }
-        }
-
-        results.recycle(exclude = lastResult)
-        return lastResult
-    }
-
-    private fun applyPrimitive(
-        canvas: Canvas,
-        primitiveNode: FilterPrimitiveRenderNode<*>,
-        results: FilterSourceMap,
-        lastResult: Bitmap?,
-        primitiveScaleX: Float,
-        primitiveScaleY: Float,
-        primitiveOriginX: Float,
-        primitiveOriginY: Float,
-        canvasScaleX: Float,
-        canvasScaleY: Float,
-        primitiveUnitsAreUser: Boolean,
-        region: RectF,
-        primitiveRegion: RectF,
-    ): Bitmap? {
-        val primitive = primitiveNode.sourceElement
-        val input = getFilterInput(
-            name = primitive.`in`,
-            results = results,
-            lastResult = lastResult
-        )
-
-        val inputBitmap = input ?: return null
-
-        return when (primitiveNode) {
-
-            is FeTurbulenceRenderNode -> doFeTurbulenceFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveScaleX = primitiveScaleX,
-                primitiveScaleY = primitiveScaleY,
-                primitiveOriginX = primitiveOriginX,
-                primitiveOriginY = primitiveOriginY,
-                regionLeft = region.left,
-                regionTop = region.top,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-            )
-
-            is FeOffsetRenderNode -> doFeOffsetFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveUnitsAreUser = primitiveUnitsAreUser,
-                primitiveScaleX = primitiveScaleX,
-                primitiveScaleY = primitiveScaleY,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-            )
-
-            is FeConvolveMatrixRenderNode -> doFeConvolveMatrixFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-            )
-
-            is FeMorphologyRenderNode -> doFeMorphologyFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveScaleX = primitiveScaleX,
-                primitiveScaleY = primitiveScaleY,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-            )
-
-            is FeComponentTransferRenderNode -> doFeComponentTransferFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-            )
-
-            is FeCompositeRenderNode -> doFeCompositeFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                results = results,
-                lastResult = lastResult,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-            )
-
-            is FeDisplacementMapRenderNode -> doFeDisplacementMapFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                results = results,
-                lastResult = lastResult,
-            )
-
-            is FeDiffuseLightingRenderNode -> doFeDiffuseLightingFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveScaleX = primitiveScaleX,
-                primitiveScaleY = primitiveScaleY,
-                primitiveOriginX = primitiveOriginX,
-                primitiveOriginY = primitiveOriginY,
-                regionLeft = region.left,
-                regionTop = region.top,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-            )
-
-            is FeSpecularLightingRenderNode -> doFeSpecularLightingFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveScaleX = primitiveScaleX,
-                primitiveScaleY = primitiveScaleY,
-                primitiveOriginX = primitiveOriginX,
-                primitiveOriginY = primitiveOriginY,
-                regionLeft = region.left,
-                regionTop = region.top,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-            )
-
-            is FeColorMatrixRenderNode -> doFeColorMatrixFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-            )
-
-            is FeGaussianBlurRenderNode -> doFeGaussianBlurFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveScaleX = primitiveScaleX,
-                primitiveScaleY = primitiveScaleY,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-            )
-
-            is FeImageRenderNode -> doFeImageFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-            )
-
-            is FeFloodRenderNode -> doFeFloodFilter(
-                canvas = canvas,
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-            )
-
-            is FeBlendRenderNode -> doFeBlendFilter(
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                results = results,
-                lastResult = lastResult,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-            )
-
-            is FeTileRenderNode -> doFeTileFilter(
-                inputBitmap = inputBitmap,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-            )
-
-            is FeDropShadowRenderNode -> doFeDropShadowFilter(
-                canvas = canvas,
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                results = results,
-                lastResult = lastResult,
-                primitiveUnitsAreUser = primitiveUnitsAreUser,
-                primitiveScaleX = primitiveScaleX,
-                primitiveScaleY = primitiveScaleY,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-                primitiveRegion = primitiveRegion,
-                filterRegion = region,
-            )
-
-            else -> {
-                canvasPool.withPooledObject { c ->
-                    val res = bitmapPool.acquireSameAs(input)
-                    c.setBitmap(res)
-                    c.drawBitmap(input, 0f, 0f, null)
-                    res
+                // Capability check: can this GPU backend represent the full graph?
+                val primitives = filterNode.collectPrimitives()
+                if (gpu.supports(primitives)) {
+                    // Specific check for Impl31/33 linear chains + attributes.
+                    // (Implementation detail: they both use tryBuildChain for this).
+                    val supported = when (gpu) {
+                        is FilterPipelineImpl31 -> gpu.tryBuildChain(filterNode, pScaleX, pScaleY) != null
+                        else -> false
+                    }
+                    if (supported) {
+                        return gpu
+                    }
                 }
             }
         }
+
+        return softwareBackend ?: FilterPipeline.createSoftware(this).also { softwareBackend = it }
     }
 
     internal fun doFeFloodFilter(
@@ -2744,47 +2345,8 @@ internal class Renderer internal constructor(
         return (dimension + 31) and 31.inv()
     }
 
-    /**
-     * Reusable paint for compositing a filtered bitmap back onto the canvas. Must honour the
-     * element's own `opacity` and `mix-blend-mode`, which are otherwise silently dropped when a
-     * `filter` is present (see renderWithFilter). Kept per-Renderer-instance (not in the
-     * companion object) so it is never shared mutable state across Drawables/threads.
-     */
-    private val filterCompositePaint: Paint = Paint()
-
-    /**
-     * The filtered bitmap is composited back onto the original canvas. This paint must
-     * honour the element's own `opacity` and `mix-blend-mode`, otherwise they are silently
-     * dropped when a `filter` is present (see renderWithFilter).
-     *
-     * When neither applies (fully opaque, normal blend) we return `null` so the bitmap is
-     * drawn exactly as before, preserving existing rendering/compositing behaviour.
-     */
-    private fun configureFilterCompositePaint(state: RendererState): Paint? {
-        val opacity = if (state.style.opacity.isNaN()) 1f else state.style.opacity
-        val alpha = (opacity * 255f).toInt().coerceIn(0, 255)
-        val blendMode = state.style.mixBlendMode
-        if (alpha >= 255 && (blendMode == null || blendMode == CSSBlendMode.normal)) {
-            return null
-        }
-        filterCompositePaint.alpha = alpha
-        setBlendMode(state, filterCompositePaint)
-        return filterCompositePaint
-    }
-
     companion object {
         private const val TAG = "Renderer"
-
-        // paint-order component codes (2 bits each) and the six packed orders.
-        private const val COMPONENT_FILL = 1
-        private const val COMPONENT_STROKE = 2
-        private const val COMPONENT_MARKERS = 3
-        private const val FILL_STROKE_MARKERS = (COMPONENT_FILL shl 4) or (COMPONENT_STROKE shl 2) or COMPONENT_MARKERS
-        private const val STROKE_FILL_MARKERS = (COMPONENT_STROKE shl 4) or (COMPONENT_FILL shl 2) or COMPONENT_MARKERS
-        private const val FILL_MARKERS_STROKE = (COMPONENT_FILL shl 4) or (COMPONENT_MARKERS shl 2) or COMPONENT_STROKE
-        private const val MARKERS_FILL_STROKE = (COMPONENT_MARKERS shl 4) or (COMPONENT_FILL shl 2) or COMPONENT_STROKE
-        private const val STROKE_MARKERS_FILL = (COMPONENT_STROKE shl 4) or (COMPONENT_MARKERS shl 2) or COMPONENT_FILL
-        private const val MARKERS_STROKE_FILL = (COMPONENT_MARKERS shl 4) or (COMPONENT_STROKE shl 2) or COMPONENT_FILL
 
         // The feColorMatrix luminance-to-alpha coefficient. Used for <mask>s.
         // Note we are using the CSS/SVG2 version of the coefficients here, rather than the older SVG1.1 coefficients.
@@ -2826,7 +2388,7 @@ internal class Renderer internal constructor(
             }
         }
 
-        private fun setBlendMode(state: RendererState, paint: Paint) {
+        internal fun setBlendMode(state: RendererState, paint: Paint): Unit {
             val mixBlendMode = state.style.mixBlendMode ?: CSSBlendMode.normal
 
             debug {
