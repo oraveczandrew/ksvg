@@ -77,9 +77,9 @@ internal sealed class RenderNode<T: SvgObject>(
     @JvmField val sourceElement: T
 ) {
     @JvmField var transform: Matrix? = null
-    // Base transform for instance nodes whose transform is composed during tree building.
+    // Base transform, for instance, nodes whose transform is composed during tree building.
     @JvmField var animationBaseTransform: Matrix? = null
-    // ViewBox -> viewport fit transform (e.g. for the root <svg>, <image>, nested <svg>).
+    // ViewBox -> viewport fit transform (e.g., for the root <svg>, <image>, nested <svg>).
     // Kept separate from [transform] because updateAnimations() re-derives [transform] from the
     // element each frame and must not clobber the fit.
     @JvmField var viewBoxTransform: Matrix? = null

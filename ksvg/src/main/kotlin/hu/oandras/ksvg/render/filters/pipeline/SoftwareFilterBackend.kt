@@ -20,12 +20,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.PorterDuff
 import android.graphics.RectF
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.style.CSSBlendMode
-import hu.oandras.ksvg.render.FilterRenderNode
-import hu.oandras.ksvg.render.FilterSourceMap
 import hu.oandras.ksvg.render.FeBlendRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeComponentTransferRenderNode
@@ -44,6 +41,8 @@ import hu.oandras.ksvg.render.FeSpecularLightingRenderNode
 import hu.oandras.ksvg.render.FeTileRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.FilterPrimitiveRenderNode
+import hu.oandras.ksvg.render.FilterRenderNode
+import hu.oandras.ksvg.render.FilterSourceMap
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.Renderer
 import hu.oandras.ksvg.render.RendererState
@@ -65,6 +64,7 @@ import hu.oandras.ksvg.render.filters.doFeTileFilter
 import hu.oandras.ksvg.render.filters.doFeTurbulenceFilter
 import hu.oandras.ksvg.render.filters.getFilterInput
 import hu.oandras.ksvg.render.pool.withPooledObject
+import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.forEachElement
 
 /**
@@ -218,11 +218,11 @@ internal class SoftwareFilterBackend internal constructor(
     }
 
     private fun drawResult(canvas: Canvas, deviceRegion: RectF, bitmap: Bitmap, state: RendererState) {
-        val saveCount = canvas.save()
-        @Suppress("DEPRECATION")
-        canvas.setMatrix(null)
-        canvas.drawBitmap(bitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
-        canvas.restoreToCount(saveCount)
+        canvas.withSave {
+            @Suppress("DEPRECATION")
+            canvas.setMatrix(null)
+            canvas.drawBitmap(bitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
+        }
     }
 
     /**
@@ -286,12 +286,14 @@ internal class SoftwareFilterBackend internal constructor(
                 }
 
                 when (primitiveNode) {
-                    is FeMergeRenderNode -> doFeMergeFilter(
-                        merge = primitiveNode,
-                        results = results,
-                        lastResult = lastResult,
-                        region = primitiveRegion
-                    )
+                    is FeMergeRenderNode -> with(renderer) {
+                        doFeMergeFilter(
+                            merge = primitiveNode,
+                            results = results,
+                            lastResult = lastResult,
+                            region = primitiveRegion
+                        )
+                    }
 
                     else -> applyPrimitive(
                         canvas = canvas,
@@ -306,7 +308,6 @@ internal class SoftwareFilterBackend internal constructor(
                         canvasScaleY = sy,
                         primitiveUnitsAreUser = primitiveUnitsAreUser,
                         filterRegion = filterRegion,
-                        deviceRegion = deviceRegion,
                         primitiveRegion = primitiveRegion,
                     )
                 }
@@ -335,7 +336,6 @@ internal class SoftwareFilterBackend internal constructor(
         canvasScaleY: Float,
         primitiveUnitsAreUser: Boolean,
         filterRegion: RectF,
-        deviceRegion: RectF,
         primitiveRegion: RectF,
     ): Bitmap? {
         val primitive = primitiveNode.sourceElement

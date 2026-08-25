@@ -23,16 +23,17 @@ import android.graphics.RenderEffect
 import android.os.Build
 import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.dom.core.Box
-import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
+import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RendererState
+import hu.oandras.ksvg.render.filters.buildColorMatrix
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
-import hu.oandras.ksvg.render.filters.buildColorMatrix
+import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.forEachElement
 
 /**
@@ -148,10 +149,18 @@ internal open class FilterPipelineImpl31 internal constructor(
                     checkLinearInput(primitive.sourceElement.`in`, previousResult, first) ?: return null
                     previousResult = primitive.sourceElement.result
                     first = false
-                    val dx = filterPrimitiveLengthX(primitive.sourceElement.dx,
-                        primitiveUnitsAreUser = true, primitiveScaleX = scaleX, canvasScaleX = 1f)
-                    val dy = filterPrimitiveLengthY(primitive.sourceElement.dy,
-                        primitiveUnitsAreUser = true, primitiveScaleY = scaleY, canvasScaleY = 1f)
+                    val dx = filterPrimitiveLengthX(
+                        length = primitive.sourceElement.dx,
+                        primitiveUnitsAreUser = true,
+                        primitiveScaleX = scaleX,
+                        canvasScaleX = 1f
+                    )
+                    val dy = filterPrimitiveLengthY(
+                        length = primitive.sourceElement.dy,
+                        primitiveUnitsAreUser = true,
+                        primitiveScaleY = scaleY,
+                        canvasScaleY = 1f
+                    )
                     if (dx == 0f && dy == 0f) null else RenderEffect.createOffsetEffect(dx, dy)
                 }
                 else -> return null
@@ -243,12 +252,12 @@ internal open class FilterPipelineImpl31 internal constructor(
         val chain = filterNode.gpuChain ?: return
         val gpuNode = filterNode.gpuNode ?: return
         gpuNode.setRenderEffect(chain.effect)
-        val saveCount = canvas.save()
-        @Suppress("DEPRECATION")
-        canvas.setMatrix(null)
-        canvas.translate(-chain.padX.toFloat(), -chain.padY.toFloat())
-        canvas.drawRenderNode(gpuNode)
-        canvas.restoreToCount(saveCount)
+        canvas.withSave {
+            @Suppress("DEPRECATION")
+            canvas.setMatrix(null)
+            canvas.translate(-chain.padX.toFloat(), -chain.padY.toFloat())
+            canvas.drawRenderNode(gpuNode)
+        }
         gpuNode.setRenderEffect(null)
     }
 

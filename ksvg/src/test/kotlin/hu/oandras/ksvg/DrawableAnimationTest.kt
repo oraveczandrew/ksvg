@@ -41,7 +41,7 @@ class DrawableAnimationTest {
             parseAnimations = true
         )
 
-        assertTrue(svg.toDrawable() is KSVGDrawable)
+        assertIs<KSVGDrawable>(svg.toDrawable())
     }
 
     @Test

@@ -47,7 +47,7 @@ inline jint clamp255f(const float v) {
     return i < 0 ? 0 : (i > 255 ? 255 : i);
 }
 
-inline float heightAt(const jint* pix, const jint width, const jint height, jint x, jint y, const float ss) {
+inline float heightAt(const jint* pix, const jint width, const jint height, const jint x, const jint y, const float ss) {
     jint cx = x < 0 ? 0 : (x > width - 1 ? width - 1 : x);
     jint cy = y < 0 ? 0 : (y > height - 1 ? height - 1 : y);
     return static_cast<float>((pix[cy * width + cx] >> 24) & 0xff) * ss;
@@ -66,11 +66,11 @@ void applyScalar(
         float fr, float fg, float fb, const jdouble* params) {
     for (jint y = clipTop; y < clipBottom; y++) {
         const jdouble userY = userTop + y * invCanvasScaleY;
-        const float uy = static_cast<float>((userY - originY) / unitSizeY);
+        const auto uy = static_cast<float>((userY - originY) / unitSizeY);
         const jint rowOffset = y * width;
         for (jint x = clipLeft; x < clipRight; x++) {
             const jdouble userX = userLeft + x * invCanvasScaleX;
-            const float ux = static_cast<float>((userX - originX) / unitSizeX);
+            const auto ux = static_cast<float>((userX - originX) / unitSizeX);
             const float surfaceZ = heightAt(pix, width, height, x, y, ss);
 
             float lx, ly, lz, factor;
@@ -106,7 +106,7 @@ void applyScalar(
                         const double dSx = tx / tLen, dSy = ty / tLen, dSz = tz / tLen;
                         double dot = dSx * -lx + dSy * -ly + dSz * -lz;
                         if (dot < -1.0) dot = -1.0; else if (dot > 1.0) dot = 1.0;
-                        float f = static_cast<float>(dot);
+                        auto f = static_cast<float>(dot);
                         if (!std::isnan(params[6]) && static_cast<double>(f) < std::cos(params[6] * M_PI / 180.0)) f = 0.f;
                         factor = f < 0.f ? 0.f : f;
                     }
@@ -156,38 +156,55 @@ void applyScalar(
     }
 }
 
-#if defined(__ARM_NEON__) || defined(__ARM_NEON__) || defined(__SSE2__)
+#if defined(__ARM_NEON__) || defined(__SSE2__)
 #define LIGHT_SIMD 1
 #endif
 
 #ifdef LIGHT_SIMD
 
-#if defined(__ARM_NEON__) || defined(__ARM_NEON__)
+#if defined(__ARM_NEON__)
 #include <arm_neon.h>
 using F32x4 = float32x4_t;
-static inline F32x4 vLoad(const float* p) { return vld1q_f32(p); }
-static inline F32x4 vAdd(F32x4 a, F32x4 b) { return vaddq_f32(a, b); }
-static inline F32x4 vSub(F32x4 a, F32x4 b) { return vsubq_f32(a, b); }
-static inline F32x4 vMul(F32x4 a, F32x4 b) { return vmulq_f32(a, b); }
-static inline F32x4 vDiv(F32x4 a, F32x4 b) { return vdivq_f32(a, b); }
-static inline F32x4 vSplat(float v) { return vdupq_n_f32(v); }
-static inline F32x4 vSqrt(F32x4 v) { return vsqrtq_f32(v); }
-static inline F32x4 vMax(F32x4 a, F32x4 b) { return vmaxq_f32(a, b); }
-static inline F32x4 vMin(F32x4 a, F32x4 b) { return vminq_f32(a, b); }
-static inline void vStore(float* p, F32x4 v) { vst1q_f32(p, v); }
+inline F32x4 vLoad(const float* p) { return vld1q_f32(p); }
+inline F32x4 vAdd(F32x4 a, F32x4 b) { return vaddq_f32(a, b); }
+inline F32x4 vSub(F32x4 a, F32x4 b) { return vsubq_f32(a, b); }
+inline F32x4 vMul(F32x4 a, F32x4 b) { return vmulq_f32(a, b); }
+#if defined(__aarch64__)
+inline F32x4 vDiv(F32x4 a, F32x4 b) { return vdivq_f32(a, b); }
+inline F32x4 vSqrt(F32x4 v) { return vsqrtq_f32(v); }
+#else
+// ARMv7-A NEON does not have vdivq_f32 and vsqrtq_f32.
+// Use Newton-Raphson approximation for division and square root.
+inline F32x4 vDiv(F32x4 a, F32x4 b) {
+    float32x4_t rec = vrecpeq_f32(b);
+    rec = vmulq_f32(vrecpsq_f32(b, rec), rec);
+    rec = vmulq_f32(vrecpsq_f32(b, rec), rec);
+    return vmulq_f32(a, rec);
+}
+inline F32x4 vSqrt(F32x4 v) {
+    float32x4_t rec = vrsqrteq_f32(v);
+    rec = vmulq_f32(vrsqrtsq_f32(vmulq_f32(v, rec), rec), rec);
+    rec = vmulq_f32(vrsqrtsq_f32(vmulq_f32(v, rec), rec), rec);
+    return vmulq_f32(v, rec);
+}
+#endif
+inline F32x4 vSplat(float v) { return vdupq_n_f32(v); }
+inline F32x4 vMax(F32x4 a, F32x4 b) { return vmaxq_f32(a, b); }
+inline F32x4 vMin(F32x4 a, F32x4 b) { return vminq_f32(a, b); }
+inline void vStore(float* p, F32x4 v) { vst1q_f32(p, v); }
 #else
 #include <emmintrin.h>
 using F32x4 = __m128;
-static inline F32x4 vLoad(const float* p) { return _mm_loadu_ps(p); }
-static inline F32x4 vAdd(F32x4 a, F32x4 b) { return _mm_add_ps(a, b); }
-static inline F32x4 vSub(F32x4 a, F32x4 b) { return _mm_sub_ps(a, b); }
-static inline F32x4 vMul(F32x4 a, F32x4 b) { return _mm_mul_ps(a, b); }
-static inline F32x4 vDiv(F32x4 a, F32x4 b) { return _mm_div_ps(a, b); }
-static inline F32x4 vSplat(float v) { return _mm_set1_ps(v); }
-static inline F32x4 vSqrt(F32x4 v) { return _mm_sqrt_ps(v); }
-static inline F32x4 vMax(F32x4 a, F32x4 b) { return _mm_max_ps(a, b); }
-static inline F32x4 vMin(F32x4 a, F32x4 b) { return _mm_min_ps(a, b); }
-static inline void vStore(float* p, F32x4 v) { _mm_storeu_ps(p, v); }
+inline F32x4 vLoad(const float* p) { return _mm_loadu_ps(p); }
+inline F32x4 vAdd(F32x4 a, F32x4 b) { return _mm_add_ps(a, b); }
+inline F32x4 vSub(F32x4 a, F32x4 b) { return _mm_sub_ps(a, b); }
+inline F32x4 vMul(F32x4 a, F32x4 b) { return _mm_mul_ps(a, b); }
+inline F32x4 vDiv(F32x4 a, F32x4 b) { return _mm_div_ps(a, b); }
+inline F32x4 vSplat(float v) { return _mm_set1_ps(v); }
+inline F32x4 vSqrt(F32x4 v) { return _mm_sqrt_ps(v); }
+inline F32x4 vMax(F32x4 a, F32x4 b) { return _mm_max_ps(a, b); }
+inline F32x4 vMin(F32x4 a, F32x4 b) { return _mm_min_ps(a, b); }
+inline void vStore(float* p, F32x4 v) { _mm_storeu_ps(p, v); }
 #endif
 
 // Sobel + surface normal for 4 consecutive pixels. ht/hm/hb point at column
@@ -209,8 +226,8 @@ inline void sobelNormal4(
     const F32x4 sumB = vAdd(vAdd(lB, vMul(two, mB)), rB);
     const F32x4 sumT = vAdd(vAdd(lT, vMul(two, mT)), rT);
 
-    const F32x4 dzdx = vDiv(vSub(sumR, sumL), invDx);
-    const F32x4 dzdy = vDiv(vSub(sumB, sumT), invDy);
+    const F32x4 dzdx = vDiv(vSub(sumR, sumL), vSplat(invDx));
+    const F32x4 dzdy = vDiv(vSub(sumB, sumT), vSplat(invDy));
 
     nx = vSub(vSplat(0.f), dzdx);
     ny = vSub(vSplat(0.f), dzdy);
@@ -265,7 +282,7 @@ void applyVector(
         }
 
         const jdouble userY = userTop + y * invCanvasScaleY;
-        const float uy = static_cast<float>((userY - originY) / unitSizeY);
+        const auto uy = static_cast<float>((userY - originY) / unitSizeY);
 
         jint x = clipLeft;
         const jint vecEnd = clipLeft + ((clipRight - clipLeft) & ~3);
@@ -300,7 +317,7 @@ void applyVector(
                 for (jint l = 0; l < 4; l++) {
                     const jint px = x + l;
                     const jdouble userX = userLeft + px * invCanvasScaleX;
-                    const float ux = static_cast<float>((userX - originX) / unitSizeX);
+                    const auto ux = static_cast<float>((userX - originX) / unitSizeX);
                     const float surfaceZ = rowM[base + l + 1];
                     float plx, ply, plz, factor;
                     if (lightType == 1) {
@@ -328,7 +345,7 @@ void applyVector(
                                 const double dSx = tx / tLen, dSy = ty / tLen, dSz = tz / tLen;
                                 double dot = dSx * -plx + dSy * -ply + dSz * -plz;
                                 if (dot < -1.0) dot = -1.0; else if (dot > 1.0) dot = 1.0;
-                                float f = static_cast<float>(dot);
+                                auto f = static_cast<float>(dot);
                                 if (!std::isnan(params[6]) &&
                                     static_cast<double>(f) < std::cos(params[6] * M_PI / 180.0)) f = 0.f;
                                 factor = f < 0.f ? 0.f : f;
@@ -368,7 +385,7 @@ void applyVector(
         // Scalar tail.
         for (; x < clipRight; x++) {
             const jdouble userX = userLeft + x * invCanvasScaleX;
-            const float ux = static_cast<float>((userX - originX) / unitSizeX);
+            const auto ux = static_cast<float>((userX - originX) / unitSizeX);
             const float surfaceZ = rowM[x - clipLeft + 1];
             (void) surfaceZ; (void) ux; (void) uy;
             // Reuse the scalar reference for tail pixels via a tiny inline copy:
@@ -395,7 +412,7 @@ void applyVector(
                             const double dSx = tx / tLen, dSy = ty / tLen, dSz = tz / tLen;
                             double dot = dSx * -plx + dSy * -ply + dSz * -plz;
                             if (dot < -1.0) dot = -1.0; else if (dot > 1.0) dot = 1.0;
-                            float f = static_cast<float>(dot);
+                            auto f = static_cast<float>(dot);
                             if (!std::isnan(params[6]) &&
                                 static_cast<double>(f) < std::cos(params[6] * M_PI / 180.0)) f = 0.f;
                             factor = f < 0.f ? 0.f : f;
@@ -451,7 +468,7 @@ void applyVector(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_LightingNative_apply(
         JNIEnv* env, jclass clazz,
-        jintArray jPix, jintArray jOut,
+        const jintArray jPix, const jintArray jOut,
         jint width, jint height,
         jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
         jfloat surfaceScaleNormalized,
@@ -460,17 +477,25 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
         jdouble originX, jdouble originY,
         jdouble unitSizeX, jdouble unitSizeY,
         jfloat canvasScaleX, jfloat canvasScaleY,
-        jint lightType, jboolean specular,
+        jint lightType, const jboolean specular,
         jfloat k, jfloat exponent,
-        jint lightR, jint lightG, jint lightB,
-        jdoubleArray jParams) {
-    auto* pix = static_cast<jint*>(env->GetPrimitiveArrayCritical(jPix, nullptr));
-    if (pix == nullptr) return;
-    auto* out = static_cast<jint*>(env->GetPrimitiveArrayCritical(jOut, nullptr));
+        const jint lightR, const jint lightG, const jint lightB,
+        const jdoubleArray jParams) {
+    // Small array first: no JNI call may occur between a
+    // GetPrimitiveArrayCritical pair, so the params must be fetched
+    // BEFORE entering the critical sections.
     jdouble* params = env->GetDoubleArrayElements(jParams, nullptr);
-    if (out == nullptr || params == nullptr) {
-        if (out != nullptr) env->ReleasePrimitiveArrayCritical(jOut, out, JNI_ABORT);
+    if (params == nullptr) return;
+
+    auto* pix = static_cast<jint*>(env->GetPrimitiveArrayCritical(jPix, nullptr));
+    if (pix == nullptr) {
+        env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
+        return;
+    }
+    auto* out = static_cast<jint*>(env->GetPrimitiveArrayCritical(jOut, nullptr));
+    if (out == nullptr) {
         env->ReleasePrimitiveArrayCritical(jPix, pix, JNI_ABORT);
+        env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
         return;
     }
 
@@ -504,7 +529,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
                     static_cast<float>(lightB), params);
     }
 
-    env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
     env->ReleasePrimitiveArrayCritical(jOut, out, JNI_ABORT);
     env->ReleasePrimitiveArrayCritical(jPix, pix, JNI_ABORT);
+    env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
 }

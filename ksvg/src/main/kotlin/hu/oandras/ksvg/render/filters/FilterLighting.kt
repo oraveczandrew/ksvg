@@ -20,26 +20,26 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.RectF
 import hu.oandras.ksvg.dom.COLOR_WHITE
-import hu.oandras.ksvg.filtering.KotlinKernels
-import hu.oandras.ksvg.filtering.LightingNative
-import hu.oandras.ksvg.utils.blue
-import hu.oandras.ksvg.utils.green
-import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.dom.filter.FeDistantLight
 import hu.oandras.ksvg.dom.filter.FePointLight
 import hu.oandras.ksvg.dom.filter.FeSpotLight
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
 import hu.oandras.ksvg.dom.filter.Lighting
 import hu.oandras.ksvg.dom.style.ColorValue
+import hu.oandras.ksvg.filtering.KotlinKernels
+import hu.oandras.ksvg.filtering.LightingNative
 import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
 import hu.oandras.ksvg.render.FeSpecularLightingRenderNode
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.pool.IntArrayBucket
+import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.clamp
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 
 @SuppressLint("UseKtx")
 context(renderContext: RenderContext)
-private inline fun doLightingFilter(
+private fun doLightingFilter(
     primitive: FilterPrimitive,
     light: Lighting?,
     surfaceScale: Float,
