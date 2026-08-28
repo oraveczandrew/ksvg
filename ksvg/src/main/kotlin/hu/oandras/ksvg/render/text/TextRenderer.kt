@@ -32,6 +32,7 @@ import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextDirection
 import hu.oandras.ksvg.dom.text.TextOrientation
 import hu.oandras.ksvg.dom.text.TextTransform
+import hu.oandras.ksvg.render.DisplayContext
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.TRefRenderNode
@@ -41,7 +42,7 @@ import hu.oandras.ksvg.render.TextPathRenderNode
 import hu.oandras.ksvg.render.TextSequenceNode
 import hu.oandras.ksvg.utils.capitalizeStr
 import hu.oandras.ksvg.utils.forEachElement
-import java.util.*
+import java.util.Locale
 
 internal abstract class TextProcessor {
     @JvmField
@@ -105,7 +106,7 @@ internal abstract class TextProcessor {
         return true
     }
 
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     abstract fun processText(canvas: Canvas, text: String)
 }
 
@@ -141,7 +142,7 @@ internal fun RendererState.getAnchorPosition(): TextAnchor? {
     }
 }
 
-context(renderContext: RenderContext)
+context(renderContext: DisplayContext)
 internal fun calculateTextWidth(children: List<TextNode>, parentState: RendererState): Float {
     var width = 0f
     children.forEachElement { child ->
@@ -161,7 +162,7 @@ internal fun calculateTextWidth(children: List<TextNode>, parentState: RendererS
     return width
 }
 
-context(renderContext: RenderContext)
+context(renderContext: DisplayContext)
 internal fun calculateTextBounds(
     canvas: Canvas,
     children: List<TextNode>,
@@ -210,7 +211,7 @@ internal class TextBoundsCalculator : TextProcessor() {
         return true
     }
 
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     override fun processText(canvas: Canvas, text: String) {
         if (state.style.visibility != false) {
             val rect = Rect()
@@ -240,7 +241,7 @@ internal class TextBoundsCalculator : TextProcessor() {
     }
 
     // Needed for calculateTextBounds calls that pass state
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     fun processText(canvas: Canvas, text: String, state: RendererState) {
         // Wrap state so processText can access it
         // Actually, TextBoundsCalculator seems to be used without an initial state 
@@ -259,7 +260,7 @@ internal open class PlainTextDrawer(
     internal var state: RendererState,
 ) : TextProcessor() {
 
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     override fun processText(canvas: Canvas, text: String) {
         val style = state.style
         if (style.visibility == false) {
@@ -288,7 +289,7 @@ internal open class PlainTextDrawer(
         }
     }
 
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     private fun processTextHorizontal(canvas: Canvas, text: String) {
         val letterspacingAdj = state.style.letterSpacing!!.floatValueInContext() / 2
         val paint = state.fillPaint
@@ -356,7 +357,7 @@ internal open class PlainTextDrawer(
     }
 
     @SuppressLint("UseKtx")
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     private fun processTextVertical(canvas: Canvas, text: String) {
         val orientation = state.style.textOrientation ?: TextOrientation.mixed
 
@@ -400,7 +401,7 @@ internal class PathTextDrawer(
     state: RendererState
 ) : PlainTextDrawer(state) {
 
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     override fun processText(canvas: Canvas, text: String) {
         if (state.style.visibility != false) {
             val transformedText = applyTextTransform(text, state.style.textTransform)
@@ -476,7 +477,7 @@ internal class PlainTextToPath(
         return true
     }
 
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     override fun processText(canvas: Canvas, text: String) {
         // Should not be called without state
     }
@@ -508,7 +509,7 @@ internal class PlainTextToPath(
     }
 }
 
-context(renderContext: RenderContext)
+context(renderContext: DisplayContext)
 internal fun calculateBaselineOffset(paint: Paint, style: Style): Float {
     val baseline = style.alignmentBaseline ?: style.dominantBaseline
     var offset = 0f

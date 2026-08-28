@@ -30,7 +30,7 @@ import hu.oandras.ksvg.dom.style.SvgPaint
 import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
 
-context(renderContext: RenderContext)
+context(renderContext: DisplayContext)
 internal fun updateStyle(
     state: RendererState,
     builder: Style.Builder,

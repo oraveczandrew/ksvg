@@ -17,7 +17,7 @@
 
 package hu.oandras.ksvg.css
 
-import hu.oandras.ksvg.render.RenderContext
+import hu.oandras.ksvg.render.DisplayContext
 import kotlin.math.hypot
 
 private const val SQRT2 = 1.414213562373095
@@ -39,7 +39,7 @@ internal data class CSSLength(
     }
 
     // Convert length to user units for a horizontally-related context.
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     fun floatValueXInContext(): Float {
         return when (unit) {
             CssUnit.em -> value * renderContext.currentFontSize
@@ -60,7 +60,7 @@ internal data class CSSLength(
     }
 
     // Convert length to user units for a vertically-related context.
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     fun floatValueYInContext(): Float {
         return if (unit == CssUnit.percent) {
             val viewPortUser = renderContext.effectiveViewPortInUserUnits
@@ -73,7 +73,7 @@ internal data class CSSLength(
 
     // Convert length to user units for a context that is not orientation-specific.
     // For example, stroke width.
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     fun floatValueInContext(): Float {
         return if (unit == CssUnit.percent) {
             val viewPortUser = renderContext.effectiveViewPortInUserUnits
@@ -92,7 +92,7 @@ internal data class CSSLength(
 
     // Convert length to user units for a context that is not orientation-specific.
     // For percentage values, use the given 'max' parameter to represent the 100% value.
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     fun floatValueInContext(max: Float): Float {
         return if (unit == CssUnit.percent) {
             value * max / 100f

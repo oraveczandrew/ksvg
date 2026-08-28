@@ -343,11 +343,10 @@ internal class RenderScene private constructor(
 private class SceneUpdateContext(
     pools: PoolOwner,
     dpi: Float,
-) : hu.oandras.ksvg.render.animation.AnimationContext, PoolOwner by pools {
+) : DisplayContext, PoolOwner by pools {
     override val dPI: Float = dpi
     override val currentFontSize: Float = DEFAULT_TEXT_SIZE
     override val currentFontXHeight: Float = currentFontSize / 2f
-    override val animationTimeMs: Long = 0L // no animation state during viewport updates
     var walkViewPort: Box? = null
     var walkViewBox: Box? = null
     override val effectiveViewPortInUserUnits: Box

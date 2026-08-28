@@ -58,13 +58,17 @@ internal open class FilterPipelineImpl31 internal constructor(
 ) : FilterBackend {
 
     /** Effect chain plus the transparent recording pad it requires. */
-    internal open class Chain internal constructor(
+    internal class Chain internal constructor(
         @JvmField internal val effect: RenderEffect,
         @JvmField internal val padX: Int,
         @JvmField internal val padY: Int,
         @JvmField internal val scaleX: Float,
         @JvmField internal val scaleY: Float,
-    )
+    ) {
+        override fun toString(): String {
+            return "Chain(effect=$effect, padX=$padX, padY=$padY, scaleX=$scaleX, scaleY=$scaleY)"
+        }
+    }
 
     // Caller-owned mutable state; a backend instance is owned by a single
     // render operation and never shared between threads.
@@ -114,41 +118,58 @@ internal open class FilterPipelineImpl31 internal constructor(
         var first = true
         var padX = 0
         var padY = 0
+        val resultEffects = mutableMapOf<String, RenderEffect>()
 
         filterNode.primitives.forEachElement { primitive ->
+            val resultName = when (primitive) {
+                is FeColorMatrixRenderNode -> primitive.sourceElement.result
+                is FeGaussianBlurRenderNode -> primitive.sourceElement.result
+                is FeOffsetRenderNode -> primitive.sourceElement.result
+                else -> null
+            }
+
+            val input = when (primitive) {
+                is FeColorMatrixRenderNode -> primitive.sourceElement.`in`
+                is FeGaussianBlurRenderNode -> primitive.sourceElement.`in`
+                is FeOffsetRenderNode -> primitive.sourceElement.`in`
+                else -> null
+            }
+
+            val inputEffect = resolveEffect(input, previousResult, first, chain, resultEffects) ?: return null
+
             val effect = when (primitive) {
                 is FeColorMatrixRenderNode -> {
                     val element = primitive.sourceElement
-                    checkLinearInput(element.`in`, previousResult, first) ?: return null
-                    previousResult = element.result
-                    first = false
-                    RenderEffect.createColorFilterEffect(
-                        android.graphics.ColorMatrixColorFilter(
-                            buildColorMatrix(element.type, element.values)
-                        )
+                    val colorFilter = android.graphics.ColorMatrixColorFilter(
+                        buildColorMatrix(element.type, element.values)
                     )
+                    if (inputEffect == IDENTITY_EFFECT) {
+                        RenderEffect.createColorFilterEffect(colorFilter)
+                    } else {
+                        RenderEffect.createColorFilterEffect(colorFilter, inputEffect)
+                    }
                 }
                 is FeGaussianBlurRenderNode -> {
-                    checkLinearInput(primitive.sourceElement.`in`, previousResult, first) ?: return null
-                    previousResult = primitive.sourceElement.result
-                    first = false
                     val sigmaX = primitive.stdDeviationX * scaleX
                     val sigmaY = primitive.stdDeviationY * scaleY
                     if (sigmaX <= 0f && sigmaY <= 0f) {
-                        null // matches the CPU path: identity when both sigmas are zero
+                        inputEffect
                     } else {
                         // Transparent pad so CLAMP reads transparent black,
                         // matching the CPU kernel's pedestal (3 sigma rule).
                         padX = maxOf(padX, kotlin.math.ceil(sigmaX * 3f).toInt())
                         padY = maxOf(padY, kotlin.math.ceil(sigmaY * 3f).toInt())
-                        RenderEffect.createBlurEffect(sigmaX, sigmaY,
-                            android.graphics.Shader.TileMode.CLAMP)
+                        
+                        if (inputEffect == IDENTITY_EFFECT) {
+                            RenderEffect.createBlurEffect(sigmaX, sigmaY,
+                                android.graphics.Shader.TileMode.CLAMP)
+                        } else {
+                            RenderEffect.createBlurEffect(sigmaX, sigmaY, inputEffect,
+                                android.graphics.Shader.TileMode.CLAMP)
+                        }
                     }
                 }
                 is FeOffsetRenderNode -> {
-                    checkLinearInput(primitive.sourceElement.`in`, previousResult, first) ?: return null
-                    previousResult = primitive.sourceElement.result
-                    first = false
                     val dx = filterPrimitiveLengthX(
                         length = primitive.sourceElement.dx,
                         primitiveUnitsAreUser = true,
@@ -161,14 +182,24 @@ internal open class FilterPipelineImpl31 internal constructor(
                         primitiveScaleY = scaleY,
                         canvasScaleY = 1f
                     )
-                    if (dx == 0f && dy == 0f) null else RenderEffect.createOffsetEffect(dx, dy)
+                    if (dx == 0f && dy == 0f) {
+                        inputEffect
+                    } else {
+                        if (inputEffect == IDENTITY_EFFECT) {
+                            RenderEffect.createOffsetEffect(dx, dy)
+                        } else {
+                            RenderEffect.createOffsetEffect(dx, dy, inputEffect)
+                        }
+                    }
                 }
                 else -> return null
             }
 
-            if (effect != null) {
-                val previous = chain
-                chain = if (previous == null) effect else RenderEffect.createChainEffect(effect, previous)
+            chain = effect
+            previousResult = resultName
+            first = false
+            if (resultName != null) {
+                resultEffects[resultName] = effect
             }
         }
 
@@ -202,6 +233,7 @@ internal open class FilterPipelineImpl31 internal constructor(
         val contentVersion = filterNode.contentVersion
         var gpuNode = filterNode.gpuNode
         val valid = gpuNode != null &&
+                gpuNode.hasDisplayList() &&
                 filterNode.gpuSourceVersion == contentVersion &&
                 filterNode.gpuFilterVersion == filterNode.version &&
                 filterNode.gpuScaleX == sx && filterNode.gpuScaleY == sy &&
@@ -221,6 +253,7 @@ internal open class FilterPipelineImpl31 internal constructor(
             filterNode.gpuHeight = height
             filterNode.gpuPadX = padX
             filterNode.gpuPadY = padY
+            gpuNode.setPosition(0, 0, width + 2 * padX, height + 2 * padY)
             recordingActive = true
             return recording
         }
@@ -255,10 +288,9 @@ internal open class FilterPipelineImpl31 internal constructor(
         canvas.withSave {
             @Suppress("DEPRECATION")
             canvas.setMatrix(null)
-            canvas.translate(-chain.padX.toFloat(), -chain.padY.toFloat())
+            canvas.translate(deviceRegion.left - chain.padX, deviceRegion.top - chain.padY)
             canvas.drawRenderNode(gpuNode)
         }
-        gpuNode.setRenderEffect(null)
     }
 
     protected open fun obtainChain(
@@ -279,17 +311,38 @@ internal open class FilterPipelineImpl31 internal constructor(
             ) 
         }
 
-    protected fun checkLinearInput(input: String?, previousResult: String?, first: Boolean): Unit? {
-        if (first) {
-            // First input may be implicit or the explicit source graphic.
-            if (input != null && input != "SourceGraphic") return null
-        } else {
-            if (input == null || input != previousResult) return null
+    protected fun resolveEffect(
+        input: String?,
+        previousResult: String?,
+        first: Boolean,
+        currentChain: RenderEffect?,
+        resultEffects: Map<String, RenderEffect>
+    ): RenderEffect? {
+        if (input == null) {
+            return if (first) IDENTITY_EFFECT else currentChain
         }
-        return Unit
+
+        return when (input) {
+            "SourceGraphic" -> IDENTITY_EFFECT
+            "SourceAlpha" -> SOURCE_ALPHA_EFFECT
+            previousResult -> currentChain
+            else -> resultEffects[input]
+        }
     }
 
     override fun release() {
         recordingActive = false
+    }
+
+    companion object {
+        internal val IDENTITY_EFFECT = RenderEffect.createOffsetEffect(0f, 0f)
+        internal val SOURCE_ALPHA_EFFECT = RenderEffect.createColorFilterEffect(
+            android.graphics.ColorMatrixColorFilter(floatArrayOf(
+                0f, 0f, 0f, 0f, 0f,
+                0f, 0f, 0f, 0f, 0f,
+                0f, 0f, 0f, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f
+            ))
+        )
     }
 }

@@ -110,7 +110,6 @@ import hu.oandras.ksvg.render.animation.AnimateFloatNode
 import hu.oandras.ksvg.render.animation.AnimateMotionNode
 import hu.oandras.ksvg.render.animation.AnimatePathNode
 import hu.oandras.ksvg.render.animation.AnimateTransformNode
-import hu.oandras.ksvg.render.animation.AnimationContext
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.animation.computePacedKeyTimesColor
 import hu.oandras.ksvg.render.animation.computePacedKeyTimesDashArray
@@ -143,7 +142,8 @@ import hu.oandras.ksvg.utils.optimizeReadOnlyList
 import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.takeIfNonZeroOrElse
 import hu.oandras.ksvg.utils.textXMLSpaceTransform
-import java.util.*
+import java.util.Locale
+import java.util.Stack
 import kotlin.math.max
 
 internal class RenderTreeBuilder(
@@ -151,7 +151,7 @@ internal class RenderTreeBuilder(
     override val dPI: Float,
     private val externalFileResolver: ExternalFileResolver?,
     pools: PoolOwner,
-) : AnimationContext, PoolOwner by pools {
+) : DisplayContext, PoolOwner by pools {
 
     private var state: RendererState = RendererState()
     private val stateStack: Stack<RendererState> = Stack()
@@ -169,9 +169,6 @@ internal class RenderTreeBuilder(
     private val buildingIds: ArraySet<String> = ArraySet()
 
     private var ruleMatchContext: CSSParser.RuleMatchContext? = null
-
-    override val animationTimeMs: Long
-        get() = document.animationTimeMs
 
     override val currentFontSize: Float
         get() = state.fillConfig.textSize

@@ -62,14 +62,14 @@ internal fun resolveRootViewOverrides(document: SVGImpl, options: RenderOptionsI
  * Builds a viewport Box from x/y/width/height lengths resolved in the current
  * [RenderContext]; missing width/height fall back to the effective viewport.
  */
-context(renderContext: RenderContext)
+context(displayContext: DisplayContext)
 internal fun makeViewportInContext(
     x: CSSLength?,
     y: CSSLength?,
     width: CSSLength?,
     height: CSSLength?
 ): Box {
-    val viewPortUser = renderContext.effectiveViewPortInUserUnits
+    val viewPortUser = displayContext.effectiveViewPortInUserUnits
     return Box(
         minX = x?.floatValueXInContext() ?: 0f,
         minY = y?.floatValueYInContext() ?: 0f,

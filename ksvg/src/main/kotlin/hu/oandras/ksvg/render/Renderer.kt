@@ -76,11 +76,11 @@ import hu.oandras.ksvg.render.animation.updateAnimations
 import hu.oandras.ksvg.render.filters.doFeGaussianBlurFilter
 import hu.oandras.ksvg.render.filters.doFeOffsetFilter
 import hu.oandras.ksvg.render.filters.getFilterInput
-import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
-import hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31
-import hu.oandras.ksvg.render.filters.pipeline.FilterPipeline
-import hu.oandras.ksvg.render.filters.pipeline.SoftwareFilterBackend
 import hu.oandras.ksvg.render.filters.luminanceToAlphaFloatArray
+import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
+import hu.oandras.ksvg.render.filters.pipeline.FilterPipeline
+import hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31
+import hu.oandras.ksvg.render.filters.pipeline.SoftwareFilterBackend
 import hu.oandras.ksvg.render.pool.Pool
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.render.pool.withPooledObject
@@ -95,7 +95,7 @@ import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.withAlpha
-import java.util.*
+import java.util.Stack
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -1125,8 +1125,14 @@ internal class Renderer internal constructor(
                     // Specific check for Impl31/33 linear chains + attributes.
                     val supported = when (gpu) {
                         is FilterPipelineImpl31 -> gpu.tryBuildChain(
-                            filterNode, pScaleX, pScaleY, 
-                            filterRegion, deviceRegion, sx, sy, boundingBox
+                            filterNode = filterNode,
+                            scaleX = pScaleX,
+                            scaleY = pScaleY,
+                            filterRegion = filterRegion,
+                            deviceRegion = deviceRegion,
+                            sx = sx,
+                            sy = sy,
+                            boundingBox = boundingBox
                         ) != null
                         else -> false
                     }
@@ -1138,6 +1144,25 @@ internal class Renderer internal constructor(
         }
 
         return softwareBackend ?: FilterPipeline.createSoftware(this).also { softwareBackend = it }
+    }
+
+    override fun resolveFloodColor(
+        primitiveNode: FilterPrimitiveRenderNode<*>,
+        baseStyle: Style
+    ): Int {
+        return styleBuilderPool.withPooledObject { builder ->
+            builder.reset(baseStyle)
+            updateStyleForElement(state, builder, primitiveNode.sourceElement, primitiveNode.animationNodes)
+            val floodColor = builder.floodColor
+            val floodOpacity = builder.floodOpacity
+            val colorInt = when (floodColor) {
+                is ColorValue -> floodColor.value
+                is CurrentColor -> builder.color?.value ?: COLOR_BLACK
+                else -> COLOR_BLACK
+            }
+            val alpha = clamp255(floodOpacity * 255f)
+            if (alpha == 0) 0 else colorInt.withAlpha(alpha)
+        }
     }
 
     internal fun doFeFloodFilter(
@@ -2394,7 +2419,7 @@ internal class Renderer internal constructor(
             }
         }
 
-        internal fun setBlendMode(state: RendererState, paint: Paint): Unit {
+        internal fun setBlendMode(state: RendererState, paint: Paint) {
             val mixBlendMode = state.style.mixBlendMode ?: CSSBlendMode.normal
 
             debug {

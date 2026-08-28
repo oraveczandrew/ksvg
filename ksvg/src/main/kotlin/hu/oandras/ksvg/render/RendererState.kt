@@ -205,7 +205,7 @@ internal class RendererState private constructor(
         return "RendererState(style=$style, hasFill=$hasFill, hasStroke=$hasStroke, viewPort=$viewPort, viewBox=$viewBox, spacePreserve=$spacePreserve, fontFeatureSet=$fontFeatureSet, fontVariationSet=$fontVariationSet)"
     }
 
-    context(renderContext: RenderContext)
+    context(renderContext: DisplayContext)
     internal fun updateStrokeDash(
         strokeDashArray: Array<CSSLength>? = style.strokeDashArray,
         strokeDashOffset: CSSLength? = style.strokeDashOffset,

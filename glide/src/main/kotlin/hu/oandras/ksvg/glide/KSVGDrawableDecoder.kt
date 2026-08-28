@@ -52,9 +52,11 @@ public class KSVGDrawableDecoder : ResourceDecoder<InputStream, Drawable> {
                 svg.toDrawable()
             }
 
-            val canvas = Canvas()
-            drawable.setBounds(0, 0, width, height)
-            drawable.draw(canvas)
+            if (false) {
+                val canvas = Canvas()
+                drawable.setBounds(0, 0, width, height)
+                drawable.draw(canvas)
+            }
 
             return KSVGDrawableResource(drawable)
         } catch (e: KSVGParseException) {

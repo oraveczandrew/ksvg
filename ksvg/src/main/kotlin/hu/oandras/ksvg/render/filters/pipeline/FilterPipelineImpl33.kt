@@ -19,6 +19,7 @@ package hu.oandras.ksvg.render.filters.pipeline
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.BlendMode
+import android.graphics.PorterDuffColorFilter
 import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
@@ -42,21 +43,27 @@ import hu.oandras.ksvg.render.FeCompositeRenderNode
 import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
 import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
 import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
+import hu.oandras.ksvg.render.FeDropShadowRenderNode
+import hu.oandras.ksvg.render.FeFloodRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
+import hu.oandras.ksvg.render.FeMergeRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.FeSpecularLightingRenderNode
+import hu.oandras.ksvg.render.FeTileRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.FilterPrimitiveRenderNode
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.RenderContext
+import hu.oandras.ksvg.render.calculatePrimitiveRegion
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.filters.buildColorMatrix
+import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.red
-import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
@@ -79,7 +86,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                 FilterPrimitiveSet.FLAG_DISPLACEMENT_MAP or
                 FilterPrimitiveSet.FLAG_TURBULENCE or
                 FilterPrimitiveSet.FLAG_BLEND or
-                FilterPrimitiveSet.FLAG_COMPOSITE
+                FilterPrimitiveSet.FLAG_COMPOSITE or
+                FilterPrimitiveSet.FLAG_FLOOD or
+                FilterPrimitiveSet.FLAG_MERGE or
+                FilterPrimitiveSet.FLAG_TILE or
+                FilterPrimitiveSet.FLAG_DROP_SHADOW
         return primitives.bits != 0 && (primitives.bits and supportedMask.inv()) == 0
     }
 
@@ -108,148 +119,290 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         var first = true
         var padX = 0
         var padY = 0
+        val resultShaders = mutableMapOf<String, RuntimeShader>()
+        val resultEffects = mutableMapOf<String, RenderEffect>()
 
         filterNode.primitives.forEachElement { primitive ->
+            val resultName = when (primitive) {
+                is FeOffsetRenderNode -> primitive.sourceElement.result
+                is FeGaussianBlurRenderNode -> primitive.sourceElement.result
+                is FeMorphologyRenderNode -> primitive.sourceElement.result
+                is FeColorMatrixRenderNode -> primitive.sourceElement.result
+                is FeDiffuseLightingRenderNode -> primitive.sourceElement.result
+                is FeSpecularLightingRenderNode -> primitive.sourceElement.result
+                is FeComponentTransferRenderNode -> primitive.sourceElement.result
+                is FeConvolveMatrixRenderNode -> primitive.sourceElement.result
+                is FeBlendRenderNode -> primitive.sourceElement.result
+                is FeCompositeRenderNode -> primitive.sourceElement.result
+                is FeDisplacementMapRenderNode -> primitive.sourceElement.result
+                is FeTurbulenceRenderNode -> primitive.sourceElement.result
+                is FeFloodRenderNode -> primitive.sourceElement.result
+                is FeMergeRenderNode -> primitive.sourceElement.result
+                else -> null
+            }
+
+            val input = when (primitive) {
+                is FeOffsetRenderNode -> primitive.sourceElement.`in`
+                is FeGaussianBlurRenderNode -> primitive.sourceElement.`in`
+                is FeMorphologyRenderNode -> primitive.sourceElement.`in`
+                is FeColorMatrixRenderNode -> primitive.sourceElement.`in`
+                is FeDiffuseLightingRenderNode -> primitive.sourceElement.`in`
+                is FeSpecularLightingRenderNode -> primitive.sourceElement.`in`
+                is FeComponentTransferRenderNode -> primitive.sourceElement.`in`
+                is FeConvolveMatrixRenderNode -> primitive.sourceElement.`in`
+                is FeBlendRenderNode -> primitive.sourceElement.`in`
+                is FeCompositeRenderNode -> primitive.sourceElement.`in`
+                is FeDisplacementMapRenderNode -> primitive.sourceElement.`in`
+                is FeFloodRenderNode -> primitive.sourceElement.`in`
+                else -> null
+            }
+
+            val inputEffect = resolveEffect(input, previousResult, first, chain, resultEffects) ?: return null
+
             val effect = when (primitive) {
                 is FeOffsetRenderNode -> {
                     val offset = primitive.sourceElement
-                    checkLinearInput(offset.`in`, previousResult, first) ?: return null
-                    previousResult = offset.result
-                    first = false
-                    RenderEffect.createOffsetEffect(
-                        offset.dx?.floatValueInContext() ?: 0f,
-                        offset.dy?.floatValueInContext() ?: 0f
-                    )
+                    val dx = offset.dx?.floatValueInContext() ?: 0f
+                    val dy = offset.dy?.floatValueInContext() ?: 0f
+                    if (dx == 0f && dy == 0f) {
+                        inputEffect
+                    } else {
+                        if (inputEffect == IDENTITY_EFFECT) {
+                            RenderEffect.createOffsetEffect(dx, dy)
+                        } else {
+                            RenderEffect.createOffsetEffect(dx, dy, inputEffect)
+                        }
+                    }
                 }
                 is FeGaussianBlurRenderNode -> {
-                    val blur = primitive.sourceElement
-                    checkLinearInput(blur.`in`, previousResult, first) ?: return null
-                    previousResult = blur.result
-                    first = false
                     val sigmaX = primitive.stdDeviationX * scaleX
                     val sigmaY = primitive.stdDeviationY * scaleY
                     if (sigmaX <= 0f && sigmaY <= 0f) {
-                        null
+                        inputEffect
                     } else {
-                        padX = max(padX, ceil(sigmaX * 3f).toInt())
-                        padY = max(padY, ceil(sigmaY * 3f).toInt())
-                        RenderEffect.createBlurEffect(sigmaX, sigmaY, Shader.TileMode.CLAMP)
+                        padX = max(padX, (sigmaX * 3f).ceilToInt())
+                        padY = max(padY, (sigmaY * 3f).ceilToInt())
+                        if (inputEffect == IDENTITY_EFFECT) {
+                            RenderEffect.createBlurEffect(sigmaX, sigmaY, Shader.TileMode.CLAMP)
+                        } else {
+                            RenderEffect.createBlurEffect(sigmaX, sigmaY, inputEffect, Shader.TileMode.CLAMP)
+                        }
                     }
                 }
                 is FeMorphologyRenderNode -> {
                     val morph = primitive.sourceElement
-                    checkLinearInput(morph.`in`, previousResult, first) ?: return null
-                    previousResult = morph.result
-                    first = false
                     val radX = morph.radiusX * scaleX
                     val radY = morph.radiusY * scaleY
+                    padX = max(padX, radX.ceilToInt())
+                    padY = max(padY, radY.ceilToInt())
                     val shader = RuntimeShader(MORPHOLOGY_SHADER)
                     shader.setFloatUniform("uRadius", radX, radY)
                     shader.setIntUniform("uErode", if (primitive.erode) 1 else 0)
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").let {
+                        if (inputEffect == IDENTITY_EFFECT) it else RenderEffect.createChainEffect(it, inputEffect)
+                    }
                 }
                 is FeColorMatrixRenderNode -> {
                     val colorMatrix = primitive.sourceElement
-                    checkLinearInput(colorMatrix.`in`, previousResult, first) ?: return null
-                    previousResult = colorMatrix.result
-                    first = false
                     val matrix = buildColorMatrix(colorMatrix.type, colorMatrix.values)
                     val shader = RuntimeShader(COLOR_MATRIX_SHADER)
                     shader.setFloatUniform("uMatrix", matrix.array)
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").let {
+                        if (inputEffect == IDENTITY_EFFECT) it else RenderEffect.createChainEffect(it, inputEffect)
+                    }
                 }
                 is FeDiffuseLightingRenderNode -> {
-                    val diff = primitive.sourceElement
-                    checkLinearInput(diff.`in`, previousResult, first) ?: return null
-                    previousResult = diff.result
-                    first = false
                     val shader = buildLightingShader(primitive, false) ?: return null
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").let {
+                        if (inputEffect == IDENTITY_EFFECT) it else RenderEffect.createChainEffect(it, inputEffect)
+                    }
                 }
                 is FeSpecularLightingRenderNode -> {
-                    val spec = primitive.sourceElement
-                    checkLinearInput(spec.`in`, previousResult, first) ?: return null
-                    previousResult = spec.result
-                    first = false
                     val shader = buildLightingShader(primitive, true) ?: return null
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").let {
+                        if (inputEffect == IDENTITY_EFFECT) it else RenderEffect.createChainEffect(it, inputEffect)
+                    }
                 }
                 is FeComponentTransferRenderNode -> {
-                    val ct = primitive.sourceElement
-                    checkLinearInput(ct.`in`, previousResult, first) ?: return null
-                    previousResult = ct.result
-                    first = false
                     val shader = buildComponentTransferShader(primitive)
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").let {
+                        if (inputEffect == IDENTITY_EFFECT) it else RenderEffect.createChainEffect(it, inputEffect)
+                    }
                 }
                 is FeConvolveMatrixRenderNode -> {
-                    val conv = primitive.sourceElement
-                    checkLinearInput(conv.`in`, previousResult, first) ?: return null
-                    previousResult = conv.result
-                    first = false
                     val shader = buildConvolveMatrixShader(primitive) ?: return null
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").let {
+                        if (inputEffect == IDENTITY_EFFECT) it else RenderEffect.createChainEffect(it, inputEffect)
+                    }
                 }
                 is FeBlendRenderNode -> {
                     val blend = primitive.sourceElement
-                    // We only support feBlend if it stays in a linear chain (in=previous, in2=SourceGraphic)
-                    // or if it's the first primitive (in=SourceGraphic, in2=SourceGraphic)
-                    checkLinearInput(blend.`in`, previousResult, first) ?: return null
-                    if (primitive.in2 != null && primitive.in2 != "SourceGraphic") return null
-                    
+                    val in2Effect = resolveEffect(blend.in2, previousResult, first, chain, resultEffects) ?: return null
                     val mode = primitive.mode.toBlendMode() ?: return null
-                    val sourceEffect = RenderEffect.createOffsetEffect(0f, 0f)
                     
-                    // src = in (previous result or source), dst = in2 (source)
-                    val effect = RenderEffect.createBlendModeEffect(sourceEffect, chain ?: sourceEffect, mode)
-                    
-                    previousResult = blend.result
-                    first = false
-                    effect
+                    RenderEffect.createBlendModeEffect(
+                        if (in2Effect == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else in2Effect,
+                        if (inputEffect == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else inputEffect,
+                        mode
+                    )
                 }
                 is FeCompositeRenderNode -> {
                     val composite = primitive.sourceElement
-                    checkLinearInput(composite.`in`, previousResult, first) ?: return null
-                    // We only support feComposite if in2 is SourceGraphic
-                    if (composite.in2 != null && composite.in2 != "SourceGraphic") return null
+                    val in2Effect = resolveEffect(composite.in2, previousResult, first, chain, resultEffects) ?: return null
                     
                     if (composite.operator == FeCompositeOperator.arithmetic) {
-                        // Arithmetic needs two dynamic inputs in a RuntimeShader, which RenderEffect doesn't 
-                        // support easily. Fall back to software for now.
-                        return null
+                        if (composite.k1 == 0f && composite.k2 == 1f && composite.k3 == 1f && composite.k4 == 0f) {
+                            RenderEffect.createBlendModeEffect(
+                                in2Effect,
+                                inputEffect,
+                                BlendMode.PLUS
+                            )
+                        } else {
+                            val in2Shader = composite.in2?.let { resultShaders[it] }
+                            if (in2Shader != null) {
+                                val shader = RuntimeShader(COMPOSITE_SHADER)
+                                shader.setInputShader("uIn2", in2Shader)
+                                shader.setIntUniform("uOperator", 5)
+                                shader.setFloatUniform("uK", floatArrayOf(composite.k1, composite.k2, composite.k3, composite.k4))
+                                
+                                val effect = RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                                resultShaders[resultName ?: ""] = shader
+                                if (inputEffect == IDENTITY_EFFECT) effect else RenderEffect.createChainEffect(effect, inputEffect)
+                            } else {
+                                return null
+                            }
+                        }
+                    } else {
+                        val mode = composite.operator.toBlendMode() ?: return null
+                        RenderEffect.createBlendModeEffect(
+                            in2Effect,
+                            inputEffect,
+                            mode
+                        )
                     }
-                    
-                    val mode = composite.operator.toBlendMode() ?: return null
-                    val sourceEffect = RenderEffect.createOffsetEffect(0f, 0f)
-                    
-                    // src = in (previous result or source), dst = in2 (source)
-                    val effect = RenderEffect.createBlendModeEffect(sourceEffect, chain ?: sourceEffect, mode)
-                    
-                    previousResult = composite.result
-                    first = false
-                    effect
                 }
                 is FeDisplacementMapRenderNode -> {
                     val disp = primitive.sourceElement
-                    checkLinearInput(disp.`in`, previousResult, first) ?: return null
-                    previousResult = disp.result
-                    first = false
+                    val mapShader = resultShaders[disp.in2] ?: return null
                     val shader = buildDisplacementMapShader(primitive, scaleX, scaleY)
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    shader.setInputShader("uMap", mapShader)
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").let {
+                        if (inputEffect == IDENTITY_EFFECT) it else RenderEffect.createChainEffect(it, inputEffect)
+                    }
                 }
                 is FeTurbulenceRenderNode -> {
-                    val turb = primitive.sourceElement
-                    previousResult = turb.result
-                    first = false
-                    val shader = buildTurbulenceShader(primitive, scaleX, scaleY, filterRegion, sx, sy)
+                    val shader = buildTurbulenceShader(primitive, scaleX, scaleY, filterRegion, sx, sy, padX, padY)
+                    resultShaders[resultName ?: ""] = shader
                     RenderEffect.createRuntimeShaderEffect(shader, "in_source")
+                }
+                is FeFloodRenderNode -> {
+                    val color = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
+                    val shader = RuntimeShader(FLOOD_SHADER)
+                    shader.setColorUniform("uColor", color)
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                }
+                is FeMergeRenderNode -> {
+                    var mergeEffect: RenderEffect? = null
+                    primitive.mergeNodes.forEach { inputName ->
+                        val inputNodeEffect = resolveEffect(inputName, previousResult, first, chain, resultEffects) ?: return null
+                        mergeEffect = if (mergeEffect == null) {
+                            inputNodeEffect
+                        } else {
+                            RenderEffect.createBlendModeEffect(
+                                inputNodeEffect,
+                                mergeEffect,
+                                BlendMode.SRC_OVER
+                            )
+                        }
+                    }
+                    mergeEffect
+                }
+                is FeTileRenderNode -> {
+                    val tile = primitive.sourceElement
+                    val tileRect = renderContext.rectFPool.withPooledObject { rect ->
+                        calculatePrimitiveRegion(
+                            primitive = tile,
+                            filterRegion = filterRegion,
+                            unitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            originalObjBBox = boundingBox,
+                            outRect = rect
+                        )
+                        // Transform user-space tile region to device-pixel space relative to the deviceRegion
+                        floatArrayOf(
+                            (rect.left - filterRegion.left) * sx + padX,
+                            (rect.top - filterRegion.top) * sy + padY,
+                            (rect.right - filterRegion.left) * sx + padX,
+                            (rect.bottom - filterRegion.top) * sy + padY
+                        )
+                    }
+                    
+                    val shader = RuntimeShader(TILE_SHADER)
+                    shader.setFloatUniform("uRect", tileRect)
+                    shader.setFloatUniform("uOffset", deviceRegion.left - padX, deviceRegion.top - padY)
+                    resultShaders[resultName ?: ""] = shader
+                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").let {
+                        if (inputEffect == IDENTITY_EFFECT) it else RenderEffect.createChainEffect(it, inputEffect)
+                    }
+                }
+                is FeDropShadowRenderNode -> {
+                    val alphaEffect = if (inputEffect == IDENTITY_EFFECT) {
+                        SOURCE_ALPHA_EFFECT
+                    } else {
+                        RenderEffect.createColorFilterEffect(
+                            android.graphics.ColorMatrixColorFilter(floatArrayOf(
+                                0f, 0f, 0f, 0f, 0f,
+                                0f, 0f, 0f, 0f, 0f,
+                                0f, 0f, 0f, 0f, 0f,
+                                0f, 0f, 0f, 1f, 0f
+                            )),
+                            inputEffect
+                        )
+                    }
+
+                    val sigmaX = primitive.blurNode.stdDeviationX * scaleX
+                    val sigmaY = primitive.blurNode.stdDeviationY * scaleY
+                    val blurredEffect = if (sigmaX > 0f || sigmaY > 0f) {
+                        padX = max(padX, (sigmaX * 3f).ceilToInt())
+                        padY = max(padY, (sigmaY * 3f).ceilToInt())
+                        RenderEffect.createBlurEffect(sigmaX, sigmaY, alphaEffect, Shader.TileMode.CLAMP)
+                    } else {
+                        alphaEffect
+                    }
+
+                    val dx = primitive.offsetNode.dx * scaleX
+                    val dy = primitive.offsetNode.dy * scaleY
+                    val offsetEffect = RenderEffect.createOffsetEffect(dx, dy, blurredEffect)
+
+                    val floodColor = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
+                    val coloredShadowEffect = RenderEffect.createColorFilterEffect(
+                        PorterDuffColorFilter(floodColor, android.graphics.PorterDuff.Mode.SRC_IN),
+                        offsetEffect
+                    )
+
+                    RenderEffect.createBlendModeEffect(
+                        inputEffect,
+                        coloredShadowEffect,
+                        BlendMode.SRC_OVER
+                    )
                 }
                 else -> return null
             }
 
-            if (effect != null) {
-                val previous = chain
-                chain = if (previous == null) effect else RenderEffect.createChainEffect(effect, previous)
+            chain = effect
+            previousResult = resultName
+            first = false
+            if (resultName != null) {
+                if (effect != null) {
+                    resultEffects[resultName] = effect
+                }
             }
         }
 
@@ -378,7 +531,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         pScaleY: Float,
         filterRegion: RectF,
         canvasScaleX: Float,
-        canvasScaleY: Float
+        canvasScaleY: Float,
+        padX: Int,
+        padY: Int
     ): RuntimeShader {
         val shader = RuntimeShader(TURBULENCE_SHADER)
         val element = node.sourceElement
@@ -391,10 +546,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         shader.setIntUniform("uIsFractal", if (element.type == FeTurbulenceType.fractalNoise) 1 else 0)
         shader.setFloatUniform("uTilePeriod", 0f, 0f) // Simplified
         shader.setFloatUniform("uOrigin", filterRegion.left, filterRegion.top)
-        shader.setFloatUniform("uUnitSize", 1f, 1f)
-        shader.setFloatUniform("uUserLeftTop", 0f, 0f)
+        shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
         shader.setFloatUniform("uInvCanvasScale", 1f / canvasScaleX, 1f / canvasScaleY)
-        shader.setFloatUniform("uPad", 0f, 0f)
+        shader.setFloatUniform("uOffset", filterRegion.left * canvasScaleX - padX, filterRegion.top * canvasScaleY - padY)
 
         val lattice = obtainLatticeBitmap(node)
         shader.setInputShader("uLattice", BitmapShader(lattice, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
@@ -504,15 +658,17 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                 
                 float dotNL = max(dot(n, l), 0.0);
                 float3 color;
+                float a = 1.0;
                 if (uIsSpecular == 0) {
                     color = uLightColor * uConstant * dotNL;
                 } else {
                     float3 v = float3(0.0, 0.0, 1.0);
                     float3 h = normalize(l + v);
                     color = uLightColor * uConstant * pow(max(dot(n, h), 0.0), uExponent);
+                    a = max(max(color.r, color.g), color.b);
                 }
                 
-                return half4(color, 1.0);
+                return half4(color, a);
             }
         """
 
@@ -553,21 +709,44 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             uniform shader uInput;
             uniform shader uIn2;
             uniform int uOperator;
-            uniform float2 uK;
-            uniform float2 uK34;
+            uniform float4 uK;
             half4 main(float2 fragCoord) {
-                float4 src = uIn2.eval(fragCoord);
-                float4 dst = uInput.eval(fragCoord);
+                float4 src = uInput.eval(fragCoord);
+                float4 dst = uIn2.eval(fragCoord);
                 if (uOperator == 0) return half4(src + dst * (1.0 - src.a));
                 if (uOperator == 1) return half4(src * dst.a);
                 if (uOperator == 2) return half4(src * (1.0 - dst.a));
                 if (uOperator == 3) return half4(src * dst.a + dst * (1.0 - src.a));
                 if (uOperator == 4) return half4(src * (1.0 - dst.a) + dst * (1.0 - src.a));
                 if (uOperator == 5) {
-                    float4 res = uK.x * src * dst + uK.y * src + uK34.x * dst + uK34.y;
+                    float4 res = uK.x * dst * src + uK.y * src + uK.z * dst + uK.w;
                     return half4(clamp(res, 0.0, 1.0));
                 }
                 return half4(dst);
+            }
+        """
+
+        private const val FLOOD_SHADER = """
+            uniform shader uInput;
+            layout(color) uniform half4 uColor;
+            half4 main(float2 fragCoord) {
+                return uColor;
+            }
+        """
+
+        private const val TILE_SHADER = """
+            uniform shader uInput;
+            uniform float4 uRect;
+            uniform float2 uOffset;
+            half4 main(float2 fragCoord) {
+                float2 localCoord = fragCoord - uOffset;
+                float w = uRect.z - uRect.x;
+                float h = uRect.w - uRect.y;
+                float2 coord = float2(
+                    mod(localCoord.x - uRect.x, w),
+                    mod(localCoord.y - uRect.y, h)
+                ) + uRect.xy;
+                return uInput.eval(coord);
             }
         """
 
@@ -666,7 +845,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             uniform float2 uUnitSize;
             uniform float2 uUserLeftTop;
             uniform float2 uInvCanvasScale;
-            uniform float2 uPad;
+            uniform float2 uOffset;
 
             int customMod(int x, int y) {
                 return x - y * int(floor(float(x) / float(y)));
@@ -752,7 +931,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             }
 
             half4 main(float2 fragCoord) {
-                float2 local = fragCoord - uPad;
+                float2 local = fragCoord - uOffset;
                 float2 user = uUserLeftTop + local * uInvCanvasScale;
                 float2 primitive = (user - uOrigin) / uUnitSize;
                 float2 p = primitive * uBaseFrequency;

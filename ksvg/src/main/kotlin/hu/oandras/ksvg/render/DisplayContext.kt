@@ -16,12 +16,11 @@
 
 package hu.oandras.ksvg.render
 
-import hu.oandras.ksvg.dom.style.Style
-import hu.oandras.ksvg.render.pool.PoolOwner
+import hu.oandras.ksvg.dom.core.Box
 
-internal interface RenderContext: DisplayContext, PoolOwner {
-    fun resolveFloodColor(
-        primitiveNode: FilterPrimitiveRenderNode<*>,
-        baseStyle: Style
-    ): Int
+internal interface DisplayContext {
+    val dPI: Float
+    val currentFontSize: Float
+    val currentFontXHeight: Float
+    val effectiveViewPortInUserUnits: Box
 }

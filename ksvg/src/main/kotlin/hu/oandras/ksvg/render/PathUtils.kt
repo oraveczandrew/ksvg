@@ -29,11 +29,12 @@ import hu.oandras.ksvg.dom.shapes.PolygonShape
 import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.render.animation.AnimationContext
 import hu.oandras.ksvg.render.animation.animatedFloat
+import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.render.pool.withPooledObject
 import kotlin.math.abs
 import kotlin.math.min
 
-context(renderContext: AnimationContext)
+context(renderContext: DisplayContext)
 internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathRenderNode? = null): Boolean {
     // Missing width/height makes the <rect> invalid -> not rendered (spec).
     val objWidth = obj.width ?: return false
@@ -54,7 +55,7 @@ internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathR
     if (ryLength == null && rxLength != null) ryVal = rxVal
     if (rxLength == null && ryLength != null) rxVal = ryVal
 
-    if (node != null) {
+    if (renderContext is AnimationContext && node != null) {
         x = animatedFloat(node, SVGAttr.x, x)
         y = animatedFloat(node, SVGAttr.y, y)
         w = animatedFloat(node, SVGAttr.width, w)
@@ -77,7 +78,7 @@ internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathR
     return changed
 }
 
-context(renderContext: AnimationContext)
+context(renderContext: DisplayContext)
 internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: PathRenderNode? = null): Boolean {
     var cx = obj.cx?.floatValueXInContext() ?: 0f
     var cy = obj.cy?.floatValueYInContext() ?: 0f
@@ -85,7 +86,7 @@ internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: Pat
     val rLength = obj.r ?: return false
     var r = rLength.floatValueInContext()
 
-    if (node != null) {
+    if (renderContext is AnimationContext && node != null) {
         cx = animatedFloat(node, SVGAttr.cx, cx)
         cy = animatedFloat(node, SVGAttr.cy, cy)
         r = animatedFloat(node, SVGAttr.r, r)
@@ -103,7 +104,7 @@ internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: Pat
     return changed
 }
 
-context(renderContext: AnimationContext)
+context(renderContext: DisplayContext)
 internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: PathRenderNode? = null): Boolean {
     var cx = obj.cx?.floatValueXInContext() ?: 0f
     var cy = obj.cy?.floatValueYInContext() ?: 0f
@@ -113,7 +114,7 @@ internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: Pa
     var rx = rxLength.floatValueXInContext()
     var ry = ryLength.floatValueYInContext()
 
-    if (node != null) {
+    if (renderContext is AnimationContext && node != null) {
         cx = animatedFloat(node, SVGAttr.cx, cx)
         cy = animatedFloat(node, SVGAttr.cy, cy)
         rx = animatedFloat(node, SVGAttr.rx, rx)
@@ -132,14 +133,14 @@ internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: Pa
     return changed
 }
 
-context(renderContext: AnimationContext)
+context(renderContext: DisplayContext)
 internal fun updatePathAndBoundingBox(obj: LineShape, outPath: Path, node: PathRenderNode? = null): Boolean {
     var x1 = obj.x1?.floatValueXInContext() ?: 0f
     var y1 = obj.y1?.floatValueYInContext() ?: 0f
     var x2 = obj.x2?.floatValueXInContext() ?: 0f
     var y2 = obj.y2?.floatValueYInContext() ?: 0f
 
-    if (node != null) {
+    if (renderContext is AnimationContext && node != null) {
         x1 = animatedFloat(node, SVGAttr.x1, x1)
         y1 = animatedFloat(node, SVGAttr.y1, y1)
         x2 = animatedFloat(node, SVGAttr.x2, x2)
@@ -159,7 +160,7 @@ internal fun updatePathAndBoundingBox(obj: LineShape, outPath: Path, node: PathR
     return changed
 }
 
-context(renderContext: AnimationContext)
+context(poolOwner: PoolOwner)
 internal fun updatePathAndBoundingBox(obj: PolyLineShape, outPath: Path, animatedPoints: FloatArray? = null): Boolean {
     val points = animatedPoints ?: obj.points ?: return false
     val numPoints = points.size
@@ -193,9 +194,9 @@ internal fun updatePathAndBoundingBox(
     }
 }
 
-context(renderContext: RenderContext)
+context(poolOwner: PoolOwner)
 internal fun Element.updateBoundingBox(path: Path): Boolean {
-    return renderContext.rectFPool.withPooledObject { rect ->
+    return poolOwner.rectFPool.withPooledObject { rect ->
         path.computeBounds(rect, true)
         updateBoundingBox(
             minX = rect.left,
@@ -232,12 +233,12 @@ internal fun RenderNode<*>.updateBoundingBox(path: Path) {
     }
 }
 
-context(renderContext: RenderContext)
+context(poolOwner: PoolOwner)
 internal fun calculatePathBounds(path: Path?): Box {
     return if (path == null) {
         Box.EMPTY
     } else {
-        renderContext.rectFPool.withPooledObject { rect ->
+        poolOwner.rectFPool.withPooledObject { rect ->
             path.computeBounds(rect, true)
             Box(rect)
         }
