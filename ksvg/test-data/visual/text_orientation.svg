@@ -1,0 +1,11 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -->
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <text x="65" y="205" transform="rotate(-45 65 205)" font-family="sans-serif" font-size="20" text-orientation="mixed">Mixed</text>
+  <text x="170" y="205" transform="rotate(-45 170 205)" font-family="sans-serif" font-size="20" text-orientation="sideways">Sideways</text>
+  <text x="120" y="30" text-anchor="middle" font-size="12">text-orientation</text>
+</svg>

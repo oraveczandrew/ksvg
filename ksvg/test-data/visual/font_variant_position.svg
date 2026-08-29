@@ -1,0 +1,5 @@
+<svg width="320" height="100" viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="320" height="100" fill="white" />
+    <text x="20" y="45" font-family="sans-serif" font-size="28">Normal H2O x2</text>
+    <text x="20" y="80" font-family="sans-serif" font-size="28" font-variant-position="sub">Sub H2O</text>
+</svg>

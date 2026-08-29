@@ -1,0 +1,15 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -->
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="45" cy="70" r="14" fill="tomato">
+    <animate attributeName="cx" from="45" by="150" dur="3s" repeatCount="indefinite" calcMode="paced"/>
+  </circle>
+  <rect x="30" y="120" width="30" height="30" fill="royalblue">
+    <animate attributeName="x" values="30;95;160;30" keyTimes="0;0.25;0.5;1" dur="4s" calcMode="discrete" repeatCount="indefinite"/>
+  </rect>
+  <text x="120" y="200" text-anchor="middle" font-size="12">by + paced / discrete</text>
+</svg>

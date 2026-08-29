@@ -1,0 +1,15 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -->
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <g font-family="sans-serif">
+    <text x="10" y="35" font-size="20" font-stretch="condensed" font-variant="small-caps">Condensed small caps</text>
+    <text x="10" y="75" font-size="20" font-variant="all-small-caps" font-kerning="normal">Kerning</text>
+    <text x="10" y="115" font-size="20" font-feature-settings="&quot;liga&quot; 0" font-variant-ligatures="none">Ligature control</text>
+    <text x="10" y="155" font-size="18" font-variant-numeric="tabular-nums">1234567890</text>
+    <text x="10" y="195" font-size="18" font-variant-east-asian="full-width">ABC 123</text>
+  </g>
+</svg>

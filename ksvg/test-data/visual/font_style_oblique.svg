@@ -1,0 +1,5 @@
+<svg width="320" height="120" viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg">
+    <text x="20" y="35" font-family="serif" font-size="24" font-style="normal">Normal text</text>
+    <text x="20" y="70" font-family="serif" font-size="24" font-style="italic">Italic text</text>
+    <text x="20" y="105" font-family="serif" font-size="24" font-style="oblique">Oblique text</text>
+</svg>

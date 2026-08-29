@@ -1,0 +1,24 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -->
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="point" x="-30%" y="-30%" width="160%" height="160%">
+      <feDiffuseLighting in="SourceGraphic" surfaceScale="4" diffuseConstant="1.2" lighting-color="white">
+        <fePointLight x="120" y="70" z="80"/>
+      </feDiffuseLighting>
+    </filter>
+    <filter id="spot" x="-30%" y="-30%" width="160%" height="160%">
+      <feSpecularLighting in="SourceGraphic" surfaceScale="4" specularConstant="1" specularExponent="18" lighting-color="white">
+        <feSpotLight x="60" y="60" z="100" pointsAtX="120" pointsAtY="110" pointsAtZ="0" limitingConeAngle="35"/>
+      </feSpecularLighting>
+    </filter>
+  </defs>
+  <circle cx="70" cy="110" r="50" fill="royalblue" filter="url(#point)"/>
+  <circle cx="170" cy="110" r="50" fill="seagreen" filter="url(#spot)"/>
+  <text x="70" y="190" text-anchor="middle" font-size="12">point</text>
+  <text x="170" y="190" text-anchor="middle" font-size="12">spot</text>
+</svg>

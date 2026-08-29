@@ -1,0 +1,13 @@
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="g"><stop stop-color="black"/><stop offset="1" stop-color="white"/></linearGradient>
+    <filter id="f"><feComponentTransfer>
+      <feFuncR type="linear" slope="0.5" intercept="0.25"/>
+      <feFuncG type="linear" slope="1.2" intercept="-0.1"/>
+      <feFuncB type="identity"/>
+      <feFuncA type="linear" slope="0.8" intercept="0.2"/>
+    </feComponentTransfer></filter>
+  </defs>
+  <rect x="10" y="20" width="220" height="55" fill="url(#g)"/>
+  <rect x="10" y="95" width="220" height="55" fill="url(#g)" filter="url(#f)"/>
+  <text x="120" y="190" text-anchor="middle" font-size="12">linear + identity component transfer</text>
+</svg>

@@ -1,0 +1,22 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -->
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .parent { fill: seagreen; stroke: navy; stroke-width: 4; color: seagreen; }
+    .inherit { fill: inherit; stroke: inherit; }
+    .unset { fill: unset; stroke: unset; }
+    .initial { fill: initial; stroke: initial; }
+    .revert { fill: revert; stroke: revert; }
+  </style>
+  <g class="parent">
+    <rect class="inherit" x="10" y="20" width="50" height="50"/>
+    <rect class="unset" x="70" y="20" width="50" height="50"/>
+    <rect class="initial" x="130" y="20" width="50" height="50"/>
+    <rect class="revert" x="190" y="20" width="40" height="50"/>
+  </g>
+  <text x="120" y="105" text-anchor="middle" font-size="11">inherit / unset / initial / revert</text>
+</svg>

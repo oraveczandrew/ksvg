@@ -1,0 +1,13 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -->
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <title>Feature test: title and desc</title>
+  <desc>A simple geometric composition used to verify metadata nodes are accepted.</desc>
+  <circle cx="80" cy="110" r="55" fill="mediumseagreen"/>
+  <rect x="125" y="60" width="80" height="100" rx="14" fill="slateblue"/>
+  <text x="120" y="205" text-anchor="middle" font-size="12">title + desc</text>
+</svg>
