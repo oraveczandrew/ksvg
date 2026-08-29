@@ -26,7 +26,9 @@ import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.render.ALPHA_MATRIX_COLOR_FILTER
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
+import hu.oandras.ksvg.render.FeDropShadowRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
+import hu.oandras.ksvg.render.FeMorphologyRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.RenderContext
@@ -97,6 +99,70 @@ internal open class FilterPipelineImpl31 internal constructor(
                 FilterPrimitiveSet.FLAG_GAUSSIAN_BLUR or
                 FilterPrimitiveSet.FLAG_OFFSET
 
+    context(renderContext: RenderContext)
+    protected open fun calculateTotalPadding(
+        filterNode: FilterRenderNode,
+        scaleX: Float,
+        scaleY: Float,
+        sx: Float,
+        sy: Float
+    ): Long {
+        var expandX = 0f
+        var expandY = 0f
+        var offsetX = 0f
+        var offsetY = 0f
+
+        filterNode.primitives.forEachElement { primitive ->
+            when (primitive) {
+                is FeGaussianBlurRenderNode -> {
+                    expandX += primitive.stdDeviationX * scaleX * 4f
+                    expandY += primitive.stdDeviationY * scaleY * 4f
+                }
+                is FeMorphologyRenderNode -> {
+                    expandX += primitive.sourceElement.radiusX * scaleX
+                    expandY += primitive.sourceElement.radiusY * scaleY
+                }
+                is FeOffsetRenderNode -> {
+                    val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
+                    offsetX += Math.abs(filterPrimitiveLengthX(
+                        length = primitive.sourceElement.dx,
+                        primitiveUnitsAreUser = primitiveUnitsAreUser,
+                        primitiveScaleX = scaleX,
+                        canvasScaleX = sx
+                    ))
+                    offsetY += Math.abs(filterPrimitiveLengthY(
+                        length = primitive.sourceElement.dy,
+                        primitiveUnitsAreUser = primitiveUnitsAreUser,
+                        primitiveScaleY = scaleY,
+                        canvasScaleY = sy
+                    ))
+                }
+                is FeDropShadowRenderNode -> {
+                    expandX += primitive.blurNode.stdDeviationX * scaleX * 4f
+                    expandY += primitive.blurNode.stdDeviationY * scaleY * 4f
+                    offsetX += Math.abs(filterPrimitiveLengthX(
+                        length = primitive.sourceElement.dx,
+                        primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                        primitiveScaleX = scaleX,
+                        canvasScaleX = sx
+                    ))
+                    offsetY += Math.abs(filterPrimitiveLengthY(
+                        length = primitive.sourceElement.dy,
+                        primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                        primitiveScaleY = scaleX,
+                        canvasScaleY = sy
+                    ))
+                }
+                else -> {}
+            }
+        }
+
+        val padX = (expandX + offsetX + 10f).ceilToInt()
+        val padY = (expandY + offsetY + 10f).ceilToInt()
+
+        return (padX.toLong() shl 32) or (padY.toLong() and 0xFFFFFFFFL)
+    }
+
     // Caller-owned mutable state; a backend instance is owned by a single
     // render operation and never shared between threads.
     private var recordingActive: Boolean = false
@@ -123,7 +189,9 @@ internal open class FilterPipelineImpl31 internal constructor(
         if (cached != null &&
             filterNode.gpuChainVersion == filterNode.version &&
             filterNode.gpuChainScaleX == scaleX &&
-            filterNode.gpuChainScaleY == scaleY
+            filterNode.gpuChainScaleY == scaleY &&
+            filterNode.gpuChainDeviceLeft == deviceRegion.left &&
+            filterNode.gpuChainDeviceTop == deviceRegion.top
         ) {
             return cached
         }
@@ -144,6 +212,8 @@ internal open class FilterPipelineImpl31 internal constructor(
             filterNode.gpuChainVersion = filterNode.version
             filterNode.gpuChainScaleX = scaleX
             filterNode.gpuChainScaleY = scaleY
+            filterNode.gpuChainDeviceLeft = deviceRegion.left
+            filterNode.gpuChainDeviceTop = deviceRegion.top
         }
 
         return chain
@@ -169,11 +239,12 @@ internal open class FilterPipelineImpl31 internal constructor(
         sy: Float,
         boundingBox: Box,
     ): Chain? {
-        var chain: RenderEffect? = null
+        var chainEffect: RenderEffect? = null
         var previousResult: String? = null
         var first = true
-        var padX = 0
-        var padY = 0
+        val packed = calculateTotalPadding(filterNode, scaleX, scaleY, sx, sy)
+        val totalPadX = (packed shr 32).toInt()
+        val totalPadY = (packed and 0xFFFFFFFFL).toInt()
         val resultEffects = ArrayMap<String, RenderEffect>()
 
         filterNode.primitives.forEachElement { primitive ->
@@ -182,7 +253,7 @@ internal open class FilterPipelineImpl31 internal constructor(
             val resultName = sourceElement.result
             val input = sourceElement.`in`
 
-            val inputEffect = resolveEffect(input, previousResult, first, chain, resultEffects) ?: return null
+            val inputEffect = resolveEffect(input, previousResult, first, chainEffect, resultEffects) ?: return null
 
             val effect = when (primitive) {
                 is FeColorMatrixRenderNode -> {
@@ -199,11 +270,6 @@ internal open class FilterPipelineImpl31 internal constructor(
                     if (sigmaX <= 0f && sigmaY <= 0f) {
                         inputEffect
                     } else {
-                        // Transparent pad so CLAMP reads transparent black,
-                        // matching the CPU kernel's pedestal (3 sigma rule).
-                        padX = maxOf(padX, (sigmaX * 3f).ceilToInt())
-                        padY = maxOf(padY, (sigmaY * 3f).ceilToInt())
-
                         RenderEffect.createBlurEffect(
                             sigmaX, sigmaY,
                             android.graphics.Shader.TileMode.CLAMP
@@ -214,15 +280,15 @@ internal open class FilterPipelineImpl31 internal constructor(
                 is FeOffsetRenderNode -> {
                     val dx = filterPrimitiveLengthX(
                         length = primitive.sourceElement.dx,
-                        primitiveUnitsAreUser = true,
+                        primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
                         primitiveScaleX = scaleX,
-                        canvasScaleX = 1f
+                        canvasScaleX = scaleX
                     )
                     val dy = filterPrimitiveLengthY(
                         length = primitive.sourceElement.dy,
-                        primitiveUnitsAreUser = true,
+                        primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
                         primitiveScaleY = scaleY,
-                        canvasScaleY = 1f
+                        canvasScaleY = scaleY
                     )
                     if (dx == 0f && dy == 0f) {
                         inputEffect
@@ -234,7 +300,7 @@ internal open class FilterPipelineImpl31 internal constructor(
                 else -> return null
             }
 
-            chain = effect
+            chainEffect = effect
             previousResult = resultName
             first = false
             if (resultName != null) {
@@ -242,11 +308,11 @@ internal open class FilterPipelineImpl31 internal constructor(
             }
         }
 
-        val result = chain ?: return null
+        val result = chainEffect ?: return null
         return Chain(
             effect = result,
-            padX = padX,
-            padY = padY,
+            padX = totalPadX,
+            padY = totalPadY,
             scaleX = scaleX,
             scaleY = scaleY,
             deviceLeft = deviceRegion.left,
@@ -280,7 +346,7 @@ internal open class FilterPipelineImpl31 internal constructor(
 
         val padX = chain.padX
         val padY = chain.padY
-        val contentVersion = filterNode.contentVersion
+        val contentVersion = node.contentVersion
         var gpuNode = filterNode.gpuNode
         val valid = gpuNode != null &&
                 gpuNode.hasDisplayList() &&
@@ -288,12 +354,19 @@ internal open class FilterPipelineImpl31 internal constructor(
                 filterNode.gpuFilterVersion == filterNode.version &&
                 filterNode.gpuScaleX == sx && filterNode.gpuScaleY == sy &&
                 filterNode.gpuWidth == width && filterNode.gpuHeight == height &&
-                filterNode.gpuPadX == padX && filterNode.gpuPadY == padY
+                filterNode.gpuPadX == padX && filterNode.gpuPadY == padY &&
+                matrix == filterNode.gpuSourceMatrix
         if (!valid) {
             gpuNode = gpuNode ?: AndroidRenderNode("ksvg-filter-source")
             val recording = gpuNode.beginRecording(width + 2 * padX, height + 2 * padY)
             recording.translate(padX - deviceRegion.left, padY - deviceRegion.top)
             recording.concat(matrix)
+            // The source content and the CTM applied above are baked into the
+            // display list; snapshot the matrix so a later CTM change (e.g. an
+            // animated transform, or an ancestor moving) forces a re-record
+            // instead of reusing the stale, frozen content.
+            val sourceMatrix = filterNode.gpuSourceMatrix ?: Matrix().also { filterNode.gpuSourceMatrix = it }
+            sourceMatrix.set(matrix)
             filterNode.gpuNode = gpuNode
             filterNode.gpuSourceVersion = contentVersion
             filterNode.gpuFilterVersion = filterNode.version

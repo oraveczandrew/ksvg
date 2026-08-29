@@ -77,6 +77,8 @@ import hu.oandras.ksvg.render.pool.FloatArrayBucket
 import hu.oandras.ksvg.render.pool.IntArrayBucket
 import hu.oandras.ksvg.utils.anyElement
 import hu.oandras.ksvg.utils.forEachElement
+import kotlin.math.abs
+import kotlin.math.max
 
 internal sealed class RenderNode<T: SvgObject>(
     @JvmField val sourceElement: T
@@ -158,8 +160,18 @@ internal sealed class RenderNode<T: SvgObject>(
     @JvmField var lastScaleX: Float = 0f
     @JvmField var lastScaleY: Float = 0f
 
-    internal fun hasAnimations(): Boolean = hasAnimationsInSubtree
+    internal fun hasAnimations(): Boolean = hasAnimationsInSubtree || computeHasAnimations()
     internal open fun hasFilters(): Boolean = hasFilterInSubtree || filterNode != null
+
+    /** Returns the maximum filter extent (blur + offset) in device pixels for any filter in the subtree. */
+    internal open fun computeMaxFilterExtent(sx: Float, sy: Float): Float {
+        var maxExtent = 0f
+        val fn = filterNode
+        if (fn != null) {
+            maxExtent = max(maxExtent, fn.computeMaxExtent(sx, sy))
+        }
+        return maxExtent
+    }
 
     internal open fun hasMarkers(): Boolean {
         return markerStartNode != null || markerMidNode != null || markerEndNode != null
@@ -194,7 +206,7 @@ internal sealed class RenderNode<T: SvgObject>(
             bitmapPool.release(it)
             cachedSourceContent = null
         }
-        filterNode?.recycle(bitmapPool)
+        filterNode?.recycle()
     }
 
     override fun toString(): String {
@@ -243,6 +255,14 @@ internal open class GroupRenderNode<T: ConditionalContainer>(
 
     override fun hasFilters(): Boolean {
         return super.hasFilters() || children.anyElement { it.hasFilters() }
+    }
+
+    override fun computeMaxFilterExtent(sx: Float, sy: Float): Float {
+        var maxExtent = super.computeMaxFilterExtent(sx, sy)
+        children.forEachElement { child ->
+            maxExtent = max(maxExtent, child.computeMaxFilterExtent(sx, sy))
+        }
+        return maxExtent
     }
 
     override fun computeSubtreeContainsBlendMode(): Boolean {
@@ -373,6 +393,10 @@ internal abstract class KSVGTextContainerRenderNode<T : TextContainer>(
         return super.hasMarkers() || children.anyElement { (it as? RenderNode<*>)?.hasMarkers() == true }
     }
 
+    override fun computeHasAnimations(): Boolean {
+        return super.computeHasAnimations() || children.anyElement { (it as? RenderNode<*>)?.hasAnimations() == true }
+    }
+
     override fun hasFilters(): Boolean {
         return super.hasFilters() || children.anyElement { (it as? RenderNode<*>)?.hasFilters() == true }
     }
@@ -489,12 +513,18 @@ internal class FilterRenderNode(
     @JvmField var gpuHeight: Int = 0
     @JvmField var gpuPadX: Int = 0
     @JvmField var gpuPadY: Int = 0
+    // The CTM captured when the source display list was recorded. Content and
+    // matrix are baked into the display list, so either changing invalidates
+    // it (e.g. an animated transform must force a re-record every frame).
+    @JvmField var gpuSourceMatrix: Matrix? = null
     // Built effect chain cache: depends on the filter's attributes (version)
     // and the primitive scales, not on the rendered content.
     @JvmField var gpuChain: FilterPipelineImpl31.Chain? = null
     @JvmField var gpuChainVersion: Int = -1
     @JvmField var gpuChainScaleX: Float = 0f
     @JvmField var gpuChainScaleY: Float = 0f
+    @JvmField var gpuChainDeviceLeft: Float = 0f
+    @JvmField var gpuChainDeviceTop: Float = 0f
     @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
     @JvmField val renderState: RendererState = RendererState()
 
@@ -518,9 +548,42 @@ internal class FilterRenderNode(
         version++
     }
 
-    fun recycle(bitmapPool: BitmapPool) {
+    fun recycle() {
         filterSourceMap?.recycle()
         filterSourceMap = null
+    }
+
+    /** Maximum extent (blur radius * 5 + offset) in device pixels for this filter. */
+    fun computeMaxExtent(sx: Float, sy: Float): Float {
+        var expandX = 0f
+        var expandY = 0f
+        var offsetX = 0f
+        var offsetY = 0f
+
+        primitives.forEachElement { primitive ->
+            when (primitive) {
+                is FeGaussianBlurRenderNode -> {
+                    expandX += primitive.stdDeviationX * sx * 5f
+                    expandY += primitive.stdDeviationY * sy * 5f
+                }
+                is FeMorphologyRenderNode -> {
+                    expandX += primitive.sourceElement.radiusX * sx
+                    expandY += primitive.sourceElement.radiusY * sy
+                }
+                is FeOffsetRenderNode -> {
+                    offsetX += abs(primitive.dx)
+                    offsetY += abs(primitive.dy)
+                }
+                is FeDropShadowRenderNode -> {
+                    expandX += primitive.blurNode.stdDeviationX * sx * 5f
+                    expandY += primitive.blurNode.stdDeviationY * sy * 5f
+                    offsetX += abs(primitive.offsetNode.dx)
+                    offsetY += abs(primitive.offsetNode.dy)
+                }
+                else -> {}
+            }
+        }
+        return max(max(expandX, expandY) + max(offsetX, offsetY) + 20f, 0f)
     }
 }
 
@@ -687,6 +750,8 @@ internal class FeComponentTransferRenderNode(
     // Lazily built [A,R,G,B] 256-entry LUTs; null until first use. The tables
     // depend only on build-time transfer functions, so they are computed once.
     @JvmField var lutTables: Array<ByteArray>? = null
+
+    @JvmField var gpuLutBitmap: Bitmap? = null
 }
 
 internal class FeCompositeRenderNode(

@@ -63,6 +63,8 @@ import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.calculatePrimitiveRegion
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.filters.buildColorMatrix
+import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
+import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.blue
@@ -70,6 +72,7 @@ import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.red
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -115,7 +118,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         val resultEffects = ArrayMap<String, RenderEffect>()
 
         // 1. Pre-calculate total padding for the entire chain
-        val (totalPadX, totalPadY) = calculateTotalPadding(filterNode, scaleX, scaleY)
+        val packed = calculateTotalPadding(filterNode, scaleX, scaleY, sx, sy)
+        val totalPadX = (packed shr 32).toInt()
+        val totalPadY = (packed and 0xFFFFFFFFL).toInt()
 
         filterNode.primitives.forEachElement { primitive ->
             val sourceElement = primitive.sourceElement
@@ -127,15 +132,26 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
             val effect = when (primitive) {
                 is FeOffsetRenderNode -> {
-                    val offset = primitive.sourceElement
-                    val dx = offset.dx?.floatValueInContext() ?: 0f
-                    val dy = offset.dy?.floatValueInContext() ?: 0f
+                    val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
+                    val dx = filterPrimitiveLengthX(
+                        length = primitive.sourceElement.dx,
+                        primitiveUnitsAreUser = primitiveUnitsAreUser,
+                        primitiveScaleX = scaleX,
+                        canvasScaleX = sx
+                    )
+                    val dy = filterPrimitiveLengthY(
+                        length = primitive.sourceElement.dy,
+                        primitiveUnitsAreUser = primitiveUnitsAreUser,
+                        primitiveScaleY = scaleY,
+                        canvasScaleY = sy
+                    )
                     if (dx == 0f && dy == 0f) {
                         inputEffect
                     } else {
                         RenderEffect.createOffsetEffect(dx, dy).chainWith(inputEffect)
                     }
                 }
+
                 is FeGaussianBlurRenderNode -> {
                     val sigmaX = primitive.stdDeviationX * scaleX
                     val sigmaY = primitive.stdDeviationY * scaleY
@@ -145,6 +161,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         RenderEffect.createBlurEffect(sigmaX, sigmaY, Shader.TileMode.CLAMP).chainWith(inputEffect)
                     }
                 }
+
                 is FeMorphologyRenderNode -> {
                     val morph = primitive.sourceElement
                     val radX = morph.radiusX * scaleX
@@ -155,6 +172,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                     resultShaders[resultName ?: ""] = shader
                     RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                 }
+
                 is FeColorMatrixRenderNode -> {
                     val colorMatrix = primitive.sourceElement
                     val matrix = buildColorMatrix(colorMatrix.type, colorMatrix.values)
@@ -163,72 +181,112 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                     resultShaders[resultName ?: ""] = shader
                     RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                 }
+
                 is FeDiffuseLightingRenderNode -> {
-                    val shader = buildLightingShader(primitive, false) ?: return null
-                    resultShaders[resultName ?: ""] = shader
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                    renderContext.rectFPool.withPooledObject { primitiveRegion ->
+                        calculatePrimitiveRegion(
+                            primitive = primitive.sourceElement,
+                            filterRegion = filterRegion,
+                            unitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            originalObjBBox = boundingBox,
+                            outRect = primitiveRegion
+                        )
+                        primitiveRegion.set(
+                            (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
+                            (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
+                            (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
+                            (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                        )
+
+                        val shader = buildLightingShader(primitive, false) ?: return null
+                        shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
+                        shader.setFloatUniform("uInvCanvasScale", 1f / sx, 1f / sy)
+                        shader.setFloatUniform("uOffset", totalPadX.toFloat(), totalPadY.toFloat())
+                        shader.setRectFUniform("uPrimitiveRegion", primitiveRegion)
+
+                        resultShaders[resultName ?: ""] = shader
+                        RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                    }
                 }
+
                 is FeSpecularLightingRenderNode -> {
-                    val shader = buildLightingShader(primitive, true) ?: return null
-                    resultShaders[resultName ?: ""] = shader
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                    renderContext.rectFPool.withPooledObject { rect ->
+                        calculatePrimitiveRegion(
+                            primitive = primitive.sourceElement,
+                            filterRegion = filterRegion,
+                            unitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            originalObjBBox = boundingBox,
+                            outRect = rect
+                        )
+                        rect.set(
+                            (rect.left - filterRegion.left) * sx + totalPadX,
+                            (rect.top - filterRegion.top) * sy + totalPadY,
+                            (rect.right - filterRegion.left) * sx + totalPadX,
+                            (rect.bottom - filterRegion.top) * sy + totalPadY
+                        )
+
+                        val shader = buildLightingShader(primitive, true) ?: return null
+                        shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
+                        shader.setFloatUniform("uInvCanvasScale", 1f / sx, 1f / sy)
+                        shader.setFloatUniform("uOffset", totalPadX.toFloat(), totalPadY.toFloat())
+                        shader.setFloatUniform(
+                            "uPrimitiveRegion",
+                            rect.left, rect.top, rect.right, rect.bottom
+                        )
+
+                        resultShaders[resultName ?: ""] = shader
+                        RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                    }
                 }
+
                 is FeComponentTransferRenderNode -> {
                     val shader = buildComponentTransferShader(primitive)
                     resultShaders[resultName ?: ""] = shader
                     RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                 }
+
                 is FeConvolveMatrixRenderNode -> {
                     val shader = buildConvolveMatrixShader(primitive) ?: return null
                     resultShaders[resultName ?: ""] = shader
                     RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                 }
+
                 is FeBlendRenderNode -> {
                     val blend = primitive.sourceElement
                     val in2Effect = resolveEffect(blend.in2, previousResult, first, chain, resultEffects) ?: return null
                     val mode = primitive.mode.toBlendMode() ?: return null
-                    
-                    RenderEffect.createBlendModeEffect(
-                        if (in2Effect == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else in2Effect,
-                        if (inputEffect == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else inputEffect,
-                        mode
-                    )
+
+                    createBlendModeRenderEffect(in2Effect, inputEffect, mode)
                 }
+
                 is FeCompositeRenderNode -> {
                     val composite = primitive.sourceElement
-                    val in2Effect = resolveEffect(composite.in2, previousResult, first, chain, resultEffects) ?: return null
-                    
+                    val in2Effect =
+                        resolveEffect(composite.in2, previousResult, first, chain, resultEffects) ?: return null
+
                     if (composite.operator == FeCompositeOperator.arithmetic) {
                         if (composite.k1 == 0f && composite.k2 == 1f && composite.k3 == 1f && composite.k4 == 0f) {
-                            RenderEffect.createBlendModeEffect(
-                                in2Effect,
-                                inputEffect,
-                                BlendMode.PLUS
-                            )
+                            createBlendModeRenderEffect(in2Effect, inputEffect, BlendMode.PLUS)
                         } else {
                             val in2Shader = composite.in2?.let { resultShaders[it] }
                             if (in2Shader != null) {
                                 val shader = RuntimeShader(COMPOSITE_SHADER)
                                 shader.setInputShader("uIn2", in2Shader)
                                 shader.setIntUniform("uOperator", 5)
-                                shader.setFloatUniform("uK", floatArrayOf(composite.k1, composite.k2, composite.k3, composite.k4))
-                                
-                                val effect = RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                                shader.setFloatUniform("uK", composite.k1, composite.k2, composite.k3, composite.k4)
+
                                 resultShaders[resultName ?: ""] = shader
-                                effect.chainWith(inputEffect)
+                                RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                             } else {
                                 return null
                             }
                         }
                     } else {
                         val mode = composite.operator.toBlendMode() ?: return null
-                        RenderEffect.createBlendModeEffect(
-                            in2Effect,
-                            inputEffect,
-                            mode
-                        )
+                        createBlendModeRenderEffect(in2Effect, inputEffect, mode)
                     }
                 }
+
                 is FeDisplacementMapRenderNode -> {
                     val disp = primitive.sourceElement
                     val mapShader = resultShaders[disp.in2] ?: return null
@@ -237,69 +295,114 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                     resultShaders[resultName ?: ""] = shader
                     RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                 }
+
                 is FeTurbulenceRenderNode -> {
-                    val shader = buildTurbulenceShader(
-                        node = primitive,
-                        pScaleX = scaleX,
-                        pScaleY = scaleY,
-                        filterRegion = filterRegion,
-                        canvasScaleX = sx,
-                        canvasScaleY = sy,
-                        padX = totalPadX,
-                        padY = totalPadY,
-                        filterNode = filterNode,
-                        boundingBox = boundingBox,
-                    )
-                    resultShaders[resultName ?: ""] = shader
-                    RenderEffect.createRuntimeShaderEffect(shader, "in_source")
+                    renderContext.rectFPool.withPooledObject { primitiveRegion ->
+                        calculatePrimitiveRegion(
+                            primitive = primitive.sourceElement,
+                            filterRegion = filterRegion,
+                            unitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            originalObjBBox = boundingBox,
+                            outRect = primitiveRegion
+                        )
+                        // Map to buffer space: (user - filterRegion.left) * sx + padX
+                        primitiveRegion.set(
+                            (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
+                            (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
+                            (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
+                            (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                        )
+
+                        val shader = buildTurbulenceShader(
+                            node = primitive,
+                            pScaleX = scaleX,
+                            pScaleY = scaleY,
+                            filterRegion = filterRegion,
+                            canvasScaleX = sx,
+                            canvasScaleY = sy,
+                            padX = totalPadX,
+                            padY = totalPadY,
+                            filterNode = filterNode,
+                            boundingBox = boundingBox,
+                        )
+                        shader.setFloatUniform(
+                            "uPrimitiveRegion",
+                            primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom
+                        )
+
+                        resultShaders[resultName ?: ""] = shader
+                        RenderEffect.createRuntimeShaderEffect(shader, "in_source")
+                    }
                 }
+
                 is FeFloodRenderNode -> {
-                    val color = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
-                    val shader = RuntimeShader(FLOOD_SHADER)
-                    shader.setColorUniform("uColor", color)
-                    resultShaders[resultName ?: ""] = shader
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    renderContext.rectFPool.withPooledObject { primitiveRegion ->
+                        calculatePrimitiveRegion(
+                            primitive = primitive.sourceElement,
+                            filterRegion = filterRegion,
+                            unitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            originalObjBBox = boundingBox,
+                            outRect = primitiveRegion
+                        )
+                        primitiveRegion.set(
+                            (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
+                            (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
+                            (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
+                            (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                        )
+
+                        val color = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
+                        val shader = RuntimeShader(FLOOD_SHADER)
+                        shader.setColorUniform("uColor", color)
+                        shader.setFloatUniform(
+                            "uPrimitiveRegion",
+                            primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom
+                        )
+                        resultShaders[resultName ?: ""] = shader
+                        RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                    }
                 }
+
                 is FeMergeRenderNode -> {
                     var mergeEffect: RenderEffect? = null
                     primitive.mergeNodes.forEach { inputName ->
-                        val inputNodeEffect = resolveEffect(inputName, previousResult, first, chain, resultEffects) ?: return null
+                        val inputNodeEffect =
+                            resolveEffect(inputName ?: "SourceGraphic", previousResult, first, chain, resultEffects)
+                                ?: return null
                         mergeEffect = if (mergeEffect == null) {
                             inputNodeEffect
                         } else {
-                            RenderEffect.createBlendModeEffect(
-                                inputNodeEffect,
-                                mergeEffect,
-                                BlendMode.SRC_OVER
-                            )
+                            createBlendModeRenderEffect(mergeEffect, inputNodeEffect, BlendMode.SRC_OVER)
                         }
                     }
                     mergeEffect
                 }
+
                 is FeTileRenderNode -> {
                     val tile = primitive.sourceElement
-                    val tileRect = renderContext.rectFPool.withPooledObject { rect ->
+                    renderContext.rectFPool.withPooledObject { tileRect ->
                         calculatePrimitiveRegion(
                             primitive = tile,
                             filterRegion = filterRegion,
                             unitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
                             originalObjBBox = boundingBox,
-                            outRect = rect
+                            outRect = tileRect
                         )
                         // Transform user-space tile region to device-pixel space relative to the deviceRegion
-                        floatArrayOf(
-                            (rect.left - filterRegion.left) * sx + totalPadX,
-                            (rect.top - filterRegion.top) * sy + totalPadY,
-                            (rect.right - filterRegion.left) * sx + totalPadX,
-                            (rect.bottom - filterRegion.top) * sy + totalPadY
+                        tileRect.set(
+                            (tileRect.left - filterRegion.left) * sx + totalPadX,
+                            (tileRect.top - filterRegion.top) * sy + totalPadY,
+                            (tileRect.right - filterRegion.left) * sx + totalPadX,
+                            (tileRect.bottom - filterRegion.top) * sy + totalPadY
                         )
+
+                        val shader = RuntimeShader(TILE_SHADER)
+                        shader.setRectFUniform("uRect", tileRect)
+                        resultShaders[resultName ?: ""] = shader
+                        RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                     }
-                    
-                    val shader = RuntimeShader(TILE_SHADER)
-                    shader.setFloatUniform("uRect", tileRect)
-                    resultShaders[resultName ?: ""] = shader
-                    RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                 }
+
                 is FeDropShadowRenderNode -> {
                     val alphaEffect = if (inputEffect == IDENTITY_EFFECT) {
                         SOURCE_ALPHA_EFFECT
@@ -318,8 +421,19 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         alphaEffect
                     }
 
-                    val dx = primitive.offsetNode.dx * scaleX
-                    val dy = primitive.offsetNode.dy * scaleY
+                    val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
+                    val dx = filterPrimitiveLengthX(
+                        length = primitive.sourceElement.dx,
+                        primitiveUnitsAreUser = primitiveUnitsAreUser,
+                        primitiveScaleX = scaleX,
+                        canvasScaleX = sx
+                    )
+                    val dy = filterPrimitiveLengthY(
+                        length = primitive.sourceElement.dy,
+                        primitiveUnitsAreUser = primitiveUnitsAreUser,
+                        primitiveScaleY = scaleY,
+                        canvasScaleY = sy
+                    )
                     val offsetEffect = RenderEffect.createOffsetEffect(dx, dy, blurredEffect)
 
                     val floodColor = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
@@ -328,12 +442,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         offsetEffect
                     )
 
-                    RenderEffect.createBlendModeEffect(
-                        inputEffect,
-                        coloredShadowEffect,
-                        BlendMode.SRC_OVER
-                    )
+                    createBlendModeRenderEffect(coloredShadowEffect, inputEffect, BlendMode.SRC_OVER)
                 }
+
                 else -> return null
             }
 
@@ -359,29 +470,94 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         )
     }
 
-    private fun calculateTotalPadding(filterNode: FilterRenderNode, scaleX: Float, scaleY: Float): Pair<Int, Int> {
-        var padX = 0f
-        var padY = 0f
+    private fun RuntimeShader.setRectFUniform(name: String, rect: RectF) {
+        setFloatUniform(name, rect.left, rect.top, rect.right, rect.bottom)
+    }
+
+    private fun createBlendModeRenderEffect(
+        dst: RenderEffect,
+        src: RenderEffect,
+        blendMode: BlendMode
+    ): RenderEffect {
+        val d = if (dst == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else dst
+        val s = if (src == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else src
+        return RenderEffect.createBlendModeEffect(d, s, blendMode)
+    }
+
+    context(renderContext: RenderContext)
+    override fun calculateTotalPadding(
+        filterNode: FilterRenderNode,
+        scaleX: Float,
+        scaleY: Float,
+        sx: Float,
+        sy: Float
+    ): Long {
+        var expandX = 0f
+        var expandY = 0f
+        var offsetX = 0f
+        var offsetY = 0f
+
         filterNode.primitives.forEachElement { primitive ->
             when (primitive) {
                 is FeGaussianBlurRenderNode -> {
-                    padX += primitive.stdDeviationX * scaleX * 3f
-                    padY += primitive.stdDeviationY * scaleY * 3f
+                    expandX += primitive.stdDeviationX * scaleX * 5f
+                    expandY += primitive.stdDeviationY * scaleY * 5f
                 }
+
                 is FeMorphologyRenderNode -> {
-                    val sourceElement = primitive.sourceElement
-                    padX += sourceElement.radiusX * scaleX
-                    padY += sourceElement.radiusY * scaleY
+                    expandX += primitive.sourceElement.radiusX * scaleX
+                    expandY += primitive.sourceElement.radiusY * scaleY
                 }
+
+                is FeOffsetRenderNode -> {
+                    val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
+                    offsetX += abs(
+                        filterPrimitiveLengthX(
+                            length = primitive.sourceElement.dx,
+                            primitiveUnitsAreUser = primitiveUnitsAreUser,
+                            primitiveScaleX = scaleX,
+                            canvasScaleX = sx
+                        )
+                    )
+                    offsetY += abs(
+                        filterPrimitiveLengthY(
+                            length = primitive.sourceElement.dy,
+                            primitiveUnitsAreUser = primitiveUnitsAreUser,
+                            primitiveScaleY = scaleY,
+                            canvasScaleY = sy
+                        )
+                    )
+                }
+
                 is FeDropShadowRenderNode -> {
-                    val blurNode = primitive.blurNode
-                    padX += blurNode.stdDeviationX * scaleX * 3f
-                    padY += blurNode.stdDeviationY * scaleY * 3f
+                    expandX += primitive.blurNode.stdDeviationX * scaleX * 5f
+                    expandY += primitive.blurNode.stdDeviationY * scaleY * 5f
+                    offsetX += abs(
+                        filterPrimitiveLengthX(
+                            length = primitive.sourceElement.dx,
+                            primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            primitiveScaleX = scaleX,
+                            canvasScaleX = sx
+                        )
+                    )
+                    offsetY += abs(
+                        filterPrimitiveLengthY(
+                            length = primitive.sourceElement.dy,
+                            primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            primitiveScaleY = scaleY,
+                            canvasScaleY = sy
+                        )
+                    )
                 }
+
                 else -> {}
             }
         }
-        return padX.ceilToInt() to padY.ceilToInt()
+
+        val padX = (expandX + offsetX + 20f).ceilToInt()
+        val padY = (expandY + offsetY + 20f).ceilToInt()
+
+        return (padX.toLong() shl 32) or (padY.toLong() and 0xFFFFFFFFL)
     }
 
     override fun drawFiltered(
@@ -476,10 +652,12 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                 val lz = sin(elevationRad)
                 shader.setFloatUniform("uLightPosDir", lx.toFloat(), ly.toFloat(), lz.toFloat())
             }
+
             is FePointLight -> {
                 shader.setIntUniform("uLightType", 1)
                 shader.setFloatUniform("uLightPosDir", light.x, light.y, light.z)
             }
+
             is FeSpotLight -> {
                 shader.setIntUniform("uLightType", 2)
                 shader.setFloatUniform("uLightPosDir", light.x, light.y, light.z)
@@ -493,7 +671,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
     private fun buildComponentTransferShader(node: FeComponentTransferRenderNode): RuntimeShader {
         val shader = RuntimeShader(COMPONENT_TRANSFER_SHADER)
         val lut = node.lutTables ?: Array(4) { ByteArray(256) { it.toByte() } }
-        val bitmap = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
+        var bitmap = node.gpuLutBitmap
+        if (bitmap == null || bitmap.isRecycled) {
+            bitmap = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
+            node.gpuLutBitmap = bitmap
+        }
         val pixels = IntArray(256)
         for (i in 0 until 256) {
             val a = lut[0][i].toInt() and 0xFF
@@ -525,7 +707,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         return shader
     }
 
-    private fun buildDisplacementMapShader(node: FeDisplacementMapRenderNode, pScaleX: Float, pScaleY: Float): RuntimeShader {
+    private fun buildDisplacementMapShader(
+        node: FeDisplacementMapRenderNode,
+        pScaleX: Float,
+        pScaleY: Float
+    ): RuntimeShader {
         val element = node.sourceElement
         val shader = RuntimeShader(DISPLACEMENT_MAP_SHADER)
         shader.setFloatUniform("uScale", element.scale * pScaleX, element.scale * pScaleY)
@@ -649,6 +835,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             uniform float3 uPointsAt;
             uniform float2 uSpotParams;
 
+            uniform float2 uUserLeftTop;
+            uniform float2 uInvCanvasScale;
+            uniform float2 uOffset;
+            uniform float4 uPrimitiveRegion;
+
             float3 getNormal(float2 fragCoord) {
                 float h0 = uInput.eval(fragCoord + float2(-1.0, -1.0)).a;
                 float h1 = uInput.eval(fragCoord + float2(0.0, -1.0)).a;
@@ -662,17 +853,31 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                 float dx = (h2 + 2.0*h5 + h8) - (h0 + 2.0*h3 + h6);
                 float dy = (h6 + 2.0*h7 + h8) - (h0 + 2.0*h1 + h2);
                 
-                float3 n = float3(-dx * uSurfaceScale, -dy * uSurfaceScale, 1.0);
+                // SVG spec kernel: Nx = -surfaceScale * dx / 4.0. 
+                // Since samples are separated by 2 pixels, Nx is the slope per pixel.
+                // We multiply by uInvCanvasScale to get user-space slopes.
+                float Nx = -dx * 0.25 * uSurfaceScale * uInvCanvasScale.x;
+                float Ny = -dy * 0.25 * uSurfaceScale * uInvCanvasScale.y;
+                
+                float3 n = float3(Nx, Ny, 1.0);
                 return normalize(n);
             }
 
             half4 main(float2 fragCoord) {
+                if (fragCoord.x < uPrimitiveRegion.x - 0.5 || fragCoord.x > uPrimitiveRegion.z + 0.5 ||
+                    fragCoord.y < uPrimitiveRegion.y - 0.5 || fragCoord.y > uPrimitiveRegion.w + 0.5) {
+                    return half4(0.0);
+                }
+
                 float3 n = getNormal(fragCoord);
                 float3 l;
                 if (uLightType == 0) {
                     l = normalize(uLightPosDir);
                 } else {
-                    float3 p = float3(fragCoord, uInput.eval(fragCoord).a * uSurfaceScale);
+                    float2 local = fragCoord - uOffset;
+                    float2 user = uUserLeftTop + local * uInvCanvasScale;
+
+                    float3 p = float3(user, uInput.eval(fragCoord).a * uSurfaceScale);
                     l = normalize(uLightPosDir - p);
                 }
                 
@@ -733,7 +938,12 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         private const val FLOOD_SHADER = """
             uniform shader uInput;
             layout(color) uniform half4 uColor;
+            uniform float4 uPrimitiveRegion;
             half4 main(float2 fragCoord) {
+                if (fragCoord.x < uPrimitiveRegion.x - 0.5 || fragCoord.x > uPrimitiveRegion.z + 0.5 ||
+                    fragCoord.y < uPrimitiveRegion.y - 0.5 || fragCoord.y > uPrimitiveRegion.w + 0.5) {
+                    return half4(0.0);
+                }
                 return uColor;
             }
         """
@@ -853,6 +1063,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             uniform float2 uUserLeftTop;
             uniform float2 uInvCanvasScale;
             uniform float2 uOffset;
+            uniform float4 uPrimitiveRegion;
 
             int customMod(int x, int y) {
                 return x - y * int(floor(float(x) / float(y)));
@@ -938,6 +1149,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             }
 
             half4 main(float2 fragCoord) {
+                if (fragCoord.x < uPrimitiveRegion.x - 0.5 || fragCoord.x > uPrimitiveRegion.z + 0.5 ||
+                    fragCoord.y < uPrimitiveRegion.y - 0.5 || fragCoord.y > uPrimitiveRegion.w + 0.5) {
+                    return half4(0.0);
+                }
+
                 // fragCoord is in gpuNode-local buffer space; uOffset maps it back to
                 // device-pixel coordinates relative to the filter region top-left.
                 float2 local = fragCoord - uOffset;

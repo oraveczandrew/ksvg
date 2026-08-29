@@ -270,7 +270,7 @@ internal class SoftwareFilterBackend internal constructor(
         filterNode: FilterRenderNode,
         originalObjBBox: Box,
         state: RendererState,
-    ): Bitmap? {
+    ): Bitmap? = with(renderContext) {
         val filter = filterNode.sourceElement
 
         val results = filterNode.filterSourceMap ?: FilterSourceMap(renderContext).also {
@@ -285,20 +285,20 @@ internal class SoftwareFilterBackend internal constructor(
         // dimensions, so both must be expressed in bitmap-pixel space. The bitmap
         // maps exactly onto the filter region, so the pixel-space filter region is
         // simply the full bitmap.
-        val filterRegionPx = RectF(0f, 0f, sourceBitmap.width.toFloat(), sourceBitmap.height.toFloat())
+        renderContext.rectFPool.withPooledObject { filterRegionPx ->
+            filterRegionPx.set(0f, 0f, sourceBitmap.width.toFloat(), sourceBitmap.height.toFloat())
 
-        var lastResult: Bitmap? = sourceBitmap
-        val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
-        val primitiveScaleX = if (primitiveUnitsAreUser) sx else originalObjBBox.width * sx
-        val primitiveScaleY = if (primitiveUnitsAreUser) sy else originalObjBBox.height * sy
-        val primitiveOriginX = if (primitiveUnitsAreUser) 0f else originalObjBBox.minX
-        val primitiveOriginY = if (primitiveUnitsAreUser) 0f else originalObjBBox.minY
+            var lastResult: Bitmap? = sourceBitmap
+            val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
+            val primitiveScaleX = if (primitiveUnitsAreUser) sx else originalObjBBox.width * sx
+            val primitiveScaleY = if (primitiveUnitsAreUser) sy else originalObjBBox.height * sy
+            val primitiveOriginX = if (primitiveUnitsAreUser) 0f else originalObjBBox.minX
+            val primitiveOriginY = if (primitiveUnitsAreUser) 0f else originalObjBBox.minY
 
-        filterNode.primitives.forEachElement { primitiveNode ->
-            val child = primitiveNode.sourceElement
+            filterNode.primitives.forEachElement { primitiveNode ->
+                val child = primitiveNode.sourceElement
 
-            val res = renderContext.rectFPool.withPooledObject { primitiveRegion ->
-                with(renderContext) {
+                val res = renderContext.rectFPool.withPooledObject { primitiveRegion ->
                     calculatePrimitiveRegion(
                         primitive = child,
                         filterRegion = filterRegion,
@@ -306,67 +306,63 @@ internal class SoftwareFilterBackend internal constructor(
                         originalObjBBox = originalObjBBox,
                         outRect = primitiveRegion
                     )
-                }
 
-                // Remap `primitiveRegion` from user space to bitmap-pixel space so
-                // the per-primitive subregion clipping (which uses the bitmap's
-                // pixel dimensions) lines up correctly at any render scale.
-                val frW = filterRegion.width()
-                val frH = filterRegion.height()
-                if (frW > 0f && frH > 0f) {
-                    val scaleX = sourceBitmap.width / frW
-                    val scaleY = sourceBitmap.height / frH
-                    primitiveRegion.set(
-                        (primitiveRegion.left - filterRegion.left) * scaleX,
-                        (primitiveRegion.top - filterRegion.top) * scaleY,
-                        (primitiveRegion.right - filterRegion.left) * scaleX,
-                        (primitiveRegion.bottom - filterRegion.top) * scaleY,
-                    )
-                }
+                    // Remap `primitiveRegion` from user space to bitmap-pixel space so
+                    // the per-primitive subregion clipping (which uses the bitmap's
+                    // pixel dimensions) lines up correctly at any render scale.
+                    val frW = filterRegion.width()
+                    val frH = filterRegion.height()
+                    if (frW > 0f && frH > 0f) {
+                        val scaleX = sourceBitmap.width / frW
+                        val scaleY = sourceBitmap.height / frH
+                        primitiveRegion.set(
+                            (primitiveRegion.left - filterRegion.left) * scaleX,
+                            (primitiveRegion.top - filterRegion.top) * scaleY,
+                            (primitiveRegion.right - filterRegion.left) * scaleX,
+                            (primitiveRegion.bottom - filterRegion.top) * scaleY,
+                        )
+                    }
 
-                when (primitiveNode) {
-                    is FeMergeRenderNode -> with(renderContext) {
-                        doFeMergeFilter(
+                    when (primitiveNode) {
+                        is FeMergeRenderNode -> doFeMergeFilter(
                             merge = primitiveNode,
                             results = results,
                             lastResult = lastResult,
                             region = primitiveRegion
                         )
-                    }
 
-                    else -> applyPrimitive(
-                        canvas = canvas,
-                        primitiveNode = primitiveNode,
-                        results = results,
-                        lastResult = lastResult,
-                        primitiveScaleX = primitiveScaleX,
-                        primitiveScaleY = primitiveScaleY,
-                        primitiveOriginX = primitiveOriginX,
-                        primitiveOriginY = primitiveOriginY,
-                        canvasScaleX = sx,
-                        canvasScaleY = sy,
-                        primitiveUnitsAreUser = primitiveUnitsAreUser,
-                        filterRegion = filterRegionPx,
-                        filterRegionUserLeft = filterRegion.left,
-                        filterRegionUserTop = filterRegion.top,
-                        primitiveRegion = primitiveRegion,
-                        state = state,
-                    )
+                        else -> applyPrimitive(
+                            primitiveNode = primitiveNode,
+                            results = results,
+                            lastResult = lastResult,
+                            primitiveScaleX = primitiveScaleX,
+                            primitiveScaleY = primitiveScaleY,
+                            primitiveOriginX = primitiveOriginX,
+                            primitiveOriginY = primitiveOriginY,
+                            canvasScaleX = sx,
+                            canvasScaleY = sy,
+                            primitiveUnitsAreUser = primitiveUnitsAreUser,
+                            filterRegion = filterRegionPx,
+                            filterRegionUserLeft = filterRegion.left,
+                            filterRegionUserTop = filterRegion.top,
+                            primitiveRegion = primitiveRegion,
+                            state = state,
+                        )
+                    }
+                }
+
+                if (res != null) {
+                    results.set(child.result, res)
+                    lastResult = res
                 }
             }
 
-            if (res != null) {
-                results.set(child.result, res)
-                lastResult = res
-            }
+            results.recycle(exclude = lastResult)
+            return lastResult
         }
-
-        results.recycle(exclude = lastResult)
-        return lastResult
     }
 
     private fun applyPrimitive(
-        canvas: Canvas,
         primitiveNode: FilterPrimitiveRenderNode<*>,
         results: FilterSourceMap,
         lastResult: Bitmap?,
@@ -395,15 +391,15 @@ internal class SoftwareFilterBackend internal constructor(
         return when (primitiveNode) {
 
             is FeTurbulenceRenderNode -> with(renderContext) {
-                    doFeTurbulenceFilter(
-                        primitiveNode = primitiveNode,
-                        inputBitmap = inputBitmap,
-                        primitiveScaleX = primitiveScaleX,
-                        primitiveScaleY = primitiveScaleY,
-                        primitiveOriginX = primitiveOriginX,
-                        primitiveOriginY = primitiveOriginY,
-                        regionLeft = filterRegionUserLeft,
-                        regionTop = filterRegionUserTop,
+                doFeTurbulenceFilter(
+                    primitiveNode = primitiveNode,
+                    inputBitmap = inputBitmap,
+                    primitiveScaleX = primitiveScaleX,
+                    primitiveScaleY = primitiveScaleY,
+                    primitiveOriginX = primitiveOriginX,
+                    primitiveOriginY = primitiveOriginY,
+                    regionLeft = filterRegionUserLeft,
+                    regionTop = filterRegionUserTop,
                     canvasScaleX = canvasScaleX,
                     canvasScaleY = canvasScaleY,
                     primitiveRegion = primitiveRegion,
@@ -477,15 +473,15 @@ internal class SoftwareFilterBackend internal constructor(
             }
 
             is FeDiffuseLightingRenderNode -> with(renderContext) {
-                    doFeDiffuseLightingFilter(
-                        primitiveNode = primitiveNode,
-                        inputBitmap = inputBitmap,
-                        primitiveScaleX = primitiveScaleX,
-                        primitiveScaleY = primitiveScaleY,
-                        primitiveOriginX = primitiveOriginX,
-                        primitiveOriginY = primitiveOriginY,
-                        regionLeft = filterRegionUserLeft,
-                        regionTop = filterRegionUserTop,
+                doFeDiffuseLightingFilter(
+                    primitiveNode = primitiveNode,
+                    inputBitmap = inputBitmap,
+                    primitiveScaleX = primitiveScaleX,
+                    primitiveScaleY = primitiveScaleY,
+                    primitiveOriginX = primitiveOriginX,
+                    primitiveOriginY = primitiveOriginY,
+                    regionLeft = filterRegionUserLeft,
+                    regionTop = filterRegionUserTop,
                     canvasScaleX = canvasScaleX,
                     canvasScaleY = canvasScaleY,
                     primitiveRegion = primitiveRegion,
@@ -494,15 +490,15 @@ internal class SoftwareFilterBackend internal constructor(
             }
 
             is FeSpecularLightingRenderNode -> with(renderContext) {
-                    doFeSpecularLightingFilter(
-                        primitiveNode = primitiveNode,
-                        inputBitmap = inputBitmap,
-                        primitiveScaleX = primitiveScaleX,
-                        primitiveScaleY = primitiveScaleY,
-                        primitiveOriginX = primitiveOriginX,
-                        primitiveOriginY = primitiveOriginY,
-                        regionLeft = filterRegionUserLeft,
-                        regionTop = filterRegionUserTop,
+                doFeSpecularLightingFilter(
+                    primitiveNode = primitiveNode,
+                    inputBitmap = inputBitmap,
+                    primitiveScaleX = primitiveScaleX,
+                    primitiveScaleY = primitiveScaleY,
+                    primitiveOriginX = primitiveOriginX,
+                    primitiveOriginY = primitiveOriginY,
+                    regionLeft = filterRegionUserLeft,
+                    regionTop = filterRegionUserTop,
                     canvasScaleX = canvasScaleX,
                     canvasScaleY = canvasScaleY,
                     primitiveRegion = primitiveRegion,

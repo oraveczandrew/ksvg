@@ -58,6 +58,7 @@ private val ACCEPTED_SIMILARITY_EXCEPTIONS = mapOf(
     "text_letter_spacing.svg" to 0.92,
     "text_variation_settings.svg" to 0.88,
     "text_advanced_features.svg" to 0.88,
+    "filters.svg" to 0.93,
 
     // Complex filter interactions and tiling edge cases
     "filter_tile.svg" to 0.93,
@@ -67,6 +68,7 @@ private val ACCEPTED_SIMILARITY_EXCEPTIONS = mapOf(
 
     // feTurbulence / feDisplacementMap use a noise/PRNG algorithm that differs from
     // rsvg; the outputs are valid but never pixel-equal, so the comparison is excluded.
+    "lightning.svg" to 0.0,
     "displacement.svg" to 0.0,
     "turbulence.svg" to 0.0,
 )

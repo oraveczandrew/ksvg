@@ -91,6 +91,11 @@ internal fun RendererState.selectTypefaceAndFontStyling(
     fillConfig.setFontVariationSettings(fontVariationSettings)
     strokeConfig.setFontVariationSettings(fontVariationSettings)
 
+    // Merge font-feature-settings and font-variant-position into the state's fontFeatureSet
+    val ffsBuilder = getFontFeatureSetBuilder()
+    ffsBuilder.addSettings(style.fontFeatureSettings)
+    ffsBuilder.addSettings(style.fontVariantPosition)
+
     val fontFeatureSettings = fontFeatureSet.toString()
     fillConfig.setFontFeatureSettings(fontFeatureSettings)
     strokeConfig.setFontFeatureSettings(fontFeatureSettings)

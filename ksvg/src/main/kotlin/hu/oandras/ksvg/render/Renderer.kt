@@ -92,7 +92,7 @@ import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.withAlpha
-import java.util.Stack
+import java.util.*
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -656,7 +656,20 @@ internal class Renderer internal constructor(
         if (rec.replay(canvas, key)) return
 
         // Record fresh content, then replay it once onto the real canvas.
-        val pad = 16f
+        // If the subtree has filters (e.g., drop-shadow), filter effects can
+        // extend beyond the geometric boundingBox. Compute the maximum filter
+        // extent (blur radius + offset) from the filter primitives.
+        val pad = if (hasFilters()) {
+            matrixPool.withPooledObject { m ->
+                val v = getValuesFloatArray
+                @Suppress("DEPRECATION")
+                canvas.getMatrix(m)
+                m.getValues(v)
+                val sx = hypot(v[Matrix.MSCALE_X].toDouble(), v[Matrix.MSKEW_Y].toDouble()).toFloat()
+                val sy = hypot(v[Matrix.MSCALE_Y].toDouble(), v[Matrix.MSKEW_X].toDouble()).toFloat()
+                computeMaxFilterExtent(sx, sy)
+            }
+        } else 16f
         val w = (bb.width + 2 * pad).toInt().coerceAtLeast(1)
         val h = (bb.height + 2 * pad).toInt().coerceAtLeast(1)
         val ox = bb.minX - pad
@@ -1071,65 +1084,69 @@ internal class Renderer internal constructor(
         // it unset would leak the previous node's mode onto a node with a normal blend.
         setBlendMode(nodeState, saveLayerPaint)
 
-        val statePushRectF = statePushRectF
-        canvas.getClipBounds(statePushRectF)
+        rectFPool.withPooledObject { clipBoundsF ->
+            // getClipBounds(Rect) returns local coordinates.
+            val clipR = statePushRectF
+            canvas.getClipBounds(clipR)
+            clipBoundsF.set(clipR.left.toFloat(), clipR.top.toFloat(), clipR.right.toFloat(), clipR.bottom.toFloat())
 
-        val bbox = node.boundingBox
-        if (bbox != null && !node.hasMarkers() && !node.hasFilters()) {
-            val strokeWidth = nodeStyle.strokeWidth
-            val strokeWidthPx = if (strokeWidth != null && !strokeWidth.isZero) {
-                with(this@Renderer) { strokeWidth.floatValueInContext() }
-            } else 0f
+            val bbox = node.boundingBox
+            if (bbox != null && !node.hasMarkers() && !node.hasFilters()) {
+                val strokeWidth = nodeStyle.strokeWidth
+                val strokeWidthPx = if (strokeWidth != null && !strokeWidth.isZero) {
+                    with(this@Renderer) { strokeWidth.floatValueInContext() }
+                } else 0f
 
-            matrixPool.withPooledObject { matrix ->
-                @Suppress("DEPRECATION")
-                canvas.getMatrix(matrix)
-                rectFPool.withPooledObject { deviceBBox ->
-                    deviceBBox.set(bbox.minX, bbox.minY, bbox.maxX(), bbox.maxY())
-                    matrix.mapRect(deviceBBox)
-
-                    // Calculate stroke padding in device space.
+                matrixPool.withPooledObject { matrix ->
+                    @Suppress("DEPRECATION")
+                    canvas.getMatrix(matrix)
                     val v = getValuesFloatArray
                     matrix.getValues(v)
                     val sx = hypot(v[Matrix.MSCALE_X], v[Matrix.MSKEW_Y])
                     val sy = hypot(v[Matrix.MSCALE_Y], v[Matrix.MSKEW_X])
                     val maxScale = max(sx, sy)
+                    val padLocal = if (maxScale > 0) 1f / maxScale else 1f
 
-                    // Padding for stroke + 1px for anti-aliasing safety.
-                    val pad = ceil(strokeWidthPx * 0.5f * maxScale) + 1f
-                    deviceBBox.inset(-pad, -pad)
+                    val pad = strokeWidthPx * 0.5f + padLocal
+                    
+                    val bboxL = bbox.minX - pad
+                    val bboxT = bbox.minY - pad
+                    val bboxR = bbox.maxX() + pad
+                    val bboxB = bbox.maxY() + pad
 
-                    // Intersect with current clip bounds
-                    val left = max(statePushRectF.left.toFloat(), deviceBBox.left)
-                    val top = max(statePushRectF.top.toFloat(), deviceBBox.top)
-                    val right = min(statePushRectF.right.toFloat(), deviceBBox.right)
-                    val bottom = min(statePushRectF.bottom.toFloat(), deviceBBox.bottom)
+                    val left = max(clipBoundsF.left, bboxL)
+                    val top = max(clipBoundsF.top, bboxT)
+                    val right = min(clipBoundsF.right, bboxR)
+                    val bottom = min(clipBoundsF.bottom, bboxB)
 
+                    // Optimization: if the bounding box is significantly smaller than the clip,
+                    // use it to reduce saveLayer memory/time.
                     if (right > left && bottom > top) {
-                        statePushRectF.set(
-                            floor(left).toInt(),
-                            floor(top).toInt(),
-                            ceil(right).toInt(),
-                            ceil(bottom).toInt()
-                        )
+                        // Safety: Truly tighten only if NO filter is present and it's not a container.
+                        // Filter effects often extend beyond the bounding box.
+                        if (node !is GroupRenderNode<*> && node !is KSVGTextContainerRenderNode<*> && !node.hasFilters()) {
+                            clipBoundsF.set(left, top, right, bottom)
+                        }
                     }
                 }
             }
+
+            // FOR TEST: Ensure we don't clip nested SVGs too aggressively in saveLayer.
+            // If it's an SVG container, we should at least allow the whole clipBounds (viewport).
+            // Actually, node.boundingBox for SVG should already cover its children.
+            // But alignment might shift them.
+
+            val savedCount = canvas.saveLayer(
+                /* left = */ clipBoundsF.left,
+                /* top = */ clipBoundsF.top,
+                /* right = */ clipBoundsF.right,
+                /* bottom = */ clipBoundsF.bottom,
+                /* paint = */ saveLayerPaint
+            )
+
+            // Save style state
+            stateStack.push(newSavedRendererState(oldState, savedCount))
         }
-
-        val savedCount = canvas.saveLayer(
-            /* left = */ statePushRectF.left.toFloat(),
-            /* top = */ statePushRectF.top.toFloat(),
-            /* right = */ statePushRectF.right.toFloat(),
-            /* bottom = */ statePushRectF.bottom.toFloat(),
-            /* paint = */ saveLayerPaint
-        )
-
-
-
-
-        // Save style state
-        stateStack.push(newSavedRendererState(oldState, savedCount))
         val newState = renderStatePool.pull()
         newState.apply(oldState)
         newState.paintHost = oldState.paintHost

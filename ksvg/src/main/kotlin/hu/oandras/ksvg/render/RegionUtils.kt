@@ -57,10 +57,10 @@ internal fun calculatePrimitiveRegion(
     originalObjBBox: Box,
     outRect: RectF
 ) {
-    val x: Float
-    val y: Float
-    val w: Float
-    val h: Float
+    var x: Float
+    var y: Float
+    var w: Float
+    var h: Float
 
     if (unitsAreUser) {
         x = primitive.x?.floatValueXInContext() ?: filterRegion.left
@@ -68,31 +68,27 @@ internal fun calculatePrimitiveRegion(
         w = primitive.width?.floatValueXInContext() ?: filterRegion.width()
         h = primitive.height?.floatValueYInContext() ?: filterRegion.height()
     } else {
-        val _x = primitive.x?.floatValueInContext(1f)
-        val _y = primitive.y?.floatValueInContext(1f)
-        val _w = primitive.width?.floatValueInContext(1f)
-        val _h = primitive.height?.floatValueInContext(1f)
-
-        x = if (_x != null) {
-            originalObjBBox.minX + _x * originalObjBBox.width
+        val px = primitive.x
+        val py = primitive.y
+        val pw = primitive.width
+        val ph = primitive.height
+        x = if (px != null) {
+            originalObjBBox.minX + px.floatValueInContext(1f) * originalObjBBox.width
         } else {
             filterRegion.left
         }
-
-        y = if (_y != null) {
-            originalObjBBox.minY + _y * originalObjBBox.height
+        y = if (py != null) {
+            originalObjBBox.minY + py.floatValueInContext(1f) * originalObjBBox.height
         } else {
             filterRegion.top
         }
-
-        w = if (_w != null) {
-            _w * originalObjBBox.width
+        w = if (pw != null) {
+            pw.floatValueInContext(1f) * originalObjBBox.width
         } else {
             filterRegion.width()
         }
-
-        h = if (_h != null) {
-            _h * originalObjBBox.height
+        h = if (ph != null) {
+            ph.floatValueInContext(1f) * originalObjBBox.height
         } else {
             filterRegion.height()
         }

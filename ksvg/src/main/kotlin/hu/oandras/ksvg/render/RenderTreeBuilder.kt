@@ -144,8 +144,7 @@ import hu.oandras.ksvg.utils.optimizeReadOnlyList
 import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.takeIfNonZeroOrElse
 import hu.oandras.ksvg.utils.textXMLSpaceTransform
-import java.util.Locale
-import java.util.Stack
+import java.util.*
 import kotlin.math.max
 
 internal class RenderTreeBuilder(
@@ -1700,8 +1699,8 @@ internal class RenderTreeBuilder(
                         dx = primitive.dx,
                         dy = primitive.dy,
                     ),
-                    dx = 0f,
-                    dy = 0f,
+                    dx = primitive.dx?.floatValueXInContext() ?: 0f,
+                    dy = primitive.dy?.floatValueYInContext() ?: 0f,
                 )
                 FeDropShadowRenderNode(
                     sourceElement = primitive,
