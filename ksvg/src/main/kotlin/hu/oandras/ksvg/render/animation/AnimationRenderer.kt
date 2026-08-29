@@ -194,7 +194,7 @@ internal fun updatePathAndBoundingBox(
         if (obj is PolygonShape) {
             outPath.close()
         }
-        val box = calculatePathBounds(outPath)
+        val box = calculatePathBounds(outPath, obj.boundingBox)
         obj.boundingBox = box
         node.boundingBox = box
         true
@@ -223,7 +223,7 @@ internal fun updatePathAndBoundingBox(
     }
 
     return if (dChanged) {
-        val box = calculatePathBounds(outPath)
+        val box = calculatePathBounds(outPath, obj.boundingBox)
         obj.boundingBox = box
         node.boundingBox = box
         true

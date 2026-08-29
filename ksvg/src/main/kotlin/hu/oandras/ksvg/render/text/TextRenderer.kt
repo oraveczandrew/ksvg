@@ -40,9 +40,10 @@ import hu.oandras.ksvg.render.TSpanRenderNode
 import hu.oandras.ksvg.render.TextNode
 import hu.oandras.ksvg.render.TextPathRenderNode
 import hu.oandras.ksvg.render.TextSequenceNode
+import hu.oandras.ksvg.render.pool.FloatArrayBucket
 import hu.oandras.ksvg.utils.capitalizeStr
 import hu.oandras.ksvg.utils.forEachElement
-import java.util.Locale
+import java.util.*
 
 internal abstract class TextProcessor {
     @JvmField
@@ -107,7 +108,7 @@ internal abstract class TextProcessor {
     }
 
     context(renderContext: DisplayContext)
-    abstract fun processText(canvas: Canvas, text: String)
+    abstract fun processText(canvas: Canvas, text: String, widths: FloatArrayBucket)
 }
 
 private class TextPositioning(
@@ -147,7 +148,7 @@ internal fun calculateTextWidth(children: List<TextNode>, parentState: RendererS
     var width = 0f
     children.forEachElement { child ->
         width += when (child) {
-            is TextSequenceNode -> measureText(child.text, parentState.fillPaint, parentState.textWidthBuffer)
+            is TextSequenceNode -> measureText(child.text, parentState.fillPaint, child.textWidthBuffer)
             is TSpanRenderNode -> {
                 // If x or y is specified, it might reset the layout chunk, but for total width 
                 // calculation we still need to know how much space it takes from its start point.
@@ -155,7 +156,7 @@ internal fun calculateTextWidth(children: List<TextNode>, parentState: RendererS
             }
 
             is TextPathRenderNode -> calculateTextWidth(child.children, child.renderState)
-            is TRefRenderNode -> measureText(child.text, child.renderState.fillPaint, child.renderState.textWidthBuffer)
+            is TRefRenderNode -> measureText(child.text, child.renderState.fillPaint, child.textWidthBuffer)
             else -> 0f
         }
     }
@@ -173,7 +174,7 @@ internal fun calculateTextBounds(
         when (child) {
             is TextSequenceNode -> {
                 // For sequence nodes we use parent state because they don't have their own
-                proc.processText(canvas, child.text, parentState)
+                proc.processText(canvas, child.text, parentState, child.textWidthBuffer)
             }
 
             is TSpanRenderNode -> {
@@ -184,7 +185,7 @@ internal fun calculateTextBounds(
 
             is TRefRenderNode -> {
                 proc.pushPositioning(child.x, child.y, child.dx, child.dy)
-                proc.processText(canvas, child.text, child.renderState)
+                proc.processText(canvas, child.text, child.renderState, child.textWidthBuffer)
                 proc.popPositioning()
             }
 
@@ -212,23 +213,24 @@ internal class TextBoundsCalculator : TextProcessor() {
     }
 
     context(renderContext: DisplayContext)
-    override fun processText(canvas: Canvas, text: String) {
+    override fun processText(canvas: Canvas, text: String, widths: FloatArrayBucket) {
         if (state.style.visibility != false) {
             val rect = Rect()
             val paint = state.fillPaint
-            val widths = state.textWidthBuffer
             val transformedText = applyTextTransform(text, state.style.textTransform)
             val baselineOffset = calculateBaselineOffset(paint, state.style)
-            
+
             if (hasPositioning()) {
-                for (char in transformedText) {
+                val buffer = widths.getWithSize(transformedText.length)
+                paint.getTextWidths(transformedText, buffer)
+                for (i in transformedText.indices) {
                     applyPositioning()
-                    val s = char.toString()
+                    val s = transformedText[i].toString()
                     paint.getTextBounds(s, 0, 1, rect)
                     val textBounds = RectF(rect)
                     textBounds.offset(x, y + baselineOffset)
                     boundingBox.union(textBounds)
-                    x += measureText(s, paint, widths)
+                    x += buffer[i]
                 }
             } else {
                 paint.getTextBounds(transformedText, 0, transformedText.length, rect)
@@ -242,13 +244,13 @@ internal class TextBoundsCalculator : TextProcessor() {
 
     // Needed for calculateTextBounds calls that pass state
     context(renderContext: DisplayContext)
-    fun processText(canvas: Canvas, text: String, state: RendererState) {
+    fun processText(canvas: Canvas, text: String, state: RendererState, widths: FloatArrayBucket) {
         // Wrap state so processText can access it
-        // Actually, TextBoundsCalculator seems to be used without an initial state 
+        // Actually, TextBoundsCalculator seems to be used without an initial state
         // in calculateTextBounds, but it uses the passed state for each call.
         // Let's adjust TextBoundsCalculator to hold current state.
         this.state = state
-        processText(canvas, text)
+        processText(canvas, text, widths)
     }
 
     @JvmField
@@ -260,11 +262,13 @@ internal open class PlainTextDrawer(
     internal var state: RendererState,
 ) : TextProcessor() {
 
+    private val fontMetrics = Paint.FontMetrics()
+
     context(renderContext: DisplayContext)
-    override fun processText(canvas: Canvas, text: String) {
+    override fun processText(canvas: Canvas, text: String, widths: FloatArrayBucket) {
         val style = state.style
         if (style.visibility == false) {
-            updatePositionAfterText(text)
+            updatePositionAfterText(text, widths)
             return
         }
 
@@ -272,16 +276,16 @@ internal open class PlainTextDrawer(
 
         val writingMode = style.writingMode ?: WritingMode.horizontal_tb
         if (writingMode.isVertical) {
-            processTextVertical(canvas, transformedText)
+            processTextVertical(canvas, transformedText, widths)
         } else {
-            processTextHorizontal(canvas, transformedText)
+            processTextHorizontal(canvas, transformedText, widths)
         }
     }
 
-    private fun updatePositionAfterText(text: String) {
+    private fun updatePositionAfterText(text: String, widths: FloatArrayBucket) {
         val style = state.style
         val writingMode = style.writingMode ?: WritingMode.horizontal_tb
-        val advance = measureText(text, state.fillPaint, state.textWidthBuffer)
+        val advance = measureText(text, state.fillPaint, widths)
         if (writingMode.isVertical) {
             y += advance
         } else {
@@ -290,17 +294,26 @@ internal open class PlainTextDrawer(
     }
 
     context(renderContext: DisplayContext)
-    private fun processTextHorizontal(canvas: Canvas, text: String) {
+    private fun processTextHorizontal(canvas: Canvas, text: String, widths: FloatArrayBucket) {
         val letterspacingAdj = state.style.letterSpacing!!.floatValueInContext() / 2
         val paint = state.fillPaint
         val strokePaint = state.strokePaint
-        val widths = state.textWidthBuffer
         val baselineOffset = calculateBaselineOffset(paint, state.style)
+        // Resolve font metrics once for the whole run. drawManualDecorations is
+        // called per glyph in the positioning branch, so reading paint.fontMetrics
+        // (which allocates a FontMetrics) there would allocate per character.
+        val fm = fontMetrics
+        paint.getFontMetrics(fm)
 
         if (hasPositioning()) {
-            for (char in text) {
+            // Measure the whole run once into the node's width buffer, then index
+            // per character. This keeps the buffer at the run's fixed length (no
+            // per-frame resize) and avoids measuring each glyph in isolation.
+            val buffer = widths.getWithSize(text.length)
+            paint.getTextWidths(text, buffer)
+            for (i in text.indices) {
                 applyPositioning()
-                val s = char.toString()
+                val s = text[i].toString()
                 val adjustedX = x - letterspacingAdj
                 val baselineY = y + baselineOffset
                 if (state.hasFill) {
@@ -309,8 +322,8 @@ internal open class PlainTextDrawer(
                 if (state.hasStroke) {
                     canvas.drawText(s, adjustedX, baselineY, strokePaint)
                 }
-                val advance = measureText(s, paint, widths)
-                drawManualDecorations(canvas, adjustedX, baselineY, advance, paint)
+                val advance = buffer[i]
+                drawManualDecorations(canvas, adjustedX, baselineY, advance, paint, fm)
                 x += advance
             }
         } else {
@@ -323,14 +336,13 @@ internal open class PlainTextDrawer(
                 canvas.drawText(text, adjustedX, baselineY, strokePaint)
             }
             val advance = measureText(text, paint, widths)
-            drawManualDecorations(canvas, adjustedX, baselineY, advance, paint)
+            drawManualDecorations(canvas, adjustedX, baselineY, advance, paint, fm)
             x += advance
         }
     }
 
-    private fun drawManualDecorations(canvas: Canvas, x: Float, y: Float, advance: Float, paint: Paint) {
+    private fun drawManualDecorations(canvas: Canvas, x: Float, y: Float, advance: Float, paint: Paint, fm: Paint.FontMetrics) {
         val decoration = state.style.textDecoration ?: return
-        val fm = paint.fontMetrics
         val thickness = paint.textSize / 18f
 
         if (decoration.hasOverline()) {
@@ -358,7 +370,7 @@ internal open class PlainTextDrawer(
 
     @SuppressLint("UseKtx")
     context(renderContext: DisplayContext)
-    private fun processTextVertical(canvas: Canvas, text: String) {
+    private fun processTextVertical(canvas: Canvas, text: String, widths: FloatArrayBucket) {
         val orientation = state.style.textOrientation ?: TextOrientation.mixed
 
         if (orientation == TextOrientation.sideways) {
@@ -366,7 +378,7 @@ internal open class PlainTextDrawer(
             val oldY = y
             canvas.save()
             canvas.rotate(90f, x, y)
-            processTextHorizontal(canvas, text)
+            processTextHorizontal(canvas, text, widths)
             canvas.restore()
 
             val advance = x - oldX
@@ -402,7 +414,7 @@ internal class PathTextDrawer(
 ) : PlainTextDrawer(state) {
 
     context(renderContext: DisplayContext)
-    override fun processText(canvas: Canvas, text: String) {
+    override fun processText(canvas: Canvas, text: String, widths: FloatArrayBucket) {
         if (state.style.visibility != false) {
             val transformedText = applyTextTransform(text, state.style.textTransform)
             // Android/Skia divides letterspacing and puts half before and after each letter.
@@ -431,7 +443,7 @@ internal class PathTextDrawer(
         }
 
         // Update the current text position
-        x += measureText(text, state.fillPaint, state.textWidthBuffer)
+        x += measureText(text, state.fillPaint, widths)
     }
 }
 
@@ -444,7 +456,7 @@ internal fun calculateTextPath(
     children.forEachElement { child ->
         when (child) {
             is TextSequenceNode -> {
-                proc.processText(child.text, parentState)
+                proc.processText(child.text, parentState, child.textWidthBuffer)
             }
 
             is TSpanRenderNode -> {
@@ -455,7 +467,7 @@ internal fun calculateTextPath(
 
             is TRefRenderNode -> {
                 proc.pushPositioning(child.x, child.y, child.dx, child.dy)
-                proc.processText(child.text, child.renderState)
+                proc.processText(child.text, child.renderState, child.textWidthBuffer)
                 proc.popPositioning()
             }
 
@@ -478,26 +490,27 @@ internal class PlainTextToPath(
     }
 
     context(renderContext: DisplayContext)
-    override fun processText(canvas: Canvas, text: String) {
+    override fun processText(canvas: Canvas, text: String, widths: FloatArrayBucket) {
         // Should not be called without state
     }
 
     context(renderContext: RenderContext)
-    fun processText(text: String, state: RendererState) {
+    fun processText(text: String, state: RendererState, widths: FloatArrayBucket) {
         if (state.style.visibility != false) {
             val paint = state.fillPaint
-            val widths = state.textWidthBuffer
             val transformedText = applyTextTransform(text, state.style.textTransform)
             val baselineOffset = calculateBaselineOffset(paint, state.style)
-            
+
             if (hasPositioning()) {
-                for (char in transformedText) {
+                val buffer = widths.getWithSize(transformedText.length)
+                paint.getTextWidths(transformedText, buffer)
+                for (i in transformedText.indices) {
                     applyPositioning()
-                    val s = char.toString()
+                    val s = transformedText[i].toString()
                     val spanPath = Path()
                     paint.getTextPath(s, 0, 1, x, y + baselineOffset, spanPath)
                     textAsPath.addPath(spanPath)
-                    x += measureText(s, paint, widths)
+                    x += buffer[i]
                 }
             } else {
                 val spanPath = Path()

@@ -424,7 +424,7 @@ internal class Renderer internal constructor(
                     plainDrawer.state = state
                 }
                 processor.pushPositioning(node.x, node.y, node.dx, node.dy)
-                processor.processText(canvas, node.text)
+                processor.processText(canvas, node.text, node.textWidthBuffer)
             } finally {
                 processor.popPositioning()
                 if (plainDrawer != null) plainDrawer.state = processorState ?: state
@@ -439,7 +439,7 @@ internal class Renderer internal constructor(
     ) {
         node.children.forEachElement { child ->
             when (child) {
-                is TextSequenceNode -> processor.processText(canvas, child.text)
+                is TextSequenceNode -> processor.processText(canvas, child.text, child.textWidthBuffer)
                 is TSpanRenderNode -> renderTSpanNode(canvas, child, processor)
                 is TextPathRenderNode -> renderTextPathNode(canvas, child)
                 is TRefRenderNode -> renderTRefNode(canvas, child, processor)

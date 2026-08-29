@@ -139,9 +139,6 @@ internal class RendererState private constructor(
     @JvmField
     val dashIntervalBuffer = FloatArrayBucket()
 
-    @JvmField
-    val textWidthBuffer = FloatArrayBucket()
-
     // Scale applied to stroke-dasharray / dashoffset when the shape declares a
     // `pathLength`. Computed from (actual path length / declared pathLength).
     @JvmField

@@ -51,6 +51,15 @@ public class Box(
         return minY + height
     }
 
+    public fun copy(rect: RectF): Box {
+        return copy(
+            minX = floor(rect.left),
+            minY = floor(rect.top),
+            width = ceil(rect.right) - floor(rect.left),
+            height = ceil(rect.bottom) - floor(rect.top)
+        )
+    }
+
     public fun copy(
         minX: Float = this.minX,
         minY: Float = this.minY,

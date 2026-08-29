@@ -234,13 +234,13 @@ internal fun RenderNode<*>.updateBoundingBox(path: Path) {
 }
 
 context(poolOwner: PoolOwner)
-internal fun calculatePathBounds(path: Path?): Box {
+internal fun calculatePathBounds(path: Path?, toRecycle: Box?): Box {
     return if (path == null) {
         Box.EMPTY
     } else {
         poolOwner.rectFPool.withPooledObject { rect ->
             path.computeBounds(rect, true)
-            Box(rect)
+            toRecycle?.copy(rect) ?: Box(rect)
         }
     }
 }

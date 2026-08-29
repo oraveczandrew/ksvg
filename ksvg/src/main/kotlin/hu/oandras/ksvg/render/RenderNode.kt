@@ -180,7 +180,11 @@ internal sealed interface TextNode
 
 internal class TextSequenceNode(
     @JvmField val text: String
-) : TextNode
+) : TextNode {
+    // Per-node width buffer: sized once to this run's fixed text length and
+    // reused every frame, so measuring it never resizes/reallocates.
+    @JvmField val textWidthBuffer = FloatArrayBucket()
+}
 
 /**
  * The x/y/width/height length sources a nested viewport container (<svg>,
@@ -349,6 +353,9 @@ internal class TRefRenderNode(
     @JvmField var dx: FloatArray?,
     @JvmField var dy: FloatArray?,
 ) : RenderNode<TRef>(sourceElement), TextNode {
+    // Per-node width buffer (see TextSequenceNode.textWidthBuffer).
+    @JvmField val textWidthBuffer = FloatArrayBucket()
+
     override fun render(renderer: Renderer, canvas: Canvas) {
         error("TRef is rendered via renderTRefNode(node, processor) during text traversal")
     }

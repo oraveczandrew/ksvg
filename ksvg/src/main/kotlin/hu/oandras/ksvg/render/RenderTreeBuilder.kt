@@ -944,7 +944,7 @@ internal class RenderTreeBuilder(
         val path = PathConverter(pathDefinition).path
         
         if (obj.boundingBox == null) {
-            obj.boundingBox = calculatePathBounds(path)
+            obj.boundingBox = calculatePathBounds(path, null)
         }
         updateParentBoundingBox(obj)
 
