@@ -21,6 +21,7 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.BuildConfig
+import hu.oandras.ksvg.dom.style.CSSBlendMode
 
 internal enum class BlendModeCompat {
     CLEAR, SRC, DST, SRC_OVER, DST_OVER, SRC_IN, DST_IN, SRC_OUT, DST_OUT, SRC_ATOP, DST_ATOP, XOR, ADD,
@@ -201,4 +202,25 @@ internal fun Paint.setBlendModeCompat(mode: BlendModeCompat?) {
 
 internal fun isBlendModeSupported(mode: BlendModeCompat): Boolean {
     return paintCompat.isBlendModeSupported(mode)
+}
+
+internal fun CSSBlendMode.toBlendModeCompat(): BlendModeCompat? {
+    return when (this) {
+        CSSBlendMode.multiply -> BlendModeCompat.MULTIPLY
+        CSSBlendMode.screen -> BlendModeCompat.SCREEN
+        CSSBlendMode.overlay -> BlendModeCompat.OVERLAY
+        CSSBlendMode.darken -> BlendModeCompat.DARKEN
+        CSSBlendMode.lighten -> BlendModeCompat.LIGHTEN
+        CSSBlendMode.color_dodge -> BlendModeCompat.COLOR_DODGE
+        CSSBlendMode.color_burn -> BlendModeCompat.COLOR_BURN
+        CSSBlendMode.hard_light -> BlendModeCompat.HARD_LIGHT
+        CSSBlendMode.soft_light -> BlendModeCompat.SOFT_LIGHT
+        CSSBlendMode.difference -> BlendModeCompat.DIFFERENCE
+        CSSBlendMode.exclusion -> BlendModeCompat.EXCLUSION
+        CSSBlendMode.hue -> BlendModeCompat.HUE
+        CSSBlendMode.saturation -> BlendModeCompat.SATURATION
+        CSSBlendMode.color -> BlendModeCompat.COLOR
+        CSSBlendMode.luminosity -> BlendModeCompat.LUMINOSITY
+        else -> null
+    }
 }

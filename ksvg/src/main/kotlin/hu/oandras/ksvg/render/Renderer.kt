@@ -19,7 +19,6 @@
 package hu.oandras.ksvg.render
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -39,9 +38,9 @@ import android.util.Log
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
-import hu.oandras.ksvg.compat.BlendModeCompat
 import hu.oandras.ksvg.compat.isBlendModeSupported
 import hu.oandras.ksvg.compat.setBlendModeCompat
+import hu.oandras.ksvg.compat.toBlendModeCompat
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.CSSParser.RuleMatchContext
@@ -73,9 +72,6 @@ import hu.oandras.ksvg.render.animation.AnimationContext
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.animation.applyAnimatedStyle
 import hu.oandras.ksvg.render.animation.updateAnimations
-import hu.oandras.ksvg.render.filters.doFeGaussianBlurFilter
-import hu.oandras.ksvg.render.filters.doFeOffsetFilter
-import hu.oandras.ksvg.render.filters.getFilterInput
 import hu.oandras.ksvg.render.filters.luminanceToAlphaFloatArray
 import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
 import hu.oandras.ksvg.render.filters.pipeline.FilterPipeline
@@ -1067,7 +1063,7 @@ internal class Renderer internal constructor(
      * @param node The node we are compositing. Compositing happens if the node is not fully opaque or if it has a mask.
      */
     @JvmSynthetic
-    internal fun popLayer(canvas: Canvas, node: RenderNode<*>, isMaskContent: Boolean = false) {
+    internal fun popLayer(canvas: Canvas, node: RenderNode<*>, isMaskContent: Boolean) {
         try {
             // If this is masked content, apply the mask now
             val maskNode = if (isMaskContent) null else node.maskNode
@@ -1170,125 +1166,6 @@ internal class Renderer internal constructor(
             val alpha = clamp255(floodOpacity * 255f)
             if (alpha == 0) 0 else colorInt.withAlpha(alpha)
         }
-    }
-
-    internal fun doFeFloodFilter(
-        canvas: Canvas,
-        primitiveNode: FeFloodRenderNode,
-        inputBitmap: Bitmap,
-        primitiveRegion: RectF,
-        filterRegion: RectF,
-    ): Bitmap {
-        val color = withNewState(canvas) { state ->
-            styleBuilderPool.withPooledObject { builder ->
-                builder.reset(state.style)
-                updateStyleForElement(state, builder, primitiveNode.sourceElement, primitiveNode.animationNodes)
-                val floodColor = builder.floodColor
-                val floodOpacity = builder.floodOpacity
-                val colorInt = when (floodColor) {
-                    is ColorValue -> floodColor.value
-                    is CurrentColor -> builder.color?.value ?: COLOR_BLACK
-                    else -> COLOR_BLACK
-                }
-                val alpha = clamp255(floodOpacity * 255f)
-                if (alpha == 0) 0 else colorInt.withAlpha(alpha)
-            }
-        }
-
-        val res = bitmapPool.acquireSameAs(inputBitmap)
-        canvasPool.withPooledObject { c ->
-            c.setBitmap(res)
-            val clipLeft = (primitiveRegion.left - filterRegion.left)
-            val clipTop = (primitiveRegion.top - filterRegion.top)
-            val clipRight = (primitiveRegion.right - filterRegion.left)
-            val clipBottom = (primitiveRegion.bottom - filterRegion.top)
-            
-            saveLayerPaint.reset()
-            saveLayerPaint.color = color
-            c.drawRect(clipLeft, clipTop, clipRight, clipBottom, saveLayerPaint)
-        }
-        return res
-    }
-
-    internal fun doFeDropShadowFilter(
-        canvas: Canvas,
-        primitiveNode: FeDropShadowRenderNode,
-        inputBitmap: Bitmap,
-        results: FilterSourceMap,
-        lastResult: Bitmap?,
-        primitiveUnitsAreUser: Boolean,
-        primitiveScaleX: Float,
-        primitiveScaleY: Float,
-        canvasScaleX: Float,
-        canvasScaleY: Float,
-        primitiveRegion: RectF,
-        filterRegion: RectF,
-    ): Bitmap {
-        val primitive = primitiveNode.sourceElement
-
-        // The shadow silhouette is derived from the input's alpha.
-        val sourceAlpha = getFilterInput("SourceAlpha", results, lastResult)
-            ?: getFilterInput(primitive.`in`, results, lastResult)
-            ?: return inputBitmap
-
-        // 1. Blur the silhouette.
-        val blurred = doFeGaussianBlurFilter(
-            primitiveNode = primitiveNode.blurNode,
-            inputBitmap = sourceAlpha,
-            primitiveScaleX = primitiveScaleX,
-            primitiveScaleY = primitiveScaleY,
-            primitiveRegion = primitiveRegion,
-            filterRegion = filterRegion,
-            canvasScaleX = canvasScaleX,
-            canvasScaleY = canvasScaleY,
-        )
-
-        // 2. Offset the blurred silhouette by dx, dy.
-        val offset = doFeOffsetFilter(
-            primitiveNode = primitiveNode.offsetNode,
-            inputBitmap = blurred,
-            primitiveUnitsAreUser = primitiveUnitsAreUser,
-            primitiveScaleX = primitiveScaleX,
-            primitiveScaleY = primitiveScaleY,
-            canvasScaleX = canvasScaleX,
-            canvasScaleY = canvasScaleY,
-            primitiveRegion = primitiveRegion,
-            filterRegion = filterRegion,
-        )
-
-        // 3. Resolve the flood color/opacity from the element's style.
-        val floodColorInt = withNewState(canvas = canvas) { state ->
-            styleBuilderPool.withPooledObject { builder ->
-                builder.reset(state.style)
-                updateStyleForElement(state, builder, primitive, primitiveNode.animationNodes)
-                val floodColor = builder.floodColor
-                val floodOpacity = builder.floodOpacity
-                val colorInt = when (floodColor) {
-                    is ColorValue -> floodColor.value
-                    is CurrentColor -> builder.color?.value ?: COLOR_BLACK
-                    else -> COLOR_BLACK
-                }
-                val alpha = clamp255(floodOpacity * 255f)
-                if (alpha == 0) 0 else colorInt.withAlpha(alpha)
-            }
-        }
-
-        // 4. Color the offset silhouette with the flood color.
-        val shadow = bitmapPool.acquireSameAs(inputBitmap)
-        canvasPool.withPooledObject { c ->
-            c.setBitmap(shadow)
-            c.drawColor(floodColorInt, PorterDuff.Mode.SRC)
-            c.drawBitmap(offset, 0f, 0f, primitiveNode.shadowPaint)
-        }
-
-        // 5. Composite the original graphic on top of the shadow.
-        val res = bitmapPool.acquireSameAs(inputBitmap)
-        canvasPool.withPooledObject { c ->
-            c.setBitmap(res)
-            c.drawBitmap(shadow, 0f, 0f, null)
-            c.drawBitmap(inputBitmap, 0f, 0f, null)
-        }
-        return res
     }
 
     private fun requiresCompositing(node: RenderNode<*>): Boolean {
@@ -2434,27 +2311,6 @@ internal class Renderer internal constructor(
             }
 
             paint.setBlendModeCompat(mixBlendMode.toBlendModeCompat())
-        }
-
-        private fun CSSBlendMode.toBlendModeCompat(): BlendModeCompat? {
-            return when (this) {
-                CSSBlendMode.multiply -> BlendModeCompat.MULTIPLY
-                CSSBlendMode.screen -> BlendModeCompat.SCREEN
-                CSSBlendMode.overlay -> BlendModeCompat.OVERLAY
-                CSSBlendMode.darken -> BlendModeCompat.DARKEN
-                CSSBlendMode.lighten -> BlendModeCompat.LIGHTEN
-                CSSBlendMode.color_dodge -> BlendModeCompat.COLOR_DODGE
-                CSSBlendMode.color_burn -> BlendModeCompat.COLOR_BURN
-                CSSBlendMode.hard_light -> BlendModeCompat.HARD_LIGHT
-                CSSBlendMode.soft_light -> BlendModeCompat.SOFT_LIGHT
-                CSSBlendMode.difference -> BlendModeCompat.DIFFERENCE
-                CSSBlendMode.exclusion -> BlendModeCompat.EXCLUSION
-                CSSBlendMode.hue -> BlendModeCompat.HUE
-                CSSBlendMode.saturation -> BlendModeCompat.SATURATION
-                CSSBlendMode.color -> BlendModeCompat.COLOR
-                CSSBlendMode.luminosity -> BlendModeCompat.LUMINOSITY
-                else -> null
-            }
         }
 
         /*

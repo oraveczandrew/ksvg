@@ -21,6 +21,8 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
+import hu.oandras.ksvg.compat.setBlendModeCompat
+import hu.oandras.ksvg.compat.toBlendModeCompat
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.style.CSSBlendMode
 import hu.oandras.ksvg.render.FeBlendRenderNode
@@ -43,8 +45,8 @@ import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.FilterPrimitiveRenderNode
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.FilterSourceMap
+import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.RenderNode
-import hu.oandras.ksvg.render.Renderer
 import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.calculatePrimitiveRegion
 import hu.oandras.ksvg.render.filters.doFeBlendFilter
@@ -54,6 +56,8 @@ import hu.oandras.ksvg.render.filters.doFeCompositeFilter
 import hu.oandras.ksvg.render.filters.doFeConvolveMatrixFilter
 import hu.oandras.ksvg.render.filters.doFeDiffuseLightingFilter
 import hu.oandras.ksvg.render.filters.doFeDisplacementMapFilter
+import hu.oandras.ksvg.render.filters.doFeDropShadowFilter
+import hu.oandras.ksvg.render.filters.doFeFloodFilter
 import hu.oandras.ksvg.render.filters.doFeGaussianBlurFilter
 import hu.oandras.ksvg.render.filters.doFeImageFilter
 import hu.oandras.ksvg.render.filters.doFeMergeFilter
@@ -73,7 +77,7 @@ import hu.oandras.ksvg.utils.forEachElement
  * [FilterPipeline]: it claims every primitive set.
  */
 internal class SoftwareFilterBackend internal constructor(
-    private val renderer: Renderer,
+    private val renderContext: RenderContext,
 ) : FilterBackend {
 
     // Backend-owned recording canvas for source-bitmap rendering; reused to
@@ -123,9 +127,9 @@ internal class SoftwareFilterBackend internal constructor(
         ) {
             if (!canReuseSource) {
                 if (sourceBitmap != null) {
-                    renderer.bitmapPool.release(sourceBitmap)
+                    renderContext.bitmapPool.release(sourceBitmap)
                 }
-                sourceBitmap = renderer.bitmapPool.acquire(
+                sourceBitmap = renderContext.bitmapPool.acquire(
                     width,
                     height,
                     Bitmap.Config.ARGB_8888
@@ -186,7 +190,7 @@ internal class SoftwareFilterBackend internal constructor(
 
         if (cachedFilterOutput != null && cachedFilterOutput !== sourceBitmap) {
             if (cachedFilterOutput.allocationByteCount < width * height * 4) {
-                renderer.bitmapPool.release(cachedFilterOutput)
+                renderContext.bitmapPool.release(cachedFilterOutput)
                 node.cachedFilterOutput = null
             }
         }
@@ -199,7 +203,8 @@ internal class SoftwareFilterBackend internal constructor(
             sx = sx,
             sy = sy,
             filterNode = filterNode,
-            originalObjBBox = boundingBox
+            originalObjBBox = boundingBox,
+            state = state,
         )
 
         node.cachedFilterOutput = filteredBitmap
@@ -219,7 +224,7 @@ internal class SoftwareFilterBackend internal constructor(
 
     private fun drawResult(canvas: Canvas, deviceRegion: RectF, bitmap: Bitmap, state: RendererState) {
         canvas.withSave {
-            renderer.matrixPool.withPooledObject { matrix ->
+            renderContext.matrixPool.withPooledObject { matrix ->
                 @Suppress("DEPRECATION")
                 canvas.getMatrix(matrix)
                 if (matrix.invert(matrix)) {
@@ -250,7 +255,7 @@ internal class SoftwareFilterBackend internal constructor(
             return null
         }
         filterCompositePaint.alpha = alpha
-        Renderer.setBlendMode(state, filterCompositePaint)
+        filterCompositePaint.setBlendModeCompat(state.style.mixBlendMode?.toBlendModeCompat())
         return filterCompositePaint
     }
 
@@ -264,10 +269,11 @@ internal class SoftwareFilterBackend internal constructor(
         sy: Float,
         filterNode: FilterRenderNode,
         originalObjBBox: Box,
+        state: RendererState,
     ): Bitmap? {
         val filter = filterNode.sourceElement
 
-        val results = filterNode.filterSourceMap ?: FilterSourceMap(renderer).also {
+        val results = filterNode.filterSourceMap ?: FilterSourceMap(renderContext).also {
             filterNode.filterSourceMap = it
         }
 
@@ -283,8 +289,8 @@ internal class SoftwareFilterBackend internal constructor(
         filterNode.primitives.forEachElement { primitiveNode ->
             val child = primitiveNode.sourceElement
 
-            val res = renderer.rectFPool.withPooledObject { primitiveRegion ->
-                with(renderer) {
+            val res = renderContext.rectFPool.withPooledObject { primitiveRegion ->
+                with(renderContext) {
                     calculatePrimitiveRegion(
                         primitive = child,
                         filterRegion = filterRegion,
@@ -295,7 +301,7 @@ internal class SoftwareFilterBackend internal constructor(
                 }
 
                 when (primitiveNode) {
-                    is FeMergeRenderNode -> with(renderer) {
+                    is FeMergeRenderNode -> with(renderContext) {
                         doFeMergeFilter(
                             merge = primitiveNode,
                             results = results,
@@ -318,6 +324,7 @@ internal class SoftwareFilterBackend internal constructor(
                         primitiveUnitsAreUser = primitiveUnitsAreUser,
                         filterRegion = filterRegion,
                         primitiveRegion = primitiveRegion,
+                        state = state,
                     )
                 }
             }
@@ -346,6 +353,7 @@ internal class SoftwareFilterBackend internal constructor(
         primitiveUnitsAreUser: Boolean,
         filterRegion: RectF,
         primitiveRegion: RectF,
+        state: RendererState,
     ): Bitmap? {
         val primitive = primitiveNode.sourceElement
         val input = getFilterInput(
@@ -358,7 +366,7 @@ internal class SoftwareFilterBackend internal constructor(
 
         return when (primitiveNode) {
 
-            is FeTurbulenceRenderNode -> with(renderer) {
+            is FeTurbulenceRenderNode -> with(renderContext) {
                 doFeTurbulenceFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -375,7 +383,7 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeOffsetRenderNode -> with(renderer) {
+            is FeOffsetRenderNode -> with(renderContext) {
                 doFeOffsetFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -389,14 +397,14 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeConvolveMatrixRenderNode -> with(renderer) {
+            is FeConvolveMatrixRenderNode -> with(renderContext) {
                 doFeConvolveMatrixFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
                 )
             }
 
-            is FeMorphologyRenderNode -> with(renderer) {
+            is FeMorphologyRenderNode -> with(renderContext) {
                 doFeMorphologyFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -404,12 +412,10 @@ internal class SoftwareFilterBackend internal constructor(
                     primitiveScaleY = primitiveScaleY,
                     primitiveRegion = primitiveRegion,
                     filterRegion = filterRegion,
-                    canvasScaleX = canvasScaleX,
-                    canvasScaleY = canvasScaleY,
                 )
             }
 
-            is FeComponentTransferRenderNode -> with(renderer) {
+            is FeComponentTransferRenderNode -> with(renderContext) {
                 doFeComponentTransferFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -420,7 +426,7 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeCompositeRenderNode -> with(renderer) {
+            is FeCompositeRenderNode -> with(renderContext) {
                 doFeCompositeFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -433,7 +439,7 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeDisplacementMapRenderNode -> with(renderer) {
+            is FeDisplacementMapRenderNode -> with(renderContext) {
                 doFeDisplacementMapFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -442,7 +448,7 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeDiffuseLightingRenderNode -> with(renderer) {
+            is FeDiffuseLightingRenderNode -> with(renderContext) {
                 doFeDiffuseLightingFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -459,7 +465,7 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeSpecularLightingRenderNode -> with(renderer) {
+            is FeSpecularLightingRenderNode -> with(renderContext) {
                 doFeSpecularLightingFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -476,7 +482,7 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeColorMatrixRenderNode -> with(renderer) {
+            is FeColorMatrixRenderNode -> with(renderContext) {
                 doFeColorMatrixFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -487,7 +493,7 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeGaussianBlurRenderNode -> with(renderer) {
+            is FeGaussianBlurRenderNode -> with(renderContext) {
                 doFeGaussianBlurFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -495,27 +501,27 @@ internal class SoftwareFilterBackend internal constructor(
                     primitiveScaleY = primitiveScaleY,
                     primitiveRegion = primitiveRegion,
                     filterRegion = filterRegion,
-                    canvasScaleX = canvasScaleX,
-                    canvasScaleY = canvasScaleY,
                 )
             }
 
-            is FeImageRenderNode -> with(renderer) {
+            is FeImageRenderNode -> with(renderContext) {
                 doFeImageFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
                 )
             }
 
-            is FeFloodRenderNode -> renderer.doFeFloodFilter(
-                canvas = canvas,
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                primitiveRegion = primitiveRegion,
-                filterRegion = filterRegion,
-            )
+            is FeFloodRenderNode -> with(renderContext) {
+                doFeFloodFilter(
+                    primitiveNode = primitiveNode,
+                    inputBitmap = inputBitmap,
+                    primitiveRegion = primitiveRegion,
+                    filterRegion = filterRegion,
+                    baseStyle = state.style,
+                )
+            }
 
-            is FeBlendRenderNode -> with(renderer) {
+            is FeBlendRenderNode -> with(renderContext) {
                 doFeBlendFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
@@ -528,33 +534,33 @@ internal class SoftwareFilterBackend internal constructor(
                 )
             }
 
-            is FeTileRenderNode -> with(renderer) {
+            is FeTileRenderNode -> with(renderContext) {
                 doFeTileFilter(
                     inputBitmap = inputBitmap,
                     primitiveRegion = primitiveRegion,
                     filterRegion = filterRegion,
-                    canvasScaleX = canvasScaleX,
-                    canvasScaleY = canvasScaleY,
                 )
             }
 
-            is FeDropShadowRenderNode -> renderer.doFeDropShadowFilter(
-                canvas = canvas,
-                primitiveNode = primitiveNode,
-                inputBitmap = inputBitmap,
-                results = results,
-                lastResult = lastResult,
-                primitiveUnitsAreUser = primitiveUnitsAreUser,
-                primitiveScaleX = primitiveScaleX,
-                primitiveScaleY = primitiveScaleY,
-                canvasScaleX = canvasScaleX,
-                canvasScaleY = canvasScaleY,
-                primitiveRegion = primitiveRegion,
-                filterRegion = filterRegion,
-            )
+            is FeDropShadowRenderNode -> with(renderContext) {
+                doFeDropShadowFilter(
+                    primitiveNode = primitiveNode,
+                    inputBitmap = inputBitmap,
+                    results = results,
+                    lastResult = lastResult,
+                    primitiveUnitsAreUser = primitiveUnitsAreUser,
+                    primitiveScaleX = primitiveScaleX,
+                    primitiveScaleY = primitiveScaleY,
+                    canvasScaleX = canvasScaleX,
+                    canvasScaleY = canvasScaleY,
+                    primitiveRegion = primitiveRegion,
+                    filterRegion = filterRegion,
+                    baseStyle = state.style,
+                )
+            }
 
             else -> {
-                val res = renderer.bitmapPool.acquireSameAs(input)
+                val res = renderContext.bitmapPool.acquireSameAs(input)
                 recordCanvas.setBitmap(res)
                 recordCanvas.drawBitmap(input, 0f, 0f, null)
                 res

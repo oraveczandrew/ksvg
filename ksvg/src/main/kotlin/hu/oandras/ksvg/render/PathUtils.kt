@@ -35,7 +35,7 @@ import kotlin.math.abs
 import kotlin.math.min
 
 context(renderContext: DisplayContext)
-internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathRenderNode? = null): Boolean {
+internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathRenderNode?): Boolean {
     // Missing width/height makes the <rect> invalid -> not rendered (spec).
     val objWidth = obj.width ?: return false
     val objHeight = obj.height ?: return false
@@ -79,7 +79,7 @@ internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathR
 }
 
 context(renderContext: DisplayContext)
-internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: PathRenderNode? = null): Boolean {
+internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: PathRenderNode?): Boolean {
     var cx = obj.cx?.floatValueXInContext() ?: 0f
     var cy = obj.cy?.floatValueYInContext() ?: 0f
     // Missing r makes the <circle> invalid -> not rendered (spec).
@@ -105,7 +105,7 @@ internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: Pat
 }
 
 context(renderContext: DisplayContext)
-internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: PathRenderNode? = null): Boolean {
+internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: PathRenderNode?): Boolean {
     var cx = obj.cx?.floatValueXInContext() ?: 0f
     var cy = obj.cy?.floatValueYInContext() ?: 0f
     // Missing rx/ry make the <ellipse> invalid -> not rendered (spec).
@@ -134,7 +134,7 @@ internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: Pa
 }
 
 context(renderContext: DisplayContext)
-internal fun updatePathAndBoundingBox(obj: LineShape, outPath: Path, node: PathRenderNode? = null): Boolean {
+internal fun updatePathAndBoundingBox(obj: LineShape, outPath: Path, node: PathRenderNode?): Boolean {
     var x1 = obj.x1?.floatValueXInContext() ?: 0f
     var y1 = obj.y1?.floatValueYInContext() ?: 0f
     var x2 = obj.x2?.floatValueXInContext() ?: 0f
@@ -161,7 +161,7 @@ internal fun updatePathAndBoundingBox(obj: LineShape, outPath: Path, node: PathR
 }
 
 context(poolOwner: PoolOwner)
-internal fun updatePathAndBoundingBox(obj: PolyLineShape, outPath: Path, animatedPoints: FloatArray? = null): Boolean {
+internal fun updatePathAndBoundingBox(obj: PolyLineShape, outPath: Path, animatedPoints: FloatArray?): Boolean {
     val points = animatedPoints ?: obj.points ?: return false
     val numPoints = points.size
     if (numPoints % 2 != 0) return false
@@ -183,7 +183,7 @@ internal fun updatePathAndBoundingBox(obj: PolyLineShape, outPath: Path, animate
 internal fun updatePathAndBoundingBox(
     obj: PathShape,
     outPath: Path,
-    @Suppress("unused") node: PathRenderNode? = null
+    @Suppress("unused") node: PathRenderNode?
 ): Boolean {
     val pathDef = obj.d
     return if (pathDef != null) {

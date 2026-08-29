@@ -22,6 +22,9 @@ import android.graphics.Paint
 import android.graphics.RectF
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.css.CSSLength
+import hu.oandras.ksvg.filtering.ConvolveNative
+import hu.oandras.ksvg.filtering.KotlinKernels
+import hu.oandras.ksvg.filtering.MorphologyNative
 import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
@@ -29,9 +32,6 @@ import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withClip
-import hu.oandras.ksvg.filtering.ConvolveNative
-import hu.oandras.ksvg.filtering.KotlinKernels
-import hu.oandras.ksvg.filtering.MorphologyNative
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp
 
@@ -53,10 +53,10 @@ internal fun doFeOffsetFilter(
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     renderContext.canvasPool.withPooledObject { c ->
         c.setBitmap(res)
-        val clipLeft = (primitiveRegion.left - filterRegion.left)
-        val clipTop = (primitiveRegion.top - filterRegion.top)
-        val clipRight = (primitiveRegion.right - filterRegion.left)
-        val clipBottom = (primitiveRegion.bottom - filterRegion.top)
+        val clipLeft = primitiveRegion.left - filterRegion.left
+        val clipTop = primitiveRegion.top - filterRegion.top
+        val clipRight = primitiveRegion.right - filterRegion.left
+        val clipBottom = primitiveRegion.bottom - filterRegion.top
         c.clipRect(clipLeft, clipTop, clipRight, clipBottom)
         c.drawBitmap(inputBitmap, dx, dy, null)
     }
@@ -119,8 +119,6 @@ internal fun doFeGaussianBlurFilter(
     primitiveScaleY: Float,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     val stdDeviationX = primitiveNode.stdDeviationX * primitiveScaleX
     val stdDeviationY = primitiveNode.stdDeviationY * primitiveScaleY
@@ -140,10 +138,10 @@ internal fun doFeGaussianBlurFilter(
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     res.setPixels(pixels, 0, width, 0, 0, width, height)
 
-    val clipLeft = ((primitiveRegion.left - filterRegion.left)).toInt()
-    val clipTop = ((primitiveRegion.top - filterRegion.top)).toInt()
-    val clipRight = ((primitiveRegion.right - filterRegion.left)).toInt()
-    val clipBottom = ((primitiveRegion.bottom - filterRegion.top)).toInt()
+    val clipLeft = (primitiveRegion.left - filterRegion.left).toInt()
+    val clipTop = (primitiveRegion.top - filterRegion.top).toInt()
+    val clipRight = (primitiveRegion.right - filterRegion.left).toInt()
+    val clipBottom = (primitiveRegion.bottom - filterRegion.top).toInt()
 
     if (clipLeft > 0 || clipTop > 0 || clipRight < width || clipBottom < height) {
         val clearPaint = Paint()
@@ -171,8 +169,6 @@ internal fun doFeMorphologyFilter(
     primitiveScaleY: Float,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     val primitive = primitiveNode.sourceElement
     val radiusX = (primitive.radiusX * primitiveScaleX).ceilToInt()
@@ -185,14 +181,10 @@ internal fun doFeTileFilter(
     inputBitmap: Bitmap,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap = applyTile(
     input = inputBitmap,
     primitiveRegion = primitiveRegion,
     filterRegion = filterRegion,
-    canvasScaleX = canvasScaleX,
-    canvasScaleY = canvasScaleY,
 )
 
 context(renderContext: RenderContext)
@@ -249,10 +241,10 @@ private fun applyMorphology(
     input.getPixels(src, 0, width, 0, 0, width, height)
     val dst = primitiveNode.dstPixels.getWithSize(size)
 
-    val clipLeft = clamp(((primitiveRegion.left - filterRegion.left)).toInt(), 0, width)
-    val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
-    val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
-    val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
+    val clipLeft = clamp((primitiveRegion.left - filterRegion.left).toInt(), 0, width)
+    val clipTop = clamp((primitiveRegion.top - filterRegion.top).toInt(), 0, height)
+    val clipRight = clamp((primitiveRegion.right - filterRegion.left).toInt(), 0, width)
+    val clipBottom = clamp((primitiveRegion.bottom - filterRegion.top).toInt(), 0, height)
 
     dst.fill(0) // Initialize with transparent
 
@@ -279,16 +271,14 @@ private fun applyTile(
     input: Bitmap,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     val res = renderContext.bitmapPool.acquireSameAs(input)
     renderContext.canvasPool.withPooledObject { c ->
         c.setBitmap(res)
-        val clipLeft = (primitiveRegion.left - filterRegion.left)
-        val clipTop = (primitiveRegion.top - filterRegion.top)
-        val clipRight = (primitiveRegion.right - filterRegion.left)
-        val clipBottom = (primitiveRegion.bottom - filterRegion.top)
+        val clipLeft = primitiveRegion.left - filterRegion.left
+        val clipTop = primitiveRegion.top - filterRegion.top
+        val clipRight = primitiveRegion.right - filterRegion.left
+        val clipBottom = primitiveRegion.bottom - filterRegion.top
 
         c.withClip(clipLeft, clipTop, clipRight, clipBottom) {
             var y = clipTop

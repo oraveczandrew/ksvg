@@ -21,7 +21,7 @@ import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.Region
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
 
-context(renderContext: RenderContext)
+context(renderContext: DisplayContext)
 internal fun calculateRegion(region: Region, originalObjBBox: Box, outRect: RectF) {
     val unitsAreUser = region.unitsAreUser == true
 
@@ -49,7 +49,7 @@ internal fun calculateRegion(region: Region, originalObjBBox: Box, outRect: Rect
     outRect.set(x, y, x + w, y + h)
 }
 
-context(renderContext: RenderContext)
+context(renderContext: DisplayContext)
 internal fun calculatePrimitiveRegion(
     primitive: FilterPrimitive,
     filterRegion: RectF,
