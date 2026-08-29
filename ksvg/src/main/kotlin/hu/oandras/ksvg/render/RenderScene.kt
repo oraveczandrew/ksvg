@@ -314,6 +314,7 @@ internal class RenderScene private constructor(
                 dPI = dPI,
                 externalFileResolver = externalFileResolver,
                 pools = pools,
+                logger = document,
             )
             val node = builder.build(options)
             val scene = RenderScene(node, dPI, modificationCount, optionsFingerprint)

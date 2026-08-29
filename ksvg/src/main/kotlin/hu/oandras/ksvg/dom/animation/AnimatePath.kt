@@ -100,15 +100,18 @@ internal class AnimatePath(
         override fun build(): AnimatePath {
             val attrName = attributeName
             val isPoints = attrName == SVGAttr.points
-            
+
+            val valuesString = valuesString
             if (valuesString != null) {
-                values = if (isPoints) parseSemicolonPointsPathList(valuesString!!) else parseSemicolonPathList(valuesString!!)
+                values = if (isPoints) parseSemicolonPointsPathList(valuesString) else parseSemicolonPathList(valuesString)
             }
+            val fromString = fromString
             if (fromString != null) {
-                from = if (isPoints) parsePointsAsPath(fromString!!) else parsePath(fromString!!)
+                from = if (isPoints) parsePointsAsPath(fromString) else parsePath(fromString)
             }
+            val toString = toString
             if (toString != null) {
-                to = if (isPoints) parsePointsAsPath(toString!!) else parsePath(toString!!)
+                to = if (isPoints) parsePointsAsPath(toString) else parsePath(toString)
             }
 
             return AnimatePath(

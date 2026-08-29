@@ -19,12 +19,13 @@
 
 package hu.oandras.ksvg.parser
 
-import android.util.Log
 import android.util.Xml
 import androidx.collection.ArrayMap
+import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.KSVGParseException
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.MediaType
 import hu.oandras.ksvg.css.Source
@@ -101,6 +102,8 @@ import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.dom.text.TextRoot
 import hu.oandras.ksvg.dom.text.TextSequence
+import hu.oandras.ksvg.logD
+import hu.oandras.ksvg.logE
 import hu.oandras.ksvg.render.animation.isColorAttribute
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.trimLowerThanSpace
@@ -120,7 +123,12 @@ import javax.xml.parsers.SAXParserFactory
 /*
  * SVG parser code. Used by SVG class. Should not be called directly.
  */
-internal class SVGParserImpl : SVGParser {
+internal class SVGParserImpl(
+    enableInternalEntities: Boolean = true,
+    externalFileResolver: ExternalFileResolver? = null,
+    animationsEnabled: Boolean = false,
+    logger: LoggerContext = AndroidLoggerContext,
+) : SVGParser {
     // SVG parser
     private var svgDocument: SVGImpl? = null
 
@@ -130,9 +138,10 @@ internal class SVGParserImpl : SVGParser {
 
     private var currentElement: Container? = null
     private var currentAnimationElement: ElementBase? = null
-    private var enableInternalEntities = true
-    private var animationsEnabled = false
-    private var externalFileResolver: ExternalFileResolver? = null
+    private val enableInternalEntities = enableInternalEntities
+    private val animationsEnabled = animationsEnabled
+    private val externalFileResolver: ExternalFileResolver? = externalFileResolver
+    private val logger: LoggerContext = logger
 
     // For handling elements we don't support
     private var ignoring = false
@@ -203,38 +212,18 @@ internal class SVGParserImpl : SVGParser {
             parseUsingXmlPullParser(input)
             return checkNotNull(svgDocument) { "svgDocument is null after XmlPullParser parse" }
         } catch (e: IOException) {
-            Log.e(
-                TAG,
-                "Error occurred while performing check for entities.  File may not be parsed correctly if it contains entity definitions.",
-                e
-            )
+            logger.logE(TAG) {
+                "Error occurred while performing check for entities.  File may not be parsed correctly if it contains entity definitions.\n" + e.stackTraceToString()
+            }
             parseUsingXmlPullParser(input)
             return checkNotNull(svgDocument) { "svgDocument is null after fallback parse" }
         } finally {
             try {
                 input.close()
             } catch (_: IOException) {
-                Log.e(TAG, "Exception thrown closing input stream")
+                logger.logE(TAG) { "Exception thrown closing input stream" }
             }
         }
-    }
-
-    //=========================================================================
-    // Attribute setters
-    //=========================================================================
-    override fun setInternalEntitiesEnabled(enable: Boolean): SVGParser {
-        enableInternalEntities = enable
-        return this
-    }
-
-    override fun setExternalFileResolver(fileResolver: ExternalFileResolver?): SVGParser {
-        externalFileResolver = fileResolver
-        return this
-    }
-
-    override fun setAnimationsEnabled(enable: Boolean): SVGParser {
-        animationsEnabled = enable
-        return this
     }
 
     //=========================================================================
@@ -445,7 +434,11 @@ internal class SVGParserImpl : SVGParser {
     // Parser event classes used by both XML parser implementations
     //=========================================================================
     private fun startDocument() {
-        svgDocument = SVGImpl(enableInternalEntities, externalFileResolver).apply {
+        svgDocument = SVGImpl(
+            enableInternalEntities,
+            externalFileResolver,
+            logger
+        ).apply {
             animationsEnabled = this@SVGParserImpl.animationsEnabled
         }
     }
@@ -777,7 +770,7 @@ internal class SVGParserImpl : SVGParser {
 
             attr = attributes[XML_STYLESHEET_ATTR_HREF]
             if (attr != null) {
-                var css = externalFileResolver!!.resolveCSSStyleSheet(attr) ?: return
+                var css = externalFileResolver.resolveCSSStyleSheet(attr) ?: return
 
                 val mediaAttr = attributes[XML_STYLESHEET_ATTR_MEDIA]
                 if (mediaAttr != null && XML_STYLESHEET_ATTR_MEDIA_ALL != mediaAttr.trimLowerThanSpace()) {
@@ -808,10 +801,17 @@ internal class SVGParserImpl : SVGParser {
 
 
     //=========================================================================
+    @Suppress("SimplifyBooleanWithConstants")
+    private inline fun debug(lazyMessage: () -> String) {
+        if (BuildConfig.DEBUG && DEBUG_MODE) {
+            logger.logD(TAG, lazyMessage)
+        }
+    }
+
     private fun dumpNode(elem: SvgObject?, indent: String?) {
         if (!DEBUG_MODE) return
         var indent = indent
-        Log.d(TAG, indent + elem)
+        logger.logD(TAG) { (indent ?: "") + elem }
         if (elem is ConditionalContainer) {
             indent = "$indent  "
             elem.getChildren().forEachElement { child ->
@@ -899,7 +899,7 @@ internal class SVGParserImpl : SVGParser {
 
             target.addAnimation(obj)
         } catch (e: Throwable) {
-            Log.e(TAG, "Cannot parse <animateTransform>", e)
+            logger.logE(TAG) { "Cannot parse <animateTransform>\n" + e.stackTraceToString() }
         }
     }
 
@@ -922,7 +922,7 @@ internal class SVGParserImpl : SVGParser {
 
             target.addAnimation(obj)
         } catch (e: Throwable) {
-            Log.e(TAG, "Cannot parse <animate>", e)
+            logger.logE(TAG) { "Cannot parse <animate>\n" + e.stackTraceToString() }
         }
     }
 
@@ -941,7 +941,7 @@ internal class SVGParserImpl : SVGParser {
 
             target.addAnimation(obj)
         } catch (e: Throwable) {
-            Log.e(TAG, "Cannot parse <animateColor>", e)
+            logger.logE(TAG) { "Cannot parse <animateColor>\n" + e.stackTraceToString() }
         }
     }
 
@@ -961,7 +961,7 @@ internal class SVGParserImpl : SVGParser {
             target.addAnimation(obj)
             this.currentElement = obj
         } catch (e: Throwable) {
-            Log.e(TAG, "Cannot parse <animateMotion>", e)
+            logger.logE(TAG) { "Cannot parse <animateMotion>\n" + e.stackTraceToString() }
         }
     }
 
@@ -976,7 +976,7 @@ internal class SVGParserImpl : SVGParser {
 
             currentElement.addChild(obj)
         } catch (e: Throwable) {
-            Log.e(TAG, "Cannot parse <mpath>", e)
+            logger.logE(TAG) { "Cannot parse <mpath>\n" + e.stackTraceToString() }
         }
     }
 
@@ -1004,7 +1004,7 @@ internal class SVGParserImpl : SVGParser {
             val obj = builder.build()
             target.addAnimation(obj)
         } catch (e: Throwable) {
-            Log.e(TAG, "Cannot parse <set>", e)
+            logger.logE(TAG) { "Cannot parse <set>\n" + e.stackTraceToString() }
         }
     }
 
@@ -1438,7 +1438,8 @@ internal class SVGParserImpl : SVGParser {
         val parser = CSSParser(
             deviceMediaType = MediaType.screen,
             source = Source.Document,
-            externalFileResolver = externalFileResolver
+            externalFileResolver = externalFileResolver,
+            logger = logger
         )
         requireSvgDocument().addCSSRules(ruleset = parser.parse(sheet))
     }
@@ -1737,12 +1738,5 @@ internal class SVGParserImpl : SVGParser {
         const val ENTITY_WATCH_BUFFER_SIZE: Int = 4096
 
         private const val DEBUG_MODE: Boolean = false
-
-        @Suppress("SimplifyBooleanWithConstants")
-        private inline fun debug(lazyMessage: () -> String) {
-            if (BuildConfig.DEBUG && DEBUG_MODE) {
-                Log.d(TAG, lazyMessage())
-            }
-        }
     }
 }

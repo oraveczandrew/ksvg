@@ -24,7 +24,6 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import hu.oandras.ksvg.dom.SVGImpl
-import hu.oandras.ksvg.render.PathConverter
 import java.io.IOException
 import java.io.InputStream
 
@@ -368,9 +367,10 @@ public interface SVG {
         @Throws(KSVGParseException::class)
         public fun getFromInputStream(
             inputStream: InputStream,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext = AndroidLoggerContext
         ): SVG {
-            return SVGImpl.getFromInputStream(inputStream, parseAnimations)
+            return SVGImpl.getFromInputStream(inputStream, parseAnimations, logger)
         }
 
 
@@ -387,9 +387,10 @@ public interface SVG {
         @Throws(KSVGParseException::class)
         public fun getFromString(
             svg: String,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext = AndroidLoggerContext
         ): SVG {
-            return SVGImpl.getFromString(svg, parseAnimations)
+            return SVGImpl.getFromString(svg, parseAnimations, logger)
         }
 
 
@@ -408,9 +409,10 @@ public interface SVG {
         public fun getFromResource(
             context: Context,
             resourceId: Int,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext = AndroidLoggerContext
         ): SVG {
-            return getFromResource(context.resources, resourceId, parseAnimations)
+            return getFromResource(context.resources, resourceId, parseAnimations, logger)
         }
 
 
@@ -422,7 +424,7 @@ public interface SVG {
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error parsing the document.
-    
+     
          */
         @JvmStatic
         @JvmOverloads
@@ -430,9 +432,10 @@ public interface SVG {
         public fun getFromResource(
             resources: Resources,
             resourceId: Int,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext = AndroidLoggerContext
         ): SVG {
-            return SVGImpl.getFromResource(resources, resourceId, parseAnimations)
+            return SVGImpl.getFromResource(resources, resourceId, parseAnimations, logger)
         }
 
 
@@ -452,9 +455,10 @@ public interface SVG {
         public fun getFromAsset(
             assetManager: AssetManager,
             filename: String,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext = AndroidLoggerContext
         ): SVG {
-            return SVGImpl.getFromAsset(assetManager, filename, parseAnimations)
+            return SVGImpl.getFromAsset(assetManager, filename, parseAnimations, logger)
         }
 
 
@@ -469,10 +473,8 @@ public interface SVG {
           * @return an Android `Path`
           */
         @JvmStatic
-        public fun parsePath(pathDefinition: String): Path {
-            val pathDef = hu.oandras.ksvg.parser.parsePath(pathDefinition)
-            val pathConv = PathConverter(pathDef)
-            return pathConv.path
+        public fun parsePath(pathDefinition: String, logger: LoggerContext = AndroidLoggerContext): Path {
+             return SVGImpl.parsePath(pathDefinition, logger)
         }
 
 

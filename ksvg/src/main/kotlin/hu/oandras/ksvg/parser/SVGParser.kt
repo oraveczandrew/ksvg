@@ -16,9 +16,7 @@
  */
 package hu.oandras.ksvg.parser
 
-import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.KSVGParseException
-import hu.oandras.ksvg.SVG
 import hu.oandras.ksvg.dom.SVGImpl
 import java.io.InputStream
 
@@ -28,21 +26,4 @@ internal interface SVGParser {
      */
     @Throws(KSVGParseException::class)
     fun parseStream(input: InputStream): SVGImpl
-
-    /**
-     * Tells the parser whether to allow the expansion of internal entities.
-     * An example of a document containing an internal entities is:
-     */
-    fun setInternalEntitiesEnabled(enable: Boolean): SVGParser
-
-    /**
-     * Register an [ExternalFileResolver] instance that the parser should use when resolving
-     * external references such as images, fonts, and CSS stylesheets.
-     */
-    fun setExternalFileResolver(fileResolver: ExternalFileResolver?): SVGParser
-
-    /**
-     * Enable or disable parsing of animations.
-     */
-    fun setAnimationsEnabled(enable: Boolean): SVGParser
 }

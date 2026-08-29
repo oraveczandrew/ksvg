@@ -21,12 +21,12 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.PathMeasure
-import android.util.Log
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
 import androidx.collection.MutableFloatList
 import androidx.collection.MutableIntList
 import hu.oandras.ksvg.ExternalFileResolver
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.css.CSSLength
@@ -104,6 +104,7 @@ import hu.oandras.ksvg.dom.text.TextAnchor
 import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.dom.text.TextSequence
+import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.render.animation.AnimateColorNode
 import hu.oandras.ksvg.render.animation.AnimateDashArrayNode
 import hu.oandras.ksvg.render.animation.AnimateFloatNode
@@ -150,7 +151,8 @@ internal class RenderTreeBuilder(
     override val dPI: Float,
     private val externalFileResolver: ExternalFileResolver?,
     pools: PoolOwner,
-) : DisplayContext, PoolOwner by pools {
+    logger: LoggerContext,
+) : DisplayContext, PoolOwner by pools, LoggerContext by logger {
 
     private var state: RendererState = RendererState()
     private val stateStack: Stack<RendererState> = Stack()
@@ -271,7 +273,7 @@ internal class RenderTreeBuilder(
         // re-entry as empty/missing matches the spec and avoids unbounded recursion.
         val id = (obj as? ElementBase)?.id
         if (id != null && !buildingIds.add(id)) {
-            Log.w("KSVG", "Cyclic reference detected for id '$id'; treating as empty")
+            logW("KSVG") { "Cyclic reference detected for id '$id'; treating as empty" }
             return null
         }
         try {
@@ -310,7 +312,7 @@ internal class RenderTreeBuilder(
                 if (clipPath != null) {
                     node.clipPathNode = buildClipPath(clipPath)
                 } else {
-                    Log.w("KSVG", "Clip-path reference '$it' is missing or invalid; hiding element")
+                    logW("KSVG") { "Clip-path reference '$it' is missing or invalid; hiding element" }
                     hideInvalidReference = true
                 }
             }
@@ -319,7 +321,7 @@ internal class RenderTreeBuilder(
                 if (mask != null) {
                     node.maskNode = buildMask(mask)
                 } else {
-                    Log.w("KSVG", "Mask reference '$it' is missing or invalid; hiding element")
+                    logW("KSVG") { "Mask reference '$it' is missing or invalid; hiding element" }
                     hideInvalidReference = true
                 }
             }
@@ -1260,7 +1262,7 @@ internal class RenderTreeBuilder(
     private fun buildClipPath(clipPath: ClipPath): ClipPathRenderNode? {
         val id = clipPath.id
         if (id != null && !buildingIds.add(id)) {
-            Log.w("KSVG", "Cyclic clip-path reference detected for id '$id'; treating as empty")
+            logW("KSVG") { "Cyclic clip-path reference detected for id '$id'; treating as empty" }
             return null
         }
         try {
@@ -1644,7 +1646,7 @@ internal class RenderTreeBuilder(
                     null
                 }
                 if (image == null && referencedNode == null) {
-                    Log.w("FeImageFilter", String.format("Could not locate image '%s'", href))
+                    logW("FeImageFilter") { String.format("Could not locate image '%s'", href) }
                 }
                 FeImageRenderNode(sourceElement = primitive, image = image, referencedNode = referencedNode)
             }

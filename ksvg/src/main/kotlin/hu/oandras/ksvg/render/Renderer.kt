@@ -34,8 +34,8 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader.TileMode
 import android.os.Build
-import android.util.Log
 import hu.oandras.ksvg.BuildConfig
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.compat.isBlendModeSupported
@@ -68,6 +68,8 @@ import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.RenderQuality
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.VectorEffect
+import hu.oandras.ksvg.logD
+import hu.oandras.ksvg.logE
 import hu.oandras.ksvg.render.animation.AnimationContext
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.animation.applyAnimatedStyle
@@ -112,7 +114,7 @@ internal class Renderer internal constructor(
     // dots per inch. Needed for accurate conversion of length values that have real world units, such as "cm".
     override val dPI: Float,
     pools: PoolOwner,
-): AnimationContext, PoolOwner by pools {
+): AnimationContext, PoolOwner by pools, LoggerContext by document {
     // Renderer state
     private var state: RendererState = RendererState()
 
@@ -2268,6 +2270,32 @@ internal class Renderer internal constructor(
         return (dimension + 31) and 31.inv()
     }
 
+    @Suppress("SameParameterValue")
+    private fun error(message: String) {
+        logE(TAG) { message }
+    }
+
+    private fun error(format: String, vararg args: Any?) {
+        logE(TAG) { String.format(format, *args) }
+    }
+
+    @Suppress("SimplifyBooleanWithConstants")
+    private inline fun debug(lazyMessage: () -> String) {
+        if (DEBUG && BuildConfig.DEBUG) {
+            logD(TAG) { lazyMessage() }
+        }
+    }
+
+    internal fun setBlendMode(state: RendererState, paint: Paint) {
+        val mixBlendMode = state.style.mixBlendMode ?: CSSBlendMode.normal
+
+        debug {
+            "Setting blend mode to $mixBlendMode"
+        }
+
+        paint.setBlendModeCompat(mixBlendMode.toBlendModeCompat())
+    }
+
     companion object {
         private const val TAG = "Renderer"
 
@@ -2295,36 +2323,10 @@ internal class Renderer internal constructor(
         private val bitmapPaint: Paint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val bitmapPaintOptimizeSpeed: Paint = Paint()
 
-        @Suppress("SameParameterValue")
-        private fun error(message: String) {
-            Log.e(TAG, message)
-        }
-
-        private fun error(format: String, vararg args: Any?) {
-            Log.e(TAG, String.format(format, *args))
-        }
-
-        @Suppress("SimplifyBooleanWithConstants")
-        private inline fun debug(lazyMessage: () -> String) {
-            if (DEBUG && BuildConfig.DEBUG) {
-                Log.d(TAG, lazyMessage.invoke())
-            }
-        }
-
-        internal fun setBlendMode(state: RendererState, paint: Paint) {
-            val mixBlendMode = state.style.mixBlendMode ?: CSSBlendMode.normal
-
-            debug {
-                "Setting blend mode to $mixBlendMode"
-            }
-
-            paint.setBlendModeCompat(mixBlendMode.toBlendModeCompat())
-        }
-
         /*
-        * This was one of the ambiguous markers. Try to see if we can find a better direction for
-        * it, now that we have more info available on the neighboring marker positions.
-        */
+         * This was one of the ambiguous markers. Try to see if we can find a better direction for
+         * it, now that we have more info available on the neighboring marker positions.
+         */
         private fun realignMarkerMid(
             lastPos: MarkerVector,
             thisPos: MarkerVector,

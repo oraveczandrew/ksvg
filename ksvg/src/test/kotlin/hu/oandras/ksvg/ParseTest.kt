@@ -48,7 +48,7 @@ class ParseTest {
         // XmlPullParser
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "</svg>"
-        val svg: SVGImpl = SVGImpl.getFromString(test)
+        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
         assertNotNull(svg.rootElement)
     }
 
@@ -63,7 +63,7 @@ class ParseTest {
                     "]>" +
                     "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                     "</svg>"
-        val svg: SVGImpl = SVGImpl.getFromString(test)
+        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
         assertNotNull(svg.rootElement)
     }
 
@@ -77,7 +77,7 @@ class ParseTest {
                     "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                     "</svg>"
         SVG.setInternalEntitiesEnabled(false)
-        val svg: SVGImpl = SVGImpl.getFromString(test)
+        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
         assertNotNull(svg.rootElement)
     }
 

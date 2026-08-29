@@ -38,7 +38,7 @@ class FileParsingTest {
 
     @Test
     fun testParse() {
-        val svg = SVGImpl.getFromInputStream(openFile("hungary_location_map.svg"))
+        val svg = SVGImpl.getFromInputStream(openFile("hungary_location_map.svg"), logger = NoopLoggerContext)
         assertNotNull(svg)
         assertEquals("1.0", svg.documentSVGVersion)
         assertEquals(1209.7271f, svg.documentWidth, 0.0001f)
@@ -115,7 +115,11 @@ class FileParsingTest {
         @JvmStatic
         @BeforeClass
         fun warmUp() {
-            val _ = SVGImpl.getFromInputStream(openFile("hungary_location_map.svg"))
+            val _ = SVGImpl.getFromInputStream(
+                inputStream = openFile(fileName = "hungary_location_map.svg"),
+                parseAnimations = true,
+                logger = NoopLoggerContext
+            )
         }
     }
 }

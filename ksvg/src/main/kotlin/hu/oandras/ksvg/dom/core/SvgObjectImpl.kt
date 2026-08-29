@@ -19,6 +19,7 @@ package hu.oandras.ksvg.dom.core
 
 import androidx.annotation.CallSuper
 import hu.oandras.ksvg.KSVGParseException
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.style.Style
 import org.xml.sax.Attributes
@@ -51,7 +52,7 @@ internal open class SvgObjectImpl(
     ): SvgObject.Builder<SvgObjectImpl>(
         document,
         parent,
-    ) {
+    ), LoggerContext by document {
 
         private var id: String? = null
 

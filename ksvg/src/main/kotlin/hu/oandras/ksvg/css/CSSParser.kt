@@ -16,13 +16,16 @@
  */
 package hu.oandras.ksvg.css
 
-import android.util.Log
+import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.ExternalFileResolver
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.logE
+import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.parser.checkCssState
 import hu.oandras.ksvg.utils.forEachElement
 
@@ -33,7 +36,8 @@ import hu.oandras.ksvg.utils.forEachElement
 internal class CSSParser internal constructor(
     private val deviceMediaType: MediaType = MediaType.screen, // Where these rules came from (Parser or RenderOptions)
     private val source: Source = Source.Document,
-    private val externalFileResolver: ExternalFileResolver? = null
+    private val externalFileResolver: ExternalFileResolver? = null,
+    private val logger: LoggerContext = AndroidLoggerContext
 ) {
 
     private var inMediaRule = false
@@ -215,7 +219,7 @@ internal class CSSParser internal constructor(
             }
         } else {
             // Unknown/unsupported at-rule
-            warn("Ignoring @%s rule", atKeyword)
+            logger.logW(TAG) { String.format("Ignoring @%s rule", atKeyword) }
             skipAtRule(scan)
         }
         scan.skipWhitespace()
@@ -237,7 +241,6 @@ internal class CSSParser internal constructor(
         }
     }
 
-
     private fun parseRuleset(scan: CSSTextScanner): CSSRuleset {
         val ruleset = CSSRuleset()
         try {
@@ -255,8 +258,8 @@ internal class CSSParser internal constructor(
                 break
             }
         } catch (e: CSSParseException) {
-            Log.e(TAG, "CSS parser terminated early due to error: " + e.message)
-            if (BuildConfig.DEBUG) Log.e(TAG, "Stacktrace:", e)
+            logger.logE(TAG) { "CSS parser terminated early due to error: " + e.message.orEmpty() }
+            if (BuildConfig.DEBUG) logger.logE(TAG) { "Stacktrace:\n" + e.stackTraceToString() }
         }
         return ruleset
     }
@@ -352,13 +355,6 @@ internal class CSSParser internal constructor(
             scan.skipWhitespace()
             val mediaList = parseMediaList(scan)
             return mediaMatches(mediaList, rendererMediaType)
-        }
-
-
-        //==============================================================================
-        @Suppress("SameParameterValue")
-        private fun warn(format: String, vararg args: Any?) {
-            Log.w(TAG, String.format(format, *args))
         }
 
 

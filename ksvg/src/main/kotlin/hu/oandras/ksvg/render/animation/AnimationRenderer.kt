@@ -18,7 +18,6 @@ package hu.oandras.ksvg.render.animation
 
 import android.graphics.Matrix
 import android.graphics.Path
-import android.util.Log
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.compat.supportsWordSpacing
 import hu.oandras.ksvg.css.CSSLength
@@ -36,6 +35,7 @@ import hu.oandras.ksvg.dom.shapes.PolygonShape
 import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.dom.style.ColorValue
 import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.FilterPrimitiveRenderNode
@@ -545,13 +545,14 @@ private fun applyFloatAnimation(
 
         else -> {
             if (BuildConfig.DEBUG) {
-                Log.w("KSVG", "Unknown animated attribute: $attributeName")
+                renderContext.logW("KSVG") { "Unknown animated attribute: $attributeName" }
             }
         }
     }
     return changed
 }
 
+context(renderContext: AnimationContext)
 private fun applyColorAnimation(
     state: RendererState,
     builder: Style.Builder,
@@ -620,7 +621,7 @@ private fun applyColorAnimation(
 
         else -> {
             if (BuildConfig.DEBUG) {
-                Log.w("KSVG", "Unknown animated attribute: $attributeName")
+                renderContext.logW("KSVG") { "Unknown animated attribute: $attributeName" }
             }
         }
     }

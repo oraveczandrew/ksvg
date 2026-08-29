@@ -17,11 +17,13 @@
 
 package hu.oandras.ksvg.parser
 
-import android.util.Log
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.dom.core.PathDefinition
+import hu.oandras.ksvg.logE
 
 private const val TAG = "PathParser"
 
+context(loggerContext: LoggerContext)
 internal fun parsePath(value: String): PathDefinition {
     val scan = TextScanner(value)
 
@@ -64,10 +66,7 @@ internal fun parsePath(value: String): PathDefinition {
                 x = scan.nextFloat()
                 y = scan.checkedNextFloat(x)
                 if (y.isNaN()) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 // Relative moveto at the start of a path is treated as an absolute moveto.
@@ -98,10 +97,7 @@ internal fun parsePath(value: String): PathDefinition {
                 x = scan.nextFloat()
                 y = scan.checkedNextFloat(x)
                 if (y.isNaN()) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 if (pathCommand == 'l') {
@@ -131,10 +127,7 @@ internal fun parsePath(value: String): PathDefinition {
                 x = scan.checkedNextFloat(y2)
                 y = scan.checkedNextFloat(x)
                 if (y.isNaN()) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 if (pathCommand == 'c') {
@@ -168,10 +161,7 @@ internal fun parsePath(value: String): PathDefinition {
                 x = scan.checkedNextFloat(y2)
                 y = scan.checkedNextFloat(x)
                 if (y.isNaN()) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 if (pathCommand == 's') {
@@ -211,10 +201,7 @@ internal fun parsePath(value: String): PathDefinition {
             'h' -> {
                 x = scan.nextFloat()
                 if (x.isNaN()) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 if (pathCommand == 'h') {
@@ -235,10 +222,7 @@ internal fun parsePath(value: String): PathDefinition {
             'v' -> {
                 y = scan.nextFloat()
                 if (y.isNaN()) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 if (pathCommand == 'v') {
@@ -262,10 +246,7 @@ internal fun parsePath(value: String): PathDefinition {
                 x = scan.checkedNextFloat(y1)
                 y = scan.checkedNextFloat(x)
                 if (y.isNaN()) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 if (pathCommand == 'q') {
@@ -293,10 +274,7 @@ internal fun parsePath(value: String): PathDefinition {
                 x = scan.nextFloat()
                 y = scan.checkedNextFloat(x)
                 if (y.isNaN()) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 if (pathCommand == 't') {
@@ -325,10 +303,7 @@ internal fun parsePath(value: String): PathDefinition {
                 x = scan.checkedNextFloat(sweepFlag)
                 y = scan.checkedNextFloat(x)
                 if (y.isNaN() || rx < 0 || ry < 0) {
-                    Log.e(
-                        TAG,
-                        "Bad path coords for $pathCommand path segment"
-                    )
+                    loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
                 if (pathCommand == 'a') {
@@ -373,6 +348,7 @@ internal fun parsePath(value: String): PathDefinition {
  * Parses a semicolon-separated list of path data strings (e.g. the `values` of an
  * `<animate attributeName="d">`) into a list of [PathDefinition]s.
  */
+context(loggerContext: LoggerContext)
 internal fun parseSemicolonPathList(value: String): List<PathDefinition> {
     val result = mutableListOf<PathDefinition>()
     val len = value.length

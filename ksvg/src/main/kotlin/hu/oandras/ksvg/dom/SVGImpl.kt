@@ -23,14 +23,15 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.RectF
-import android.util.Log
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
+import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.HitRegion
 import hu.oandras.ksvg.KSVGAnimatedDrawable
 import hu.oandras.ksvg.KSVGDrawable
 import hu.oandras.ksvg.KSVGParseException
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.OnSvgClickListener
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
@@ -47,6 +48,7 @@ import hu.oandras.ksvg.dom.core.Svg
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.core.View
 import hu.oandras.ksvg.dom.text.A
+import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.parser.SVGParser
 import hu.oandras.ksvg.parser.SVGParserImpl
 import hu.oandras.ksvg.parser.parseLength
@@ -95,8 +97,12 @@ internal class SVGImpl internal constructor(
     // The parser configuration settings that was used for the current instance
     // Will continue to be used for future parsing by this instance. For example
     // when parsing addition CSS.
-    override val externalFileResolver: ExternalFileResolver?
-) : SVG {
+    override val externalFileResolver: ExternalFileResolver?,
+    /**
+     * The [LoggerContext] used for parser and renderer logging for this document.
+     */
+    loggerContext: LoggerContext = AndroidLoggerContext
+) : SVG, LoggerContext by loggerContext {
     @JvmField
     internal var animationsEnabled: Boolean = false
 
@@ -457,7 +463,7 @@ internal class SVGImpl internal constructor(
             return viewElems.mapNotNullTo(ArraySet(viewElems.size)) { elem ->
                 (elem as View).id.also {
                     if (it == null) {
-                        Log.w("KSVG", "getViewList(): found a <view> without an id attribute")
+                        logW("KSVG") { "getViewList(): found a <view> without an id attribute" }
                     }
                 }
             }
@@ -812,9 +818,10 @@ internal class SVGImpl internal constructor(
         @Throws(KSVGParseException::class)
         fun getFromInputStream(
             inputStream: InputStream,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext
         ): SVGImpl {
-            return createParser(parseAnimations).parseStream(inputStream)
+            return createParser(parseAnimations, logger).parseStream(inputStream)
         }
 
         /**
@@ -828,9 +835,10 @@ internal class SVGImpl internal constructor(
         @Throws(KSVGParseException::class)
         fun getFromString(
             svg: String,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext
         ): SVGImpl {
-            return createParser(parseAnimations).parseStream(ByteArrayInputStream(svg.toByteArray()))
+            return createParser(parseAnimations, logger).parseStream(ByteArrayInputStream(svg.toByteArray()))
         }
 
         /**
@@ -841,17 +849,18 @@ internal class SVGImpl internal constructor(
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error parsing the document.
-    
+     
          */
         @Throws(KSVGParseException::class)
         fun getFromResource(
             resources: Resources,
             resourceId: Int,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext
         ): SVGImpl {
             val inputStream = resources.openRawResource(resourceId)
             try {
-                return createParser(parseAnimations).parseStream(inputStream)
+                return createParser(parseAnimations, logger).parseStream(inputStream)
             } finally {
                 try {
                     inputStream.close()
@@ -875,11 +884,12 @@ internal class SVGImpl internal constructor(
         fun getFromAsset(
             assetManager: AssetManager,
             filename: String,
-            parseAnimations: Boolean = false
+            parseAnimations: Boolean = false,
+            logger: LoggerContext
         ): SVGImpl {
             val inputStream = assetManager.open(filename)
             try {
-                return createParser(parseAnimations).parseStream(inputStream)
+                return createParser(parseAnimations, logger).parseStream(inputStream)
             } finally {
                 try {
                     inputStream.close()
@@ -899,8 +909,10 @@ internal class SVGImpl internal constructor(
           * @param pathDefinition an SVG path element definition string
           * @return an Android `Path`
           */
-        fun parsePath(pathDefinition: String): Path {
-            val pathDef = hu.oandras.ksvg.parser.parsePath(pathDefinition)
+        fun parsePath(pathDefinition: String, logger: LoggerContext): Path {
+            val pathDef = with(logger) {
+                hu.oandras.ksvg.parser.parsePath(pathDefinition)
+            }
             val pathConv = PathConverter(pathDef)
             return pathConv.path
         }
@@ -942,11 +954,13 @@ internal class SVGImpl internal constructor(
         }
 
         //===============================================================================
-        private fun createParser(parseAnimations: Boolean): SVGParser {
-            return SVGParserImpl()
-                .setInternalEntitiesEnabled(enableInternalEntitiesSingleton)
-                .setExternalFileResolver(externalFileResolverSingleton)
-                .setAnimationsEnabled(parseAnimations)
+        private fun createParser(parseAnimations: Boolean, logger: LoggerContext): SVGParser {
+            return SVGParserImpl(
+                enableInternalEntities = enableInternalEntitiesSingleton,
+                externalFileResolver = externalFileResolverSingleton,
+                animationsEnabled = parseAnimations,
+                logger = logger,
+            )
         }
     }
 }

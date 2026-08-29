@@ -19,7 +19,8 @@ package hu.oandras.ksvg.render
 import android.graphics.LinearGradient
 import android.graphics.RadialGradient
 import android.graphics.Shader.TileMode
-import android.util.Log
+import hu.oandras.ksvg.LoggerContext
+
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Pattern
 import hu.oandras.ksvg.dom.core.SolidColor
@@ -28,6 +29,8 @@ import hu.oandras.ksvg.dom.gradient.GradientLinear
 import hu.oandras.ksvg.dom.gradient.GradientRadial
 import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.SvgPaint
+import hu.oandras.ksvg.logE
+import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.render.animation.AnimationNode
 
 private const val TAG = "Renderer"
@@ -159,6 +162,7 @@ internal sealed class ResolvedPaint {
  * Returns null when the paint is not a [PaintReference] or does not reference a gradient/solid-color
  * (patterns are handled separately via [RenderNode.fillPatternNode]).
  */
+context(loggerContext: LoggerContext)
 internal fun resolvePaintReference(document: SVGImpl, paint: SvgPaint?): ResolvedPaint? {
     if (paint !is PaintReference) return null
     val ref = document.resolveIRI(paint.href) ?: return ResolvedPaint.Missing
@@ -190,19 +194,20 @@ internal fun resolvePaintReference(document: SVGImpl, paint: SvgPaint?): Resolve
  * Any unspecified fields in this gradient can be 'borrowed' from another
  * gradient specified by the href attribute.
  */
+context(loggerContext: LoggerContext)
 internal fun fillInChainedGradientFields(gradient: Gradient, href: String) {
     // Locate the referenced object
     val ref = gradient.document.resolveIRI(href)
     if (ref == null) {
-        Log.w(TAG, String.format("Gradient reference '%s' not found", href))
+        loggerContext.logW(TAG) { String.format("Gradient reference '%s' not found", href) }
         return
     }
     if (ref !is Gradient) {
-        Log.e(TAG, "Gradient href attributes must point to other gradient elements")
+        loggerContext.logE(TAG) { "Gradient href attributes must point to other gradient elements" }
         return
     }
     if (ref === gradient) {
-        Log.e(TAG, String.format("Circular reference in gradient href attribute '%s'", href))
+        loggerContext.logE(TAG) { String.format("Circular reference in gradient href attribute '%s'", href) }
         return
     }
 

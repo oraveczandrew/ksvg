@@ -17,10 +17,11 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.Canvas
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.render.pool.PoolOwner
 
-internal interface RenderContext: DisplayContext, PoolOwner {
+internal interface RenderContext: DisplayContext, PoolOwner, LoggerContext {
     fun resolveFloodColor(
         primitiveNode: FilterPrimitiveRenderNode<*>,
         baseStyle: Style
