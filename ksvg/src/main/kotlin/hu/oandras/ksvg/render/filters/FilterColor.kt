@@ -40,8 +40,8 @@ import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.linearToSRgb
 import hu.oandras.ksvg.utils.sRgbToLinear
 import hu.oandras.ksvg.utils.toRadians
+import hu.oandras.ksvg.utils.floorToInt
 import kotlin.math.cos
-import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.sin
 
@@ -263,7 +263,7 @@ private fun interpolateTable(x: Float, tableValues: FloatArray?): Float {
     if (tableValues.size == 1) return tableValues[0]
     val scaled = clamp(x, 0f, 1f) * (tableValues.size - 1)
     val index = clamp(
-        n = floor(scaled).toInt(),
+        n = scaled.floorToInt(),
         min = 0,
         max = tableValues.size - 2
     )
@@ -274,7 +274,7 @@ private fun interpolateTable(x: Float, tableValues: FloatArray?): Float {
 private fun discreteTable(x: Float, tableValues: FloatArray?): Float {
     if (tableValues == null || tableValues.isEmpty()) return x
     val index = clamp(
-        n = floor(clamp(x, 0f, 1f) * tableValues.size).toInt(),
+        n = (clamp(x, 0f, 1f) * tableValues.size).floorToInt(),
         min = 0,
         max = tableValues.size - 1
     )

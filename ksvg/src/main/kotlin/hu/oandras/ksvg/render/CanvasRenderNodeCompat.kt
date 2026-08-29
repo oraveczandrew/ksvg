@@ -21,7 +21,7 @@ import android.graphics.Picture
 import android.graphics.RenderNode
 import android.os.Build
 import androidx.annotation.RequiresApi
-import kotlin.math.floor
+import hu.oandras.ksvg.utils.floorToInt
 
 /**
  * Off-screen display-list capture for static subtrees.
@@ -118,8 +118,8 @@ internal class RenderNodeRecorder : CanvasRenderNodeCompat() {
         if (!rn.hasDisplayList()) return false
 
         // Move the node's clip bounds over the recorded user-space area...
-        val left = floor(ox).toInt()
-        val top = floor(oy).toInt()
+        val left = ox.floorToInt()
+        val top = oy.floorToInt()
         rn.setPosition(left, top, left + width, top + height)
         // ...and put the sub-pixel remainder back via translation.
         rn.translationX = ox - left
@@ -136,8 +136,8 @@ internal class RenderNodeRecorder : CanvasRenderNodeCompat() {
         this.oy = oy
         val rn = renderNode ?: RenderNode("ksvg").also { renderNode = it }
         rn.setPosition(
-            floor(ox).toInt(), floor(oy).toInt(),
-            floor(ox).toInt() + this.width, floor(oy).toInt() + this.height
+            ox.floorToInt(), oy.floorToInt(),
+            ox.floorToInt() + this.width, oy.floorToInt() + this.height
         )
         val c = rn.beginRecording(this.width, this.height)
         c.translate(-ox, -oy)

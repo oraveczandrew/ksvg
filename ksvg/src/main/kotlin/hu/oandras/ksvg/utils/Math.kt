@@ -19,6 +19,7 @@ package hu.oandras.ksvg.utils
 import hu.oandras.ksvg.KSVGParseException
 import kotlin.math.PI
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -56,6 +57,10 @@ internal fun Float.toDegrees(): Float = (this * 180.0 / PI).toFloat()
 
 internal fun Float.ceilToInt(): Int {
     return ceil(this).toInt()
+}
+
+internal fun Float.floorToInt(): Int {
+    return floor(this).toInt()
 }
 
 internal fun Int.squared(): Int = Math.multiplyExact(this, this)
