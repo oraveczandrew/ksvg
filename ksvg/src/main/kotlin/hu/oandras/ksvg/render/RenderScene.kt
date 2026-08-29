@@ -63,6 +63,13 @@ internal class RenderScene private constructor(
     @JvmField
     var viewport: Rect? = null
 
+    /**
+     * Last [RenderOptionsImpl.viewPort] passed to [applyViewport], used by its
+     * fast-path skip check. The resolved transforms only depend on the drawable
+     * bounds and this override, so when both are unchanged there is nothing to do.
+     */
+    private var lastViewPortOverride: Box? = null
+
     // Root-level view overrides resolved at build time (shared helper with the builder).
     private var rootOverrides: RootViewOverrides = RootViewOverrides(null, null)
 
@@ -81,6 +88,20 @@ internal class RenderScene private constructor(
         val root = rootNode ?: return
         val rootSvg = root.sourceElement as? Svg ?: return
         if (root !is GroupRenderNode<*>) return
+
+        // Fast-path: applyViewport runs on every draw, but the resolved viewport
+        // transforms only depend on the drawable bounds and the viewport override.
+        // When neither changed, there is nothing to recompute, so skip the whole
+        // walk - no allocation and, crucially, no spurious contentVersion bumps
+        // that would invalidate display-list caches every frame.
+        val last = viewport
+        if (last != null
+            && last.left == bounds.left && last.top == bounds.top
+            && last.right == bounds.right && last.bottom == bounds.bottom
+            && options.viewPort == lastViewPortOverride
+        ) {
+            return
+        }
 
         val ctx = SceneUpdateContext(pools, dPI)
 
@@ -102,7 +123,9 @@ internal class RenderScene private constructor(
         }
 
         updateViewportContainer(root, rootSvg, vp, rootOverrides.viewBoxOverride, rootOverrides.parOverride, ctx)
-        viewport = Rect(bounds)
+        val viewportRect = viewport ?: Rect(bounds).also { viewport = it }
+        viewportRect.set(bounds)
+        lastViewPortOverride = options.viewPort
     }
 
     fun recycle(bitmapPool: BitmapPool) {
@@ -127,7 +150,11 @@ internal class RenderScene private constructor(
         val oldViewBox = ctx.walkViewBox
         ctx.walkViewPort = viewPort
 
-        val matrix = Matrix()
+        // Reuse the node's viewBox transform matrix across applyViewport calls so we
+        // don't allocate a new Matrix per viewport container on every bounds change.
+        // applyViewportTransform only composes pre* ops, so reset before recomputing.
+        val matrix = node.viewBoxTransform ?: Matrix()
+        matrix.reset()
         val viewBox = viewBoxOverride ?: container.viewBox
         val positioning = parOverride
             ?: container.preserveAspectRatio
@@ -135,11 +162,9 @@ internal class RenderScene private constructor(
 
         ctx.walkViewBox = applyViewportTransform(viewPort, viewBox, positioning, matrix)
 
-        if (node.viewBoxTransform != matrix) {
-            node.viewBoxTransform = matrix
-            // Recorded display-list content lives in the OLD coordinate system.
-            node.notifyChange(contentChanged = true)
-        }
+        node.viewBoxTransform = matrix
+        // Recorded display-list content lives in the OLD coordinate system.
+        node.notifyChange(contentChanged = true)
 
         updateChildren(node, ctx)
 
