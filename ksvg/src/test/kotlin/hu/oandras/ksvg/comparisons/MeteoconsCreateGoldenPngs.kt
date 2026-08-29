@@ -24,7 +24,7 @@ import org.robolectric.ParameterizedRobolectricTestRunner.Parameters
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
-@Ignore("x")
+@Ignore("Run manually to generate golden images")
 @RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MeteoconsCreateGoldenPngs(
@@ -36,17 +36,16 @@ class MeteoconsCreateGoldenPngs(
         get() = METEOCONS_TARGET_SIZE
 
     companion object {
+        private var cleaned = false
 
         @JvmStatic
         @BeforeClass
         fun check() {
             assumeHasRsvgConvert()
-
-            val targetFolder = File(METEOCONS_GOLDEN_ROOT_PATH)
-            if (targetFolder.exists()) {
-                targetFolder.deleteRecursively()
+            if (!cleaned) {
+                reinitFolder(METEOCONS_GOLDEN_ROOT_PATH)
+                cleaned = true
             }
-            targetFolder.mkdirs()
         }
 
         @JvmStatic

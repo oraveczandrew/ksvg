@@ -131,6 +131,18 @@ fun assumeHasRsvgConvert() {
     assumeTrue("rsvg-convert not found", hasRsvgConvert())
 }
 
+/**
+ * Deletes [rootPath] (if it exists) and recreates it empty, so a golden-generation run
+ * starts from a clean slate without leaving goldens from SVGs that were removed.
+ */
+internal fun reinitFolder(rootPath: String) {
+    val folder = File(rootPath)
+    if (folder.exists()) {
+        folder.deleteRecursively()
+    }
+    folder.mkdirs()
+}
+
 internal fun File.listDirectories(): Array<File> {
     return listFiles {
         it.isDirectory

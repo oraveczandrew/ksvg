@@ -39,15 +39,15 @@ class CreateLibraryGoldenPngs(
         get() = true
 
     companion object {
+        private var cleaned = false
 
         @JvmStatic
         @BeforeClass
         fun check() {
-            val targetFolder = File(VISUAL_LIBRARY_GOLDEN_ROOT_PATH)
-            if (targetFolder.exists()) {
-                targetFolder.deleteRecursively()
+            if (!cleaned) {
+                reinitFolder(VISUAL_LIBRARY_GOLDEN_ROOT_PATH)
+                cleaned = true
             }
-            targetFolder.mkdirs()
         }
 
         @JvmStatic
