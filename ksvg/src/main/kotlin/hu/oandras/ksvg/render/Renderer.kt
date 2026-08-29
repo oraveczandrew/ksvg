@@ -251,7 +251,7 @@ internal class Renderer internal constructor(
             rootNode.updateAnimations(document.animationTimeMs)
         }
 
-        withNewRootContextState(canvas) { canvas, _ ->
+        withNewRootContextState(canvas, rootNode.subtreeContainsBlendMode) { canvas, _ ->
             val viewPort = (rootNode as? GroupRenderNode)?.viewPort ?: renderOptions.viewPort
             if (viewPort != null && rootNode.renderState.style.overflow == false) {
                 setClipRect(canvas, viewPort)
@@ -496,8 +496,12 @@ internal class Renderer internal constructor(
         }
     }
 
-    private inline fun withNewRootContextState(canvas: Canvas, r: (Canvas, RendererState) -> Unit) {
-        val state = statePush(canvas, isRootContext = true)
+    private inline fun withNewRootContextState(
+        canvas: Canvas,
+        needsRootIsolation: Boolean,
+        r: (Canvas, RendererState) -> Unit
+    ) {
+        val state = statePush(canvas, isRootContext = true, needsRootIsolation = needsRootIsolation)
         try {
             r(canvas, state)
         } finally {
@@ -534,23 +538,28 @@ internal class Renderer internal constructor(
     internal fun statePush(
         canvas: Canvas,
         isRootContext: Boolean = false,
+        needsRootIsolation: Boolean = false,
         saveCanvas: Boolean = true,
         applyFrom: RendererState = state,
         host: RenderNode<*>? = null,
     ): RendererState {
         val savedCount = if (saveCanvas) {
             if (isRootContext) {
-                // Root SVG context should be transparent. So we need to saveLayer
-                // to avoid background messing with blend modes etc.
-                val statePushRectF = statePushRectF
-                canvas.getClipBounds(statePushRectF)
-                canvas.saveLayer(
-                    statePushRectF.left.toFloat(),
-                    statePushRectF.top.toFloat(),
-                    statePushRectF.right.toFloat(),
-                    statePushRectF.bottom.toFloat(),
-                    null
-                )
+                if (needsRootIsolation) {
+                    // Root SVG context should be transparent. So we need to saveLayer
+                    // to avoid background messing with blend modes etc.
+                    val statePushRectF = statePushRectF
+                    canvas.getClipBounds(statePushRectF)
+                    canvas.saveLayer(
+                        statePushRectF.left.toFloat(),
+                        statePushRectF.top.toFloat(),
+                        statePushRectF.right.toFloat(),
+                        statePushRectF.bottom.toFloat(),
+                        null
+                    )
+                } else {
+                    canvas.save()
+                }
             } else {
                 canvas.save()
             }
@@ -1057,12 +1066,55 @@ internal class Renderer internal constructor(
 
         saveLayerPaint.alpha = clamp255(oldState.style.opacity * opacityAdjustment * 255f)
 
-        if (oldState.style.mixBlendMode != CSSBlendMode.normal) {
-            setBlendMode(oldState, saveLayerPaint)
-        }
+        // Always resolve the blend mode: `saveLayerPaint` is a shared instance, so leaving
+        // it unset would leak the previous node's mode onto a node with a normal blend.
+        setBlendMode(oldState, saveLayerPaint)
 
         val statePushRectF = statePushRectF
         canvas.getClipBounds(statePushRectF)
+
+        val bbox = node.boundingBox
+        if (bbox != null) {
+            val style = oldState.style
+            val strokeWidth = style.strokeWidth
+            val strokeWidthPx = if (strokeWidth != null && !strokeWidth.isZero) {
+                with(this@Renderer) { strokeWidth.floatValueInContext() }
+            } else 0f
+
+            // Calculate local padding.
+            var pad = strokeWidthPx * 0.5f
+
+            // Add 1px device-space padding for anti-aliasing safety.
+            matrixPool.withPooledObject { m ->
+                @Suppress("DEPRECATION")
+                canvas.getMatrix(m)
+                val v = getValuesFloatArray
+                m.getValues(v)
+                val sx = hypot(v[Matrix.MSCALE_X], v[Matrix.MSKEW_Y])
+                val sy = hypot(v[Matrix.MSCALE_Y], v[Matrix.MSKEW_X])
+                val maxScale = max(sx, sy)
+                if (maxScale > 0f) {
+                    pad += 1f / maxScale
+                } else {
+                    pad += 1f
+                }
+            }
+
+            val left = max(statePushRectF.left.toFloat(), bbox.minX - pad)
+            val top = max(statePushRectF.top.toFloat(), bbox.minY - pad)
+            val right = min(statePushRectF.right.toFloat(), bbox.maxX() + pad)
+            val bottom = min(statePushRectF.bottom.toFloat(), bbox.maxY() + pad)
+
+            if (right > left && bottom > top) {
+                statePushRectF.set(
+                    floor(left).toInt(),
+                    floor(top).toInt(),
+                    ceil(right).toInt(),
+                    ceil(bottom).toInt()
+                )
+            }
+        }
+
         val savedCount = canvas.saveLayer(
             /* left = */ statePushRectF.left.toFloat(),
             /* top = */ statePushRectF.top.toFloat(),
@@ -1070,6 +1122,8 @@ internal class Renderer internal constructor(
             /* bottom = */ statePushRectF.bottom.toFloat(),
             /* paint = */ saveLayerPaint
         )
+
+
 
         // Save style state
         stateStack.push(newSavedRendererState(oldState, savedCount))
@@ -2282,19 +2336,10 @@ internal class Renderer internal constructor(
         return (dimension + 31) and 31.inv()
     }
 
-    @Suppress("SameParameterValue")
-    private fun error(message: String) {
-        logE(TAG) { message }
-    }
-
-    private fun error(format: String, vararg args: Any?) {
-        logE(TAG) { String.format(format, *args) }
-    }
-
     @Suppress("SimplifyBooleanWithConstants")
     private inline fun debug(lazyMessage: () -> String) {
         if (DEBUG && BuildConfig.DEBUG) {
-            logD(TAG) { lazyMessage() }
+            logD(TAG, lazyMessage)
         }
     }
 

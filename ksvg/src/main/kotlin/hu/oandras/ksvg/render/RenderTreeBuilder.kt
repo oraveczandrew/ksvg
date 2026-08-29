@@ -252,6 +252,7 @@ internal class RenderTreeBuilder(
             )
             if (n != null) {
                 n.hasAnimationsInSubtree = n.computeHasAnimations()
+                n.subtreeContainsBlendMode = n.computeSubtreeContainsBlendMode()
             }
             statePop()
             n

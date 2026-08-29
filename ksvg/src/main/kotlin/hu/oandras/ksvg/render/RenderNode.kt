@@ -22,6 +22,9 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import hu.oandras.ksvg.compat.XFerModes
+import hu.oandras.ksvg.compat.toBlendModeCompat
+import hu.oandras.ksvg.dom.style.CSSBlendMode
+import hu.oandras.ksvg.dom.style.Isolation
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.ClipPath
@@ -96,6 +99,7 @@ internal sealed class RenderNode<T: SvgObject>(
     @JvmField var strokePaintRef: ResolvedPaint? = null
     @JvmField var animationNodes: List<AnimationNode>? = null
     @JvmField var hasAnimationsInSubtree: Boolean = false
+    @JvmField var subtreeContainsBlendMode: Boolean = false
 
     /**
      * When true the node never captures a display-list cache. Used for groups
@@ -157,6 +161,20 @@ internal sealed class RenderNode<T: SvgObject>(
         return animationNodes?.isNotEmpty() == true
     }
 
+    /**
+     * True when any node in the subtree (including this one) has a mix-blend-mode that
+     * actually composites against its backdrop. Used to skip the root offscreen layer when
+     * the document has no blending, since that layer only exists to give blend modes a
+     * transparent backdrop.
+     */
+    internal open fun computeSubtreeContainsBlendMode(): Boolean {
+        val style = renderState.style
+        val mode = style.mixBlendMode
+        return (mode != null && mode != CSSBlendMode.normal && mode.toBlendModeCompat() != null) ||
+                style.isolation == Isolation.isolate
+    }
+
+
     abstract fun render(renderer: Renderer, canvas: Canvas)
 
     open fun recycle(bitmapPool: BitmapPool) {
@@ -211,6 +229,10 @@ internal open class GroupRenderNode<T: ConditionalContainer>(
         return super.computeHasAnimations() || children.any { it.hasAnimations() }
     }
 
+    override fun computeSubtreeContainsBlendMode(): Boolean {
+        return super.computeSubtreeContainsBlendMode() || children.any { it.subtreeContainsBlendMode }
+    }
+
     override fun render(renderer: Renderer, canvas: Canvas) {
         renderer.renderGroupNode(canvas, this)
     }
@@ -261,6 +283,10 @@ internal class ClipPathRenderNode(
         return super.computeHasAnimations() || children.any { it.hasAnimations() }
     }
 
+    override fun computeSubtreeContainsBlendMode(): Boolean {
+        return super.computeSubtreeContainsBlendMode() || children.any { it.subtreeContainsBlendMode }
+    }
+
     override fun render(renderer: Renderer, canvas: Canvas) {
         error("ClipPaths are not rendered directly")
     }
@@ -276,6 +302,10 @@ internal class SwitchRenderNode(
 ) : RenderNode<Switch>(sourceElement) {
     override fun computeHasAnimations(): Boolean {
         return super.computeHasAnimations() || selectedChild?.hasAnimations() == true
+    }
+
+    override fun computeSubtreeContainsBlendMode(): Boolean {
+        return super.computeSubtreeContainsBlendMode() || selectedChild?.subtreeContainsBlendMode == true
     }
 
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -381,6 +411,10 @@ internal class PatternRenderNode(
 
     override fun computeHasAnimations(): Boolean {
         return super.computeHasAnimations() || children.any { it.hasAnimations() }
+    }
+
+    override fun computeSubtreeContainsBlendMode(): Boolean {
+        return super.computeSubtreeContainsBlendMode() || children.any { it.subtreeContainsBlendMode }
     }
 
     override fun render(renderer: Renderer, canvas: Canvas) {
