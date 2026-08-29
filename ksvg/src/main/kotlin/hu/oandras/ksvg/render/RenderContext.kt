@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg.render
 
+import android.graphics.Canvas
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.render.pool.PoolOwner
 
@@ -24,4 +25,8 @@ internal interface RenderContext: DisplayContext, PoolOwner {
         primitiveNode: FilterPrimitiveRenderNode<*>,
         baseStyle: Style
     ): Int
+
+    /** Renders a previously-built render node onto the given canvas (used by `feImage`
+     *  when it references another element by id). */
+    fun renderNode(canvas: Canvas, node: RenderNode<*>)
 }

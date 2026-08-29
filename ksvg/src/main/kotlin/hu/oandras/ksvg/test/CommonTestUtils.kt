@@ -26,16 +26,28 @@ import java.io.File
 import java.io.InputStream
 
 @VisibleForTesting
-internal fun renderWithLibrary(file: File, outBitmap: Bitmap): Bitmap {
-    return file.inputStream().use {
-        renderWithLibrary(it, outBitmap)
-    }
-}
+ internal fun renderWithLibrary(file: File, outBitmap: Bitmap): Bitmap {
+     return file.inputStream().use {
+         renderWithLibrary(it, outBitmap)
+     }
+ }
 
-@VisibleForTesting
+ internal fun renderWithLibrary(file: File, outBitmap: Bitmap, softwareFiltering: Boolean): Bitmap {
+     return file.inputStream().use {
+         renderWithLibrary(it, outBitmap, softwareFiltering)
+     }
+ }
+
+ @VisibleForTesting
 internal fun renderWithLibrary(input: InputStream, outBitmap: Bitmap): Bitmap {
     val svg = SVG.getFromInputStream(input)
     return renderSvgTo(svg, outBitmap)
+}
+
+ @VisibleForTesting
+internal fun renderWithLibrary(input: InputStream, outBitmap: Bitmap, softwareFiltering: Boolean): Bitmap {
+    val svg = SVG.getFromInputStream(input)
+    return renderSvgTo(svg, outBitmap, softwareFiltering)
 }
 
 @VisibleForTesting
@@ -45,6 +57,10 @@ internal fun renderWithLibrary(input: String, outBitmap: Bitmap): Bitmap {
 }
 
 private fun renderSvgTo(svg: SVG, outBitmap: Bitmap): Bitmap {
+    return renderSvgTo(svg, outBitmap, false)
+}
+
+private fun renderSvgTo(svg: SVG, outBitmap: Bitmap, softwareFiltering: Boolean): Bitmap {
     outBitmap.eraseColor(0)
 
     val canvas = Canvas(outBitmap)
@@ -56,6 +72,9 @@ private fun renderSvgTo(svg: SVG, outBitmap: Bitmap): Bitmap {
         width = outBitmap.width.toFloat(),
         height = outBitmap.height.toFloat()
     )
+    if (softwareFiltering) {
+        options.softwareFiltering(true)
+    }
 
     svg.renderToCanvas(canvas, options)
     return outBitmap
@@ -73,4 +92,32 @@ internal fun decodePng(input: InputStream, inBitmap: Bitmap): Bitmap? {
     return BitmapFactory.decodeStream(input, null, BitmapFactory.Options().also {
         it.inBitmap = inBitmap
     })
+}
+
+/**
+ * Iterates over every pixel of [this] Bitmap, invoking [action] with the raw ARGB color int.
+ */
+@VisibleForTesting
+internal inline fun Bitmap.forEachPixel(action: (color: Int) -> Unit) {
+    val w = width
+    val h = height
+    val px = IntArray(w * h)
+    getPixels(px, 0, w, 0, 0, w, h)
+    for (i in px.indices) {
+        action(px[i])
+    }
+}
+
+/**
+ * Counts the pixels of [bitmap] for which [predicate] returns true. The predicate
+ * receives the raw ARGB color int; use [hu.oandras.ksvg.utils.alpha] /
+ * [hu.oandras.ksvg.utils.red] etc. to inspect individual channels.
+ */
+@VisibleForTesting
+internal inline fun countPixels(bitmap: Bitmap, predicate: (color: Int) -> Boolean): Int {
+    var count = 0
+    bitmap.forEachPixel { color ->
+        if (predicate(color)) count++
+    }
+    return count
 }

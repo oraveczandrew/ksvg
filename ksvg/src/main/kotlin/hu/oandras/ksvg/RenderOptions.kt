@@ -172,6 +172,23 @@ public interface RenderOptions {
      */
     public fun hasTarget(): Boolean
 
+    /**
+     * Forces the renderer to use the software (CPU) filter backend instead of the
+     * GPU/RenderEffect backend, even on hardware-accelerated canvases and API levels
+     * that would otherwise prefer the GPU path. Useful for deterministic output in
+     * tests and for filter primitives the GPU backend does not support.
+     * @param enabled whether to force software filtering (defaults to `true`)
+     * @return this same `RenderOptions` instance
+     */
+    public fun softwareFiltering(enabled: Boolean): RenderOptions
+
+    /**
+     * Returns true if this RenderOptions instance has had software filtering forced
+     * with [softwareFiltering].
+     * @return true if software filtering is forced
+     */
+    public fun hasSoftwareFiltering(): Boolean
+
     public companion object {
         /**
          * Create a new `RenderOptions` instance.

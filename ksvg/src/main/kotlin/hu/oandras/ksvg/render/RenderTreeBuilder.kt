@@ -1635,10 +1635,18 @@ internal class RenderTreeBuilder(
                 val image = href?.let {
                     checkForImageDataURL(it) ?: externalFileResolver?.resolveImage(it)
                 }
-                if (image == null) {
+                // `feImage` may reference another element in the document by id
+                // (e.g. `href="#source"`); in that case we build the referenced
+                // node and render it instead of an external/raster image.
+                val referencedNode = if (href != null && href.startsWith("#")) {
+                    document.getElementById(href.substring(1))?.let { build(it) }
+                } else {
+                    null
+                }
+                if (image == null && referencedNode == null) {
                     Log.w("FeImageFilter", String.format("Could not locate image '%s'", href))
                 }
-                FeImageRenderNode(primitive, image)
+                FeImageRenderNode(sourceElement = primitive, image = image, referencedNode = referencedNode)
             }
             is FeFlood -> FeFloodRenderNode(primitive).also { node ->
                 node.animationNodes = primitive.animations?.mapNotNullElements {

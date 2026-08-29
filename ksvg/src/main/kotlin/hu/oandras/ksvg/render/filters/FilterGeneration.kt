@@ -18,6 +18,7 @@ package hu.oandras.ksvg.render.filters
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.PorterDuff
 import android.graphics.RectF
 import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
@@ -229,18 +230,36 @@ context(renderContext: RenderContext)
 internal fun doFeImageFilter(
     primitiveNode: FeImageRenderNode,
     inputBitmap: Bitmap,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
 ): Bitmap {
-    val image = primitiveNode.image ?: return inputBitmap
+    val image = primitiveNode.image
+    val referencedNode = primitiveNode.referencedNode
 
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     renderContext.canvasPool.withPooledObject { c ->
         c.setBitmap(res)
-        val sx = res.width.toFloat() / image.width.toFloat()
-        val sy = res.height.toFloat() / image.height.toFloat()
-        c.save()
-        c.scale(sx, sy)
-        c.drawBitmap(image, 0f, 0f, null)
-        c.restore()
+        c.drawColor(0, PorterDuff.Mode.CLEAR)
+        when {
+            referencedNode != null -> {
+                // Render the referenced element (e.g. an in-document node
+                // referenced via `href="#id"`) into the result bitmap. The
+                // element's user-space coordinates map directly onto the filter
+                // region, so we scale by the canvas (device) scale.
+                c.save()
+                c.scale(canvasScaleX, canvasScaleY)
+                renderContext.renderNode(c, referencedNode)
+                c.restore()
+            }
+            image != null -> {
+                val sx = res.width.toFloat() / image.width.toFloat()
+                val sy = res.height.toFloat() / image.height.toFloat()
+                c.save()
+                c.scale(sx, sy)
+                c.drawBitmap(image, 0f, 0f, null)
+                c.restore()
+            }
+        }
     }
     return res
 }

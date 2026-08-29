@@ -692,6 +692,7 @@ internal class SVGParserImpl : SVGParser {
             SVGTag.feSpotLight,
             SVGTag.feFlood,
             SVGTag.feGaussianBlur,
+            SVGTag.feImage,
             SVGTag.feMerge,
             SVGTag.feMergeNode,
             SVGTag.feMorphology,
@@ -1199,16 +1200,30 @@ internal class SVGParserImpl : SVGParser {
         debug { "<tref>" }
 
         val currentElement = requireCurrentElement()
-        checkState(currentElement is TextContainer) { "Invalid document. <tref> elements are only valid inside <text> or <tspan> elements." }
-        val builder = TRef.Builder(requireSvgDocument(), currentElement)
-        builder.parseAttributes(attributes)
-        val obj = builder.build()
+        if (currentElement is TextContainer) {
+            val builder = TRef.Builder(requireSvgDocument(), currentElement)
+            builder.parseAttributes(attributes)
+            val obj = builder.build()
 
-        currentElement.addChild(obj)
-        obj.textRoot = if (currentElement is TextRoot) {
-            currentElement
+            currentElement.addChild(obj)
+            obj.textRoot = if (currentElement is TextRoot) {
+                currentElement
+            } else {
+                (currentElement as TextChild).textRoot
+            }
         } else {
-            (currentElement as TextChild).textRoot
+            // A <tref> directly under <svg>/<g> is not strictly valid SVG 1.1, but
+            // browsers render it as if it were a top-level <text>. Wrap it in a
+            // synthetic <text> so it gains a text root and is drawn.
+            val syntheticText = Text.Builder(requireSvgDocument(), currentElement).build()
+            currentElement.addChild(syntheticText)
+
+            val builder = TRef.Builder(requireSvgDocument(), syntheticText)
+            builder.parseAttributes(attributes)
+            val obj = builder.build()
+
+            syntheticText.addChild(obj)
+            obj.textRoot = syntheticText
         }
     }
 

@@ -120,6 +120,10 @@ internal class Renderer internal constructor(
     private var softwareBackend: SoftwareFilterBackend? = null
     private var gpuBackend: FilterBackend? = null
 
+    // When true, the software filter backend is used regardless of canvas
+    // acceleration / API level (set from RenderOptions.softwareFiltering()).
+    private var forceSoftwareFiltering: Boolean = false
+
     // Reused across text renders to avoid per-element allocation in the render loop.
     private val plainTextDrawer = PlainTextDrawer(state)
 
@@ -219,7 +223,13 @@ internal class Renderer internal constructor(
     /*
      * Render the whole document starting from a RenderNode tree.
     */
+    override fun renderNode(canvas: Canvas, node: RenderNode<*>) {
+        node.render(this, canvas)
+    }
+
     internal fun renderDocument(canvas: Canvas, rootNode: RenderNode<*>, renderOptions: RenderOptions) {
+
+        forceSoftwareFiltering = renderOptions.hasSoftwareFiltering()
 
         val css = renderOptions.css
         if (css != null) {
@@ -949,7 +959,6 @@ internal class Renderer internal constructor(
         rectFPool.withPooledObject { region ->
             calculateRegion(filter, boundingBox, region)
             if (region.width() > 0f && region.height() > 0f) {
-
                 matrixPool.withPooledObject { matrix ->
                     matrixPool.withPooledObject { newMatrix ->
                         rectFPool.withPooledObject { deviceRegion ->
@@ -957,7 +966,6 @@ internal class Renderer internal constructor(
                             canvas.getMatrix(matrix)
 
                             matrix.mapRect(deviceRegion, region)
-
                             val m = getValuesFloatArray
                             matrix.getValues(m)
                             val sx = hypot(m[Matrix.MSCALE_X], m[Matrix.MSKEW_Y])
@@ -1113,7 +1121,7 @@ internal class Renderer internal constructor(
         // GPU effect-chain attempt (RenderEffect + RenderNode recording).
         // Only for graphs Impl31 represents exactly, and only when the element
         // would not need a separate compositing layer for the result.
-        if (canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31 &&
+        if (!forceSoftwareFiltering && canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31 &&
             state.style.opacity == 1f && state.style.mixBlendMode == CSSBlendMode.normal
         ) {
             val gpu = gpuBackend ?: FilterPipeline.createGpuOrNull(this)?.also { gpuBackend = it }

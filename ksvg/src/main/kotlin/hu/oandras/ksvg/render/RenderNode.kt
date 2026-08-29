@@ -652,6 +652,7 @@ internal class FeSpecularLightingRenderNode(
 internal class FeImageRenderNode(
     sourceElement: FeImage,
     @JvmField val image: Bitmap?,
+    @JvmField val referencedNode: RenderNode<*>?,
 ) : FilterPrimitiveRenderNode<FeImage>(sourceElement) {
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_IMAGE
 }

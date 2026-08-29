@@ -34,6 +34,7 @@ internal class RenderOptionsImpl internal constructor(
     private var _viewBox: Box?,
     private var _viewId: String?,
     private var _viewPort: Box?,
+    private var _softwareFiltering: Boolean,
 ) : RenderOptions {
 
     override val css: CSS?
@@ -54,6 +55,8 @@ internal class RenderOptionsImpl internal constructor(
     override val targetId: String?
         get() = _targetId
 
+    override fun hasSoftwareFiltering(): Boolean = _softwareFiltering
+
     /**
      * Create a new `RenderOptions` instance.
      */
@@ -64,6 +67,7 @@ internal class RenderOptionsImpl internal constructor(
         _viewBox = null,
         _viewId = null,
         _viewPort = null,
+        _softwareFiltering = false,
     )
 
     /**
@@ -77,6 +81,7 @@ internal class RenderOptionsImpl internal constructor(
         _viewId = other.viewId,
         _viewPort = other.viewPort,
         _targetId = other.targetId,
+        _softwareFiltering = other.hasSoftwareFiltering(),
     )
 
     /**
@@ -242,9 +247,13 @@ internal class RenderOptionsImpl internal constructor(
      * @return true if this RenderOptions instance has had a target set
      */
     override fun hasTarget(): Boolean {
-        return _targetId != null
+        return this._targetId != null
     }
 
+    override fun softwareFiltering(enabled: Boolean): RenderOptions {
+        _softwareFiltering = enabled
+        return this
+    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -256,6 +265,7 @@ internal class RenderOptionsImpl internal constructor(
         if (_viewBox != other._viewBox) return false
         if (_viewId != other._viewId) return false
         if (_viewPort != other._viewPort) return false
+        if (_softwareFiltering != other._softwareFiltering) return false
 
         return true
     }
@@ -267,6 +277,7 @@ internal class RenderOptionsImpl internal constructor(
         result = 31 * result + _viewBox.hashCode()
         result = 31 * result + _viewId.hashCode()
         result = 31 * result + _viewPort.hashCode()
+        result = 31 * result + _softwareFiltering.hashCode()
         return result
     }
 
