@@ -97,6 +97,15 @@ internal sealed class RenderNode<T: SvgObject>(
     @JvmField var animationNodes: List<AnimationNode>? = null
     @JvmField var hasAnimationsInSubtree: Boolean = false
 
+    /**
+     * When true the node never captures a display-list cache. Used for groups
+     * that aggregate a viewport-establishing descendant (<use> of <symbol>/<svg>):
+     * that descendant's viewBox transform is resolved by [RenderScene.applyViewport]
+     * after the first build, and its change would otherwise leave this node's
+     * cached pixels stale (the cache key only tracks this node's own version).
+     */
+    @JvmField var disableDisplayListCache: Boolean = false
+
     // Snapshot of the fully resolved base style + paint state (before any animation),
     // captured lazily on the first updateAnimations() pass. Each animation frame reverts
     // `renderState` to this base before applying the current animation values, so

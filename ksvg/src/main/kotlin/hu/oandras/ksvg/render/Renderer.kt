@@ -95,7 +95,7 @@ import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.withAlpha
-import java.util.Stack
+import java.util.*
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -613,6 +613,13 @@ internal class Renderer internal constructor(
         if (!canvas.isHardwareAccelerated) { content(canvas); return }
         // Animated subtrees change every frame; caching would be pure overhead.
         if (hasAnimationsInSubtree) { content(canvas); return }
+        // Nodes that establish their own viewport (<symbol>/nested <svg>, i.e. a
+        // viewBoxTransform) cannot be naively cached: their transform is baked
+        // into a nested RenderNode and breaks when replayed inside a parent's
+        // display list. Draw them directly so the (correct) content is captured
+        // by the enclosing display list, matching the CPU path.
+        if ((this as? GroupRenderNode<*>)?.viewportSpec != null) { content(canvas); return }
+        if (disableDisplayListCache) { content(canvas); return }
         val bb = boundingBox ?: run { content(canvas); return }
 
         var rec = displayList

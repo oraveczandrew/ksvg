@@ -60,15 +60,18 @@ internal fun createBitmap(width: Int, height: Int,config: Bitmap.Config): Bitmap
     return Bitmap.createBitmap(width, height, config)!!
 }
 
+@JvmField
+internal val ALPHA_MATRIX_COLOR_FILTER = ColorMatrixColorFilter(ColorMatrix(
+    floatArrayOf(
+        0f, 0f, 0f, 0f, 0f,
+        0f, 0f, 0f, 0f, 0f,
+        0f, 0f, 0f, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    )
+))
+
 private val extractAlphaPaint = Paint().apply {
-    setColorFilter(ColorMatrixColorFilter(ColorMatrix(
-        floatArrayOf(
-            0f, 0f, 0f, 0f, 0f,
-            0f, 0f, 0f, 0f, 0f,
-            0f, 0f, 0f, 0f, 0f,
-            0f, 0f, 0f, 1f, 0f
-        )
-    )))
+    setColorFilter(ALPHA_MATRIX_COLOR_FILTER)
 }
 
 context(poolOwner: PoolOwner)

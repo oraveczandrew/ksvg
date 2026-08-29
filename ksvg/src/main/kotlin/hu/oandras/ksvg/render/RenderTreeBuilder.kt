@@ -142,8 +142,7 @@ import hu.oandras.ksvg.utils.optimizeReadOnlyList
 import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.takeIfNonZeroOrElse
 import hu.oandras.ksvg.utils.textXMLSpaceTransform
-import java.util.Locale
-import java.util.Stack
+import java.util.*
 import kotlin.math.max
 
 internal class RenderTreeBuilder(
@@ -276,6 +275,10 @@ internal class RenderTreeBuilder(
             return null
         }
         try {
+        // A DOM element may be referenced by several <use> instances; its cached
+        // bounding box must be recomputed fresh for each build instead of
+        // accumulating stale values across instances (SVG-SUPPORT.md, <use>).
+        (obj as? Element)?.boundingBox = null
         statePush()
         checkXMLSpaceAttribute(obj)
 
@@ -908,7 +911,18 @@ internal class RenderTreeBuilder(
         node.transform = transform
         node.animationBaseTransform = transform.copy()
         node.renderState.apply(state)
-        updateParentBoundingBox(obj)
+        // The referenced element establishes its own viewport (<symbol>/<svg>);
+        // its viewBox transform is re-resolved by RenderScene.applyViewport after
+        // this build, so don't cache a display list of its (initially unscaled)
+        // pixels here.
+        if (refNode is GroupRenderNode<*> && refNode.viewportSpec != null) {
+            node.disableDisplayListCache = true
+        }
+        // Pass the full <use> transform (attribute + x/y) so the parent's
+        // bounding box is computed in world space. The node's own boundingBox
+        // stays in local space, matching how withNodeDisplayList records its
+        // content (a fresh recording canvas ignores the outer transform).
+        updateParentBoundingBox(obj, transform)
         node.boundingBox = obj.boundingBox
         return node
     }
@@ -1766,14 +1780,14 @@ internal class RenderTreeBuilder(
         return makeViewportInContext(x, y, width, height)
     }
 
-    private fun updateParentBoundingBox(obj: Element) {
+    private fun updateParentBoundingBox(obj: Element, transformOverride: Matrix? = null) {
         if (obj.parent == null) return
         var boundingBox = obj.boundingBox ?: return
 
         if (parentStack.isEmpty()) return
 
         // Transform bounding box to parent space
-        (obj as? HasTransform)?.getTransform()?.let { matrix ->
+        (transformOverride ?: (obj as? HasTransform)?.getTransform())?.let { matrix ->
             rectFPool.withPooledObject { rect ->
                 rect.set(
                     boundingBox.minX,

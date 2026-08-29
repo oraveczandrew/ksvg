@@ -318,6 +318,18 @@ internal class RenderScene private constructor(
             val node = builder.build(options)
             val scene = RenderScene(node, dPI, modificationCount, optionsFingerprint)
             scene.rootOverrides = resolveRootViewOverrides(document, options) ?: RootViewOverrides(null, null)
+            // Resolve viewBox transforms up front so the first render already has
+            // correct geometry (the drawable only calls applyViewport on later
+            // bounds-only changes, otherwise viewport nodes would render with a
+            // null viewBoxTransform on the very first frame).
+            val vp = options.viewPort
+            if (node != null && vp != null) {
+                scene.applyViewport(
+                    Rect(0, 0, vp.width.toInt(), vp.height.toInt()),
+                    options,
+                    pools,
+                )
+            }
             return scene
         }
 

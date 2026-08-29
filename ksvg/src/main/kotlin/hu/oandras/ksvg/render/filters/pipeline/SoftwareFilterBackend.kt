@@ -219,9 +219,18 @@ internal class SoftwareFilterBackend internal constructor(
 
     private fun drawResult(canvas: Canvas, deviceRegion: RectF, bitmap: Bitmap, state: RendererState) {
         canvas.withSave {
-            @Suppress("DEPRECATION")
-            canvas.setMatrix(null)
-            canvas.drawBitmap(bitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
+            renderer.matrixPool.withPooledObject { matrix ->
+                @Suppress("DEPRECATION")
+                canvas.getMatrix(matrix)
+                if (matrix.invert(matrix)) {
+                    canvas.concat(matrix)
+                } else {
+                    // Fallback to absolute reset if not invertible (rare)
+                    @Suppress("DEPRECATION")
+                    canvas.setMatrix(null)
+                }
+                canvas.drawBitmap(bitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
+            }
         }
     }
 

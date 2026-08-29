@@ -57,9 +57,9 @@ private fun doLightingFilter(
     primitiveRegion: RectF,
     filterRegion: RectF,
     // feSpecularLighting produces a transparency map (alpha = max(R,G,B)); feDiffuseLighting is opaque.
-    alphaIsMaxOfChannels: Boolean = false,
-    k: Float = 0f,
-    exponent: Float = 0f,
+    alphaIsMaxOfChannels: Boolean,
+    k: Float,
+    exponent: Float,
 ): Bitmap {
     val lightSource = light ?: return inputBitmap
 
@@ -222,7 +222,9 @@ internal fun doFeDiffuseLightingFilter(
         canvasScaleY = canvasScaleY,
         primitiveRegion = primitiveRegion,
         filterRegion = filterRegion,
+        alphaIsMaxOfChannels = false,
         k = diffuseConstant,
+        exponent = 0f,
     )
 }
 
