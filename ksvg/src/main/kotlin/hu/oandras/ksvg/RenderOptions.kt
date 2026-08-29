@@ -177,9 +177,13 @@ public interface RenderOptions {
      * GPU/RenderEffect backend, even on hardware-accelerated canvases and API levels
      * that would otherwise prefer the GPU path. Useful for deterministic output in
      * tests and for filter primitives the GPU backend does not support.
+     *
+     * This API is annotated with [SlowSoftwareFiltering]; callers must opt in to
+     * acknowledge that software filtering is significantly slower than the GPU path.
      * @param enabled whether to force software filtering (defaults to `true`)
      * @return this same `RenderOptions` instance
      */
+    @SlowSoftwareFiltering
     public fun softwareFiltering(enabled: Boolean): RenderOptions
 
     /**

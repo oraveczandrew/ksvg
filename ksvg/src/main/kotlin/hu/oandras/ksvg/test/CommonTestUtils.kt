@@ -22,6 +22,7 @@ import android.graphics.Canvas
 import androidx.annotation.VisibleForTesting
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
+import hu.oandras.ksvg.SlowSoftwareFiltering
 import java.io.File
 import java.io.InputStream
 
@@ -60,25 +61,26 @@ private fun renderSvgTo(svg: SVG, outBitmap: Bitmap): Bitmap {
     return renderSvgTo(svg, outBitmap, false)
 }
 
-private fun renderSvgTo(svg: SVG, outBitmap: Bitmap, softwareFiltering: Boolean): Bitmap {
-    outBitmap.eraseColor(0)
+ @OptIn(SlowSoftwareFiltering::class)
+ private fun renderSvgTo(svg: SVG, outBitmap: Bitmap, softwareFiltering: Boolean): Bitmap {
+     outBitmap.eraseColor(0)
 
-    val canvas = Canvas(outBitmap)
+     val canvas = Canvas(outBitmap)
 
-    val options = RenderOptions.create()
-    options.viewPort(
-        minX = 0f,
-        minY = 0f,
-        width = outBitmap.width.toFloat(),
-        height = outBitmap.height.toFloat()
-    )
-    if (softwareFiltering) {
-        options.softwareFiltering(true)
-    }
+     val options = RenderOptions.create()
+     options.viewPort(
+         minX = 0f,
+         minY = 0f,
+         width = outBitmap.width.toFloat(),
+         height = outBitmap.height.toFloat()
+     )
+     if (softwareFiltering) {
+         options.softwareFiltering(true)
+     }
 
-    svg.renderToCanvas(canvas, options)
-    return outBitmap
-}
+     svg.renderToCanvas(canvas, options)
+     return outBitmap
+ }
 
 @VisibleForTesting
 internal fun decodePng(file: File, inBitmap: Bitmap): Bitmap? {

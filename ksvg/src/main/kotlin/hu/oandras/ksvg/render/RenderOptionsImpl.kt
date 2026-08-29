@@ -250,6 +250,7 @@ internal class RenderOptionsImpl internal constructor(
         return this._targetId != null
     }
 
+    @hu.oandras.ksvg.SlowSoftwareFiltering
     override fun softwareFiltering(enabled: Boolean): RenderOptions {
         _softwareFiltering = enabled
         return this

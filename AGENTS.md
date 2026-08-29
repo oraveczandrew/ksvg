@@ -61,8 +61,14 @@ Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/N
 
 ## Testing & Coverage
 *   **Unit Tests**: Located in `ksvg/src/test/kotlin`. Check assert functions in `Asserts.kt`.
-*   **Robolectric Shadows**: We use `MockCanvas`, `MockPath`, and `MockPaint`.
-*   **Test Quality**: Only test non-trivial logic.
+ *   **Robolectric Shadows**: We use `MockCanvas`, `MockPath`, and `MockPaint`.
+ *   **Deterministic filter output**: When a unit test exercises the filter pipeline, render with the
+     software backend via `hu.oandras.ksvg.test.renderWithLibrary(file, bitmap, softwareFiltering = true)`
+     (see `CommonTestUtils`). Use the shared pixel helpers `Bitmap.forEachPixel` and `countPixels`
+     (also in `CommonTestUtils`) for assertions; inspect channels with `hu.oandras.ksvg.utils.ColorUtils`
+     (`val Int.alpha/red/green/blue`). Note that `renderWithLibrary`'s `softwareFiltering` argument opts in to
+     `@SlowSoftwareFiltering` internally.
+ *   **Test Quality**: Only test non-trivial logic.
 *   **Jacoco Coverage**: To generate a coverage report, run:
     ```bash
     ./gradlew :ksvg:jacocoTestReport
@@ -104,6 +110,14 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 - Do not introduce mutable shared or global state.
 - Do not use mutable singleton (`object`) helpers for allocation avoidance.
 - Reusable state must be owned by the current rendering operation and must not be shared between threads.
+- **Forcing the software filter backend**: The renderer prefers the GPU/RenderEffect pipeline when the canvas is
+  hardware-accelerated and the API level allows. To force the CPU/software filter backend, use
+  `RenderOptions.softwareFiltering(enabled = true)`, e.g.
+  `SVG.getFromString(svg).renderToCanvas(canvas, RenderOptions.create().softwareFiltering(true))`.
+  The setter is annotated with `@SlowSoftwareFiltering` (a `kotlin.RequiresOptIn` marker at WARNING level) because
+  software filtering is significantly slower — callers must opt in with `@OptIn(SlowSoftwareFiltering::class)` to
+  acknowledge the cost. Use it for deterministic output (tests, golden comparisons) or for filter primitives the
+  GPU backend does not yet support. The GPU path is selected automatically otherwise.
 
 ## Native blur (`:nativeblur`) — JNI / NDK
 - **NDK build, no hand-config**: `gaussian_blur.cpp` is an Android/NDK CMake build (Gradle compiles it via `nativeblur/.cxx`); never configure it on the host toolchain.
