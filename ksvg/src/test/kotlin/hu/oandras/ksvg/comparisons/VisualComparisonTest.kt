@@ -151,9 +151,14 @@ class VisualComparisonTest(
         private val goldenRootPath: File
             get() = File(VISUAL_GOLDEN_ROOT_PATH)
 
+        private var setupDone = false
+
         @JvmStatic
         @BeforeClass
         fun setup() {
+            if (setupDone) return
+            setupDone = true
+
             val diffDir = File("test-data/visual-diff")
             if (diffDir.exists()) {
                 diffDir.listFiles()?.forEach { it.delete() }
