@@ -129,12 +129,12 @@ private fun resolveFontFromFontFamily(
     return null
 }
 
-private fun checkGenericFont(
+internal fun checkGenericFont(
     fontName: String,
     fontWeight: Float,
     fontStyle: FontStyle
 ): Typeface? {
-    val italic = fontStyle == FontStyle.italic
+    val italic = fontStyle == FontStyle.italic || fontStyle == FontStyle.oblique
 
     val typefaceStyle: Int = if (fontWeight >= Style.FONT_WEIGHT_BOLD) {
         if (italic) {

@@ -1466,17 +1466,17 @@ internal class Style internal constructor(
                     builder.fontStyle = fontStyle
                     if (fontStyle != null) {
                         builder.addSpecifiedFlag(SPECIFIED_FONT_STYLE)
-                        if (fontStyle == FontStyle.italic || fontStyle == FontStyle.oblique) {
-                            builder.getFontVariationSettingsBuilder().apply {
-                                addSetting(
-                                    CSSFontVariationSettings.VARIATION_ITALIC,
-                                    CSSFontVariationSettings.VARIATION_ITALIC_VALUE_ON
-                                )
-                                addSetting(
-                                    CSSFontVariationSettings.VARIATION_SLANT,
-                                    CSSFontVariationSettings.VARIATION_OBLIQUE_VALUE_ON
-                                )
-                            }
+                        if (fontStyle == FontStyle.italic) {
+                            builder.getFontVariationSettingsBuilder().addSetting(
+                                CSSFontVariationSettings.VARIATION_ITALIC,
+                                CSSFontVariationSettings.VARIATION_ITALIC_VALUE_ON
+                            )
+                            builder.addSpecifiedFlag(SPECIFIED_FONT_VARIATION_SETTINGS)
+                        } else if (fontStyle == FontStyle.oblique) {
+                            builder.getFontVariationSettingsBuilder().addSetting(
+                                CSSFontVariationSettings.VARIATION_SLANT,
+                                CSSFontVariationSettings.VARIATION_OBLIQUE_VALUE_ON
+                            )
                             builder.addSpecifiedFlag(SPECIFIED_FONT_VARIATION_SETTINGS)
                         }
                     }

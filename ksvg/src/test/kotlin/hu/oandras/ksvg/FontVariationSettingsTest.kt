@@ -92,6 +92,55 @@ class FontVariationSettingsTest {
         )
     }
 
+    @Test
+    @Throws(KSVGParseException::class)
+    fun fontStyleItalic() {
+        val test = "<svg>\n" +
+                "  <text style=\"font-style: italic\">Test</text>\n" +
+                "</svg>"
+        val svg: SVG = SVG.getFromString(test)
+
+        val bm1: Bitmap = createBitmap(200, 200)
+        val canvas = Canvas(bm1)
+        svg.renderToCanvas(canvas)
+
+        val mock: MockCanvas = canvas.asShadow()
+
+        assertEquals(
+            sortVariations("'ital' 1,'wdth' 100,'wght' 400"),
+            sortVariations(
+                mock.paintProp(
+                    4,
+                    "fv"
+                )
+            )
+        )
+    }
+
+    @Test
+    @Throws(KSVGParseException::class)
+    fun fontStyleOblique() {
+        val test = "<svg>\n" +
+                "  <text style=\"font-style: oblique\">Test</text>\n" +
+                "</svg>"
+        val svg: SVG = SVG.getFromString(test)
+
+        val bm1: Bitmap = createBitmap(200, 200)
+        val canvas = Canvas(bm1)
+        svg.renderToCanvas(canvas)
+
+        val mock: MockCanvas = canvas.asShadow()
+
+        assertEquals(
+            sortVariations("'slnt' -14,'wdth' 100,'wght' 400"),
+            sortVariations(
+                mock.paintProp(
+                    4,
+                    "fv"
+                )
+            )
+        )
+    }
 
     companion object {
         //-----------------------------------------------------------------------------------------------
