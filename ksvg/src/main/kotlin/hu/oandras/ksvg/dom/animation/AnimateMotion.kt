@@ -26,6 +26,7 @@ import hu.oandras.ksvg.dom.core.PathDefinition
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parsePath
 import hu.oandras.ksvg.render.animation.parseSemicolonFloatList
+import hu.oandras.ksvg.utils.anyElement
 import org.xml.sax.Attributes
 
 internal class AnimateMotion(
@@ -66,7 +67,7 @@ internal class AnimateMotion(
     override fun getNodeName(): String = "animateMotion"
 
     override fun isValid(): Boolean {
-        return super.isValid() && (path != null || getChildren().any { it is MPath })
+        return super.isValid() && (path != null || getChildren().anyElement { it is MPath })
     }
 
     class Builder(

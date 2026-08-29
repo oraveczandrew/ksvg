@@ -71,7 +71,7 @@ Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/N
  *   **Test Quality**: Only test non-trivial logic.
 *   **Jacoco Coverage**: To generate a coverage report, run:
     ```bash
-    ./gradlew :ksvg:jacocoTestReport
+    ./gradlew :ksvg:jacocoTestReport -Dorg.gradle.warning.mode=none
     ```
      The report will be available at `ksvg/ksvg/build/reports/jacoco/jacocoTestReport/html/index.html`.
   *   **Robolectric text/canvas unit-test pitfalls** (read before asserting on rendered pixels):
@@ -81,7 +81,7 @@ Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/N
     *   **`Style.Builder` needs a base**: `build()` reads `lateinit original` and throws on bare `Style.Builder()`. Use `Style().toBuilder().apply{…}.build()`; its enum fields (in `dom.style`/`dom.text`) use lowercase constants, e.g. `WritingMode.horizontal_tb`, `TextTransform.Uppercase`, `BaselineShift(null, BaselineShift.Type.Sub)`.
  *   **Golden PNGs**: For visual regression, use `FiltersVisualComparisonTest`. Note that `MeteoconsVisualComparisonTest` is slow and can be excluded during quick iterations.
     ```bash
-    ./gradlew :ksvg:testDebugUnitTest -PexcludeSlowTests
+    ./gradlew :ksvg:testDebugUnitTest -PexcludeSlowTests -Dorg.gradle.warning.mode=none
     ```
     Run it only before major releases or after changes to the animation engine.
 
@@ -102,7 +102,7 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 - **`AiVisualDiffTest`**: Parameterized per-SVG diff test. It renders each SVG under `test-data/verification/`/`filters/`/`meteocons/`, compares against the matching `*-golden/*.png` (rsvg/browser reference) using `hu.oandras.ksvg.comparisons.GoldenImageUtils.compareWithGolden`, and writes `<name>.out.png`, `<name>.diff.png`, and `summary.txt` (similarity, diffPixels, cornerDiff, meanAbsErr) under `ksvg/test-data/ai-helper/<name>/`.
 - Use the library color helpers from `hu.oandras.ksvg.utils.ColorUtils` (`val Int.alpha/red/green/blue`) for pixel math — do not recompute `(p shr 24) and 0xff` inline.
 - **CLI filtering**: pass `-PverifyFilter=<substring>` (e.g. `-PverifyFilter=filter_specular`) to run a single SVG across all visual-comparison suites (`VerificationVisualComparisonTest`, `FiltersVisualComparisonTest`, `MeteoconsVisualComparisonTest`, `AiVisualDiffTest`). The value is forwarded to the JVM system property `ksvg.verify.filter` and matched case-sensitively against the SVG file name.
-- Example: `./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AiVisualDiffTest" -PverifyFilter=filter_specular`
+- Example: `./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AiVisualDiffTest" -PverifyFilter=filter_specular -Dorg.gradle.warning.mode=none`
 
 ## Rendering
 - Drawables must be renderable off the main thread.
@@ -131,9 +131,9 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 
 ## Quick Commands
 - **Do not pass `--no-daemon` to Gradle** — always use the Gradle daemon (omit `--no-daemon`).
-- Build: `./gradlew :ksvg:compileDebugKotlin`
-- Tests: `./gradlew :ksvg:testDebugUnitTest`
-- Coverage: `./gradlew :ksvg:jacocoTestReport`
+- Build: `./gradlew :ksvg:compileDebugKotlin -Dorg.gradle.warning.mode=none`
+- Tests: `./gradlew :ksvg:testDebugUnitTest -Dorg.gradle.warning.mode=none`
+- Coverage: `./gradlew :ksvg:jacocoTestReport -Dorg.gradle.warning.mode=none`
 
 ### Tooling preferences
 - **Prefer IDE functions over shell commands** whenever one exists — e.g. `idea_build_project` for compiling, `idea_get_file_problems`/`idea_lint_files` for diagnostics, `idea_search_symbol`/`idea_search_regex` for search, `idea_rename_refactoring` for renames. Fall back to the terminal only when no IDE tool fits.
@@ -142,7 +142,7 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 ### Viewing test `println` / stdout
 Test standard output (e.g. `println` debug statements) is suppressed by default. Pass `-PshowTestOutput --console=plain` to surface it:
 ```bash
-./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AnalyzeComponentTransferTest" -PshowTestOutput --console=plain
+./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AnalyzeComponentTransferTest" -PshowTestOutput --console=plain -Dorg.gradle.warning.mode=none
 ```
 
 

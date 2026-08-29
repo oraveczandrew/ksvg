@@ -129,6 +129,7 @@ import hu.oandras.ksvg.render.text.getAnchorPosition
 import hu.oandras.ksvg.render.text.selectTypefaceAndFontStyling
 import hu.oandras.ksvg.utils.LcgRandom
 import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.anyElement
 import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.checkForImageDataURL
@@ -143,7 +144,8 @@ import hu.oandras.ksvg.utils.optimizeReadOnlyList
 import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.takeIfNonZeroOrElse
 import hu.oandras.ksvg.utils.textXMLSpaceTransform
-import java.util.*
+import java.util.Locale
+import java.util.Stack
 import kotlin.math.max
 
 internal class RenderTreeBuilder(
@@ -252,6 +254,7 @@ internal class RenderTreeBuilder(
             )
             if (n != null) {
                 n.hasAnimationsInSubtree = n.computeHasAnimations()
+                n.hasFilterInSubtree = n.hasFilters()
                 n.subtreeContainsBlendMode = n.computeSubtreeContainsBlendMode()
             }
             statePop()
@@ -348,6 +351,7 @@ internal class RenderTreeBuilder(
                 }
             }
             node.hasAnimationsInSubtree = node.computeHasAnimations()
+            node.hasFilterInSubtree = node.hasFilters()
         }
 
         statePop()
@@ -905,6 +909,7 @@ internal class RenderTreeBuilder(
             else -> build(ref)
         }
         refNode?.hasAnimationsInSubtree = refNode.computeHasAnimations()
+        refNode?.hasFilterInSubtree = refNode.hasFilters()
         ref.boundingBox?.let { updateParentBoundingBox(ref) }
         parentPop()
 
@@ -1431,7 +1436,7 @@ internal class RenderTreeBuilder(
         }
 
         node.hasAnimations = pattern.animations?.isNotEmpty() == true ||
-                children.any { it.hasAnimations() }
+                children.anyElement { it.hasAnimations() }
 
         patternNodeCache[pattern] = node
 

@@ -69,7 +69,6 @@ import hu.oandras.ksvg.dom.style.RenderQuality
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.VectorEffect
 import hu.oandras.ksvg.logD
-import hu.oandras.ksvg.logE
 import hu.oandras.ksvg.render.animation.AnimationContext
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.animation.applyAnimatedStyle
@@ -93,7 +92,7 @@ import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.withAlpha
-import java.util.*
+import java.util.Stack
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -1064,54 +1063,57 @@ internal class Renderer internal constructor(
             return false
         }
 
-        saveLayerPaint.alpha = clamp255(oldState.style.opacity * opacityAdjustment * 255f)
+        val nodeState = node.renderState
+        val nodeStyle = nodeState.style
+        saveLayerPaint.alpha = clamp255(nodeStyle.opacity * opacityAdjustment * 255f)
 
         // Always resolve the blend mode: `saveLayerPaint` is a shared instance, so leaving
         // it unset would leak the previous node's mode onto a node with a normal blend.
-        setBlendMode(oldState, saveLayerPaint)
+        setBlendMode(nodeState, saveLayerPaint)
 
         val statePushRectF = statePushRectF
         canvas.getClipBounds(statePushRectF)
 
         val bbox = node.boundingBox
-        if (bbox != null) {
-            val style = oldState.style
-            val strokeWidth = style.strokeWidth
+        if (bbox != null && !node.hasMarkers() && !node.hasFilters()) {
+            val strokeWidth = nodeStyle.strokeWidth
             val strokeWidthPx = if (strokeWidth != null && !strokeWidth.isZero) {
                 with(this@Renderer) { strokeWidth.floatValueInContext() }
             } else 0f
 
-            // Calculate local padding.
-            var pad = strokeWidthPx * 0.5f
-
-            // Add 1px device-space padding for anti-aliasing safety.
-            matrixPool.withPooledObject { m ->
+            matrixPool.withPooledObject { matrix ->
                 @Suppress("DEPRECATION")
-                canvas.getMatrix(m)
-                val v = getValuesFloatArray
-                m.getValues(v)
-                val sx = hypot(v[Matrix.MSCALE_X], v[Matrix.MSKEW_Y])
-                val sy = hypot(v[Matrix.MSCALE_Y], v[Matrix.MSKEW_X])
-                val maxScale = max(sx, sy)
-                if (maxScale > 0f) {
-                    pad += 1f / maxScale
-                } else {
-                    pad += 1f
+                canvas.getMatrix(matrix)
+                rectFPool.withPooledObject { deviceBBox ->
+                    deviceBBox.set(bbox.minX, bbox.minY, bbox.maxX(), bbox.maxY())
+                    matrix.mapRect(deviceBBox)
+
+                    // Calculate stroke padding in device space.
+                    val v = getValuesFloatArray
+                    matrix.getValues(v)
+                    val sx = hypot(v[Matrix.MSCALE_X], v[Matrix.MSKEW_Y])
+                    val sy = hypot(v[Matrix.MSCALE_Y], v[Matrix.MSKEW_X])
+                    val maxScale = max(sx, sy)
+
+                    // Padding for stroke + 1px for anti-aliasing safety.
+                    val pad = ceil(strokeWidthPx * 0.5f * maxScale) + 1f
+                    deviceBBox.inset(-pad, -pad)
+
+                    // Intersect with current clip bounds
+                    val left = max(statePushRectF.left.toFloat(), deviceBBox.left)
+                    val top = max(statePushRectF.top.toFloat(), deviceBBox.top)
+                    val right = min(statePushRectF.right.toFloat(), deviceBBox.right)
+                    val bottom = min(statePushRectF.bottom.toFloat(), deviceBBox.bottom)
+
+                    if (right > left && bottom > top) {
+                        statePushRectF.set(
+                            floor(left).toInt(),
+                            floor(top).toInt(),
+                            ceil(right).toInt(),
+                            ceil(bottom).toInt()
+                        )
+                    }
                 }
-            }
-
-            val left = max(statePushRectF.left.toFloat(), bbox.minX - pad)
-            val top = max(statePushRectF.top.toFloat(), bbox.minY - pad)
-            val right = min(statePushRectF.right.toFloat(), bbox.maxX() + pad)
-            val bottom = min(statePushRectF.bottom.toFloat(), bbox.maxY() + pad)
-
-            if (right > left && bottom > top) {
-                statePushRectF.set(
-                    floor(left).toInt(),
-                    floor(top).toInt(),
-                    ceil(right).toInt(),
-                    ceil(bottom).toInt()
-                )
             }
         }
 
@@ -1122,6 +1124,7 @@ internal class Renderer internal constructor(
             /* bottom = */ statePushRectF.bottom.toFloat(),
             /* paint = */ saveLayerPaint
         )
+
 
 
 
@@ -1321,10 +1324,15 @@ internal class Renderer internal constructor(
 
         val clip = state.style.clip
         if (clip != null) {
-            left += clip.left.floatValueXInContext()
-            top += clip.top.floatValueYInContext()
-            right -= clip.right.floatValueXInContext()
-            bottom -= clip.bottom.floatValueYInContext()
+            val clipL = clip.left.floatValueXInContext()
+            val clipT = clip.top.floatValueYInContext()
+            val clipR = clip.right.floatValueXInContext()
+            val clipB = clip.bottom.floatValueYInContext()
+
+            left = minX + clipL
+            top = minY + clipT
+            right = minX + clipR
+            bottom = minY + clipB
         }
 
         canvas.clipRect(left, top, right, bottom)

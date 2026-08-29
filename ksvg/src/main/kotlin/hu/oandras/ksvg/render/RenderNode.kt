@@ -23,8 +23,6 @@ import android.graphics.Paint
 import android.graphics.Path
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.compat.toBlendModeCompat
-import hu.oandras.ksvg.dom.style.CSSBlendMode
-import hu.oandras.ksvg.dom.style.Isolation
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.ClipPath
@@ -61,6 +59,8 @@ import hu.oandras.ksvg.dom.filter.Filter
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
 import hu.oandras.ksvg.dom.gradient.Stop
 import hu.oandras.ksvg.dom.shapes.Shape
+import hu.oandras.ksvg.dom.style.CSSBlendMode
+import hu.oandras.ksvg.dom.style.Isolation
 import hu.oandras.ksvg.dom.text.TRef
 import hu.oandras.ksvg.dom.text.TSpan
 import hu.oandras.ksvg.dom.text.Text
@@ -70,10 +70,12 @@ import hu.oandras.ksvg.filtering.StackBlurScratch
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.filters.LightVector
 import hu.oandras.ksvg.render.filters.NormalVector
+import hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31
 import hu.oandras.ksvg.render.filters.pipeline.FilterPrimitiveSet
 import hu.oandras.ksvg.render.pool.BitmapPool
 import hu.oandras.ksvg.render.pool.FloatArrayBucket
 import hu.oandras.ksvg.render.pool.IntArrayBucket
+import hu.oandras.ksvg.utils.anyElement
 import hu.oandras.ksvg.utils.forEachElement
 
 internal sealed class RenderNode<T: SvgObject>(
@@ -99,6 +101,7 @@ internal sealed class RenderNode<T: SvgObject>(
     @JvmField var strokePaintRef: ResolvedPaint? = null
     @JvmField var animationNodes: List<AnimationNode>? = null
     @JvmField var hasAnimationsInSubtree: Boolean = false
+    @JvmField var hasFilterInSubtree: Boolean = false
     @JvmField var subtreeContainsBlendMode: Boolean = false
 
     /**
@@ -156,6 +159,11 @@ internal sealed class RenderNode<T: SvgObject>(
     @JvmField var lastScaleY: Float = 0f
 
     internal fun hasAnimations(): Boolean = hasAnimationsInSubtree
+    internal open fun hasFilters(): Boolean = hasFilterInSubtree || filterNode != null
+
+    internal open fun hasMarkers(): Boolean {
+        return markerStartNode != null || markerMidNode != null || markerEndNode != null
+    }
 
     internal open fun computeHasAnimations(): Boolean {
         return animationNodes?.isNotEmpty() == true
@@ -225,12 +233,20 @@ internal open class GroupRenderNode<T: ConditionalContainer>(
     /** Present when this node establishes its own viewport (nested <svg>/<symbol>). */
     @JvmField var viewportSpec: ViewportSpec? = null
 
+    override fun hasMarkers(): Boolean {
+        return super.hasMarkers() || children.anyElement { it.hasMarkers() }
+    }
+
     override fun computeHasAnimations(): Boolean {
-        return super.computeHasAnimations() || children.any { it.hasAnimations() }
+        return super.computeHasAnimations() || children.anyElement { it.hasAnimations() }
+    }
+
+    override fun hasFilters(): Boolean {
+        return super.hasFilters() || children.anyElement { it.hasFilters() }
     }
 
     override fun computeSubtreeContainsBlendMode(): Boolean {
-        return super.computeSubtreeContainsBlendMode() || children.any { it.subtreeContainsBlendMode }
+        return super.computeSubtreeContainsBlendMode() || children.anyElement { it.subtreeContainsBlendMode }
     }
 
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -279,12 +295,20 @@ internal class ClipPathRenderNode(
     sourceElement: ClipPath,
     @JvmField val children: List<RenderNode<*>>
 ) : RenderNode<ClipPath>(sourceElement) {
+    override fun hasMarkers(): Boolean {
+        return super.hasMarkers() || children.anyElement { it.hasMarkers() }
+    }
+
     override fun computeHasAnimations(): Boolean {
-        return super.computeHasAnimations() || children.any { it.hasAnimations() }
+        return super.computeHasAnimations() || children.anyElement { it.hasAnimations() }
+    }
+
+    override fun hasFilters(): Boolean {
+        return super.hasFilters() || children.anyElement { it.hasFilters() }
     }
 
     override fun computeSubtreeContainsBlendMode(): Boolean {
-        return super.computeSubtreeContainsBlendMode() || children.any { it.subtreeContainsBlendMode }
+        return super.computeSubtreeContainsBlendMode() || children.anyElement { it.subtreeContainsBlendMode }
     }
 
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -300,6 +324,10 @@ internal class SwitchRenderNode(
     sourceElement: Switch,
     @JvmField val selectedChild: RenderNode<*>?
 ) : RenderNode<Switch>(sourceElement) {
+    override fun hasMarkers(): Boolean {
+        return super.hasMarkers() || selectedChild?.hasMarkers() == true
+    }
+
     override fun computeHasAnimations(): Boolean {
         return super.computeHasAnimations() || selectedChild?.hasAnimations() == true
     }
@@ -324,6 +352,10 @@ internal class PathRenderNode(
 ) : RenderNode<Shape>(sourceElement) {
     @JvmField val pointsBuffer = FloatArrayBucket()
 
+    override fun hasMarkers(): Boolean {
+        return super.hasMarkers() || markers?.isNotEmpty() == true
+    }
+
     override fun render(renderer: Renderer, canvas: Canvas) {
         renderer.renderPathNode(canvas, this)
     }
@@ -336,7 +368,15 @@ internal class PathRenderNode(
 internal abstract class KSVGTextContainerRenderNode<T : TextContainer>(
     sourceElement: T,
     @JvmField val children: List<TextNode>
-) : RenderNode<T>(sourceElement), TextNode
+) : RenderNode<T>(sourceElement), TextNode {
+    override fun hasMarkers(): Boolean {
+        return super.hasMarkers() || children.anyElement { (it as? RenderNode<*>)?.hasMarkers() == true }
+    }
+
+    override fun hasFilters(): Boolean {
+        return super.hasFilters() || children.anyElement { (it as? RenderNode<*>)?.hasFilters() == true }
+    }
+}
 
 internal class TextRenderNode(
     sourceElement: Text,
@@ -409,12 +449,20 @@ internal class PatternRenderNode(
     @JvmField var hasOverflow: Boolean = true
     @JvmField var hasAnimations: Boolean = false
 
+    override fun hasMarkers(): Boolean {
+        return super.hasMarkers() || children.anyElement { it.hasMarkers() }
+    }
+
     override fun computeHasAnimations(): Boolean {
-        return super.computeHasAnimations() || children.any { it.hasAnimations() }
+        return super.computeHasAnimations() || children.anyElement { it.hasAnimations() }
+    }
+
+    override fun hasFilters(): Boolean {
+        return super.hasFilters() || children.anyElement { it.hasFilters() }
     }
 
     override fun computeSubtreeContainsBlendMode(): Boolean {
-        return super.computeSubtreeContainsBlendMode() || children.any { it.subtreeContainsBlendMode }
+        return super.computeSubtreeContainsBlendMode() || children.anyElement { it.subtreeContainsBlendMode }
     }
 
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -443,7 +491,7 @@ internal class FilterRenderNode(
     @JvmField var gpuPadY: Int = 0
     // Built effect chain cache: depends on the filter's attributes (version)
     // and the primitive scales, not on the rendered content.
-    @JvmField var gpuChain: hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31.Chain? = null
+    @JvmField var gpuChain: FilterPipelineImpl31.Chain? = null
     @JvmField var gpuChainVersion: Int = -1
     @JvmField var gpuChainScaleX: Float = 0f
     @JvmField var gpuChainScaleY: Float = 0f
