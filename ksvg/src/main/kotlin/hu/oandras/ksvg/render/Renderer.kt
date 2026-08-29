@@ -359,7 +359,12 @@ internal class Renderer internal constructor(
                     processor.state = state
                     processor.x = node.x + node.dx
                     processor.y = node.y + node.dy
-                    renderTextContainer(canvas, node, processor)
+                    // Static text is captured whole: one replay per frame (see
+                    // renderPathNode). Bypasses OEM canvas-hook allocations on the
+                    // per-glyph drawText calls.
+                    node.withNodeDisplayList(canvas) { nodeCanvas ->
+                        renderTextContainer(nodeCanvas, node, processor)
+                    }
                 }
             }
         }
@@ -662,6 +667,13 @@ internal class Renderer internal constructor(
         var k = node.contentVersion.toLong() * 31
         k = k * 31 + node.renderState.fillConfig.version
         k = k * 31 + node.renderState.strokeConfig.version
+        // Defensive: paint-level text props (letterSpacing, textDecoration,
+        // font-*) are already covered by the PaintConfiguration versions, but
+        // pure layout props below are decided in TextRenderer from the style and
+        // are not animated, so fold them into the key to be safe.
+        if (node is TextRenderNode) {
+            k = k * 31 + textLayoutStyleCacheVersion(node.renderState.style)
+        }
         return k
     }
 
@@ -2367,4 +2379,21 @@ internal class Renderer internal constructor(
             return x1 * x2 + y1 * y2
         }
     }
+}
+
+/**
+ * Hash of the text-layout style fields that drive [hu.oandras.ksvg.render.text.PlainTextDrawer]
+ * but are NOT reflected in [PaintConfiguration] (and thus not in its version): writing mode,
+ * text orientation, text transform, baseline shift, dominant/alignment baseline. Folded into
+ * the display-list cache key so an animated/changed layout style re-records instead of replaying
+ * a stale capture.
+ */
+internal fun textLayoutStyleCacheVersion(style: Style): Long {
+    var k = (style.writingMode?.ordinal ?: -1).toLong()
+    k = k * 31 + (style.textOrientation?.ordinal ?: -1)
+    k = k * 31 + (style.textTransform?.ordinal ?: -1)
+    k = k * 31 + (style.baselineShift?.type?.ordinal ?: -1)
+    k = k * 31 + (style.dominantBaseline?.ordinal ?: -1)
+    k = k * 31 + (style.alignmentBaseline?.ordinal ?: -1)
+    return k
 }

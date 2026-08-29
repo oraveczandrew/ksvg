@@ -73,8 +73,13 @@ Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/N
     ```bash
     ./gradlew :ksvg:jacocoTestReport
     ```
-    The report will be available at `ksvg/ksvg/build/reports/jacoco/jacocoTestReport/html/index.html`.
-*   **Golden PNGs**: For visual regression, use `FiltersVisualComparisonTest`. Note that `MeteoconsVisualComparisonTest` is slow and can be excluded during quick iterations.
+     The report will be available at `ksvg/ksvg/build/reports/jacoco/jacocoTestReport/html/index.html`.
+  *   **Robolectric text/canvas unit-test pitfalls** (read before asserting on rendered pixels):
+    *   **Text only rasterizes under `@GraphicsMode(NATIVE)`**; the default LEGACY canvas draws no glyphs (transparent bitmap). Annotate text tests with `@GraphicsMode(NATIVE)`.
+    *   **Never shadow `MockCanvas`/`MockPath`/`MockPaint` for rasterization checks.** `MockPaint` setters (`setColor`,`setTextSize`,`setTypeface`,…) skip `super`, so the real `Paint` gets no color/size and draws nothing. Use `hu.oandras.ksvg.test.renderWithLibrary(svg, bitmap)` + `countPixels`/`forEachPixel`; the Mock* shadows are only good for op-list assertions on shapes (path/rect).
+    *   **On NATIVE (HW) the display-list cache is active**: `drawText`/`drawPath` land in an offscreen `RenderNode`, invisible to `MockCanvas` op logs — so don't assert on `drawText`/`drawRect` ops, use `Bitmap.sameAs`/`countPixels`.
+    *   **`Style.Builder` needs a base**: `build()` reads `lateinit original` and throws on bare `Style.Builder()`. Use `Style().toBuilder().apply{…}.build()`; its enum fields (in `dom.style`/`dom.text`) use lowercase constants, e.g. `WritingMode.horizontal_tb`, `TextTransform.Uppercase`, `BaselineShift(null, BaselineShift.Type.Sub)`.
+ *   **Golden PNGs**: For visual regression, use `FiltersVisualComparisonTest`. Note that `MeteoconsVisualComparisonTest` is slow and can be excluded during quick iterations.
     ```bash
     ./gradlew :ksvg:testDebugUnitTest -PexcludeSlowTests
     ```
