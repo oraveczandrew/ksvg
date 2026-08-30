@@ -92,7 +92,7 @@ internal fun stackBlur(
             sir[0] = a
             sir[1] = ((p shr 16 and 0xff) * a + 127) / 255
             sir[2] = ((p shr 8 and 0xff) * a + 127) / 255
-            sir[3] = (p and 0xff * a + 127) / 255
+            sir[3] = ((p and 0xff) * a + 127) / 255
 
             val rbs = r1 - abs(j)
             aSum += sir[0] * rbs
@@ -143,7 +143,7 @@ internal fun stackBlur(
             sirOut[0] = aNext
             sirOut[1] = ((pNext shr 16 and 0xff) * aNext + 127) / 255
             sirOut[2] = ((pNext shr 8 and 0xff) * aNext + 127) / 255
-            sirOut[3] = (pNext and 0xff * aNext + 127) / 255
+            sirOut[3] = ((pNext and 0xff) * aNext + 127) / 255
 
             aInSum += sirOut[0]
             rInSum += sirOut[1]
