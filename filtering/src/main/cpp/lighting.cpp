@@ -16,7 +16,6 @@
 
 #include <jni.h>
 #include <cmath>
-#include <cstring>
 
 // feDiffuseLighting / feSpecularLighting over unpremultiplied ARGB_8888
 // IntArrays. Bit-exact port of the Kotlin reference loop in
@@ -42,18 +41,18 @@ namespace {
 
 constexpr jint kMaxVecRowSpan = 4096; // stack height-buffer limit (floats)
 
-inline jint clamp255f(const float v) {
-    jint i = static_cast<jint>(std::floor(v + 0.5f));
+ jint clamp255f(const float v) {
+    const jint i = static_cast<jint>(std::floor(v + 0.5f));
     return i < 0 ? 0 : (i > 255 ? 255 : i);
 }
 
-inline float heightAt(const jint* pix, const jint width, const jint height, const jint x, const jint y, const float ss) {
-    jint cx = x < 0 ? 0 : (x > width - 1 ? width - 1 : x);
-    jint cy = y < 0 ? 0 : (y > height - 1 ? height - 1 : y);
+ float heightAt(const jint* pix, const jint width, const jint height, const jint x, const jint y, const float ss) {
+    const jint cx = x < 0 ? 0 : (x > width - 1 ? width - 1 : x);
+    const jint cy = y < 0 ? 0 : (y > height - 1 ? height - 1 : y);
     return static_cast<float>((pix[cy * width + cx] >> 24) & 0xff) * ss;
 }
 
-inline float clamp01(const float v) { return v < 0.f ? 0.f : (v > 1.f ? 1.f : v); }
+ float clamp01(const float v) { return v < 0.f ? 0.f : (v > 1.f ? 1.f : v); }
 
 void applyScalar(
         jint* pix, jint* out, jint width, jint height,

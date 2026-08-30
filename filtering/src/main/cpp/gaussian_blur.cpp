@@ -81,7 +81,7 @@ int computeWeights(const float sigma, std::vector<float>& weights) {
     return radius;
 }
 
-inline uint32_t pack(const float a, const float r, const float g, const float b) {
+ uint32_t pack(const float a, const float r, const float g, const float b) {
     int ia = static_cast<int>(a + 0.5f);
     int ir = static_cast<int>(r + 0.5f);
     int ig = static_cast<int>(g + 0.5f);

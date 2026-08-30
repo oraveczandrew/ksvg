@@ -40,9 +40,9 @@
 
 namespace {
 
-inline void applyScalar(
-        const jint* src, jint* dst, jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+ void applyScalar(
+        const jint* src, jint* dst, const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB) {
     const jint total = width * height;
     for (jint i = 0; i < total; i++) {
@@ -64,7 +64,7 @@ inline void applyScalar(
 #ifdef __aarch64__
 #include <arm_neon.h>
 
-inline uint8x16x4_t loadTable(const jbyte* t) {
+ uint8x16x4_t loadTable(const jbyte* t) {
     uint8x16x4_t tab;
     tab.val[0] = vld1q_u8(reinterpret_cast<const uint8_t*>(t) + 0);
     tab.val[1] = vld1q_u8(reinterpret_cast<const uint8_t*>(t) + 16);
@@ -73,7 +73,7 @@ inline uint8x16x4_t loadTable(const jbyte* t) {
     return tab;
 }
 
-inline void applyNeonBlock(
+ void applyNeonBlock(
         const jint* src, jint* dst,
         const uint8x16x4_t& tA, const uint8x16x4_t& tR,
         const uint8x16x4_t& tG, const uint8x16x4_t& tB) {

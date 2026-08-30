@@ -64,5 +64,8 @@ public object LightingNative {
         lightG: Int,
         lightB: Int,
         params: DoubleArray,
+        // When true (feSpecularLighting as terminal output), emit premultiplied
+        // (lightColor, intensity) to match cairo; otherwise straight.
+        premultipliedOutput: Boolean,
     )
 }

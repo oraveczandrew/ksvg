@@ -37,132 +37,138 @@
 // and short tails run the scalar reference loop.
 
 namespace {
-
-void applyScalarPixel(
-        const jint* src, jint* dst, const jint width, const jint height,
+    void applyScalarPixel(
+        const jint *src, jint *dst, const jint width, const jint height,
         const jint radiusX, const jint radiusY, const bool isErode, const jint init,
         const jint x, const jint y) {
-    const jint top = y - radiusY < 0 ? 0 : y - radiusY;
-    const jint bottom = y + radiusY > height - 1 ? height - 1 : y + radiusY;
-    const bool touchesTB = y - radiusY < 0 || y + radiusY > height - 1;
-    const bool touchesLR = x - radiusX < 0 || x + radiusX > width - 1;
+        const jint top = y - radiusY < 0 ? 0 : y - radiusY;
+        const jint bottom = y + radiusY > height - 1 ? height - 1 : y + radiusY;
+        const bool touchesTB = y - radiusY < 0 || y + radiusY > height - 1;
+        const bool touchesLR = x - radiusX < 0 || x + radiusX > width - 1;
 
-    // Erosion with an out-of-image kernel yields transparent black (spec);
-    // dst is pre-filled with zero.
-    if (isErode && (touchesTB || touchesLR)) {
-        return;
+        // Erosion with an out-of-image kernel yields transparent black (spec);
+        // dst is pre-filled with zero.
+        if (isErode && (touchesTB || touchesLR)) {
+            return;
+        }
+
+        jint a = init, r = init, g = init, b = init;
+        const jint rowOffset = y * width;
+        const jint left = touchesLR ? (x - radiusX < 0 ? 0 : x - radiusX) : x - radiusX;
+        const jint right = touchesLR ? (x + radiusX > width - 1 ? width - 1 : x + radiusX) : x + radiusX;
+        for (jint ky = top; ky <= bottom; ky++) {
+            const jint kRowOffset = ky * width;
+            for (jint kx = left; kx <= right; kx++) {
+                const jint c = src[kRowOffset + kx];
+                if (isErode) {
+                    const jint ca = (c >> 24) & 0xFF;
+                    if (ca < a) a = ca;
+                    const jint cr = (c >> 16) & 0xFF;
+                    if (cr < r) r = cr;
+                    const jint cg = (c >> 8) & 0xFF;
+                    if (cg < g) g = cg;
+                    const jint cb = c & 0xFF;
+                    if (cb < b) b = cb;
+                } else {
+                    const jint ca = (c >> 24) & 0xFF;
+                    if (ca > a) a = ca;
+                    const jint cr = (c >> 16) & 0xFF;
+                    if (cr > r) r = cr;
+                    const jint cg = (c >> 8) & 0xFF;
+                    if (cg > g) g = cg;
+                    const jint cb = c & 0xFF;
+                    if (cb > b) b = cb;
+                }
+            }
+        }
+        dst[rowOffset + x] = (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    jint a = init, r = init, g = init, b = init;
-    const jint rowOffset = y * width;
-    const jint left = touchesLR ? (x - radiusX < 0 ? 0 : x - radiusX) : x - radiusX;
-    const jint right = touchesLR ? (x + radiusX > width - 1 ? width - 1 : x + radiusX) : x + radiusX;
-    for (jint ky = top; ky <= bottom; ky++) {
-        const jint kRowOffset = ky * width;
-        for (jint kx = left; kx <= right; kx++) {
-            const jint c = src[kRowOffset + kx];
-            if (isErode) {
-                const jint ca = (c >> 24) & 0xFF; if (ca < a) a = ca;
-                const jint cr = (c >> 16) & 0xFF; if (cr < r) r = cr;
-                const jint cg = (c >> 8) & 0xFF;  if (cg < g) g = cg;
-                const jint cb = c & 0xFF;         if (cb < b) b = cb;
-            } else {
-                const jint ca = (c >> 24) & 0xFF; if (ca > a) a = ca;
-                const jint cr = (c >> 16) & 0xFF; if (cr > r) r = cr;
-                const jint cg = (c >> 8) & 0xFF;  if (cg > g) g = cg;
-                const jint cb = c & 0xFF;         if (cb > b) b = cb;
+    void applyScalar(
+        const jint *src, jint *dst, const jint width, const jint height,
+        const jint radiusX, const jint radiusY, const bool isErode, const jint init,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
+        std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
+        for (jint y = clipTop; y < clipBottom; y++) {
+            for (jint x = clipLeft; x < clipRight; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
         }
     }
-    dst[rowOffset + x] = (a << 24) | (r << 16) | (g << 8) | b;
-}
-
-void applyScalar(
-        const jint* src, jint* dst, const jint width, const jint height,
-        const jint radiusX, const jint radiusY, const bool isErode, const jint init,
-        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
-    std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
-    for (jint y = clipTop; y < clipBottom; y++) {
-        for (jint x = clipLeft; x < clipRight; x++) {
-            applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-        }
-    }
-}
 
 #ifdef MORPH_SIMD
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON__)
 #include <arm_neon.h>
-using Vec = uint8x16_t;
-inline Vec vecLoad(const jint* p) { return vld1q_u8(reinterpret_cast<const uint8_t*>(p)); }
-inline Vec vecMin(Vec a, Vec b) { return vminq_u8(a, b); }
-inline Vec vecMax(Vec a, Vec b) { return vmaxq_u8(a, b); }
-inline Vec vecInit(jint v) { return vdupq_n_u8(static_cast<uint8_t>(v)); }
-inline jint lane(Vec v, int i) { return static_cast<jint>(vgetq_lane_u8(v, i)); }
+    using Vec = uint8x16_t;
+    inline Vec vecLoad(const jint *p) { return vld1q_u8(reinterpret_cast<const uint8_t *>(p)); }
+    inline Vec vecMin(Vec a, Vec b) { return vminq_u8(a, b); }
+    inline Vec vecMax(Vec a, Vec b) { return vmaxq_u8(a, b); }
+    inline Vec vecInit(jint v) { return vdupq_n_u8(static_cast<uint8_t>(v)); }
+    inline jint lane(Vec v, int i) { return static_cast<jint>(vgetq_lane_u8(v, i)); }
 #else
 #include <emmintrin.h>
-using Vec = __m128i;
-inline Vec vecLoad(const jint* p) { return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p)); }
-inline Vec vecMin(Vec a, Vec b) { return _mm_min_epu8(a, b); }
-inline Vec vecMax(Vec a, Vec b) { return _mm_max_epu8(a, b); }
-inline Vec vecInit(jint v) { return _mm_set1_epi8(static_cast<char>(v)); }
-inline jint lane(Vec v, int i) { return _mm_cvtsi128_si32(_mm_srli_si128(v, i)) & 0xFF; }
+    using Vec = __m128i;
+    inline Vec vecLoad(const jint *p) { return _mm_loadu_si128(reinterpret_cast<const __m128i *>(p)); }
+    inline Vec vecMin(Vec a, Vec b) { return _mm_min_epu8(a, b); }
+    inline Vec vecMax(Vec a, Vec b) { return _mm_max_epu8(a, b); }
+    inline Vec vecInit(jint v) { return _mm_set1_epi8(static_cast<char>(v)); }
+    inline jint lane(Vec v, int i) { return _mm_cvtsi128_si32(_mm_srli_si128(v, i)) & 0xFF; }
 #endif
 
-/**
- * Interior pixel: window fully inside the image. Folds the square footprint
- * through 16-byte vectors; lane 0/1/2/3 hold B/G/R/A because chunks start on
- * pixel boundaries. Tail taps (< 4 px) run scalar.
- */
-inline void applyVectorPixel(
-        const jint* src, jint* dst, jint width,
+    /**
+     * Interior pixel: window fully inside the image. Folds the square footprint
+     * through 16-byte vectors; lane 0/1/2/3 hold B/G/R/A because chunks start on
+     * pixel boundaries. Tail taps (< 4 px) run scalar.
+     */
+    inline void applyVectorPixel(
+        const jint *src, jint *dst, jint width,
         jint radiusX, jint radiusY, bool isErode, jint init, jint x, jint y) {
-    const jint top = y - radiusY;
-    const jint bottom = y + radiusY;
-    const jint left = x - radiusX;
-    const jint right = x + radiusX;
+        const jint top = y - radiusY;
+        const jint bottom = y + radiusY;
+        const jint left = x - radiusX;
+        const jint right = x + radiusX;
 
-    Vec accMin = vecInit(isErode ? 255 : 0);
-    Vec accMax = vecInit(0);
+        Vec accMin = vecInit(isErode ? 255 : 0);
+        Vec accMax = vecInit(0);
 
-    for (jint ky = top; ky <= bottom; ky++) {
-        const jint* row = src + ky * width;
-        jint kx = left;
-        for (; kx + 4 <= right + 1; kx += 4) {
-            const Vec c = vecLoad(row + kx);
-            accMin = vecMin(accMin, c);
-            accMax = vecMax(accMax, c);
+        for (jint ky = top; ky <= bottom; ky++) {
+            const jint *row = src + ky * width;
+            jint kx = left;
+            for (; kx + 4 <= right + 1; kx += 4) {
+                const Vec c = vecLoad(row + kx);
+                accMin = vecMin(accMin, c);
+                accMax = vecMax(accMax, c);
+            }
+            for (; kx <= right; kx++) {
+                const Vec c = vecLoad(row + kx);
+                accMin = vecMin(accMin, c);
+                accMax = vecMax(accMax, c);
+            }
         }
-        for (; kx <= right; kx++) {
-            const Vec c = vecLoad(row + kx);
-            accMin = vecMin(accMin, c);
-            accMax = vecMax(accMax, c);
-        }
+
+        const Vec acc = isErode ? accMin : accMax;
+        const jint a = lane(acc, 3) & 0xFF;
+        const jint r = lane(acc, 2) & 0xFF;
+        const jint g = lane(acc, 1) & 0xFF;
+        const jint b = lane(acc, 0) & 0xFF;
+        (void) init;
+        dst[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    const Vec acc = isErode ? accMin : accMax;
-    const jint a = lane(acc, 3) & 0xFF;
-    const jint r = lane(acc, 2) & 0xFF;
-    const jint g = lane(acc, 1) & 0xFF;
-    const jint b = lane(acc, 0) & 0xFF;
-    (void) init;
-    dst[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
-}
-
 #endif // MORPH_SIMD
-
 } // namespace
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
-        JNIEnv* env, jclass clazz,
-        const jintArray jSrc, jintArray jDst,
-        const jint width, const jint height,
-        const jint radiusX, const jint radiusY, const jboolean erode,
-        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
-    auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
+    JNIEnv *env, jclass clazz,
+    const jintArray jSrc, const jintArray jDst,
+    const jint width, const jint height,
+    const jint radiusX, const jint radiusY, const jboolean erode,
+    const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
+    auto *src = static_cast<jint *>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
     if (src == nullptr) return;
-    auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    auto *dst = static_cast<jint *>(env->GetPrimitiveArrayCritical(jDst, nullptr));
     if (dst == nullptr) {
         env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
         return;
@@ -196,23 +202,23 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
         }
         for (jint x = vxLo; x < vxHi; x++) {
 #if defined(__i386__) || defined(__x86_64__)
-            switch (detectSimdLevel()) {
-                case SIMD_AVX512:
-                    ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
-                    break;
-                case SIMD_AVX2:
-                    ksvgMorphologyApplyPixelAvx2(src, dst, width, radiusX, radiusY, erode, x, y);
-                    break;
-                default:
-                    applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
-            }
-#else
+    switch (detectSimdLevel()) {
+        case SIMD_AVX512:
+            ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
+            break;
+        case SIMD_AVX2:
+            ksvgMorphologyApplyPixelAvx2(src, dst, width, radiusX, radiusY, erode, x, y);
+            break;
+        default:
             applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
+    }
+#else
+    applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
 #endif
         }
-        for (jint x = vxHi; x < xHi; x++) {
-            applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-        }
+    for (jint x = vxHi; x < xHi; x++) {
+        applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+    }
     }
     for (jint y = vyHi; y < yHi; y++) {
         for (jint x = xLo; x < xHi; x++) {

@@ -18,7 +18,6 @@
 #define KSVG_TURBULENCE_CORE_H
 
 #include <cmath>
-#include <cstdint>
 
 // Pure computational core of feTurbulence (SVG 1.1 section 15.25, adapted from
 // Mozilla gfx SVGTurbulenceRenderer-inl.h). No JNI dependencies so it can be
@@ -104,12 +103,12 @@ struct StitchInfo {
 // True mathematical modulo (result in [0, period)): a single subtraction is
 // NOT enough - sample coordinates can be many periods in, and the leftover
 // offset produced visible seams every period pixels.
-inline int32_t wrapPeriod(int32_t v, const int32_t period) {
+ int32_t wrapPeriod(int32_t v, const int32_t period) {
     v %= period;
     return v < 0 ? v + period : v;
 }
 
-inline void noise2(
+ void noise2(
         const LatticeTables& t,
         const double pxd, const double pyd,
         const StitchInfo& stitch, const bool stitchEnabled,

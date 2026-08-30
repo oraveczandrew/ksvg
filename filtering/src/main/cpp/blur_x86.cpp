@@ -20,8 +20,6 @@
  * the rest of the toolkit's intrinsics are not used by libksvgblur.
  */
 
-#include <stdint.h>
-
 // Only compiled on x86/x86_64 (see CMakeLists.txt); included in every ABI's
 // target so IDEs don't flag it as orphaned.
 #if defined(__i386__) || defined(__x86_64__)

@@ -40,29 +40,29 @@
 
 namespace {
 
-inline jint clamp255(const float v) {
+ jint clamp255(const float v) {
     const jint i = static_cast<jint>(std::floor(v + 0.5f));
     return i < 0 ? 0 : (i > 255 ? 255 : i);
 }
 
-inline jint sampleX(const jint x, const jint limit, const jint edgeMode) {
+ jint sampleX(const jint x, const jint limit, const jint edgeMode) {
     if (x >= 0 && x < limit) return x;
     switch (edgeMode) {
         case 2: return -1;               // none -> transparent contribution
         case 1: {                        // wrap
-            jint m = x % limit;
+            const jint m = x % limit;
             return m < 0 ? m + limit : m;
         }
         default: return x < 0 ? 0 : limit - 1; // duplicate
     }
 }
 
-inline jint sampleY(const jint y, const jint limit, const jint edgeMode) { return sampleX(y, limit, edgeMode); }
+ jint sampleY(const jint y, const jint limit, const jint edgeMode) { return sampleX(y, limit, edgeMode); }
 
-inline void convolveScalarPixel(
-        const jint* src, jint* dst, jint width, jint height,
-        const jfloat* kernel, jint orderX, jint orderY, jint targetX, jint targetY,
-        jfloat divisor, jfloat bias, bool preserve, jint edgeMode, jint x, jint y) {
+ void convolveScalarPixel(
+        const jint* src, jint* dst, const jint width, const jint height,
+        const jfloat* kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const jfloat divisor, const jfloat bias, const bool preserve, const jint edgeMode, const jint x, const jint y) {
     float r = 0.f, g = 0.f, b = 0.f, a = 0.f;
     for (jint ky = 0; ky < orderY; ky++) {
         const jint srcY = sampleY(y + ky - targetY, height, edgeMode);
@@ -85,10 +85,10 @@ inline void convolveScalarPixel(
 }
 
 void applyScalar(
-        const jint* src, jint* dst, jint width, jint height,
+        const jint* src, jint* dst, const jint width, const jint height,
         const jfloat* kernel,
-        jint orderX, jint orderY, jint targetX, jint targetY,
-        jfloat divisor, jfloat bias, jboolean preserveAlpha, jint edgeMode) {
+        const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const jfloat divisor, const jfloat bias, const jboolean preserveAlpha, const jint edgeMode) {
     const bool preserve = preserveAlpha == JNI_TRUE;
     for (jint y = 0; y < height; y++) {
         const jint rowOffset = y * width;
@@ -349,12 +349,12 @@ void applySseInterior(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
         JNIEnv* env, jclass clazz,
-        jintArray jSrc, jintArray jDst,
+        const jintArray jSrc, const jintArray jDst,
         jint width, jint height,
-        jfloatArray jKernel, jint orderX, jint orderY,
+        const jfloatArray jKernel, jint orderX, jint orderY,
         jint targetX, jint targetY,
         jfloat divisor, jfloat bias,
-        jboolean preserveAlpha, jint edgeMode) {
+        const jboolean preserveAlpha, const jint edgeMode) {
     // Fetch the small kernel array with a regular (non-critical) call BEFORE
     // entering any GetPrimitiveArrayCritical section: ART aborts on JNI calls
     // made between a critical get/release pair.
