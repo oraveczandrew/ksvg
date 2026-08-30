@@ -72,16 +72,16 @@ internal fun calculatePrimitiveRegion(
     if (unitsAreUser) {
         x = primitive.x?.floatValueXInContext()
             ?: inputRegion?.left
-            ?: filterRegion.left
+                    ?: filterRegion.left
         y = primitive.y?.floatValueYInContext()
             ?: inputRegion?.top
-            ?: filterRegion.top
+                    ?: filterRegion.top
         w = primitive.width?.floatValueXInContext()
             ?: inputRegion?.let { it.right - it.left }
-            ?: filterRegion.width()
+                    ?: filterRegion.width()
         h = primitive.height?.floatValueYInContext()
             ?: inputRegion?.let { it.bottom - it.top }
-            ?: filterRegion.height()
+                    ?: filterRegion.height()
     } else {
         val px = primitive.x
         val py = primitive.y
@@ -112,4 +112,50 @@ internal fun calculatePrimitiveRegion(
     outRect.set(x, y, x + w, y + h)
     // Always clip to filter region
     outRect.intersect(filterRegion)
+}
+
+/**
+ * Fills [out] with the union of the referenced input node(s)' subregions in user space, which
+ * is what a primitive that omits x/y/width/height defaults its subregion to (per the SVG
+ * Filter Effects spec). Standard inputs (no `in`, SourceGraphic, SourceAlpha) span the full
+ * filter region; a non-first primitive with `in == null` means the previous primitive's result
+ * and inherits its subregion; named inputs use their recorded subregion.
+ *
+ * @param inputIds the input identifier(s): feMerge nodes, or a single entry for other
+ * primitives.
+ * @param isMerge true for an feMerge primitive (whose inputs never inherit the previous
+ * primitive's subregion).
+ * @param standardFilterRegion the full filter region (default for standard inputs).
+ * @param namedRegion resolves a named result id to its recorded subregion, or null if unknown
+ * (e.g. an unregistered standard-input name).
+ * @param lastResultRegion the previous primitive's subregion (used when `in == null` on a
+ * non-first, non-merge primitive).
+ * @param out receives the resulting user-space union.
+ * @return true iff [out] was set (there was at least one resolvable input).
+ */
+internal fun resolvePrimitiveInputRegion(
+    inputIds: List<String?>,
+    isMerge: Boolean,
+    standardFilterRegion: RectF,
+    namedRegion: (String?) -> RectF?,
+    lastResultRegion: RectF,
+    out: RectF,
+): Boolean {
+    out.setEmpty()
+    var has = false
+    for (id in inputIds) {
+        val standard = id == "SourceGraphic" || id == "SourceAlpha"
+        val r = when {
+            isMerge && id == null -> standardFilterRegion
+            !isMerge && id == null -> lastResultRegion
+            else -> namedRegion(id) ?: if (standard) standardFilterRegion else null
+        } ?: continue
+        if (has) {
+            out.union(r)
+        } else {
+            out.set(r)
+        }
+        has = true
+    }
+    return has
 }
