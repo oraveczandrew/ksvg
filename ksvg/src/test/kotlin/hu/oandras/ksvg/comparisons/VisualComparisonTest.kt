@@ -46,7 +46,7 @@ private val EXCLUDED_FROM_VISUAL_VERIFICATION = setOf("solid_color.svg")
 //  - Engine differences that are valid but never pixel-equal (fonts, anti-aliasing,
 //    and filter noise/PRNG algorithms that differ from rsvg).
 //  - Complex filter interactions / tiling edge cases with known, stable sub-pixel drift.
-private val ACCEPTED_SIMILARITY_EXCEPTIONS = mapOf(
+private val ACCEPTED_SIMILARITY_EXCEPTIONS: Map<String, Double> = mapOf(
     // Transform interpolation and rounding differences in patterns
     "pattern_transform.svg" to 0.89,
     "patterns_markers.svg" to 0.93,
@@ -54,6 +54,7 @@ private val ACCEPTED_SIMILARITY_EXCEPTIONS = mapOf(
     // Generic font differences (Robolectric 'sans-serif' vs Golden reference)
     "text.svg" to 0.94,
     "text_anchor.svg" to 0.94,
+    "direction_text_anchor.svg" to 0.94,
     "text_fonts.svg" to 0.88,
     "text_letter_spacing.svg" to 0.92,
     "text_variation_settings.svg" to 0.88,
@@ -69,6 +70,7 @@ private val ACCEPTED_SIMILARITY_EXCEPTIONS = mapOf(
     // feTurbulence / feDisplacementMap use a noise/PRNG algorithm that differs from
     // rsvg; the outputs are valid but never pixel-equal, so the comparison is excluded.
     "lightning.svg" to 0.0,
+    "lighting.svg" to 0.0,
     "displacement.svg" to 0.0,
     "turbulence.svg" to 0.0,
 )

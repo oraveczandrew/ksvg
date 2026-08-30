@@ -313,7 +313,13 @@ internal class SoftwareFilterBackend internal constructor(
                         var hasInputRegion = false
                         when (primitiveNode) {
                             is FeMergeRenderNode -> primitiveNode.mergeNodes.forEachElement { inputId ->
-                                val r = if (inputId == null) null else results.getResultRegion(inputId)
+                                // Standard inputs (no `in`, SourceGraphic, SourceAlpha) span the whole
+                                // filter region, so they contribute the filter region to the union.
+                                val r = if (inputId == null || inputId == "SourceGraphic" || inputId == "SourceAlpha") {
+                                    filterRegion
+                                } else {
+                                    results.getResultRegion(inputId)
+                                }
                                 if (r != null) {
                                     if (hasInputRegion) inputUnion.union(r) else inputUnion.set(r)
                                     hasInputRegion = true
