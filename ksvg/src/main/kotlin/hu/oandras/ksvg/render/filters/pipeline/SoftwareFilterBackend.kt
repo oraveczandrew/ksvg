@@ -285,82 +285,134 @@ internal class SoftwareFilterBackend internal constructor(
         // dimensions, so both must be expressed in bitmap-pixel space. The bitmap
         // maps exactly onto the filter region, so the pixel-space filter region is
         // simply the full bitmap.
-        renderContext.rectFPool.withPooledObject { filterRegionPx ->
+            renderContext.rectFPool.withPooledObject { filterRegionPx ->
             filterRegionPx.set(0f, 0f, sourceBitmap.width.toFloat(), sourceBitmap.height.toFloat())
 
-            var lastResult: Bitmap? = sourceBitmap
-            val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
-            val primitiveScaleX = if (primitiveUnitsAreUser) sx else originalObjBBox.width * sx
-            val primitiveScaleY = if (primitiveUnitsAreUser) sy else originalObjBBox.height * sy
-            val primitiveOriginX = if (primitiveUnitsAreUser) 0f else originalObjBBox.minX
-            val primitiveOriginY = if (primitiveUnitsAreUser) 0f else originalObjBBox.minY
+            renderContext.rectFPool.withPooledObject { inputUnion ->
+                    var lastResult: Bitmap? = sourceBitmap
+                    // The user-space subregion of the previous primitive's result. `in` == null on a
+                    // subsequent primitive means "the result of the previous primitive" (per spec), so
+                    // the default subregion inherits this. It starts as the filter region to represent
+                    // SourceGraphic (the first primitive's default input).
+                    val lastResultRegion = renderContext.rectFPool.pull()
+                    lastResultRegion.set(filterRegion)
+                    val primitiveUnitsAreUser = filter.primitiveUnitsAreUser != false
+                    val primitiveScaleX = if (primitiveUnitsAreUser) sx else originalObjBBox.width * sx
+                    val primitiveScaleY = if (primitiveUnitsAreUser) sy else originalObjBBox.height * sy
+                    val primitiveOriginX = if (primitiveUnitsAreUser) 0f else originalObjBBox.minX
+                    val primitiveOriginY = if (primitiveUnitsAreUser) 0f else originalObjBBox.minY
 
-            filterNode.primitives.forEachElement { primitiveNode ->
-                val child = primitiveNode.sourceElement
+                    filterNode.primitives.forEachElement { primitiveNode ->
+                        val child = primitiveNode.sourceElement
 
-                val res = renderContext.rectFPool.withPooledObject { primitiveRegion ->
-                    calculatePrimitiveRegion(
-                        primitive = child,
-                        filterRegion = filterRegion,
-                        unitsAreUser = primitiveUnitsAreUser,
-                        originalObjBBox = originalObjBBox,
-                        outRect = primitiveRegion
-                    )
+                        // Compute the union of the referenced input node(s)' subregions in user
+                        // space. When a primitive omits x/y/width/height and its input is a
+                        // referenced node's result, its subregion defaults to this union (per the
+                        // SVG Filter Effects spec) instead of the whole filter region.
+                        inputUnion.setEmpty()
+                        var hasInputRegion = false
+                        when (primitiveNode) {
+                            is FeMergeRenderNode -> primitiveNode.mergeNodes.forEachElement { inputId ->
+                                val r = if (inputId == null) null else results.getResultRegion(inputId)
+                                if (r != null) {
+                                    if (hasInputRegion) inputUnion.union(r) else inputUnion.set(r)
+                                    hasInputRegion = true
+                                }
+                            }
+                            else -> {
+                                // `in` == null on a non-first primitive means "the result of the
+                                // previous primitive", so the default subregion inherits the previous
+                                // primitive's subregion (lastResultRegion, initialised to the filter
+                                // region for the first primitive / SourceGraphic). A named result uses
+                                // its recorded subregion. Other standard-input names are never
+                                // registered results, so `getResultRegion` returns null and the
+                                // default falls back to the filter region (spec-correct).
+                                val r = if (child.`in` == null) {
+                                    lastResultRegion
+                                } else {
+                                    results.getResultRegion(child.`in`)
+                                }
+                                if (r != null) {
+                                    inputUnion.set(r)
+                                    hasInputRegion = true
+                                }
+                            }
+                        }
+                        val regionResolver: (String?) -> RectF? = { _ ->
+                            if (hasInputRegion) inputUnion else null
+                        }
 
-                    // Remap `primitiveRegion` from user space to bitmap-pixel space so
-                    // the per-primitive subregion clipping (which uses the bitmap's
-                    // pixel dimensions) lines up correctly at any render scale.
-                    val frW = filterRegion.width()
-                    val frH = filterRegion.height()
-                    if (frW > 0f && frH > 0f) {
-                        val scaleX = sourceBitmap.width / frW
-                        val scaleY = sourceBitmap.height / frH
-                        primitiveRegion.set(
-                            (primitiveRegion.left - filterRegion.left) * scaleX,
-                            (primitiveRegion.top - filterRegion.top) * scaleY,
-                            (primitiveRegion.right - filterRegion.left) * scaleX,
-                            (primitiveRegion.bottom - filterRegion.top) * scaleY,
-                        )
+                        val res = renderContext.rectFPool.withPooledObject { primitiveRegion ->
+                            calculatePrimitiveRegion(
+                                primitive = child,
+                                filterRegion = filterRegion,
+                                unitsAreUser = primitiveUnitsAreUser,
+                                originalObjBBox = originalObjBBox,
+                                outRect = primitiveRegion,
+                                resolveInputRegion = regionResolver,
+                            )
+
+                            // Record the primitive's own user-space subregion (used by a following
+                            // primitive that references this result) before remapping below.
+                            results.setResultRegion(child.result, primitiveRegion)
+                            lastResultRegion.set(primitiveRegion)
+
+                            // Remap `primitiveRegion` from user space to bitmap-pixel space so
+                            // the per-primitive subregion clipping (which uses the bitmap's
+                            // pixel dimensions) lines up correctly at any render scale.
+                            val frW = filterRegion.width()
+                            val frH = filterRegion.height()
+                            if (frW > 0f && frH > 0f) {
+                                val scaleX = sourceBitmap.width / frW
+                                val scaleY = sourceBitmap.height / frH
+                                primitiveRegion.set(
+                                    (primitiveRegion.left - filterRegion.left) * scaleX,
+                                    (primitiveRegion.top - filterRegion.top) * scaleY,
+                                    (primitiveRegion.right - filterRegion.left) * scaleX,
+                                    (primitiveRegion.bottom - filterRegion.top) * scaleY,
+                                )
+                            }
+
+                            when (primitiveNode) {
+                                is FeMergeRenderNode -> doFeMergeFilter(
+                                    merge = primitiveNode,
+                                    results = results,
+                                    lastResult = lastResult,
+                                    region = primitiveRegion
+                                )
+
+                                else -> applyPrimitive(
+                                    primitiveNode = primitiveNode,
+                                    results = results,
+                                    lastResult = lastResult,
+                                    primitiveScaleX = primitiveScaleX,
+                                    primitiveScaleY = primitiveScaleY,
+                                    primitiveOriginX = primitiveOriginX,
+                                    primitiveOriginY = primitiveOriginY,
+                                    canvasScaleX = sx,
+                                    canvasScaleY = sy,
+                                    primitiveUnitsAreUser = primitiveUnitsAreUser,
+                                    filterRegion = filterRegionPx,
+                                    filterRegionUserLeft = filterRegion.left,
+                                    filterRegionUserTop = filterRegion.top,
+                                    primitiveRegion = primitiveRegion,
+                                    state = state,
+                                )
+                            }
+                        }
+
+                        if (res != null) {
+                            results.set(child.result, res)
+                            lastResult = res
+                        }
                     }
 
-                    when (primitiveNode) {
-                        is FeMergeRenderNode -> doFeMergeFilter(
-                            merge = primitiveNode,
-                            results = results,
-                            lastResult = lastResult,
-                            region = primitiveRegion
-                        )
-
-                        else -> applyPrimitive(
-                            primitiveNode = primitiveNode,
-                            results = results,
-                            lastResult = lastResult,
-                            primitiveScaleX = primitiveScaleX,
-                            primitiveScaleY = primitiveScaleY,
-                            primitiveOriginX = primitiveOriginX,
-                            primitiveOriginY = primitiveOriginY,
-                            canvasScaleX = sx,
-                            canvasScaleY = sy,
-                            primitiveUnitsAreUser = primitiveUnitsAreUser,
-                            filterRegion = filterRegionPx,
-                            filterRegionUserLeft = filterRegion.left,
-                            filterRegionUserTop = filterRegion.top,
-                            primitiveRegion = primitiveRegion,
-                            state = state,
-                        )
-                    }
-                }
-
-                if (res != null) {
-                    results.set(child.result, res)
-                    lastResult = res
+                    renderContext.rectFPool.release(lastResultRegion)
+                    results.recycle(exclude = lastResult)
+                    return lastResult
                 }
             }
-
-            results.recycle(exclude = lastResult)
-            return lastResult
         }
-    }
 
     private fun applyPrimitive(
         primitiveNode: FilterPrimitiveRenderNode<*>,

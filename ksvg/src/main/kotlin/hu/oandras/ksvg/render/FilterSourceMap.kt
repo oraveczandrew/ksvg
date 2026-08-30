@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.Bitmap
+import android.graphics.RectF
 import androidx.collection.ArrayMap
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
@@ -29,6 +30,12 @@ internal class FilterSourceMap(
     private val results = ArrayMap<String, Bitmap>()
     private val resultsWithoutId: ArrayList<Bitmap> = ArrayList()
 
+    // The filter-primitive subregion (in user space) of each named result. Per the SVG
+    // Filter Effects spec, when a following primitive omits x/y/width/height and its input
+    // is a referenced node's result, its subregion defaults to the union of the referenced
+    // node(s)' subregions — not the full filter region.
+    private val resultRegion = ArrayMap<String, RectF>()
+
     private var sourceGraphic: Bitmap? = null
 
     fun reInitWith(sourceGraphic: Bitmap) {
@@ -37,6 +44,26 @@ internal class FilterSourceMap(
         results["SourceGraphic"] = sourceGraphic
 
         resultsWithoutId.clear()
+    }
+
+    /** Records the user-space subregion of the primitive result identified by [id]. */
+    fun setResultRegion(id: String?, rect: RectF) {
+        if (id == null) return
+        val existing = resultRegion[id]
+        if (existing != null) {
+            existing.set(rect)
+        } else {
+            resultRegion[id] = RectF(rect)
+        }
+    }
+
+    /**
+     * Returns the user-space subregion of a previously stored named result, or `null` when
+     * [id] does not reference a stored result (e.g. it is a standard input or is unknown).
+     */
+    fun getResultRegion(id: String?): RectF? {
+        if (id == null) return null
+        return resultRegion[id]
     }
 
     fun get(id: String): Bitmap? {
@@ -89,5 +116,6 @@ internal class FilterSourceMap(
         results.forEachKey { string ->
             results[string] = null
         }
+        resultRegion.clear()
     }
 }

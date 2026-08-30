@@ -1005,8 +1005,8 @@ internal class Renderer internal constructor(
                             matrix.getValues(m)
                             val sx = hypot(m[Matrix.MSCALE_X], m[Matrix.MSKEW_Y])
                             val sy = hypot(m[Matrix.MSCALE_Y], m[Matrix.MSKEW_X])
-                            val width = stabilizeDimension(deviceRegion.width().ceilToInt())
-                            val height = stabilizeDimension(deviceRegion.height().ceilToInt())
+                            val width = deviceRegion.width().ceilToInt()
+                            val height = deviceRegion.height().ceilToInt()
 
                             val backend = obtainFilterBackend(canvas, filterNode, sx, sy, region, deviceRegion, boundingBox)
                             val recCanvas = backend.beginRecording(
@@ -2353,12 +2353,6 @@ internal class Renderer internal constructor(
             }
             state.style = builder.build()
         }
-    }
-
-    private fun stabilizeDimension(dimension: Int): Int {
-        if (dimension <= 0) return 0
-        // Round up to the next multiple of 32 to stabilize bitmap allocations during animations
-        return (dimension + 31) and 31.inv()
     }
 
     @Suppress("SimplifyBooleanWithConstants")

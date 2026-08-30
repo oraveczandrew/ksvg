@@ -55,18 +55,33 @@ internal fun calculatePrimitiveRegion(
     filterRegion: RectF,
     unitsAreUser: Boolean,
     originalObjBBox: Box,
-    outRect: RectF
+    outRect: RectF,
+    resolveInputRegion: (String?) -> RectF? = { null },
 ) {
-    var x: Float
-    var y: Float
-    var w: Float
-    var h: Float
+    val x: Float
+    val y: Float
+    val w: Float
+    val h: Float
+
+    // Per the SVG Filter Effects spec, a primitive that omits x/y/width/height and whose
+    // input is a referenced node's result defaults its subregion to the union of the
+    // referenced node(s)' subregions (falling back to the filter region only for standard
+    // inputs such as SourceGraphic/SourceAlpha or when there is no referenced subregion).
+    val inputRegion = resolveInputRegion(primitive.`in`)
 
     if (unitsAreUser) {
-        x = primitive.x?.floatValueXInContext() ?: filterRegion.left
-        y = primitive.y?.floatValueYInContext() ?: filterRegion.top
-        w = primitive.width?.floatValueXInContext() ?: filterRegion.width()
-        h = primitive.height?.floatValueYInContext() ?: filterRegion.height()
+        x = primitive.x?.floatValueXInContext()
+            ?: inputRegion?.left
+            ?: filterRegion.left
+        y = primitive.y?.floatValueYInContext()
+            ?: inputRegion?.top
+            ?: filterRegion.top
+        w = primitive.width?.floatValueXInContext()
+            ?: inputRegion?.let { it.right - it.left }
+            ?: filterRegion.width()
+        h = primitive.height?.floatValueYInContext()
+            ?: inputRegion?.let { it.bottom - it.top }
+            ?: filterRegion.height()
     } else {
         val px = primitive.x
         val py = primitive.y
@@ -75,22 +90,22 @@ internal fun calculatePrimitiveRegion(
         x = if (px != null) {
             originalObjBBox.minX + px.floatValueInContext(1f) * originalObjBBox.width
         } else {
-            filterRegion.left
+            inputRegion?.left ?: filterRegion.left
         }
         y = if (py != null) {
             originalObjBBox.minY + py.floatValueInContext(1f) * originalObjBBox.height
         } else {
-            filterRegion.top
+            inputRegion?.top ?: filterRegion.top
         }
         w = if (pw != null) {
             pw.floatValueInContext(1f) * originalObjBBox.width
         } else {
-            filterRegion.width()
+            inputRegion?.let { it.right - it.left } ?: filterRegion.width()
         }
         h = if (ph != null) {
             ph.floatValueInContext(1f) * originalObjBBox.height
         } else {
-            filterRegion.height()
+            inputRegion?.let { it.bottom - it.top } ?: filterRegion.height()
         }
     }
 
