@@ -80,10 +80,54 @@ android {
             "-Xreturn-value-checker=check",
         )
     }
+
+    // JVM unit tests may drive the native kernels directly through the host build
+    // of libksvgblur (see TurbulenceNativeParityTest). Point the test JVM at the
+    // generated host library directory (produced by the `buildHostNativeLib` task
+    // below) so System.loadLibrary("ksvgblur") resolves it.
+    testOptions {
+        unitTests {
+            all {
+                it.jvmArgs("-Djava.library.path=${layout.buildDirectory.get().asFile.resolve("host-native").absolutePath}")
+            }
+        }
+    }
 }
+
+// Host-architecture build of the native kernels (turbulence, blur, lighting, ...)
+// so JVM unit tests can drive the real native path bit-exactly against the Kotlin
+// reference (TurbulenceNativeParityTest). Output lands in this module's build dir.
+val hostNativeCpp: FileTree = fileTree("src/main/cpp") {
+    include("**/*.cpp", "**/*.h", "**/*.S")
+}
+val hostNativeOutputDir: File = layout.buildDirectory.dir("host-native").get().asFile
+val hostLibName: String = when {
+    System.getProperty("os.name").lowercase().contains("mac") -> "libksvgblur.dylib"
+    System.getProperty("os.name").lowercase().contains("linux") -> "libksvgblur.so"
+    else -> "ksvgblur.dll"
+}
+val buildHostNativeLib = tasks.register<Exec>("buildHostNativeLib") {
+    group = "verification"
+    description = "Builds a host-architecture libksvgblur for native-vs-Kotlin kernel parity tests."
+    inputs.files(hostNativeCpp)
+    inputs.file(rootProject.file("tmp/native-host/CMakeLists.txt"))
+    outputs.file(hostNativeOutputDir.resolve(hostLibName))
+    workingDir(rootProject.file("tmp/native-host"))
+    val configureDir = hostNativeOutputDir.resolve("cmake")
+    commandLine(
+        "sh", "-c",
+        "cmake -S . -B ${configureDir.absolutePath} " +
+            "-DCMAKE_BUILD_TYPE=Release " +
+            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${hostNativeOutputDir.absolutePath} " +
+            "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${hostNativeOutputDir.absolutePath} " +
+            "&& cmake --build ${configureDir.absolutePath} -j",
+    )
+}
+tasks.matching { it.name == "testDebugUnitTest" }.configureEach { dependsOn(buildHostNativeLib) }
 
 //noinspection UseTomlInstead
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
 }

@@ -47,10 +47,13 @@ public object KotlinKernels {
     private fun clamp(v: Float, min: Float, max: Float): Float =
             v.coerceIn(min, max)
 
+    private fun clamp(v: Int, min: Int, max: Int): Int =
+            v.coerceIn(min, max)
+
     private fun sampleCoordinate(coordinate: Int, limit: Int, edgeMode: Int): Int =
             if (coordinate in 0 until limit) coordinate else when (edgeMode) {
                 2 -> -1
-                1 -> coordinate % limit.let { if (it < 0) it + limit else it }
+                1 -> (coordinate % limit).let { if (it < 0) it + limit else it }
                 else -> if (coordinate < 0) 0 else limit - 1
             }
 
@@ -437,6 +440,51 @@ public object KotlinKernels {
                             ((arithmeticChannel(p ushr 8 and 0xFF, q ushr 8 and 0xFF, k1, k2, k3, k4)) shl 8) or
                             arithmeticChannel(p and 0xFF, q and 0xFF, k1, k2, k3, k4)
                 }
+            }
+        }
+    }
+
+    // -------------------------------------------------------- displacement map
+
+    /**
+     * feDisplacementMap kernel. [xChannel]/[yChannel]: 0=R, 1=G, 2=B, 3=A.
+     * Maps SourceGraphic pixels to SourceMap offsets.
+     */
+    public fun displacementMap(
+            src: IntArray,
+            map: IntArray,
+            dst: IntArray,
+            width: Int,
+            height: Int,
+            mapWidth: Int,
+            mapHeight: Int,
+            scale: Float,
+            xChannel: Int,
+            yChannel: Int,
+    ) {
+        val widthDivisor = maxOf(width - 1, 1)
+        val heightDivisor = maxOf(height - 1, 1)
+
+        for (y in 0 until height) {
+            val rowOffset = y * width
+            for (x in 0 until width) {
+                val mapX = if (mapWidth <= 1) 0 else (x.toFloat() / widthDivisor * (mapWidth - 1)).toInt()
+                val mapY = if (mapHeight <= 1) 0 else (y.toFloat() / heightDivisor * (mapHeight - 1)).toInt()
+                val mapPixel = map[mapY * mapWidth + mapX]
+
+                fun channelValue(p: Int, ch: Int): Float = when (ch) {
+                    0 -> ((p shr 16) and 0xFF) / 255f
+                    1 -> ((p shr 8) and 0xFF) / 255f
+                    2 -> (p and 0xFF) / 255f
+                    else -> ((p shr 24) and 0xFF) / 255f
+                }
+
+                val dx = (scale * (channelValue(mapPixel, xChannel) - 0.5f)).toInt()
+                val dy = (scale * (channelValue(mapPixel, yChannel) - 0.5f)).toInt()
+
+                val srcX = clamp(x + dx, 0, width - 1)
+                val srcY = clamp(y + dy, 0, height - 1)
+                dst[rowOffset + x] = src[srcY * width + srcX]
             }
         }
     }

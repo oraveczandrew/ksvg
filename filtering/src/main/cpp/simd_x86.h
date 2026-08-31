@@ -64,6 +64,14 @@ void ksvgComponentTransferApplyAvx2(
         jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB);
 
+// displacement_map.cpp — full frame displacement.
+void ksvgDisplacementMapApplyAvx2(
+        const jint* src, const jint* map, jint* dst, jint width, jint height,
+        jfloat scale, jint xChannel, jint yChannel);
+void ksvgDisplacementMapApplyAvx512(
+        const jint* src, const jint* map, jint* dst, jint width, jint height,
+        jfloat scale, jint xChannel, jint yChannel);
+
 #ifdef __cplusplus
 }
 #endif

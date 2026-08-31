@@ -15,6 +15,7 @@
  */
 
 #include <jni.h>
+#include <cstdint>
 #include <cstring>
 #include "cpu_dispatch.h"
 #include "simd_x86.h"

@@ -189,11 +189,45 @@ public object SoftwareKernels {
         k4: Float,
         useLinear: Boolean,
     ) {
-        KotlinKernels.arithmeticComposite(
-            inputPixels, in2Pixels, outPixels, width,
-            clipLeft, clipTop, clipRight, clipBottom,
-            k1, k2, k3, k4, useLinear,
-        )
+        if (ArithmeticCompositeNative.isAvailable) {
+            ArithmeticCompositeNative.apply(
+                inputPixels, in2Pixels, outPixels, width,
+                clipLeft, clipTop, clipRight, clipBottom,
+                k1, k2, k3, k4, useLinear
+            )
+        } else {
+            KotlinKernels.arithmeticComposite(
+                inputPixels, in2Pixels, outPixels, width,
+                clipLeft, clipTop, clipRight, clipBottom,
+                k1, k2, k3, k4, useLinear,
+            )
+        }
+    }
+
+    // -------------------------------------------------------- displacement map
+
+    @JvmStatic
+    public fun displacementMap(
+        src: IntArray,
+        map: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+        mapWidth: Int,
+        mapHeight: Int,
+        scale: Float,
+        xChannel: Int,
+        yChannel: Int,
+    ) {
+        if (DisplacementMapNative.isAvailable) {
+            DisplacementMapNative.apply(
+                src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel
+            )
+        } else {
+            KotlinKernels.displacementMap(
+                src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel
+            )
+        }
     }
 
     // --------------------------------------------------------------- feTurbulence

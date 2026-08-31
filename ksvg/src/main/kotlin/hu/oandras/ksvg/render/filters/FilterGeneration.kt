@@ -157,24 +157,18 @@ internal fun doFeDisplacementMapFilter(
 
     val outPixels = primitiveNode.outPixels.getWithSize(inputSize)
 
-    val widthDivisor = max(width - 1, 1)
-    val heightDivisor = max(height - 1, 1)
-
-    for (y in 0 until height) {
-        val rowOffset = y * width
-        for (x in 0 until width) {
-            val mapX = if (mapWidth <= 1) 0 else (x.toFloat() / widthDivisor * (mapWidth - 1)).toInt()
-            val mapY = if (mapHeight <= 1) 0 else (y.toFloat() / heightDivisor * (mapHeight - 1)).toInt()
-            val mapPixel = mapPixels[mapY * mapWidth + mapX]
-
-            val dx = (scale * (channelSelectorValue(mapPixel, primitive.xChannelSelector) - 0.5f)).toInt()
-            val dy = (scale * (channelSelectorValue(mapPixel, primitive.yChannelSelector) - 0.5f)).toInt()
-
-            val srcX = clamp(x + dx, 0, width - 1)
-            val srcY = clamp(y + dy, 0, height - 1)
-            outPixels[rowOffset + x] = inputPixels[srcY * width + srcX]
-        }
-    }
+    SoftwareKernels.displacementMap(
+        src = inputPixels,
+        map = mapPixels,
+        dst = outPixels,
+        width = width,
+        height = height,
+        mapWidth = mapWidth,
+        mapHeight = mapHeight,
+        scale = scale,
+        xChannel = primitive.xChannelSelector.ordinal,
+        yChannel = primitive.yChannelSelector.ordinal,
+    )
     res.setPixels(outPixels, 0, width, 0, 0, width, height)
     return res
 }
