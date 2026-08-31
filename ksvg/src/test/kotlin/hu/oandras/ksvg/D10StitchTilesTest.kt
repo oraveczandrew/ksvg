@@ -36,7 +36,10 @@ class D10StitchTilesTest {
 
     @Test
     fun periodicNoiseRepeatsEveryPeriod() {
-        val noise = SvgPathNoise(LcgRandom(7))
+        val lcg = LcgRandom(7)
+        val permutation = IntArray(SvgPathNoise.LATTICE_SIZE)
+        SvgPathNoise.buildPermutation(lcg, permutation)
+        val noise = SvgPathNoise(lcg, permutation)
         val p = 10
         for (t in listOf(0.3, 3.7, 9.9999)) {
             val v = noise.noise2(t, 2.4, p, p)

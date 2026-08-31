@@ -23,33 +23,41 @@ import kotlin.math.sqrt
 /**
  * Implementation of the Perlin Noise algorithm as defined in the SVG 1.1 specification (Appendix O).
  * Uses Double precision for internal calculations to minimize rounding errors.
+ *
+ * The lattice is built to match the reference (librsvg / SVG spec) draw order so the
+ * output is byte-identical to the reference implementation:
+ *
+ *  - the four channel gradient tables are filled first, in channel order 0..3, each
+ *    drawing exactly two LCG values per lattice point (retrying when both are zero),
+ *    from the shared LCG stream;
+ *  - only afterwards is the single lattice permutation built/shuffled from the same
+ *    stream and shared across all channels.
+ *
+ * The shared [p] permutation array is constructed by [buildPermutation] and must be the
+ * same instance for all channel instances of one feTurbulence primitive.
  */
-internal class SvgPathNoise(lcg: LcgRandom) {
-    @JvmField internal val p: IntArray = IntArray(B_SIZE + B_SIZE + 2)
+internal class SvgPathNoise(lcg: LcgRandom, p: IntArray) {
+    @JvmField internal val p: IntArray = p
     @JvmField internal val g2: Array<DoubleArray> = Array(B_SIZE + B_SIZE + 2) {
         DoubleArray(2)
     }
 
     init {
-        // Initialize gradients and lattice
+        // Gradient draw for one channel: 2 LCG values per lattice point, in channel order.
         for (i in 0 until B_SIZE) {
-            p[i] = i
-            g2[i][0] = ((lcg.next() % (B_SIZE + B_SIZE)) - B_SIZE).toDouble() / B_SIZE
-            g2[i][1] = ((lcg.next() % (B_SIZE + B_SIZE)) - B_SIZE).toDouble() / B_SIZE
+            var a: Int
+            var b: Int
+            do {
+                a = (lcg.next() % (B_SIZE + B_SIZE)) - B_SIZE
+                b = (lcg.next() % (B_SIZE + B_SIZE)) - B_SIZE
+            } while (a == 0 && b == 0)
+            g2[i][0] = a.toDouble() / B_SIZE
+            g2[i][1] = b.toDouble() / B_SIZE
             normalize2(g2[i])
         }
 
-        // Shuffle lattice
-        for (i in B_SIZE - 1 downTo 0) {
-            val k = p[i]
-            val j = lcg.next() % B_SIZE
-            p[i] = p[j]
-            p[j] = k
-        }
-
-        // Extend for wrapping
+        // Extend for wrapping.
         for (i in 0 until B_SIZE + 2) {
-            p[B_SIZE + i] = p[i]
             g2[B_SIZE + i][0] = g2[i][0]
             g2[B_SIZE + i][1] = g2[i][1]
         }
@@ -118,5 +126,23 @@ internal class SvgPathNoise(lcg: LcgRandom) {
     companion object {
         private const val B_SIZE = 0x100
         private const val BM = 0xff
+
+        /** Builds and shuffles the shared lattice permutation from [lcg]. */
+        internal fun buildPermutation(lcg: LcgRandom, p: IntArray) {
+            for (i in 0 until B_SIZE) {
+                p[i] = i
+            }
+            for (i in B_SIZE - 1 downTo 1) {
+                val k = p[i]
+                val j = lcg.next() % B_SIZE
+                p[i] = p[j]
+                p[j] = k
+            }
+            for (i in 0 until B_SIZE + 2) {
+                p[B_SIZE + i] = p[i]
+            }
+        }
+
+        internal const val LATTICE_SIZE = B_SIZE + B_SIZE + 2
     }
 }

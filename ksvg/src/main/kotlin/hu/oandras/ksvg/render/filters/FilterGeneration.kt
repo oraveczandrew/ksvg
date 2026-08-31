@@ -72,8 +72,13 @@ internal fun doFeTurbulenceFilter(
 
     val invCanvasScaleX = 1.0 / canvasScaleX.toDouble()
     val invCanvasScaleY = 1.0 / canvasScaleY.toDouble()
-    val userLeft = regionLeft.toDouble()
-    val userTop = regionTop.toDouble()
+    // Sample the noise on the destination (device) pixel grid: anchor the region
+    // origin to the nearest integer user coordinate so that after the filter surface
+    // is composited back at a possibly fractional device position the sampled user
+    // coordinate of each output pixel equals the reference (librsvg) integer coordinate.
+    // Integer-aligned regions (the common case) are unaffected.
+    val userLeft = Math.round(regionLeft.toDouble()).toDouble()
+    val userTop = Math.round(regionTop.toDouble()).toDouble()
     val originX = primitiveOriginX.toDouble()
     val originY = primitiveOriginY.toDouble()
 

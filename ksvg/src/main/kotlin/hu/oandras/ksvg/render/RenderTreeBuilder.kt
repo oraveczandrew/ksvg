@@ -1619,7 +1619,14 @@ internal class RenderTreeBuilder(
                 primitive,
                 generators = run {
                     val lcg = LcgRandom(if (primitive.seed <= 0) 1 else primitive.seed.toInt())
-                    Array(4) { SvgPathNoise(lcg) }
+                    val permutation = IntArray(SvgPathNoise.LATTICE_SIZE)
+                    // Gradients are drawn per channel (in order) by the SvgPathNoise
+                    // constructors sharing `lcg`; only afterwards is the single lattice
+                    // permutation built/shuffled — matching the librsvg draw order so the
+                    // output is byte-identical to the reference implementation.
+                    val generators = Array(4) { SvgPathNoise(lcg, permutation) }
+                    SvgPathNoise.buildPermutation(lcg, permutation)
+                    generators
                 },
             )
             is FeDisplacementMap -> FeDisplacementMapRenderNode(primitive)
