@@ -19,7 +19,7 @@ package hu.oandras.ksvg.render.filters
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.RectF
-import hu.oandras.ksvg.filtering.KotlinKernels
+import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.compat.BlendModeCompat
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.compat.setBlendModeCompat
@@ -135,7 +135,7 @@ private fun applyArithmeticComposite(
     val k4 = primitive.k4
     
     val outPixels = IntArray(size) // We need a clean output
-    KotlinKernels.arithmeticComposite(
+    SoftwareKernels.arithmeticComposite(
         inputPixels, in2Pixels, outPixels, width,
         clipLeft, clipTop, clipRight, clipBottom,
         k1, k2, k3, k4,

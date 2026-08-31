@@ -24,13 +24,13 @@ package hu.oandras.ksvg.filtering
  * Stateless: caller-owned pixel arrays (reused node buffers), no shared state.
  * Availability follows `libksvgblur` ([NativeGaussianBlur.isAvailable]).
  */
-public object MorphologyNative {
+internal object MorphologyNative {
 
     @JvmField
-    public val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
 
     @JvmStatic
-    public external fun apply(
+    external fun apply(
         src: IntArray,
         dst: IntArray,
         width: Int,

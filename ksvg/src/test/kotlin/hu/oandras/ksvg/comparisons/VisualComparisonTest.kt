@@ -66,13 +66,6 @@ private val ACCEPTED_SIMILARITY_EXCEPTIONS: Map<String, Double> = mapOf(
     "filter_primitives.svg" to 0.78,
     "filter_morphology_erode.svg" to 0.87,
     "filter_component_transfer_complex.svg" to 0.94,
-
-    // feTurbulence / feDisplacementMap use a noise/PRNG algorithm that differs from
-    // rsvg; the outputs are valid but never pixel-equal, so the comparison is excluded.
-    "lightning.svg" to 0.0,
-    "lighting.svg" to 0.0,
-    "displacement.svg" to 0.0,
-    "turbulence.svg" to 0.0,
 )
 
 @RunWith(ParameterizedRobolectricTestRunner::class)

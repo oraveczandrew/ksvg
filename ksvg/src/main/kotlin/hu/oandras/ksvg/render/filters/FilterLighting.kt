@@ -27,8 +27,7 @@ import hu.oandras.ksvg.dom.filter.FeSpotLight
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
 import hu.oandras.ksvg.dom.filter.Lighting
 import hu.oandras.ksvg.dom.style.ColorValue
-import hu.oandras.ksvg.filtering.KotlinKernels
-import hu.oandras.ksvg.filtering.LightingNative
+import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
 import hu.oandras.ksvg.render.FeSpecularLightingRenderNode
 import hu.oandras.ksvg.render.RenderContext
@@ -126,71 +125,37 @@ private fun doLightingFilter(
         }
     }
 
-    if (LightingNative.isAvailable) {
-        LightingNative.apply(
-            pix = pix,
-            out = out,
-            width = width,
-            height = height,
-            clipLeft = clipLeft,
-            clipTop = clipTop,
-            clipRight = clipRight,
-            clipBottom = clipBottom,
-            surfaceScaleNormalized = surfaceScaleNormalized,
-            invCanvasScaleX = invCanvasScaleX,
-            invCanvasScaleY = invCanvasScaleY,
-            userLeft = userLeft,
-            userTop = userTop,
-            originX = originX,
-            originY = originY,
-            unitSizeX = primitiveUnitSizeX,
-            unitSizeY = primitiveUnitSizeY,
-            canvasScaleX = canvasScaleX,
-            canvasScaleY = canvasScaleY,
-            lightType = lightType,
-            specular = alphaIsMaxOfChannels,
-            k = k,
-            exponent = exponent,
-            lightR = lightR,
-            lightG = lightG,
-            lightB = lightB,
-            params = params,
-            premultipliedOutput = premultipliedOutput,
-            useLinear = useLinear,
-        )
-    } else {
-        KotlinKernels.lighting(
-            pix = pix,
-            out = out,
-            width = width,
-            height = height,
-            clipLeft = clipLeft,
-            clipTop = clipTop,
-            clipRight = clipRight,
-            clipBottom = clipBottom,
-            surfaceScaleNormalized = surfaceScaleNormalized,
-            invCanvasScaleX = invCanvasScaleX,
-            invCanvasScaleY = invCanvasScaleY,
-            userLeft = userLeft,
-            userTop = userTop,
-            originX = originX,
-            originY = originY,
-            unitSizeX = primitiveUnitSizeX,
-            unitSizeY = primitiveUnitSizeY,
-            canvasScaleX = canvasScaleX,
-            canvasScaleY = canvasScaleY,
-            lightType = lightType,
-            specular = alphaIsMaxOfChannels,
-            k = k,
-            exponent = exponent,
-            lightR = lightR,
-            lightG = lightG,
-            lightB = lightB,
-            params = params,
-            premultipliedOutput = premultipliedOutput,
-            useLinear = useLinear,
-        )
-    }
+    SoftwareKernels.lighting(
+        pix = pix,
+        out = out,
+        width = width,
+        height = height,
+        clipLeft = clipLeft,
+        clipTop = clipTop,
+        clipRight = clipRight,
+        clipBottom = clipBottom,
+        surfaceScaleNormalized = surfaceScaleNormalized,
+        invCanvasScaleX = invCanvasScaleX,
+        invCanvasScaleY = invCanvasScaleY,
+        userLeft = userLeft,
+        userTop = userTop,
+        originX = originX,
+        originY = originY,
+        unitSizeX = primitiveUnitSizeX,
+        unitSizeY = primitiveUnitSizeY,
+        canvasScaleX = canvasScaleX,
+        canvasScaleY = canvasScaleY,
+        lightType = lightType,
+        specular = alphaIsMaxOfChannels,
+        k = k,
+        exponent = exponent,
+        lightR = lightR,
+        lightG = lightG,
+        lightB = lightB,
+        params = params,
+        premultipliedOutput = premultipliedOutput,
+        useLinear = useLinear,
+    )
     res.setPixels(out, 0, width, 0, 0, width, height)
     return res
 }

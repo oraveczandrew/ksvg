@@ -25,13 +25,13 @@ package hu.oandras.ksvg.filtering
  * Stateless: caller-owned pixel/kernel arrays, no shared state. Availability
  * follows `libksvgblur` ([NativeGaussianBlur.isAvailable]).
  */
-public object ConvolveNative {
+internal object ConvolveNative {
 
     @JvmField
-    public val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
 
     @JvmStatic
-    public external fun apply(
+    external fun apply(
         src: IntArray,
         dst: IntArray,
         width: Int,

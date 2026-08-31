@@ -22,9 +22,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.css.CSSLength
-import hu.oandras.ksvg.filtering.ConvolveNative
-import hu.oandras.ksvg.filtering.KotlinKernels
-import hu.oandras.ksvg.filtering.MorphologyNative
+import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
@@ -93,19 +91,11 @@ internal fun doFeConvolveMatrixFilter(
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     inputBitmap.getPixels(srcPixels, 0, width, 0, 0, width, height)
 
-    if (ConvolveNative.isAvailable) {
-        ConvolveNative.apply(
-            srcPixels, outPixels, width, height,
-            kernel, orderX, orderY, targetX, targetY,
-            divisor, bias, preserveAlpha, edgeMode.ordinal
-        )
-    } else {
-        KotlinKernels.convolveMatrix(
-            srcPixels, outPixels, width, height,
-            kernel, orderX, orderY, targetX, targetY,
-            divisor, bias, preserveAlpha, edgeMode.ordinal
-        )
-    }
+    SoftwareKernels.convolveMatrix(
+        srcPixels, outPixels, width, height,
+        kernel, orderX, orderY, targetX, targetY,
+        divisor, bias, preserveAlpha, edgeMode.ordinal,
+    )
     res.setPixels(outPixels, 0, width, 0, 0, width, height)
     return res
 }
@@ -248,17 +238,10 @@ private fun applyMorphology(
 
     dst.fill(0) // Initialize with transparent
 
-    if (MorphologyNative.isAvailable) {
-        MorphologyNative.apply(
-            src, dst, width, height, radiusX, radiusY, erode,
-            clipLeft, clipTop, clipRight, clipBottom
-        )
-    } else {
-        KotlinKernels.morphology(
-            src, dst, width, height, radiusX, radiusY, erode,
-            clipLeft, clipTop, clipRight, clipBottom
-        )
-    }
+    SoftwareKernels.morphology(
+        src, dst, width, height, radiusX, radiusY, erode,
+        clipLeft, clipTop, clipRight, clipBottom,
+    )
 
     val res = renderContext.bitmapPool.acquireSameAs(input)
     res.setPixels(dst, 0, width, 0, 0, width, height)

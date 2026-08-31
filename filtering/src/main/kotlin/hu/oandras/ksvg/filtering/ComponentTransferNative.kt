@@ -28,13 +28,13 @@ package hu.oandras.ksvg.filtering
  * (reused buffers), no shared/global state. Availability follows the same
  * `libksvgblur` library as [NativeGaussianBlur].
  */
-public object ComponentTransferNative {
+internal object ComponentTransferNative {
 
     @JvmField
-    public val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
 
     @JvmStatic
-    public external fun apply(
+    external fun apply(
         src: IntArray,
         dst: IntArray,
         width: Int,

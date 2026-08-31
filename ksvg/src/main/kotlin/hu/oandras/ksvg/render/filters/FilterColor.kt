@@ -25,8 +25,7 @@ import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.filter.FeColorMatrixType
 import hu.oandras.ksvg.dom.filter.FeFunc
 import hu.oandras.ksvg.dom.filter.FeFuncType
-import hu.oandras.ksvg.filtering.ComponentTransferNative
-import hu.oandras.ksvg.filtering.KotlinKernels
+import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeComponentTransferRenderNode
 import hu.oandras.ksvg.render.ComponentTransferFunctions
@@ -181,36 +180,20 @@ internal fun doFeComponentTransferFilter(
         primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
     ).also { primitiveNode.lutTables = it }
 
-    if (ComponentTransferNative.isAvailable) {
-        ComponentTransferNative.apply(
-            src = pixels,
-            dst = outPixels,
-            width = width,
-            height = height,
-            clipLeft = clipLeft,
-            clipTop = clipTop,
-            clipRight = clipRight,
-            clipBottom = clipBottom,
-            tableA = tables[0],
-            tableR = tables[1],
-            tableG = tables[2],
-            tableB = tables[3]
-        )
-    } else {
-        KotlinKernels.componentTransfer(
-            src = pixels,
-            dst = outPixels,
-            width = width,
-            clipLeft = clipLeft,
-            clipTop = clipTop,
-            clipRight = clipRight,
-            clipBottom = clipBottom,
-            tableA = tables[0],
-            tableR = tables[1],
-            tableG = tables[2],
-            tableB = tables[3]
-        )
-    }
+    SoftwareKernels.componentTransfer(
+        src = pixels,
+        dst = outPixels,
+        width = width,
+        height = height,
+        clipLeft = clipLeft,
+        clipTop = clipTop,
+        clipRight = clipRight,
+        clipBottom = clipBottom,
+        tableA = tables[0],
+        tableR = tables[1],
+        tableG = tables[2],
+        tableB = tables[3],
+    )
 
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     res.setPixels(outPixels, 0, width, 0, 0, width, height)
@@ -218,7 +201,7 @@ internal fun doFeComponentTransferFilter(
 }
 
 /**
- * Precomputes the four per-channel 256-entry LUTs for [ComponentTransferNative].
+ * Precomputes the four per-channel 256-entry LUTs for the component-transfer kernel.
  * Each entry replicates [applyTransferFunction] exactly (including the
  * sRGB->linear->transfer->sRGB folding used by the linearRGB color
  * interpolation path), so native output is bit-identical to the Kotlin loop.

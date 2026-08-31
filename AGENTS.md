@@ -128,6 +128,7 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 - **NDK build, no hand-config**: `gaussian_blur.cpp` is an Android/NDK CMake build (Gradle compiles it via `nativeblur/.cxx`); never configure it on the host toolchain.
 - **IDE errors are false positives**: "Cannot resolve symbol 'JNIEXPORT'" / "no project target" mean the IDE lacks the NDK toolchain — point its CMake profile at the **SDK's** cmake/ninja + NDK toolchain file (see full command above if needed). Do not change the code for these.
 - **Caller-owned buffers**: blur state lives in `StackBlurScratch` (sealed interface) — `NativeScratch` (lazy native handle) and `FallbackScratch` (Kotlin stack blur). Never add shared/global mutable state to the native code.
+- **NEVER mark a `@JvmStatic external fun` (JNI entry) `internal`**: Kotlin mangles internal members (`apply` → `apply$...`), so the C++ symbol (`Java_<pkg>_<Class>_<method>`) stops matching → `UnsatisfiedLinkError`. Make the enclosing `object` `internal`.
 
 ## Quick Commands
 - **Do not pass `--no-daemon` to Gradle** — always use the Gradle daemon (omit `--no-daemon`).
