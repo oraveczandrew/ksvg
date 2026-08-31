@@ -54,6 +54,22 @@ constexpr jint kMaxVecRowSpan = 4096; // stack height-buffer limit (floats)
 
  float clamp01(const float v) { return v < 0.f ? 0.f : (v > 1.f ? 1.f : v); }
 
+// sRGB<->linear per-component folding, bit-exact with KotlinKernels.sRgbToLinear /
+// linearToSRgb (and ColorUtils), used when color-interpolation-filters is linearRGB.
+ jint sRgbToLight(const jint c) {
+    const float a = static_cast<float>(c) / 255.f;
+    const float v = (a <= 0.04045f) ? (a / 12.92f * 255.f)
+                                    : (std::pow((a + 0.055f) / 1.055f, 2.4f) * 255.f);
+    return clamp255f(v);
+}
+
+ jint linearToLightSRgb(const jint c) {
+    const float a = static_cast<float>(c) / 255.f;
+    const float v = (a <= 0.0031308f) ? (a * 12.92f * 255.f)
+                                      : ((1.055f * std::pow(a, 1.f / 2.4f) - 0.055f) * 255.f);
+    return clamp255f(v);
+}
+
 void applyScalar(
         jint* pix, jint* out, jint width, jint height,
         jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
@@ -63,7 +79,10 @@ void applyScalar(
         float canvasScaleX, float canvasScaleY,
         jint lightType, bool isSpecular, float k, float exponent,
         float fr, float fg, float fb, const jdouble* params,
-        bool premultiplied) {
+        bool premultiplied, bool useLinear) {
+    const float lr = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fr))) : fr;
+    const float lg = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fg))) : fg;
+    const float lb = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fb))) : fb;
     for (jint y = clipTop; y < clipBottom; y++) {
         const jdouble userY = userTop + y * invCanvasScaleY;
         const auto uy = static_cast<float>((userY - originY) / unitSizeY);
@@ -145,9 +164,14 @@ void applyScalar(
                 intensity = clamp01(k * static_cast<float>(p) * factor);
             }
 
-            const jint outR = clamp255f(fr * intensity);
-            const jint outG = clamp255f(fg * intensity);
-            const jint outB = clamp255f(fb * intensity);
+            jint outR = clamp255f(lr * intensity);
+            jint outG = clamp255f(lg * intensity);
+            jint outB = clamp255f(lb * intensity);
+            if (useLinear) {
+                outR = linearToLightSRgb(outR);
+                outG = linearToLightSRgb(outG);
+                outB = linearToLightSRgb(outB);
+            }
             const jint outA = isSpecular
                     ? (outR > outG ? (outR > outB ? outR : outB) : (outG > outB ? outG : outB))
                     : 255;
@@ -253,10 +277,14 @@ void applyVector(
         float canvasScaleX, float canvasScaleY,
         jint lightType, bool isSpecular, float k, float exponent,
         float fr, float fg, float fb, const jdouble* params,
-        bool premultiplied) {
+        bool premultiplied, bool useLinear) {
     const jint span = clipRight - clipLeft + 3; // columns x-1 .. x+1 of last px
     float rowT[kMaxVecRowSpan], rowM[kMaxVecRowSpan], rowB[kMaxVecRowSpan];
     float intensities[4];
+
+    const float lr = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fr))) : fr;
+    const float lg = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fg))) : fg;
+    const float lb = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fb))) : fb;
 
     const float invDx = 4.f / canvasScaleX;
     const float invDy = 4.f / canvasScaleY;
@@ -376,9 +404,14 @@ void applyVector(
             }
 
             for (jint l = 0; l < 4; l++) {
-                const jint outR = clamp255f(fr * intensities[l]);
-                const jint outG = clamp255f(fg * intensities[l]);
-                const jint outB = clamp255f(fb * intensities[l]);
+                jint outR = clamp255f(lr * intensities[l]);
+                jint outG = clamp255f(lg * intensities[l]);
+                jint outB = clamp255f(lb * intensities[l]);
+                if (useLinear) {
+                    outR = linearToLightSRgb(outR);
+                    outG = linearToLightSRgb(outG);
+                    outB = linearToLightSRgb(outB);
+                }
                 const jint outA = isSpecular
                         ? (outR > outG ? (outR > outB ? outR : outB) : (outG > outB ? outG : outB))
                         : 255;
@@ -457,9 +490,14 @@ void applyVector(
                 const double p = std::pow(static_cast<double>(ndoth), static_cast<double>(exponent));
                 intensity = clamp01(k * static_cast<float>(p) * factor);
             }
-            const jint outR = clamp255f(fr * intensity);
-            const jint outG = clamp255f(fg * intensity);
-            const jint outB = clamp255f(fb * intensity);
+            jint outR = clamp255f(lr * intensity);
+            jint outG = clamp255f(lg * intensity);
+            jint outB = clamp255f(lb * intensity);
+            if (useLinear) {
+                outR = linearToLightSRgb(outR);
+                outG = linearToLightSRgb(outG);
+                outB = linearToLightSRgb(outB);
+            }
             const jint outA = isSpecular
                     ? (outR > outG ? (outR > outB ? outR : outB) : (outG > outB ? outG : outB))
                     : 255;
@@ -491,7 +529,8 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
         jfloat k, jfloat exponent,
         const jint lightR, const jint lightG, const jint lightB,
         const jdoubleArray jParams,
-        const jboolean premultipliedOutput) {
+        const jboolean premultipliedOutput,
+        const jboolean useLinearInput) {
     // Small array first: no JNI call may occur between a
     // GetPrimitiveArrayCritical pair, so the params must be fetched
     // BEFORE entering the critical sections.
@@ -512,6 +551,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
 
     const bool isSpecular = specular == JNI_TRUE;
     const bool premultiplied = premultipliedOutput == JNI_TRUE;
+    const bool useLinear = useLinearInput == JNI_TRUE;
     const jint span = clipRight - clipLeft + 3;
 
 #ifdef LIGHT_SIMD
@@ -526,7 +566,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
                     lightType, isSpecular, k, exponent,
                     static_cast<float>(lightR), static_cast<float>(lightG),
                     static_cast<float>(lightB), params,
-                    premultiplied);
+                    premultiplied, useLinear);
     } else
 #endif
     {
@@ -540,7 +580,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
                     lightType, isSpecular, k, exponent,
                     static_cast<float>(lightR), static_cast<float>(lightG),
                     static_cast<float>(lightB), params,
-                    premultiplied);
+                    premultiplied, useLinear);
     }
 
     env->ReleasePrimitiveArrayCritical(jOut, out, JNI_ABORT);

@@ -20,6 +20,7 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.RectF
 import hu.oandras.ksvg.dom.COLOR_WHITE
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.filter.FeDistantLight
 import hu.oandras.ksvg.dom.filter.FePointLight
 import hu.oandras.ksvg.dom.filter.FeSpotLight
@@ -61,6 +62,7 @@ private fun doLightingFilter(
     k: Float,
     exponent: Float,
     premultipliedOutput: Boolean = false,
+    useLinear: Boolean = false,
 ): Bitmap {
     val lightSource = light ?: return inputBitmap
 
@@ -154,6 +156,7 @@ private fun doLightingFilter(
             lightB = lightB,
             params = params,
             premultipliedOutput = premultipliedOutput,
+            useLinear = useLinear,
         )
     } else {
         KotlinKernels.lighting(
@@ -185,6 +188,7 @@ private fun doLightingFilter(
             lightB = lightB,
             params = params,
             premultipliedOutput = premultipliedOutput,
+            useLinear = useLinear,
         )
     }
     res.setPixels(out, 0, width, 0, 0, width, height)
@@ -228,6 +232,7 @@ internal fun doFeDiffuseLightingFilter(
         alphaIsMaxOfChannels = false,
         k = diffuseConstant,
         exponent = 0f,
+        useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
     )
 }
 
@@ -271,6 +276,7 @@ internal fun doFeSpecularLightingFilter(
         k = specularConstant,
         exponent = specularExponent,
         premultipliedOutput = premultipliedOutput,
+        useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
     )
 }
 

@@ -67,5 +67,8 @@ public object LightingNative {
         // When true (feSpecularLighting as terminal output), emit premultiplied
         // (lightColor, intensity) to match cairo; otherwise straight.
         premultipliedOutput: Boolean,
+        // When true (color-interpolation-filters: linearRGB), gamma-correct the
+        // straight RGB output from linear to sRGB (premultiplied terminal unchanged).
+        useLinear: Boolean,
     )
 }

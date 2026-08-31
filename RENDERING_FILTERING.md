@@ -124,10 +124,10 @@ Consequences (verified, 2026-08-30):
   Diffuse output is untouched (opaque, alpha=255).
 
   Result (AiVisualDiffTest, 256×256, software backend): `lighting_point_spot`
-  similarity improved **0.425 → 0.722**; `filter_specular.svg` (specular consumed
-  by `feComposite arithmetic` → non-terminal) unchanged at **0.981**. The residual
-  to 0.95 is dominated by the **diffuse** circle (see §3.3), not the specular
-  premultiplied case.
+  similarity improved **0.425 → 0.722** with the premultiplied-terminal fix alone;
+  `filter_specular.svg` (specular consumed by `feComposite arithmetic` →
+  non-terminal) unchanged at **0.981**. The diffuse-circe divergence (see §3.3)
+  then took it to **0.9783** (target ≥0.95).
 
 ### 3.2 Spot-light cone factor
 
@@ -150,13 +150,37 @@ Per librsvg `lighting.rs` `color_and_vector`:
 
 ### 3.3 Diffuse-vs-specular divergence note
 
-The `lighting_point_spot` left circle (`feDiffuseLighting` + `fePointLight`) also
-shows a small systematic brightening in rsvg vs KSVG (golden ~5–15% brighter
-inside the plateau) — NOT the premultiplied artifact (diffuse output is opaque,
-alpha=255). Light formula appears equal; suspected cause still to investigate
-(surface-normal/`kernelUnitLength` interpretation at the plateau edges, or the
-`+0.5` rounding in librsvg's `clamp(..)+0.5 as u8`). Do not alter the diffuse
-kernel without a repeatable failing case.
+The `lighting_point_spot` left circle (`feDiffuseLighting` + `fePointLight`) showed
+a systematic brightening in rsvg vs KSVG. **Root cause (resolved 2026-08-31)**:
+the SVGs use the spec default `color-interpolation-filters: linearRGB`, so the
+lighting straight RGBA is computed in linear light and the RGB terminals are
+converted back to sRGB via the sRGB EOTF before compositing. KSVG computed the
+entire lighting result directly in sRGB, darkening the diffuse output. The fix
+(`useLinear` threaded through `KotlinKernels.lighting` and the `:filtering`
+`lighting.cpp` native/AGSL path) linearizes the light color once
+(`linearLightR/G/B = sRgbToLinear(lightColor)`), computes the straight RGB in
+linear space, then applies `linearToSRgb` to the straight output when
+`color-interpolation-filters` is `LINEAR_RGB`. Bit-exact `sRgbToLinear` /
+`linearToSRgb` helpers were added to both the Kotlin and native kernels.
+
+- Diffuse: `useLinear` gamma-corrects the straight RGB (opaque, alpha=255).
+  `lighting_point_spot` similarity rose **0.722 → 0.9783** (target ≥0.95 met).
+- Specular terminal (`premultipliedOutput`, last primitive): keeps the full light
+  color in RGB and the raw linear intensity in alpha — **untouched** by the fix.
+  For the (linearRGB) `lighting_point_spot` specular circle this matches the
+  golden exactly (alpha=intensity, saturated white RGB); verified against
+  `rsvg-convert`, which produces the same alpha=R/GB=255 relationship (i.e. the
+  `alpha = max(R,G,B)` identity holds only in sRGB space, not the linearRGB
+  straight terminal that librsvg emits).
+- Validation: `filter_specular.svg` (sRGB) unchanged (0.9812); `filter_primitives.svg`
+  (linearRGB) improved 0.818 → 0.8264. The pre-existing `lighting.svg` (0.2233) red
+  is unchanged.
+
+> Note: `color-interpolation-filters="sRGB"` is not yet honored by the lighting
+> kernel — the light color is always linearized and gamma-corrected as if linearRGB
+> (the default). sRGB is honored by other primitives (`feComponentTransfer`,
+> `feComposite`), so an sRGB-requesting lighting SVG currently renders with the
+> linearRGB straight-RGB EOTF. Out of scope for this fix; tracked separately.
 
 ---
 

@@ -237,12 +237,25 @@ public object KotlinKernels {
             // color channels with the intensity in alpha. Intermediate specular output
             // (straight, alpha = max(R,G,B)) is preserved for consumer kernels.
             premultipliedOutput: Boolean = false,
+            // When true (color-interpolation-filters: linearRGB, the default per the
+            // SVG spec), the straight RGB output is gamma-corrected from linear to sRGB
+            // to match cairo/rsvg. The premultiplied specular terminal keeps the raw
+            // (linear) intensity in alpha and the full light color in RGB, so it is
+            // unaffected.
+            useLinear: Boolean = false,
     ) {
         fun heightAt(x: Int, y: Int): Float {
             val cx = x.coerceIn(0, width - 1)
             val cy = y.coerceIn(0, height - 1)
             return ((pix[cy * width + cx] shr 24) and 0xff) * surfaceScaleNormalized
         }
+
+        // light colors linearized once (only used when `useLinear` is set). For white
+        // light sRgbToLinear(255) == 255, so the straight output becomes the sRGB EOTF
+        // of the intensity, matching cairo/rsvg's linearRGB rendering.
+        val linearLightR = if (useLinear) sRgbToLinear(lightR).toFloat() else lightR.toFloat()
+        val linearLightG = if (useLinear) sRgbToLinear(lightG).toFloat() else lightG.toFloat()
+        val linearLightB = if (useLinear) sRgbToLinear(lightB).toFloat() else lightB.toFloat()
 
         for (y in clipTop until clipBottom) {
             val userY = userTop + y * invCanvasScaleY
@@ -317,9 +330,12 @@ public object KotlinKernels {
                     clamp((k * ndoth.toDouble().pow(exponent.toDouble()).toFloat() * factor), 0f, 1f)
                 }
 
-                val outR = clamp255(lightR * intensity)
-                val outG = clamp255(lightG * intensity)
-                val outB = clamp255(lightB * intensity)
+                val outR = if (useLinear) linearToSRgb(clamp255(linearLightR * intensity))
+                else clamp255(linearLightR * intensity)
+                val outG = if (useLinear) linearToSRgb(clamp255(linearLightG * intensity))
+                else clamp255(linearLightG * intensity)
+                val outB = if (useLinear) linearToSRgb(clamp255(linearLightB * intensity))
+                else clamp255(linearLightB * intensity)
                 val outA = if (specular) maxOf(outR, outG, outB) else 255
 
                 out[rowOffset + x] = if (specular && premultipliedOutput) {
