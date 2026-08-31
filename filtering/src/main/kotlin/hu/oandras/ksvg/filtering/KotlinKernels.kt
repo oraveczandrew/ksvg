@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg.filtering
 
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.math.roundToInt
@@ -36,6 +37,12 @@ public object KotlinKernels {
 
     private fun clamp255(value: Float): Int =
             value.roundToInt().coerceIn(0, 255)
+
+    private fun clamp255(value: Double): Int =
+            value.roundToInt().coerceIn(0, 255)
+
+    private fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
+            (alpha shl 24) or (red shl 16) or (green shl 8) or blue
 
     private fun clamp(v: Float, min: Float, max: Float): Float =
             v.coerceIn(min, max)
@@ -430,6 +437,83 @@ public object KotlinKernels {
                             ((arithmeticChannel(p ushr 8 and 0xFF, q ushr 8 and 0xFF, k1, k2, k3, k4)) shl 8) or
                             arithmeticChannel(p and 0xFF, q and 0xFF, k1, k2, k3, k4)
                 }
+            }
+        }
+    }
+
+    /**
+     * feTurbulence software fallback. [generators] holds the four per-channel
+     * [SvgPathNoise] lattice samplers (channel order R,G,B,A) pre-built from the
+     * primitive's seed (see `RenderTreeBuilder` in `:ksvg`). Bit-exact reference
+     * for `turbulence_core.h` / `TurbulenceNative.apply`.
+     */
+    public fun turbulence(
+            pixels: IntArray,
+            width: Int,
+            height: Int,
+            clipLeft: Int,
+            clipTop: Int,
+            clipRight: Int,
+            clipBottom: Int,
+            baseFrequencyX: Double,
+            baseFrequencyY: Double,
+            periodX: Int,
+            periodY: Int,
+            octaves: Int,
+            fractalNoise: Boolean,
+            invCanvasScaleX: Double,
+            invCanvasScaleY: Double,
+            userLeft: Double,
+            userTop: Double,
+            originX: Double,
+            originY: Double,
+            unitSizeX: Double,
+            unitSizeY: Double,
+            @Suppress("UNUSED_PARAMETER") seed: Int,
+            generators: Array<SvgPathNoise>,
+    ) {
+        for (y in clipTop until clipBottom) {
+            val userY = userTop + y.toDouble() * invCanvasScaleY
+            val py0 = ((userY - originY) / unitSizeY) * baseFrequencyY
+            for (x in clipLeft until clipRight) {
+                val userX = userLeft + x.toDouble() * invCanvasScaleX
+                val px0 = ((userX - originX) / unitSizeX) * baseFrequencyX
+
+                var r = 0.0
+                var g = 0.0
+                var b = 0.0
+                var a = 0.0
+
+                for (channel in 0 until 4) {
+                    var value = 0.0
+                    var ratio = 1.0
+                    var px = px0
+                    var py = py0
+                    var octavePeriodX = periodX
+                    var octavePeriodY = periodY
+                    for (_ in 0 until octaves) {
+                        val n = generators[channel].noise2(px, py, octavePeriodX, octavePeriodY)
+                        value += if (fractalNoise) n / ratio else abs(n) / ratio
+                        px *= 2.0
+                        py *= 2.0
+                        ratio *= 2.0
+                        octavePeriodX += octavePeriodX
+                        octavePeriodY += octavePeriodY
+                    }
+                    val finalVal = if (fractalNoise) (value + 1.0) * 127.5 else value * 255.0
+                    when (channel) {
+                        0 -> r = finalVal
+                        1 -> g = finalVal
+                        2 -> b = finalVal
+                        3 -> a = finalVal
+                    }
+                }
+                pixels[y * width + x] = argb(
+                    clamp255(a),
+                    clamp255(r),
+                    clamp255(g),
+                    clamp255(b)
+                )
             }
         }
     }

@@ -195,4 +195,49 @@ public object SoftwareKernels {
             k1, k2, k3, k4, useLinear,
         )
     }
+
+    // --------------------------------------------------------------- feTurbulence
+
+    @JvmStatic
+    public fun turbulence(
+        pixels: IntArray,
+        width: Int,
+        height: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        baseFrequencyX: Double,
+        baseFrequencyY: Double,
+        periodX: Int,
+        periodY: Int,
+        octaves: Int,
+        fractalNoise: Boolean,
+        invCanvasScaleX: Double,
+        invCanvasScaleY: Double,
+        userLeft: Double,
+        userTop: Double,
+        originX: Double,
+        originY: Double,
+        unitSizeX: Double,
+        unitSizeY: Double,
+        seed: Int,
+        generators: Array<SvgPathNoise>,
+    ) {
+        if (TurbulenceNative.isAvailable) {
+            TurbulenceNative.apply(
+                pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                unitSizeX, unitSizeY, seed,
+            )
+        } else {
+            KotlinKernels.turbulence(
+                pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                unitSizeX, unitSizeY, seed, generators,
+            )
+        }
+    }
 }

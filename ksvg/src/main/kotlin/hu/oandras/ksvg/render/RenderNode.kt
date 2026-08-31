@@ -67,6 +67,7 @@ import hu.oandras.ksvg.dom.text.Text
 import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.filtering.StackBlurScratch
+import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.filters.LightVector
 import hu.oandras.ksvg.render.filters.NormalVector

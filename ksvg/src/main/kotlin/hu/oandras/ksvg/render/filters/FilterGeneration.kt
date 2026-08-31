@@ -22,17 +22,14 @@ import android.graphics.PorterDuff
 import android.graphics.RectF
 import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
-import hu.oandras.ksvg.filtering.TurbulenceNative
+import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
 import hu.oandras.ksvg.render.FeImageRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.FilterSourceMap
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.pool.withPooledObject
-import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.clamp
-import hu.oandras.ksvg.utils.clamp255
-import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 
@@ -114,65 +111,17 @@ internal fun doFeTurbulenceFilter(
         }
     }
 
-    if (TurbulenceNative.isAvailable) {
-        TurbulenceNative.apply(
-            pixels, width, height,
-            clipLeft, clipTop, clipRight, clipBottom,
-            baseFrequencyX, baseFrequencyY, periodX, periodY,
-            octaves, isFractal,
-            invCanvasScaleX, invCanvasScaleY,
-            userLeft, userTop, originX, originY,
-            primitiveUnitSizeX, primitiveUnitSizeY,
-            primitive.seed.toInt()
-        )
-        res.setPixels(pixels, 0, width, 0, 0, width, height)
-        return res
-    }
-
-    for (y in clipTop until clipBottom) {
-        val userY = userTop + y.toDouble() * invCanvasScaleY
-        val py0 = ((userY - originY) / primitiveUnitSizeY) * baseFrequencyY
-        for (x in clipLeft until clipRight) {
-            val userX = userLeft + x.toDouble() * invCanvasScaleX
-            val px0 = ((userX - originX) / primitiveUnitSizeX) * baseFrequencyX
-
-            var r = 0.0
-            var g = 0.0
-            var b = 0.0
-            var a = 0.0
-
-            for (channel in 0 until 4) {
-                var value = 0.0
-                var ratio = 1.0
-                var px = px0
-                var py = py0
-                var octavePeriodX = periodX
-                var octavePeriodY = periodY
-                for (_ in 0 until octaves) {
-                    val n = generators[channel].noise2(px, py, octavePeriodX, octavePeriodY)
-                    value += if (isFractal) n / ratio else abs(n) / ratio
-                    px *= 2.0
-                    py *= 2.0
-                    ratio *= 2.0
-                    octavePeriodX += octavePeriodX
-                    octavePeriodY += octavePeriodY
-                }
-                val finalVal = if (isFractal) (value + 1.0) * 127.5 else value * 255.0
-                when (channel) {
-                    0 -> r = finalVal
-                    1 -> g = finalVal
-                    2 -> b = finalVal
-                    3 -> a = finalVal
-                }
-            }
-            pixels[y * width + x] = argb(
-                clamp255(a),
-                clamp255(r),
-                clamp255(g),
-                clamp255(b)
-            )
-        }
-    }
+    SoftwareKernels.turbulence(
+        pixels, width, height,
+        clipLeft, clipTop, clipRight, clipBottom,
+        baseFrequencyX, baseFrequencyY, periodX, periodY,
+        octaves, isFractal,
+        invCanvasScaleX, invCanvasScaleY,
+        userLeft, userTop, originX, originY,
+        primitiveUnitSizeX, primitiveUnitSizeY,
+        primitive.seed.toInt(),
+        generators,
+    )
     res.setPixels(pixels, 0, width, 0, 0, width, height)
     return res
 }

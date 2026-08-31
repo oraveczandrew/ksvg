@@ -14,16 +14,17 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.utils
+package hu.oandras.ksvg.filtering
 
-internal class LcgRandom(seed: Int) {
-    private var currentSeed: Int = clamp(
-        n = seed,
-        min = 1,
-        max = Int.MAX_VALUE - 1
-    )
+/**
+ * Park–Miller linear congruential generator (CACM 1988, a=16807, m=2147483647)
+ * used to build the feTurbulence lattice. Sequence must match the reference
+ * (librsvg / SVG 1.1 §15.25) so the noise output is byte-identical.
+ */
+public class LcgRandom(seed: Int) {
+    private var currentSeed: Int = seed.coerceIn(1, Int.MAX_VALUE - 1)
 
-    fun next(): Int {
+    public fun next(): Int {
         val a = 16807
         val m = 2147483647
         val q = 127773

@@ -14,9 +14,8 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.render
+package hu.oandras.ksvg.filtering
 
-import hu.oandras.ksvg.utils.LcgRandom
 import kotlin.math.floor
 import kotlin.math.sqrt
 
@@ -36,9 +35,12 @@ import kotlin.math.sqrt
  * The shared [p] permutation array is constructed by [buildPermutation] and must be the
  * same instance for all channel instances of one feTurbulence primitive.
  */
-internal class SvgPathNoise(lcg: LcgRandom, p: IntArray) {
-    @JvmField internal val p: IntArray = p
-    @JvmField internal val g2: Array<DoubleArray> = Array(B_SIZE + B_SIZE + 2) {
+public class SvgPathNoise(
+    lcg: LcgRandom,
+    @JvmField public val p: IntArray
+) {
+
+    @JvmField public val g2: Array<DoubleArray> = Array(B_SIZE + B_SIZE + 2) {
         DoubleArray(2)
     }
 
@@ -74,7 +76,7 @@ internal class SvgPathNoise(lcg: LcgRandom, p: IntArray) {
     private fun sCurve(t: Double): Double = t * t * (3.0 - 2.0 * t)
     private fun lerp(t: Double, a: Double, b: Double): Double = a + t * (b - a)
 
-    fun noise2(x: Double, y: Double, periodX: Int = 0, periodY: Int = 0): Double {
+    public fun noise2(x: Double, y: Double, periodX: Int = 0, periodY: Int = 0): Double {
         val xf = floor(x)
         var bx0 = xf.toInt()
         val rx0 = x - xf
@@ -123,12 +125,12 @@ internal class SvgPathNoise(lcg: LcgRandom, p: IntArray) {
         return lerp(sy, a, b)
     }
 
-    companion object {
+    public companion object {
         private const val B_SIZE = 0x100
         private const val BM = 0xff
 
         /** Builds and shuffles the shared lattice permutation from [lcg]. */
-        internal fun buildPermutation(lcg: LcgRandom, p: IntArray) {
+        public fun buildPermutation(lcg: LcgRandom, p: IntArray) {
             for (i in 0 until B_SIZE) {
                 p[i] = i
             }
@@ -143,6 +145,6 @@ internal class SvgPathNoise(lcg: LcgRandom, p: IntArray) {
             }
         }
 
-        internal const val LATTICE_SIZE = B_SIZE + B_SIZE + 2
+        public const val LATTICE_SIZE: Int = B_SIZE + B_SIZE + 2
     }
 }

@@ -127,7 +127,8 @@ import hu.oandras.ksvg.render.text.calculateTextWidth
 import hu.oandras.ksvg.render.text.extractRawText
 import hu.oandras.ksvg.render.text.getAnchorPosition
 import hu.oandras.ksvg.render.text.selectTypefaceAndFontStyling
-import hu.oandras.ksvg.utils.LcgRandom
+import hu.oandras.ksvg.filtering.LcgRandom
+import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.anyElement
 import hu.oandras.ksvg.utils.argb

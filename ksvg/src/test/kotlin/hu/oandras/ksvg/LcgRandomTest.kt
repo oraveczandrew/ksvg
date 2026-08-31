@@ -1,6 +1,6 @@
 package hu.oandras.ksvg
 
-import hu.oandras.ksvg.utils.LcgRandom
+import hu.oandras.ksvg.filtering.LcgRandom
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

@@ -26,13 +26,13 @@ package hu.oandras.ksvg.filtering
  * shared/global state. Availability follows `libksvgblur`
  * ([NativeGaussianBlur.isAvailable]).
  */
-public object TurbulenceNative {
+internal object TurbulenceNative {
 
     @JvmField
-    public val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
 
     @JvmStatic
-    public external fun apply(
+    external fun apply(
         pixels: IntArray,
         width: Int,
         height: Int,
