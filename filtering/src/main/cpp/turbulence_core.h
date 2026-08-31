@@ -255,7 +255,6 @@ inline void noise2Vec(
     const __m128 vY0 = _mm_set1_ps(ry0);
     const __m128 vY1 = _mm_set1_ps(ry1);
 
-    fprintf(stderr,"[vec] bx0=%d bx1=%d by0=%d by1=%d i=%d j=%d\n",bx0,bx1,by0,by1,i,j);
     const __m128 u = _mm_add_ps(_mm_mul_ps(vX0, _mm_loadu_ps(t.gradX[(i + by0) & S_BM])),
                                 _mm_mul_ps(vY0, _mm_loadu_ps(t.gradY[(i + by0) & S_BM])));
     const __m128 v = _mm_add_ps(_mm_mul_ps(vX1, _mm_loadu_ps(t.gradX[(j + by0) & S_BM])),
