@@ -13,10 +13,8 @@
   -    See the License for the specific language governing permissions and
   -    limitations under the License.
   -->
-
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <path d="M 50 50 L 150 50 L 150 150 L 50 150 Z" fill="purple">
     <animate attributeName="d" values="M 50 50 L 150 50 L 150 150 L 50 150 Z; M 100 50 L 150 150 L 50 150 Z; M 50 50 L 150 50 L 150 150 L 50 150 Z" dur="3s" repeatCount="indefinite" />
   </path>
-  <text x="100" y="20" text-anchor="middle" font-size="12">Path Morphing</text>
 </svg>

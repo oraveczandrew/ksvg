@@ -19,5 +19,4 @@
   <rect x="130" y="10" width="100" height="90" fill="url(#derived)"/>
   <rect x="10" y="120" width="100" height="90" fill="url(#radBase)"/>
   <rect x="130" y="120" width="100" height="90" fill="url(#radDerived)"/>
-  <text x="120" y="16" text-anchor="middle" font-size="10">gradient href inheritance</text>
 </svg>

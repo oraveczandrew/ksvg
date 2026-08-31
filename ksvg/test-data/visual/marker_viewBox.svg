@@ -1,5 +1,4 @@
 <svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
   <defs><marker id="m" markerUnits="userSpaceOnUse" markerWidth="30" markerHeight="30" refX="15" refY="15" orient="auto" viewBox="0 0 30 30" preserveAspectRatio="xMidYMid meet"><polygon points="0,0 30,15 0,30" fill="purple"/></marker></defs>
   <path d="M20 110 C70 20 170 20 220 110" fill="none" stroke="black" stroke-width="6" marker-end="url(#m)"/>
-  <text x="120" y="190" text-anchor="middle" font-size="12">marker viewBox + preserveAspectRatio</text>
 </svg>

@@ -19,6 +19,5 @@
   </defs>
   <circle cx="70" cy="110" r="50" fill="royalblue" filter="url(#point)"/>
   <circle cx="170" cy="110" r="50" fill="seagreen" filter="url(#spot)"/>
-  <text x="70" y="190" text-anchor="middle" font-size="12">point</text>
-  <text x="170" y="190" text-anchor="middle" font-size="12">spot</text>
+  
 </svg>

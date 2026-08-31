@@ -6,5 +6,4 @@
   </defs>
   <g transform="translate(60 90)" fill="orange" stroke="navy"><use href="#shape"/></g>
   <g transform="translate(180 90)" fill="seagreen" stroke="crimson"><use href="#shape"/></g>
-  <text x="120" y="180" text-anchor="middle" font-family="sans-serif" font-size="13">context-fill / context-stroke</text>
 </svg>

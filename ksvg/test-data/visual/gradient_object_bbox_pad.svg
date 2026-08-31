@@ -11,6 +11,5 @@
     </defs>
     <rect x="20" y="20" width="110" height="90" fill="url(#p)" />
     <rect x="170" y="20" width="110" height="90" fill="url(#r)" />
-    <text x="75" y="130" text-anchor="middle" font-size="11">objectBBox + pad</text>
-    <text x="225" y="130" text-anchor="middle" font-size="11">objectBBox + repeat</text>
+    
 </svg>

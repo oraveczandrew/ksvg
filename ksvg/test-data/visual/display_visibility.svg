@@ -4,5 +4,5 @@
   <circle cx="175" cy="40" r="30" fill="blue" visibility="hidden"/>
   <circle cx="40" cy="140" r="30" fill="orange" visibility="visible"/>
   <rect x="100" y="100" width="60" height="60" fill="purple"/>
-  <text x="100" y="180" font-size="16" fill="black" font-family="sans-serif" visibility="collapse">hidden</text>
+  <rect x="100" y="160" width="60" height="20" fill="black" visibility="collapse"/>
 </svg>

@@ -13,7 +13,6 @@
   -    See the License for the specific language governing permissions and
   -    limitations under the License.
   -->
-
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <clipPath id="clip1">
@@ -24,12 +23,8 @@
       <circle cx="150" cy="50" r="30" fill="black" />
     </mask>
   </defs>
-
   <rect x="10" y="10" width="80" height="80" fill="green" clip-path="url(#clip1)" />
-
   <rect x="110" y="10" width="80" height="80" fill="orange" mask="url(#mask1)" />
-
   <g transform="translate(0, 100)">
-    <text x="100" y="50" text-anchor="middle" font-size="20">Clip &amp; Mask</text>
   </g>
 </svg>

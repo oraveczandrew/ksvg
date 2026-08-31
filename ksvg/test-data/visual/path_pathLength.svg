@@ -6,5 +6,4 @@
   -->
 <svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
   <path d="M20 110 C70 20 170 200 220 110" fill="none" stroke="steelblue" stroke-width="8" pathLength="100" stroke-dasharray="25 10"/>
-  <text x="120" y="30" text-anchor="middle" font-family="sans-serif">pathLength + dasharray</text>
 </svg>

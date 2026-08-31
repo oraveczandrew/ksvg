@@ -13,14 +13,12 @@
   -    See the License for the specific language governing permissions and
   -    limitations under the License.
   -->
-
 <svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="black"/>
       <stop offset="1" stop-color="white"/>
     </linearGradient>
-
     <filter id="table">
       <feComponentTransfer>
         <feFuncR type="table" tableValues="0 1 0"/>
@@ -28,7 +26,6 @@
         <feFuncB type="table" tableValues="0 1 0"/>
       </feComponentTransfer>
     </filter>
-
     <filter id="discrete">
       <feComponentTransfer>
         <feFuncR type="discrete" tableValues="0 0.5 1"/>
@@ -36,7 +33,6 @@
         <feFuncB type="discrete" tableValues="0 0.5 1"/>
       </feComponentTransfer>
     </filter>
-
     <filter id="gamma">
       <feComponentTransfer>
         <feFuncR type="gamma" amplitude="1" exponent="2" offset="0"/>
@@ -45,16 +41,8 @@
       </feComponentTransfer>
     </filter>
   </defs>
-
   <rect x="10" y="10" width="280" height="40" fill="url(#g)"/>
-  <text x="10" y="70" font-size="12">Original</text>
-
   <rect x="10" y="80" width="280" height="40" fill="url(#g)" filter="url(#table)"/>
-  <text x="10" y="140" font-size="12">Table (Inverted V)</text>
-
   <rect x="10" y="150" width="280" height="40" fill="url(#g)" filter="url(#discrete)"/>
-  <text x="10" y="210" font-size="12">Discrete (3 steps)</text>
-
   <rect x="10" y="220" width="280" height="40" fill="url(#g)" filter="url(#gamma)"/>
-  <text x="10" y="280" font-size="12">Gamma (exp=2)</text>
 </svg>

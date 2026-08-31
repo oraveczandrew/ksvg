@@ -7,6 +7,5 @@
     </defs>
     <path d="M20 35 L110 35" stroke="black" stroke-width="3" fill="none" marker="url(#a)" />
     <path d="M20 85 L110 85" stroke="black" stroke-width="10" fill="none" marker="url(#a)" />
-    <text x="130" y="40" font-size="11">strokeWidth</text>
-    <text x="130" y="90" font-size="11">larger stroke</text>
+    
 </svg>

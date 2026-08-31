@@ -12,5 +12,4 @@
   </defs>
   <path d="M20 60 C70 10 170 10 220 60" fill="none" stroke="black" stroke-width="14" marker-end="url(#m)"/>
   <path d="M20 150 L220 150" fill="none" stroke="black" stroke-width="3" marker-end="url(#m)"/>
-  <text x="120" y="205" text-anchor="middle" font-size="12">userSpaceOnUse marker</text>
 </svg>

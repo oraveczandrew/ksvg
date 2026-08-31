@@ -13,22 +13,17 @@
   -    See the License for the specific language governing permissions and
   -    limitations under the License.
   -->
-
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <rect width="200" height="200" fill="#f0f0f0" />
-
   <!-- Nested SVG 1: Top-Left, 100x100 space, viewBox makes it 50x50 internal -->
   <svg x="10" y="10" width="80" height="80" viewBox="0 0 50 50">
     <rect width="50" height="50" fill="royalblue" />
     <circle cx="25" cy="25" r="20" fill="white" />
   </svg>
-
   <!-- Nested SVG 2: Bottom-Right, using preserveAspectRatio -->
   <svg x="110" y="110" width="80" height="80" viewBox="0 0 100 50" preserveAspectRatio="xMidYMid meet">
     <rect width="100" height="50" fill="crimson" />
-    <text x="50" y="30" font-size="20" text-anchor="middle" fill="white" dominant-baseline="middle">NESTED</text>
   </svg>
-
   <!-- Nested SVG 3: Middle, no dimensions, should default to 100% (of outer viewport) -->
   <g transform="translate(50, 50)">
     <svg width="100" height="100">

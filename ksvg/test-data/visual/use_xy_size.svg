@@ -11,5 +11,4 @@
   <use href="#tile" x="10" y="30" width="90" height="60"/>
   <use href="#tile" x="120" y="30" width="100" height="100"/>
   <use href="#tile" x="40" y="130" width="160" height="60"/>
-  <text x="120" y="215" text-anchor="middle" font-size="11">use x/y/width/height</text>
 </svg>

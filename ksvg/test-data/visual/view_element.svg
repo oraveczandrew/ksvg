@@ -13,7 +13,5 @@
   <rect x="120" y="0" width="120" height="220" fill="gainsboro"/>
   <circle cx="55" cy="80" r="45" fill="tomato"/>
   <circle cx="185" cy="140" r="45" fill="royalblue"/>
-  <text x="120" y="25" text-anchor="middle" font-family="sans-serif">view + viewBox</text>
-  <text x="60" y="205" text-anchor="middle" font-size="12">left view</text>
-  <text x="180" y="205" text-anchor="middle" font-size="12">right view</text>
+  
 </svg>

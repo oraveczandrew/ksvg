@@ -15,5 +15,4 @@
       <animateTransform attributeName="transform" type="skewY" from="-20" to="20" dur="2s" repeatCount="indefinite"/>
     </rect>
   </g>
-  <text x="120" y="205" text-anchor="middle" font-size="12">skewX + skewY</text>
 </svg>

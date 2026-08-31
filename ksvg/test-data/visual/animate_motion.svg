@@ -13,7 +13,6 @@
   -    See the License for the specific language governing permissions and
   -    limitations under the License.
   -->
-
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <path id="path1" d="M 20 100 C 20 20 180 20 180 100 C 180 180 20 180 20 100 Z" fill="none" stroke="lightgray" stroke-dasharray="5,5" />
   <circle r="10" fill="orange">
@@ -21,5 +20,4 @@
       <mpath href="#path1" />
     </animateMotion>
   </circle>
-  <text x="100" y="20" text-anchor="middle" font-size="12">Motion Path</text>
 </svg>

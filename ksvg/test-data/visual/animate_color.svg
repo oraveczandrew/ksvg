@@ -13,10 +13,8 @@
   -    See the License for the specific language governing permissions and
   -    limitations under the License.
   -->
-
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <circle cx="100" cy="100" r="50" fill="red">
     <animate attributeName="fill" values="red;blue;green;red" dur="4s" repeatCount="indefinite" />
   </circle>
-  <text x="100" y="20" text-anchor="middle" font-size="12">Color Animation</text>
 </svg>

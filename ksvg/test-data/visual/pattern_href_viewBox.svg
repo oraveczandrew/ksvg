@@ -12,5 +12,4 @@
     <pattern id="derived" href="#base" x="0" y="0" width="40" height="40" patternTransform="rotate(20)" viewBox="0 0 20 20" preserveAspectRatio="xMidYMid meet"/>
   </defs>
   <rect x="10" y="10" width="220" height="200" fill="url(#derived)"/>
-  <text x="120" y="25" text-anchor="middle" font-size="12">pattern href + viewBox</text>
 </svg>

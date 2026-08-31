@@ -11,5 +11,4 @@
   <rect x="20" y="140" width="35" height="35" fill="royalblue">
     <animate attributeName="x" from="20" to="185" dur="2s" begin="0s" repeatDur="5s" fill="remove"/>
   </rect>
-  <text x="120" y="30" text-anchor="middle" font-size="12">begin / end / repeatDur</text>
 </svg>

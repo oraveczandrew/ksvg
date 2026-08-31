@@ -12,5 +12,4 @@
     </filter>
   </defs>
   <circle cx="85" cy="105" r="45" fill="orange" filter="url(#f)"/>
-  <text x="120" y="200" text-anchor="middle" font-size="12">filterUnits + primitiveUnits</text>
 </svg>
