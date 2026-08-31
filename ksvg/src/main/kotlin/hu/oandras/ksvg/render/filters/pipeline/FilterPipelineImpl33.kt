@@ -829,7 +829,6 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             val p3 = generators[3].p[i] and 0xFF
             pixels[i] = (p3 shl 24) or (p0 shl 16) or (p1 shl 8) or p2
 
-            fun packG(g: Double): Int = ((g + 1.0) * 127.5 + 0.5).toInt().coerceIn(0, 255)
             val g0x = packG(generators[0].g2[i][0])
             val g1x = packG(generators[1].g2[i][0])
             val g2x = packG(generators[2].g2[i][0])
@@ -846,6 +845,8 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         node.gpuLatticeBitmap = bitmap
         return bitmap
     }
+
+    private fun packG(g: Double): Int = ((g + 1.0) * 127.5 + 0.5).toInt().coerceIn(0, 255)
 
     companion object {
         private fun FeBlendMode.toBlendMode(): BlendMode? = when (this) {

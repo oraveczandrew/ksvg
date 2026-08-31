@@ -244,12 +244,6 @@ public object KotlinKernels {
             // unaffected.
             useLinear: Boolean = false,
     ) {
-        fun heightAt(x: Int, y: Int): Float {
-            val cx = x.coerceIn(0, width - 1)
-            val cy = y.coerceIn(0, height - 1)
-            return ((pix[cy * width + cx] shr 24) and 0xff) * surfaceScaleNormalized
-        }
-
         // light colors linearized once (only used when `useLinear` is set). For white
         // light sRgbToLinear(255) == 255, so the straight output becomes the sRGB EOTF
         // of the intensity, matching cairo/rsvg's linearRGB rendering.
@@ -265,7 +259,7 @@ public object KotlinKernels {
                 val userX = userLeft + x * invCanvasScaleX
                 val ux = ((userX - originX) / unitSizeX).toFloat()
 
-                val surfaceZ = heightAt(x, y)
+                val surfaceZ = heightAt(pix, width, height, surfaceScaleNormalized, x, y)
 
                 var lx = 0f; var ly = 0f; var lz = 0f; var factor = 0f
                 when (lightType) {
@@ -311,10 +305,10 @@ public object KotlinKernels {
                     }
                 }
 
-                val dzdx = (heightAt(x + 1, y - 1) + 2 * heightAt(x + 1, y) + heightAt(x + 1, y + 1) -
-                        (heightAt(x - 1, y - 1) + 2 * heightAt(x - 1, y) + heightAt(x - 1, y + 1))) / (4f / canvasScaleX)
-                val dzdy = (heightAt(x - 1, y + 1) + 2 * heightAt(x, y + 1) + heightAt(x + 1, y + 1) -
-                        (heightAt(x - 1, y - 1) + 2 * heightAt(x, y - 1) + heightAt(x + 1, y - 1))) / (4f / canvasScaleY)
+                val dzdx = (heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y - 1) + 2 * heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y) + heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y + 1) -
+                        (heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y - 1) + 2 * heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y) + heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y + 1))) / (4f / canvasScaleX)
+                val dzdy = (heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y + 1) + 2 * heightAt(pix, width, height, surfaceScaleNormalized, x, y + 1) + heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y + 1) -
+                        (heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y - 1) + 2 * heightAt(pix, width, height, surfaceScaleNormalized, x, y - 1) + heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y - 1))) / (4f / canvasScaleY)
 
                 var nx = -dzdx; var ny = -dzdy; var nz = 1f
                 val nLen = sqrt(nx * nx + ny * ny + nz * nz)
@@ -383,6 +377,20 @@ public object KotlinKernels {
         } else {
             clamp255((1.055f * (a.pow(1f / 2.4f)) - 0.055f) * 255f)
         }
+    }
+
+    /** Surface height at (x, y) for feDiffuse/feSpecular lighting (alpha channel scaled). */
+    private fun heightAt(
+            pix: IntArray,
+            width: Int,
+            height: Int,
+            surfaceScaleNormalized: Float,
+            x: Int,
+            y: Int,
+    ): Float {
+        val cx = x.coerceIn(0, width - 1)
+        val cy = y.coerceIn(0, height - 1)
+        return ((pix[cy * width + cx] shr 24) and 0xff) * surfaceScaleNormalized
     }
 
     /**

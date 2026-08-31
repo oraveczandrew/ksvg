@@ -67,11 +67,6 @@ internal fun stackBlur(
     // spec (filter input outside the filter region is transparent). This makes blurred shapes
     // show a correct transition at the filter-region edge (e.g. feSpecularLighting height field).
     for (i in 0 until outerLimit) {
-        fun sample(j: Int): Int {
-            if (j < 0 || j > innerMax) return 0
-            return if (horizontal) pix[i * w + j] else pix[j * w + i]
-        }
-
         var aSum = 0
         var rSum = 0
         var gSum = 0
@@ -86,7 +81,7 @@ internal fun stackBlur(
         var bInSum = 0
 
         for (j in -radius..radius) {
-            val p = sample(j)
+            val p = sample(pix, w, i, innerMax, horizontal, j)
             val a = p shr 24 and 0xff
             val sir = stack[j + radius]
             sir[0] = a
@@ -138,7 +133,7 @@ internal fun stackBlur(
             gOutSum -= sirOut[2]
             bOutSum -= sirOut[3]
 
-            val pNext = sample(j + r1)
+            val pNext = sample(pix, w, i, innerMax, horizontal, j + r1)
             val aNext = pNext shr 24 and 0xff
             sirOut[0] = aNext
             sirOut[1] = ((pNext shr 16 and 0xff) * aNext + 127) / 255
@@ -170,6 +165,18 @@ internal fun stackBlur(
 
 private fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
     (alpha shl 24) or (red shl 16) or (green shl 8) or blue
+
+private fun sample(
+    pix: IntArray,
+    w: Int,
+    i: Int,
+    innerMax: Int,
+    horizontal: Boolean,
+    j: Int,
+): Int {
+    if (j < 0 || j > innerMax) return 0
+    return if (horizontal) pix[i * w + j] else pix[j * w + i]
+}
 
 private fun clamp255(value: Int): Int =
     if (value < 0) 0 else if (value > 255) 255 else value
