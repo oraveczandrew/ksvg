@@ -133,8 +133,9 @@ private fun applyArithmeticComposite(
     val k2 = primitive.k2
     val k3 = primitive.k3
     val k4 = primitive.k4
-    
-    val outPixels = IntArray(size) // We need a clean output
+
+    val outPixels = primitiveNode.outPixels.getWithSize(size)
+    outPixels.fill(0) // Clean output outside the clip region
     SoftwareKernels.arithmeticComposite(
         inputPixels, in2Pixels, outPixels, width,
         clipLeft, clipTop, clipRight, clipBottom,

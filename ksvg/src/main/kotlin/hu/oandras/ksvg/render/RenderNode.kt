@@ -761,6 +761,7 @@ internal class FeCompositeRenderNode(
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_COMPOSITE
     @JvmField val inputPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val in2Pixels: IntArrayBucket = IntArrayBucket()
+    @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
 }
 
 internal class FeTurbulenceRenderNode(
