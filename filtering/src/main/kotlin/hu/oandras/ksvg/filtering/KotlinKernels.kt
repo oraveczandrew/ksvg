@@ -232,6 +232,11 @@ public object KotlinKernels {
             lightG: Int,
             lightB: Int,
             params: DoubleArray,
+            // When true (feSpecularLighting as the terminal filter output), emit the
+            // premultiplied form (lightColor, intensity) to match cairo: full-strength
+            // color channels with the intensity in alpha. Intermediate specular output
+            // (straight, alpha = max(R,G,B)) is preserved for consumer kernels.
+            premultipliedOutput: Boolean = false,
     ) {
         fun heightAt(x: Int, y: Int): Float {
             val cx = x.coerceIn(0, width - 1)
@@ -316,7 +321,15 @@ public object KotlinKernels {
                 val outG = clamp255(lightG * intensity)
                 val outB = clamp255(lightB * intensity)
                 val outA = if (specular) maxOf(outR, outG, outB) else 255
-                out[rowOffset + x] = (outA shl 24) or (outR shl 16) or (outG shl 8) or outB
+
+                out[rowOffset + x] = if (specular && premultipliedOutput) {
+                    // Premultiplied (cairo) form: full-strength light color in RGB,
+                    // the specular intensity in alpha.
+                    val intensityBits = clamp255(intensity * 255f)
+                    (intensityBits shl 24) or (lightR shl 16) or (lightG shl 8) or lightB
+                } else {
+                    (outA shl 24) or (outR shl 16) or (outG shl 8) or outB
+                }
             }
         }
     }

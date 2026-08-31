@@ -62,7 +62,8 @@ void applyScalar(
         jdouble unitSizeX, jdouble unitSizeY,
         float canvasScaleX, float canvasScaleY,
         jint lightType, bool isSpecular, float k, float exponent,
-        float fr, float fg, float fb, const jdouble* params) {
+        float fr, float fg, float fb, const jdouble* params,
+        bool premultiplied) {
     for (jint y = clipTop; y < clipBottom; y++) {
         const jdouble userY = userTop + y * invCanvasScaleY;
         const auto uy = static_cast<float>((userY - originY) / unitSizeY);
@@ -150,7 +151,10 @@ void applyScalar(
             const jint outA = isSpecular
                     ? (outR > outG ? (outR > outB ? outR : outB) : (outG > outB ? outG : outB))
                     : 255;
-            out[rowOffset + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
+
+            out[rowOffset + x] = (isSpecular && premultiplied)
+                    ? ((clamp255f(intensity * 255.f) << 24) | (jint(fr + 0.5f) << 16) | (jint(fg + 0.5f) << 8) | jint(fb + 0.5f))
+                    : ((outA << 24) | (outR << 16) | (outG << 8) | outB);
         }
     }
 }
@@ -248,7 +252,8 @@ void applyVector(
         jdouble unitSizeX, jdouble unitSizeY,
         float canvasScaleX, float canvasScaleY,
         jint lightType, bool isSpecular, float k, float exponent,
-        float fr, float fg, float fb, const jdouble* params) {
+        float fr, float fg, float fb, const jdouble* params,
+        bool premultiplied) {
     const jint span = clipRight - clipLeft + 3; // columns x-1 .. x+1 of last px
     float rowT[kMaxVecRowSpan], rowM[kMaxVecRowSpan], rowB[kMaxVecRowSpan];
     float intensities[4];
@@ -377,7 +382,10 @@ void applyVector(
                 const jint outA = isSpecular
                         ? (outR > outG ? (outR > outB ? outR : outB) : (outG > outB ? outG : outB))
                         : 255;
-                out[rowOffset + x + l] = packPixel(outA, outR, outG, outB);
+
+                out[rowOffset + x + l] = (isSpecular && premultiplied)
+                        ? ((clamp255f(intensities[l] * 255.f) << 24) | (jint(fr + 0.5f) << 16) | (jint(fg + 0.5f) << 8) | jint(fb + 0.5f))
+                        : packPixel(outA, outR, outG, outB);
             }
         }
 
@@ -455,7 +463,10 @@ void applyVector(
             const jint outA = isSpecular
                     ? (outR > outG ? (outR > outB ? outR : outB) : (outG > outB ? outG : outB))
                     : 255;
-            out[rowOffset + x] = packPixel(outA, outR, outG, outB);
+
+            out[rowOffset + x] = (isSpecular && premultiplied)
+                    ? ((clamp255f(intensity * 255.f) << 24) | (jint(fr + 0.5f) << 16) | (jint(fg + 0.5f) << 8) | jint(fb + 0.5f))
+                    : packPixel(outA, outR, outG, outB);
         }
     }
 }
@@ -479,7 +490,8 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
         jint lightType, const jboolean specular,
         jfloat k, jfloat exponent,
         const jint lightR, const jint lightG, const jint lightB,
-        const jdoubleArray jParams) {
+        const jdoubleArray jParams,
+        const jboolean premultipliedOutput) {
     // Small array first: no JNI call may occur between a
     // GetPrimitiveArrayCritical pair, so the params must be fetched
     // BEFORE entering the critical sections.
@@ -499,6 +511,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
     }
 
     const bool isSpecular = specular == JNI_TRUE;
+    const bool premultiplied = premultipliedOutput == JNI_TRUE;
     const jint span = clipRight - clipLeft + 3;
 
 #ifdef LIGHT_SIMD
@@ -512,7 +525,8 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
                     canvasScaleX, canvasScaleY,
                     lightType, isSpecular, k, exponent,
                     static_cast<float>(lightR), static_cast<float>(lightG),
-                    static_cast<float>(lightB), params);
+                    static_cast<float>(lightB), params,
+                    premultiplied);
     } else
 #endif
     {
@@ -525,7 +539,8 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
                     canvasScaleX, canvasScaleY,
                     lightType, isSpecular, k, exponent,
                     static_cast<float>(lightR), static_cast<float>(lightG),
-                    static_cast<float>(lightB), params);
+                    static_cast<float>(lightB), params,
+                    premultiplied);
     }
 
     env->ReleasePrimitiveArrayCritical(jOut, out, JNI_ABORT);

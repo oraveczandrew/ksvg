@@ -60,6 +60,7 @@ private fun doLightingFilter(
     alphaIsMaxOfChannels: Boolean,
     k: Float,
     exponent: Float,
+    premultipliedOutput: Boolean = false,
 ): Bitmap {
     val lightSource = light ?: return inputBitmap
 
@@ -151,7 +152,8 @@ private fun doLightingFilter(
             lightR = lightR,
             lightG = lightG,
             lightB = lightB,
-            params = params
+            params = params,
+            premultipliedOutput = premultipliedOutput,
         )
     } else {
         KotlinKernels.lighting(
@@ -181,7 +183,8 @@ private fun doLightingFilter(
             lightR = lightR,
             lightG = lightG,
             lightB = lightB,
-            params = params
+            params = params,
+            premultipliedOutput = premultipliedOutput,
         )
     }
     res.setPixels(out, 0, width, 0, 0, width, height)
@@ -242,6 +245,7 @@ internal fun doFeSpecularLightingFilter(
     canvasScaleY: Float,
     primitiveRegion: RectF,
     filterRegion: RectF,
+    premultipliedOutput: Boolean = false,
 ): Bitmap {
     val primitive = primitiveNode.sourceElement
     val specularConstant = primitive.specularConstant
@@ -266,6 +270,7 @@ internal fun doFeSpecularLightingFilter(
         alphaIsMaxOfChannels = true,
         k = specularConstant,
         exponent = specularExponent,
+        premultipliedOutput = premultipliedOutput,
     )
 }
 
