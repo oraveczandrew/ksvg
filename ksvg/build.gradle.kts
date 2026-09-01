@@ -102,6 +102,10 @@ android.apply {
             if (!verifyFilter.isNullOrBlank()) {
                 it.systemProperty("ksvg.verify.filter", verifyFilter)
             }
+            val turbDebug = project.findProperty("turbDebug") as? String
+            if (!turbDebug.isNullOrBlank()) {
+                it.systemProperty("ksvg.debug.turbulence", turbDebug)
+            }
         }
     }
 }

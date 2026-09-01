@@ -993,6 +993,18 @@ internal class Renderer internal constructor(
 
         rectFPool.withPooledObject { region ->
             calculateRegion(filter, boundingBox, region)
+            // The filter effects region is clipped to the viewport in the filter's
+            // coordinate space (the user-space viewBox), matching librsvg/browser
+            // behaviour. Without this the region can extend past the canvas (e.g.
+            // the default 1.2x object-bounding-box supersampling), and primitives
+            // like feTurbulence would size their tile/lattice to the off-canvas
+            // region instead of the visible subregion.
+            state.viewBox?.let { viewBox ->
+                if (region.left < viewBox.minX) region.left = viewBox.minX
+                if (region.top < viewBox.minY) region.top = viewBox.minY
+                if (region.right > viewBox.maxX()) region.right = viewBox.maxX()
+                if (region.bottom > viewBox.maxY()) region.bottom = viewBox.maxY()
+            }
             if (region.width() > 0f && region.height() > 0f) {
                 matrixPool.withPooledObject { matrix ->
                     matrixPool.withPooledObject { newMatrix ->

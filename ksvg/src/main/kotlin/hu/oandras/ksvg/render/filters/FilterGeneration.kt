@@ -46,10 +46,11 @@ internal fun doFeTurbulenceFilter(
     canvasScaleY: Float,
     primitiveRegion: RectF,
     filterRegion: RectF,
+    filterRegionPx: RectF,
 ): Bitmap {
     val primitive = primitiveNode.sourceElement
-    val width = filterRegion.width().toInt()
-    val height = filterRegion.height().toInt()
+    val width = filterRegionPx.width().toInt()
+    val height = filterRegionPx.height().toInt()
 
     val baseX = maxOf(0.0, primitive.baseFrequencyX.toDouble())
     val baseY = maxOf(0.0, primitive.baseFrequencyY.toDouble())
@@ -69,10 +70,10 @@ internal fun doFeTurbulenceFilter(
     val primitiveUnitSizeX = primitiveScaleX.toDouble() / canvasScaleX.toDouble()
     val primitiveUnitSizeY = primitiveScaleY.toDouble() / canvasScaleY.toDouble()
 
-    val clipLeft = ((primitiveRegion.left - filterRegion.left)).toInt().coerceIn(0, width)
-    val clipTop = ((primitiveRegion.top - filterRegion.top)).toInt().coerceIn(0, height)
-    val clipRight = ((primitiveRegion.right - filterRegion.left)).toInt().coerceIn(0, width)
-    val clipBottom = ((primitiveRegion.bottom - filterRegion.top)).toInt().coerceIn(0, height)
+    val clipLeft = ((primitiveRegion.left - filterRegionPx.left)).toInt().coerceIn(0, width)
+    val clipTop = ((primitiveRegion.top - filterRegionPx.top)).toInt().coerceIn(0, height)
+    val clipRight = ((primitiveRegion.right - filterRegionPx.left)).toInt().coerceIn(0, width)
+    val clipBottom = ((primitiveRegion.bottom - filterRegionPx.top)).toInt().coerceIn(0, height)
 
     var baseFrequencyX = baseX
     var baseFrequencyY = baseY
@@ -80,24 +81,24 @@ internal fun doFeTurbulenceFilter(
     var periodY = 0
 
     if (primitive.stitchTiles == FeStitchTiles.stitch) {
-        val tileWidthPx = primitiveRegion.width().toDouble() * canvasScaleX.toDouble()
-        val tileHeightPx = primitiveRegion.height().toDouble() * canvasScaleY.toDouble()
+        val tileWidthPx = ceil(filterRegion.width().toDouble())
+        val tileHeightPx = ceil(filterRegion.height().toDouble())
 
         if (tileWidthPx > 0.0 && baseX != 0.0) {
-            val freqPx = baseX * invCanvasScaleX / primitiveUnitSizeX
-            val fLo = floor(tileWidthPx * freqPx) / tileWidthPx
-            val fHi = ceil(tileWidthPx * freqPx) / tileWidthPx
-            val adjustedFreqPx = if (freqPx / fLo < fHi / freqPx) fLo else fHi
-            baseFrequencyX = adjustedFreqPx / invCanvasScaleX * primitiveUnitSizeX
-            periodX = (tileWidthPx * adjustedFreqPx + 0.5).toInt()
+            val freq = baseX
+            val fLo = floor(tileWidthPx * freq) / tileWidthPx
+            val fHi = ceil(tileWidthPx * freq) / tileWidthPx
+            val adjustedFreq = if (freq / fLo < fHi / freq) fLo else fHi
+            baseFrequencyX = adjustedFreq
+            periodX = (tileWidthPx * adjustedFreq + 0.5).toInt()
         }
         if (tileHeightPx > 0.0 && baseY != 0.0) {
-            val freqPx = baseY * invCanvasScaleY / primitiveUnitSizeY
-            val fLo = floor(tileHeightPx * freqPx) / tileHeightPx
-            val fHi = ceil(tileHeightPx * freqPx) / tileHeightPx
-            val adjustedFreqPx = if (freqPx / fLo < fHi / freqPx) fLo else fHi
-            baseFrequencyY = adjustedFreqPx / invCanvasScaleY * primitiveUnitSizeY
-            periodY = (tileHeightPx * adjustedFreqPx + 0.5).toInt()
+            val freq = baseY
+            val fLo = floor(tileHeightPx * freq) / tileHeightPx
+            val fHi = ceil(tileHeightPx * freq) / tileHeightPx
+            val adjustedFreq = if (freq / fLo < fHi / freq) fLo else fHi
+            baseFrequencyY = adjustedFreq
+            periodY = (tileHeightPx * adjustedFreq + 0.5).toInt()
         }
     }
 

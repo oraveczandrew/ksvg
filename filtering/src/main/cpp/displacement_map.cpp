@@ -22,7 +22,7 @@
 
 namespace {
 
-inline float getChannelValue(jint pixel, int channel) {
+inline float getChannelValue(const jint pixel, const int channel) {
     switch (channel) {
         case 0: return ((pixel >> 16) & 0xFF) / 255.0f; // R
         case 1: return ((pixel >> 8) & 0xFF) / 255.0f;  // G
@@ -32,8 +32,8 @@ inline float getChannelValue(jint pixel, int channel) {
 }
 
 void applyScalar(
-        const jint* src, const jint* map, jint* dst, int width, int height,
-        int mapWidth, int mapHeight, float scale, int xChannel, int yChannel) {
+        const jint* src, const jint* map, jint* dst, const int width, const int height,
+        const int mapWidth, const int mapHeight, const float scale, const int xChannel, const int yChannel) {
     const int widthDivisor = std::max(width - 1, 1);
     const int heightDivisor = std::max(height - 1, 1);
 
@@ -60,13 +60,31 @@ void applyScalar(
 #ifdef __aarch64__
 #include <arm_neon.h>
 
-void applyNeon64(
-        const jint* src, const jint* map, jint* dst, int width, int height,
-        float scale, int xChannel, int yChannel) {
+template<int Shift>
+static inline uint32x4_t shiftRightFF(uint32x4_t pixels) {
+    if constexpr (Shift == 0) {
+        return pixels;
+    } else {
+        return vshrq_n_u32(pixels, Shift);
+    }
+}
+
+
+template<int XShift, int YShift, int XChannel, int YChannel>
+static inline void applyNeon64Impl(
+        const jint* src,
+        const jint* map,
+        jint* dst,
+        const int width,
+        const int height,
+        const float scale) {
+
     const float32x4_t vScale = vdupq_n_f32(scale);
     const float32x4_t vHalf = vdupq_n_f32(0.5f);
-    const float32x4_t v255 = vdupq_n_f32(255.0f);
+    const float32x4_t vInv255 = vdupq_n_f32(1.0f / 255.0f);
+
     const uint32x4_t maskFF = vdupq_n_u32(0xFF);
+
     const int32x4_t vWidthMinus1 = vdupq_n_s32(width - 1);
     const int32x4_t vHeightMinus1 = vdupq_n_s32(height - 1);
     const int32x4_t vZero = vdupq_n_s32(0);
@@ -74,44 +92,199 @@ void applyNeon64(
     static const int32_t increments[4] = {0, 1, 2, 3};
     const int32x4_t vIncrements = vld1q_s32(increments);
 
-    int xs = xChannel == 0 ? 16 : xChannel == 1 ? 8 : xChannel == 2 ? 0 : 24;
-    int ys = yChannel == 0 ? 16 : yChannel == 1 ? 8 : yChannel == 2 ? 0 : 24;
-
-    for (int y = 0; y < height; y++) {
+    for (int y = 0; y < height; ++y) {
         const int rowOffset = y * width;
         const int32x4_t vY = vdupq_n_s32(y);
+
         int x = 0;
+
         for (; x + 4 <= width; x += 4) {
-            const int32x4_t vX = vaddq_s32(vdupq_n_s32(x), vIncrements);
-            const uint32x4_t mapPixels = vld1q_u32(reinterpret_cast<const uint32_t*>(map + rowOffset + x));
+            const int32x4_t vX =
+                    vaddq_s32(vdupq_n_s32(x), vIncrements);
 
-            const float32x4_t vx = vdivq_f32(vcvtq_f32_u32(vandq_u32(vshrq_n_u32(mapPixels, xs), maskFF)), v255);
-            const float32x4_t vy = vdivq_f32(vcvtq_f32_u32(vandq_u32(vshrq_n_u32(mapPixels, ys), maskFF)), v255);
+            const uint32x4_t mapPixels =
+                    vld1q_u32(
+                            reinterpret_cast<const uint32_t*>(
+                                    map + rowOffset + x));
 
-            // Using vcvtq_s32_f32 which rounds towards zero, matching Kotlin (int) conversion.
-            const int32x4_t idx = vcvtq_s32_f32(vmulq_f32(vScale, vsubq_f32(vx, vHalf)));
-            const int32x4_t idy = vcvtq_s32_f32(vmulq_f32(vScale, vsubq_f32(vy, vHalf)));
+            const uint32x4_t xPixels =
+                    vandq_u32(
+                            shiftRightFF<XShift>(mapPixels),
+                            maskFF);
 
-            int32x4_t sx = vmaxq_s32(vZero, vminq_s32(vaddq_s32(vX, idx), vWidthMinus1));
-            int32x4_t sy = vmaxq_s32(vZero, vminq_s32(vaddq_s32(vY, idy), vHeightMinus1));
+            const uint32x4_t yPixels =
+                    vandq_u32(
+                            shiftRightFF<YShift>(mapPixels),
+                            maskFF);
 
-            alignas(16) int32_t sxa[4], sya[4];
+            const float32x4_t vx =
+                    vmulq_f32(
+                            vcvtq_f32_u32(xPixels),
+                            vInv255);
+
+            const float32x4_t vy =
+                    vmulq_f32(
+                            vcvtq_f32_u32(yPixels),
+                            vInv255);
+
+            const int32x4_t idx =
+                    vcvtq_s32_f32(
+                            vmulq_f32(
+                                    vScale,
+                                    vsubq_f32(vx, vHalf)));
+
+            const int32x4_t idy =
+                    vcvtq_s32_f32(
+                            vmulq_f32(
+                                    vScale,
+                                    vsubq_f32(vy, vHalf)));
+
+            const int32x4_t sx =
+                    vmaxq_s32(
+                            vZero,
+                            vminq_s32(
+                                    vaddq_s32(vX, idx),
+                                    vWidthMinus1));
+
+            const int32x4_t sy =
+                    vmaxq_s32(
+                            vZero,
+                            vminq_s32(
+                                    vaddq_s32(vY, idy),
+                                    vHeightMinus1));
+
+            alignas(16) int32_t sxa[4];
+            alignas(16) int32_t sya[4];
+
             vst1q_s32(sxa, sx);
             vst1q_s32(sya, sy);
 
-            dst[rowOffset + x + 0] = src[sya[0] * width + sxa[0]];
-            dst[rowOffset + x + 1] = src[sya[1] * width + sxa[1]];
-            dst[rowOffset + x + 2] = src[sya[2] * width + sxa[2]];
-            dst[rowOffset + x + 3] = src[sya[3] * width + sxa[3]];
+            dst[rowOffset + x + 0] =
+                    src[sya[0] * width + sxa[0]];
+
+            dst[rowOffset + x + 1] =
+                    src[sya[1] * width + sxa[1]];
+
+            dst[rowOffset + x + 2] =
+                    src[sya[2] * width + sxa[2]];
+
+            dst[rowOffset + x + 3] =
+                    src[sya[3] * width + sxa[3]];
         }
-        for (; x < width; x++) {
+
+        for (; x < width; ++x) {
             const jint mapPixel = map[rowOffset + x];
-            int dx = (int)(scale * (getChannelValue(mapPixel, xChannel) - 0.5f));
-            int dy = (int)(scale * (getChannelValue(mapPixel, yChannel) - 0.5f));
-            int sx = std::max(0, std::min(width - 1, x + dx));
-            int sy = std::max(0, std::min(height - 1, y + dy));
-            dst[rowOffset + x] = src[sy * width + sx];
+
+            const int dx =
+                    (int)(
+                            scale *
+                            (getChannelValue(mapPixel, XChannel) - 0.5f));
+
+            const int dy =
+                    (int)(
+                            scale *
+                            (getChannelValue(mapPixel, YChannel) - 0.5f));
+
+            const int sx =
+                    std::max(
+                            0,
+                            std::min(width - 1, x + dx));
+
+            const int sy =
+                    std::max(
+                            0,
+                            std::min(height - 1, y + dy));
+
+            dst[rowOffset + x] =
+                    src[sy * width + sx];
         }
+    }
+}
+
+
+void applyNeon64(
+        const jint* src,
+        const jint* map,
+        jint* dst,
+        const int width,
+        const int height,
+        const float scale,
+        const int xChannel,
+        const int yChannel) {
+
+    const int key = (xChannel << 2) | yChannel;
+
+    switch (key) {
+        case 0:
+            applyNeon64Impl<16, 16, 0, 0>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 1:
+            applyNeon64Impl<16, 8, 0, 1>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 2:
+            applyNeon64Impl<16, 0, 0, 2>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 3:
+            applyNeon64Impl<16, 24, 0, 3>(
+                    src, map, dst, width, height, scale);
+            break;
+
+        case 4:
+            applyNeon64Impl<8, 16, 1, 0>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 5:
+            applyNeon64Impl<8, 8, 1, 1>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 6:
+            applyNeon64Impl<8, 0, 1, 2>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 7:
+            applyNeon64Impl<8, 24, 1, 3>(
+                    src, map, dst, width, height, scale);
+            break;
+
+        case 8:
+            applyNeon64Impl<0, 16, 2, 0>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 9:
+            applyNeon64Impl<0, 8, 2, 1>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 10:
+            applyNeon64Impl<0, 0, 2, 2>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 11:
+            applyNeon64Impl<0, 24, 2, 3>(
+                    src, map, dst, width, height, scale);
+            break;
+
+        case 12:
+            applyNeon64Impl<24, 16, 3, 0>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 13:
+            applyNeon64Impl<24, 8, 3, 1>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 14:
+            applyNeon64Impl<24, 0, 3, 2>(
+                    src, map, dst, width, height, scale);
+            break;
+        case 15:
+            applyNeon64Impl<24, 24, 3, 3>(
+                    src, map, dst, width, height, scale);
+            break;
+
+        default:
+            __builtin_unreachable();
     }
 }
 #endif
@@ -121,9 +294,9 @@ void applyNeon64(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_DisplacementMapNative_apply(
         JNIEnv* env, jclass clazz,
-        jintArray jSrc, jintArray jMap, jintArray jDst,
-        jint width, jint height, jint mapWidth, jint mapHeight,
-        jfloat scale, jint xChannel, jint yChannel) {
+        const jintArray jSrc, const jintArray jMap, const jintArray jDst,
+        const jint width, const jint height, const jint mapWidth, const jint mapHeight,
+        const jfloat scale, const jint xChannel, const jint yChannel) {
     jint* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
     jint* map = static_cast<jint*>(env->GetPrimitiveArrayCritical(jMap, nullptr));
     jint* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));

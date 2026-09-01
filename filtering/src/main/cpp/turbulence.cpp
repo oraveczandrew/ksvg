@@ -46,8 +46,11 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
     const bool stitchEnabled = periodX > 0 && periodY > 0;
     const bool fractal = fractalNoise == JNI_TRUE;
 
-    const double fX = (invCanvasScaleX / unitSizeX) * baseFrequencyX;
-    const double fY = (invCanvasScaleY / unitSizeY) * baseFrequencyY;
+    // Stitch wrap-lattice offset must use the RAW pixel index times baseFrequency,
+    // matching librsvg (wrap_x = (tile_x * bf) as usize + PERLIN_N + width), not the
+    // inv-canvas/unitSize-scaled factor.
+    const double fX = baseFrequencyX;
+    const double fY = baseFrequencyY;
 
     for (jint y = clipTop; y < clipBottom; y++) {
         const jdouble userY = userTop + y * invCanvasScaleY;
