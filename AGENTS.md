@@ -143,6 +143,12 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 - **Caller-owned buffers**: blur state lives in `StackBlurScratch` (sealed interface) — `NativeScratch` (lazy native handle) and `FallbackScratch` (Kotlin stack blur). Never add shared/global mutable state to the native code.
 - **NEVER mark a `@JvmStatic external fun` (JNI entry) `internal`**: Kotlin mangles internal members (`apply` → `apply$...`), so the C++ symbol (`Java_<pkg>_<Class>_<method>`) stops matching → `UnsatisfiedLinkError`. Make the enclosing `object` `internal`.
 
+## Work Log
+
+- For non-trivial tasks, maintain a problem-specific Markdown work log (for example, SVG_FILTER_RENDERING.md or ISSUE_142_WORKLOG.md).
+- Record important findings, attempted approaches, failures, decisions, and next steps. Read it before starting or resuming work, and do not repeat failed approaches unless new evidence justifies them.
+- Update the log after each major investigation step or milestone, so the current state can be recovered after interruption.
+
 ## Quick Commands
 - **Do not pass `--no-daemon` to Gradle** — always use the Gradle daemon (omit `--no-daemon`).
 - Build: `./gradlew :ksvg:compileDebugKotlin -Dorg.gradle.warning.mode=none`
@@ -161,4 +167,5 @@ Test standard output (e.g. `println` debug statements) is suppressed by default.
 
 
 - Use US English for all code and documentation. You can answer in English even if the question is in Hungarian.
+- Use English internally and for all code, comments, documentation, logs, commit messages, and other project artifacts.
 - Use the IDE's import optimization feature to remove unused imports, if possible.
