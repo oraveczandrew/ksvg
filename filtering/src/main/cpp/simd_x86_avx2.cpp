@@ -15,11 +15,12 @@
  */
 
 #include <jni.h>
-#include <immintrin.h>
 #include <algorithm>
 #include <cmath>
 
 #if defined(__i386__) || defined(__x86_64__)
+
+#include <immintrin.h>
 
 namespace {
 
