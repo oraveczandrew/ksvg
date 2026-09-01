@@ -31,9 +31,6 @@ import kotlin.math.sqrt
  *    from the shared LCG stream;
  *  - only afterwards is the single lattice permutation built/shuffled from the same
  *    stream and shared across all channels.
- *
- * The shared [p] permutation array is constructed by [buildPermutation] and must be the
- * same instance for all channel instances of one feTurbulence primitive.
  */
 public class SvgPathNoise(
     lcg: LcgRandom,
@@ -45,7 +42,6 @@ public class SvgPathNoise(
     }
 
     init {
-        // Gradient draw for one channel: 2 LCG values per lattice point, in channel order.
         for (i in 0 until B_SIZE) {
             var a: Int
             var b: Int
@@ -58,7 +54,6 @@ public class SvgPathNoise(
             normalize2(g2[i])
         }
 
-        // Extend for wrapping.
         for (i in 0 until B_SIZE + 2) {
             g2[B_SIZE + i][0] = g2[i][0]
             g2[B_SIZE + i][1] = g2[i][1]
@@ -76,32 +71,42 @@ public class SvgPathNoise(
     private fun sCurve(t: Double): Double = t * t * (3.0 - 2.0 * t)
     private fun lerp(t: Double, a: Double, b: Double): Double = a + t * (b - a)
 
-    public fun noise2(x: Double, y: Double, periodX: Int = 0, periodY: Int = 0): Double {
-        val xf = floor(x)
-        var bx0 = xf.toInt()
-        val rx0 = x - xf
+    /**
+     * Samples 2D Perlin noise.
+     * [x], [y] are absolute lattice coordinates.
+     * If [periodX] > 0, the noise stitches periodically over the tile.
+     * [wrapX] is the lattice coordinate (including PERLIN_N offset) where wrapping occurs.
+     */
+    public fun noise2(
+        x: Double, y: Double,
+        periodX: Int = 0, periodY: Int = 0,
+        wrapX: Int = 0, wrapY: Int = 0
+    ): Double {
+        val tx = x + 4096.0
+        var bx0 = tx.toInt()
+        var bx1 = bx0 + 1
+        val rx0 = tx - floor(tx)
         val rx1 = rx0 - 1.0
 
-        val yf = floor(y)
-        var by0 = yf.toInt()
-        val ry0 = y - yf
+        val ty = y + 4096.0
+        var by0 = ty.toInt()
+        var by1 = by0 + 1
+        val ry0 = ty - floor(ty)
         val ry1 = ry0 - 1.0
 
-        // With a positive period the lattice wraps so that the noise tiles
-        // seamlessly every `period` lattice cells (feTurbulence stitchTiles).
-        bx0 = if (periodX > 0) {
-            Math.floorMod(bx0, periodX)
-        } else {
-            bx0 and BM
+        if (periodX > 0) {
+            if (bx0 >= wrapX) bx0 -= periodX
+            if (bx1 >= wrapX) bx1 -= periodX
         }
-        val bx1 = if (periodX > 0) (bx0 + 1) % periodX else (bx0 + 1) and BM
+        if (periodY > 0) {
+            if (by0 >= wrapY) by0 -= periodY
+            if (by1 >= wrapY) by1 -= periodY
+        }
 
-        by0 = if (periodY > 0) {
-            Math.floorMod(by0, periodY)
-        } else {
-            by0 and BM
-        }
-        val by1 = if (periodY > 0) (by0 + 1) % periodY else (by0 + 1) and BM
+        bx0 = bx0 and BM
+        bx1 = bx1 and BM
+        by0 = by0 and BM
+        by1 = by1 and BM
 
         val i = p[bx0]
         val j = p[bx1]
@@ -129,7 +134,6 @@ public class SvgPathNoise(
         private const val B_SIZE = 0x100
         private const val BM = 0xff
 
-        /** Builds and shuffles the shared lattice permutation from [lcg]. */
         public fun buildPermutation(lcg: LcgRandom, p: IntArray) {
             for (i in 0 until B_SIZE) {
                 p[i] = i

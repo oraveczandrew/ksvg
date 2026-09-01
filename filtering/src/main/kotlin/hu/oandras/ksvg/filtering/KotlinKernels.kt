@@ -17,9 +17,10 @@
 package hu.oandras.ksvg.filtering
 
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.pow
-import kotlin.math.sqrt
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * Pure-Kotlin reference kernels over unpremultiplied ARGB_8888 IntArrays.
@@ -53,9 +54,19 @@ public object KotlinKernels {
     private fun sampleCoordinate(coordinate: Int, limit: Int, edgeMode: Int): Int =
             if (coordinate in 0 until limit) coordinate else when (edgeMode) {
                 2 -> -1
-                1 -> (coordinate % limit).let { if (it < 0) it + limit else it }
+                1 -> {
+                    val m = coordinate % limit
+                    if (m < 0) m + limit else m
+                }
                 else -> if (coordinate < 0) 0 else limit - 1
             }
+
+    private fun channelValue(p: Int, ch: Int): Float = when (ch) {
+        0 -> ((p shr 16) and 0xFF) / 255f
+        1 -> ((p shr 8) and 0xFF) / 255f
+        2 -> (p and 0xFF) / 255f
+        else -> ((p shr 24) and 0xFF) / 255f
+    }
 
     // ---------------------------------------------------------------- convolve
 
@@ -472,13 +483,6 @@ public object KotlinKernels {
                 val mapY = if (mapHeight <= 1) 0 else (y.toFloat() / heightDivisor * (mapHeight - 1)).toInt()
                 val mapPixel = map[mapY * mapWidth + mapX]
 
-                fun channelValue(p: Int, ch: Int): Float = when (ch) {
-                    0 -> ((p shr 16) and 0xFF) / 255f
-                    1 -> ((p shr 8) and 0xFF) / 255f
-                    2 -> (p and 0xFF) / 255f
-                    else -> ((p shr 24) and 0xFF) / 255f
-                }
-
                 val dx = (scale * (channelValue(mapPixel, xChannel) - 0.5f)).toInt()
                 val dy = (scale * (channelValue(mapPixel, yChannel) - 0.5f)).toInt()
 
@@ -520,34 +524,63 @@ public object KotlinKernels {
             @Suppress("UNUSED_PARAMETER") seed: Int,
             generators: Array<SvgPathNoise>,
     ) {
+        val startX = userLeft + clipLeft.toDouble() * invCanvasScaleX
+        val startY = userTop + clipTop.toDouble() * invCanvasScaleY
+        val startLatticeX = (startX / unitSizeX) * baseFrequencyX
+        val startLatticeY = (startY / unitSizeY) * baseFrequencyY
+
         for (y in clipTop until clipBottom) {
             val userY = userTop + y.toDouble() * invCanvasScaleY
-            val py0 = ((userY - originY) / unitSizeY) * baseFrequencyY
+            val py0 = (userY / unitSizeY) * baseFrequencyY
             for (x in clipLeft until clipRight) {
                 val userX = userLeft + x.toDouble() * invCanvasScaleX
-                val px0 = ((userX - originX) / unitSizeX) * baseFrequencyX
+                val px0 = (userX / unitSizeX) * baseFrequencyX
 
                 var r = 0.0
                 var g = 0.0
                 var b = 0.0
                 var a = 0.0
 
-                for (channel in 0 until 4) {
-                    var value = 0.0
-                    var ratio = 1.0
-                    var px = px0
-                    var py = py0
-                    var octavePeriodX = periodX
-                    var octavePeriodY = periodY
-                    for (_ in 0 until octaves) {
-                        val n = generators[channel].noise2(px, py, octavePeriodX, octavePeriodY)
-                        value += if (fractalNoise) n / ratio else abs(n) / ratio
-                        px *= 2.0
-                        py *= 2.0
-                        ratio *= 2.0
-                        octavePeriodX += octavePeriodX
-                        octavePeriodY += octavePeriodY
-                    }
+                    val tileX = (x - clipLeft).toDouble()
+                    val tileY = (y - clipTop).toDouble()
+
+                    for (channel in 0 until 4) {
+                        var value = 0.0
+                        var ratio = 1.0
+                        var px = px0
+                        var py = py0
+                        var octavePeriodX = periodX
+                        var octavePeriodY = periodY
+
+                        // Adjust tile lattice offset per octave.
+                        var tlx = tileX * (baseFrequencyX * invCanvasScaleX / unitSizeX)
+                        var tly = tileY * (baseFrequencyY * invCanvasScaleY / unitSizeY)
+                        // Wait, freq used for tlx must match freq used for px.
+                        // px = (userLeft + tileX*invScale) / unitSize * baseFreq
+                        //    = userLeft/unitSize*baseFreq + tileX*invScale/unitSize*baseFreq.
+                        // So tlx = tileX * invScale / unitSize * baseFreq.
+                        
+                        val fX = (invCanvasScaleX / unitSizeX) * baseFrequencyX
+                        val fY = (invCanvasScaleY / unitSizeY) * baseFrequencyY
+                        var curtlx = tileX * fX
+                        var curtly = tileY * fY
+
+                        for (_ in 0 until octaves) {
+                            val wrapX = floor(curtlx).toInt() + 4096 + octavePeriodX
+                            val wrapY = floor(curtly).toInt() + 4096 + octavePeriodY
+
+                            val n = generators[channel].noise2(px, py, octavePeriodX, octavePeriodY, wrapX, wrapY)
+                            value += if (fractalNoise) n / ratio else abs(n) / ratio
+                            px *= 2.0
+                            py *= 2.0
+                            curtlx *= 2.0
+                            curtly *= 2.0
+                            ratio *= 2.0
+                            if (periodX > 0 || periodY > 0) {
+                                octavePeriodX *= 2
+                                octavePeriodY *= 2
+                            }
+                        }
                     val finalVal = if (fractalNoise) (value + 1.0) * 127.5 else value * 255.0
                     when (channel) {
                         0 -> r = finalVal

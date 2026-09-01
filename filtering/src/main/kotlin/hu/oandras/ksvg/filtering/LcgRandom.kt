@@ -22,7 +22,7 @@ package hu.oandras.ksvg.filtering
  * (librsvg / SVG 1.1 §15.25) so the noise output is byte-identical.
  */
 public class LcgRandom(seed: Int) {
-    private var currentSeed: Int = seed.coerceIn(1, Int.MAX_VALUE - 1)
+    private var currentSeed: Int = setupSeed(seed)
 
     public fun next(): Int {
         val a = 16807
@@ -32,5 +32,16 @@ public class LcgRandom(seed: Int) {
         currentSeed = a * (currentSeed % q) - r * (currentSeed / q)
         if (currentSeed <= 0) currentSeed += m
         return currentSeed
+    }
+
+    private fun setupSeed(seedIn: Int): Int {
+        var seed = seedIn
+        if (seed <= 0) {
+            seed = -(seed % (2147483647 - 1)) + 1
+        }
+        if (seed > 2147483647 - 1) {
+            seed = 2147483647 - 1
+        }
+        return seed
     }
 }

@@ -17,34 +17,9 @@
 #include <jni.h>
 #include <cmath>
 #include <cstring>
-
-// feTurbulence — SVG 1.1 §15.25 reference algorithm, adapted from Mozilla gfx
-// SVGTurbulenceRenderer-inl.h (MPL-2.0, vendored under tmp/turbulence/).
-//
-// Differences from the vendored source, all dictated by our pipeline:
-//  - output is written as UNPREMULTIPLIED ARGB_8888 ints (Bitmap.getPixels/
-//    setPixels domain) instead of premultiplied B8G8R8A8 bytes;
-//  - only the clip region is written, everything else stays transparent black;
-//  - sampling coordinates arrive pre-mapped by the caller (the Kotlin layer
-//    owns user-space -> primitive-unit -> frequency mapping and stitch
-//    frequency adjustment); this TU receives the final per-axis frequency and
-//    the lattice periods.
-//
-// Architecture strategy: like the vendored source, the SIMD axis is the four
-// COLOR CHANNELS of one pixel (one f32x4 lane per channel), not adjacent
-// pixels — the lattice lookups would require gathers across pixels. Therefore
-// there is exactly one wide path per ISA family:
-//   - ARM (armv7 NEON + AArch64): float32x4_t
-//   - x86 (SSE2 baseline and up; wider ISAs cannot exceed the 4-channel width)
-// plus a portable scalar reference. All paths perform identical operations in
-// the same order; results agree because each lane is independent.
-//
-// State: the lattice tables are rebuilt per call on the stack (~10 KB) — no
-// shared/global mutable state.
+#include <algorithm>
 
 #include "turbulence_core.h"
-
-
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
@@ -66,69 +41,75 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
     LatticeTables tables;
     initLattice(tables, seed);
 
-    // Transparent outside the clip.
     std::memset(pixels, 0, static_cast<size_t>(width) * height * sizeof(jint));
 
     const bool stitchEnabled = periodX > 0 && periodY > 0;
-    StitchInfo stitch;
-    stitch.width = periodX;
-    stitch.height = periodY;
-    stitch.wrapX = periodX;
-    stitch.wrapY = periodY;
-
     const bool fractal = fractalNoise == JNI_TRUE;
+
+    const double fX = (invCanvasScaleX / unitSizeX) * baseFrequencyX;
+    const double fY = (invCanvasScaleY / unitSizeY) * baseFrequencyY;
 
     for (jint y = clipTop; y < clipBottom; y++) {
         const jdouble userY = userTop + y * invCanvasScaleY;
-        const jdouble py0 = (userY - originY) / unitSizeY * baseFrequencyY;
+        const jdouble py0 = userY / unitSizeY * baseFrequencyY;
+        const double tileY = static_cast<double>(y - clipTop);
+        const jint rowOffset = y * width;
+
         for (jint x = clipLeft; x < clipRight; x++) {
             const jdouble userX = userLeft + x * invCanvasScaleX;
-            const jdouble px0 = (userX - originX) / unitSizeX * baseFrequencyX;
+            const jdouble px0 = userX / unitSizeX * baseFrequencyX;
+            const double tileX = static_cast<double>(x - clipLeft);
 
             float sums[4] = {0.f, 0.f, 0.f, 0.f};
-            StitchInfo si = stitch;
-            float ratio = 1.f;
-            double fx = px0;
-            double fy = py0;
 
-            for (jint octave = 0; octave < octaves; octave++) {
-                float noise[4];
-#if defined(__ARM_NEON__) || defined(__ARM_NEON__) || defined(__SSE2__)
-                noise2Vec(tables, fx, fy, si, stitchEnabled, noise);
-#else
-                noise2(tables, fx, fy, si, stitchEnabled, noise);
-#endif
-                if (fractal) {
-                    sums[0] += noise[0] / ratio;
-                    sums[1] += noise[1] / ratio;
-                    sums[2] += noise[2] / ratio;
-                    sums[3] += noise[3] / ratio;
-                } else {
-                    sums[0] += std::abs(noise[0]) / ratio;
-                    sums[1] += std::abs(noise[1]) / ratio;
-                    sums[2] += std::abs(noise[2]) / ratio;
-                    sums[3] += std::abs(noise[3]) / ratio;
-                }
-                fx *= 2.f;
-                fy *= 2.f;
-                ratio *= 2.f;
-                if (stitchEnabled) {
-                    si.width *= 2; si.wrapX *= 2;
-                    si.height *= 2; si.wrapY *= 2;
+            for (int ch = 0; ch < 4; ch++) {
+                double fx = px0;
+                double fy = py0;
+                double curtlx = tileX * fX;
+                double curtly = tileY * fY;
+                float ratio = 1.f;
+                StitchInfo si;
+                si.width = periodX;
+                si.height = periodY;
+
+                for (jint octave = 0; octave < octaves; octave++) {
+                    if (stitchEnabled) {
+                        si.wrapX = static_cast<int32_t>(std::floor(curtlx)) + 4096 + si.width;
+                        si.wrapY = static_cast<int32_t>(std::floor(curtly)) + 4096 + si.height;
+                    }
+
+                    float n;
+                    noise2(tables, ch, fx, fy, si, stitchEnabled, n);
+
+                    if (fractal) {
+                        sums[ch] += n / ratio;
+                    } else {
+                        sums[ch] += std::abs(n) / ratio;
+                    }
+
+                    fx *= 2.0;
+                    fy *= 2.0;
+                    curtlx *= 2.0;
+                    curtly *= 2.0;
+                    ratio *= 2.0;
+                    if (stitchEnabled) {
+                        si.width *= 2;
+                        si.height *= 2;
+                    }
                 }
             }
 
             jint comps[4];
             for (int ch = 0; ch < 4; ch++) {
                 const float finalVal = fractal ? (sums[ch] + 1.0f) * 127.5f : sums[ch] * 255.0f;
-                jint iv = static_cast<jint>(finalVal + 0.5f);
+                jint iv = static_cast<jint>(std::floor(finalVal + 0.5f));
                 if (iv < 0) iv = 0; else if (iv > 255) iv = 255;
                 comps[ch] = iv;
             }
-            pixels[y * width + x] =
+            pixels[rowOffset + x] =
                     (comps[3] << 24) | (comps[0] << 16) | (comps[1] << 8) | comps[2];
         }
     }
 
-    env->ReleasePrimitiveArrayCritical(jPixels, pixels, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jPixels, pixels, 0);
 }

@@ -84,6 +84,19 @@ Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/N
     ./gradlew :ksvg:testDebugUnitTest -PexcludeSlowTests -Dorg.gradle.warning.mode=none
     ```
     Run it only before major releases or after changes to the animation engine.
+ *   **Native vs Kotlin kernel parity**: `filtering/.../TurbulenceNativeParityTest` compares the
+     native feTurbulence kernel (via `SoftwareKernels`) against the pure-Kotlin reference
+     (`KotlinKernels`) bit-exactly. It is a host-JVM test that loads a host-architecture
+     (`x86_64`) build of `libksvgblur`. The `:filtering` `buildHostNativeLib` task generates it
+     automatically (into `filtering/build/host-native/`) and the test task depends on it, so
+     running the test is all you need:
+     ```bash
+     ./gradlew :filtering:testDebugUnitTest --tests "hu.oandras.ksvg.filtering.TurbulenceNativeParityTest"
+     ```
+     The host CMake project lives at `tmp/native-host/` (git-ignored); touching any native filter
+     source or that CMakeLists invalidates the up-to-date check and rebuilds. If the host lib is
+     absent/unloadable the test fails loudly (it asserts the native path actually ran), rather than
+     silently comparing Kotlin against Kotlin.
 
 ## Tracking Progress
 *   **`SVG-SUPPORT.md`**: This is the **Source of Truth** for supported features. If you implement or improve a feature, update its status (Full/Partial/None) here.

@@ -43,7 +43,7 @@ class AiVisualDiffTest(private val svgFile: File) {
         if (!outDir.exists()) outDir.mkdirs()
 
         val refBitmap = if (refPng.exists()) decodePng(refPng, tempRef) else null
-        val libBitmap = renderWithLibrary(svgFile, tempOut)
+        val libBitmap = renderWithLibrary(svgFile, tempOut, softwareFiltering = true)
 
         if (refBitmap != null) {
             val similarity = comparator.compareBitmaps(refBitmap, libBitmap)
