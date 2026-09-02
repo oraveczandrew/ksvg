@@ -56,4 +56,40 @@ internal object TurbulenceNative {
         unitSizeY: Double,
         seed: Int,
     )
+
+    /**
+     * Validation/test-only twin of [apply]. Runs an explicitly selected backend
+     * regardless of normal CPU dispatch.
+     */
+    @JvmStatic
+    @Suppress("LongParameterList")
+    external fun applyForced(
+        pixels: IntArray,
+        width: Int,
+        height: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        baseFrequencyX: Double,
+        baseFrequencyY: Double,
+        periodX: Int,
+        periodY: Int,
+        octaves: Int,
+        fractalNoise: Boolean,
+        invCanvasScaleX: Double,
+        invCanvasScaleY: Double,
+        userLeft: Double,
+        userTop: Double,
+        originX: Double,
+        originY: Double,
+        unitSizeX: Double,
+        unitSizeY: Double,
+        seed: Int,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(): Int
 }

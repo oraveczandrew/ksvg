@@ -18,13 +18,16 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <cassert>
+#include "cpu_dispatch.h"
 
 #include "turbulence_core.h"
 
-extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
-        JNIEnv* env, jclass clazz,
-        const jintArray jPixels,
+
+namespace {
+
+void applyScalar(
+        jint* pixels,
         const jint width, const jint height,
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jdouble baseFrequencyX, const jdouble baseFrequencyY,
@@ -35,20 +38,14 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
         const jdouble originX, const jdouble originY,
         const jdouble unitSizeX, const jdouble unitSizeY,
         const jint seed) {
-    auto* pixels = static_cast<jint*>(env->GetPrimitiveArrayCritical(jPixels, nullptr));
-    if (pixels == nullptr) return;
-
     LatticeTables tables;
     initLattice(tables, seed);
 
     std::memset(pixels, 0, static_cast<size_t>(width) * height * sizeof(jint));
 
-    const bool stitchEnabled = periodX > 0 && periodY > 0;
+    const bool stitchEnabled = periodX > 0 || periodY > 0;
     const bool fractal = fractalNoise == JNI_TRUE;
 
-    // Stitch wrap-lattice offset must use the RAW pixel index times baseFrequency,
-    // matching librsvg (wrap_x = (tile_x * bf) as usize + PERLIN_N + width), not the
-    // inv-canvas/unitSize-scaled factor.
     const double fX = baseFrequencyX;
     const double fY = baseFrequencyY;
 
@@ -63,14 +60,14 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
             const jdouble px0 = userX / unitSizeX * baseFrequencyX;
             const double tileX = static_cast<double>(x - clipLeft);
 
-            float sums[4] = {0.f, 0.f, 0.f, 0.f};
+            double sums[4] = {0.0, 0.0, 0.0, 0.0};
 
             for (int ch = 0; ch < 4; ch++) {
                 double fx = px0;
                 double fy = py0;
                 double curtlx = tileX * fX;
                 double curtly = tileY * fY;
-                float ratio = 1.f;
+                double ratio = 1.0;
                 StitchInfo si;
                 si.width = periodX;
                 si.height = periodY;
@@ -81,7 +78,7 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
                         si.wrapY = static_cast<int32_t>(std::floor(curtly)) + 4096 + si.height;
                     }
 
-                    float n;
+                    double n;
                     noise2(tables, ch, fx, fy, si, stitchEnabled, n);
 
                     if (fractal) {
@@ -104,8 +101,8 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
 
             jint comps[4];
             for (int ch = 0; ch < 4; ch++) {
-                const float finalVal = fractal ? (sums[ch] + 1.0f) * 127.5f : sums[ch] * 255.0f;
-                jint iv = static_cast<jint>(std::floor(finalVal + 0.5f));
+                const double finalVal = fractal ? (sums[ch] + 1.0) * 127.5 : sums[ch] * 255.0;
+                jint iv = static_cast<jint>(std::floor(finalVal + 0.5));
                 if (iv < 0) iv = 0; else if (iv > 255) iv = 255;
                 comps[ch] = iv;
             }
@@ -113,6 +110,69 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
                     (comps[3] << 24) | (comps[0] << 16) | (comps[1] << 8) | comps[2];
         }
     }
+}
 
-    env->ReleasePrimitiveArrayCritical(jPixels, pixels, 0);
+jint nativeBackendForAbi() {
+    return SIMD_BACKEND_SCALAR;
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_TurbulenceNative_nativeBackend(
+        JNIEnv* env, jclass clazz) {
+    return nativeBackendForAbi();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
+        JNIEnv* env, jclass clazz,
+        const jintArray jPixels,
+        const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jdouble baseFrequencyX, const jdouble baseFrequencyY,
+        const jint periodX, const jint periodY,
+        const jint octaves, const jboolean fractalNoise,
+        const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+        const jdouble userLeft, const jdouble userTop,
+        const jdouble originX, const jdouble originY,
+        const jdouble unitSizeX, const jdouble unitSizeY,
+        const jint seed, const jint simdBackend) {
+    (void)simdBackend;
+    assert(simdBackend == SIMD_BACKEND_SCALAR);
+
+    auto* pixels = env->GetIntArrayElements(jPixels, nullptr);
+    if (pixels == nullptr) return;
+
+    applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                unitSizeX, unitSizeY, seed);
+
+    env->ReleaseIntArrayElements(jPixels, pixels, 0);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
+        JNIEnv* env, jclass clazz,
+        const jintArray jPixels,
+        const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jdouble baseFrequencyX, const jdouble baseFrequencyY,
+        const jint periodX, const jint periodY,
+        const jint octaves, const jboolean fractalNoise,
+        const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+        const jdouble userLeft, const jdouble userTop,
+        const jdouble originX, const jdouble originY,
+        const jdouble unitSizeX, const jdouble unitSizeY,
+        const jint seed) {
+    auto* pixels = env->GetIntArrayElements(jPixels, nullptr);
+    if (pixels == nullptr) return;
+
+    applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                unitSizeX, unitSizeY, seed);
+
+    env->ReleaseIntArrayElements(jPixels, pixels, 0);
 }
