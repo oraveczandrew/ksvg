@@ -99,7 +99,7 @@ private class FallbackScratch : StackBlurScratch {
  * where the Kotlin fallback is used and no native call occurs.
  */
 public fun StackBlurScratch(): StackBlurScratch =
-    if (NativeGaussianBlur.isAvailable) NativeScratch() else FallbackScratch()
+    if (NativeBackend.isAvailable) NativeScratch() else FallbackScratch()
 
 /**
  * Native, true-Gaussian blur backed by a bundled shared library (`libksvgblur.so`,
@@ -114,14 +114,6 @@ public fun StackBlurScratch(): StackBlurScratch =
  * blur without needing to branch on availability themselves.
  */
 internal object NativeGaussianBlur {
-
-    @JvmField
-    val isAvailable: Boolean = try {
-        System.loadLibrary("ksvgblur")
-        true
-    } catch (_: Throwable) {
-        false
-    }
 
     @JvmStatic
     external fun nativeBlur(

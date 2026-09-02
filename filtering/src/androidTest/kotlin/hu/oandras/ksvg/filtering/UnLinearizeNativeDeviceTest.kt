@@ -20,7 +20,6 @@ import android.os.Build
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -32,24 +31,24 @@ import org.junit.runner.RunWith
  * Reports ABI, SIMD level, and selected backend for the validation matrix.
  */
 @RunWith(AndroidJUnit4::class)
-class UnlinearizeNativeDeviceTest {
+class UnLinearizeNativeDeviceTest {
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on device", UnlinearizeNative.isAvailable)
+        assertNativeBackendAvailable()
         
         Log.i("UnlinearizeValidation", "Testing backend: $backendName")
         Log.i("UnlinearizeValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
-        Log.i("UnlinearizeValidation", "Dispatched backend: ${UnlinearizeNative.nativeBackend()}")
+        Log.i("UnlinearizeValidation", "Dispatched backend: ${UnLinearizeNative.nativeBackend()}")
 
         for (case in UnlinearizeValidationCorpus.cases) {
             val expected = case.reference()
             val actual = if (case.inPlace) {
                 val buf = case.freshInput()
-                UnlinearizeNative.applyForced(buf, buf, case.width, case.height, case.table, backend)
+                UnLinearizeNative.applyForced(buf, buf, case.width, case.height, case.table, backend)
                 buf
             } else {
                 val out = IntArray(case.size)
-                UnlinearizeNative.applyForced(
+                UnLinearizeNative.applyForced(
                     case.freshInput(), out, case.width, case.height, case.table, backend
                 )
                 out
@@ -98,16 +97,16 @@ class UnlinearizeNativeDeviceTest {
      */
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", UnlinearizeNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in UnlinearizeValidationCorpus.cases) {
             val expected = case.reference()
             val actual = if (case.inPlace) {
                 val buf = case.freshInput()
-                UnlinearizeNative.apply(buf, buf, case.width, case.height, case.table)
+                UnLinearizeNative.apply(buf, buf, case.width, case.height, case.table)
                 buf
             } else {
                 val out = IntArray(case.size)
-                UnlinearizeNative.apply(case.freshInput(), out, case.width, case.height, case.table)
+                UnLinearizeNative.apply(case.freshInput(), out, case.width, case.height, case.table)
                 out
             }
             assertArrayEquals(

@@ -30,7 +30,7 @@ class GaussianBlurValidationTest {
     }
 
     private fun checkBackend(backend: Int, backendName: String, tolerance: Int = 0) {
-        assertTrue("libksvgblur not loadable on host", NativeGaussianBlur.isAvailable)
+        assertNativeBackendAvailable()
         val scratch = NativeGaussianBlur.createScratch()
         try {
             for (case in GaussianBlurValidationCorpus.cases) {
@@ -78,7 +78,7 @@ class GaussianBlurValidationTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on host", NativeGaussianBlur.isAvailable)
+        assertNativeBackendAvailable()
         val scratch = NativeGaussianBlur.createScratch()
         try {
             for (case in GaussianBlurValidationCorpus.cases) {

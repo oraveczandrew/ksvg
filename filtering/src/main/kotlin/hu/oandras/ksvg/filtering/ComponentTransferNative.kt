@@ -31,7 +31,7 @@ package hu.oandras.ksvg.filtering
 internal object ComponentTransferNative {
 
     @JvmField
-    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
     external fun apply(

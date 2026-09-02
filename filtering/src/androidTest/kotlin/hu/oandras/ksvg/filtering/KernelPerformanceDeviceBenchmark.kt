@@ -88,8 +88,8 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("Unlinearize", UnlinearizeNative.nativeBackend(), w, h) { b ->
-                UnlinearizeNative.applyForced(src, dst, w, h, table, b)
+            benchmarkSingle("Unlinearize", UnLinearizeNative.nativeBackend(), w, h) { b ->
+                UnLinearizeNative.applyForced(src, dst, w, h, table, b)
             }
         }
     }

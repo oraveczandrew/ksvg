@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LightingValidationTest {
@@ -30,7 +29,7 @@ class LightingValidationTest {
     }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on host", LightingNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in LightingValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -61,7 +60,7 @@ class LightingValidationTest {
 
     @Test
     fun productionDispatchSelectsHighest() {
-        assertTrue("libksvgblur not loadable on host", LightingNative.isAvailable)
+        assertNativeBackendAvailable()
         // Lighting only has one vector path (SSE2 minimum), reported as SSSE3 by dispatcher.
         assertEquals(
             "expected ssse3 as the dispatched lighting backend on this host",
@@ -72,7 +71,7 @@ class LightingValidationTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on host", LightingNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in LightingValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

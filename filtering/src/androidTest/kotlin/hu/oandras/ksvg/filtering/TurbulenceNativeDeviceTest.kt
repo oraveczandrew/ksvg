@@ -20,7 +20,6 @@ import android.os.Build
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -31,7 +30,7 @@ import org.junit.runner.RunWith
 class TurbulenceNativeDeviceTest {
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on device", TurbulenceNative.isAvailable)
+        assertNativeBackendAvailable()
         
         Log.i("TurbulenceValidation", "Testing backend: $backendName")
         Log.i("TurbulenceValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
@@ -61,7 +60,7 @@ class TurbulenceNativeDeviceTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", TurbulenceNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in TurbulenceValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MorphologyValidationTest {
@@ -30,7 +29,7 @@ class MorphologyValidationTest {
     }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on host", MorphologyNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in MorphologyValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -61,7 +60,7 @@ class MorphologyValidationTest {
 
     @Test
     fun productionDispatchSelectsHighest() {
-        assertTrue("libksvgblur not loadable on host", MorphologyNative.isAvailable)
+        assertNativeBackendAvailable()
         // On this host (i7-7820X) it should be AVX512.
         assertEquals(
             "expected avx512 as the dispatched morphology backend on this host",
@@ -72,7 +71,7 @@ class MorphologyValidationTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on host", MorphologyNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in MorphologyValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

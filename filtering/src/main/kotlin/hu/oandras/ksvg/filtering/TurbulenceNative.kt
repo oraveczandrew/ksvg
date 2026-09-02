@@ -24,12 +24,12 @@ package hu.oandras.ksvg.filtering
  *
  * Stateless: lattice tables are rebuilt per call on the native stack; no
  * shared/global state. Availability follows `libksvgblur`
- * ([NativeGaussianBlur.isAvailable]).
+ * ([NativeBackend.isAvailable]).
  */
 internal object TurbulenceNative {
 
     @JvmField
-    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
     external fun apply(

@@ -20,7 +20,6 @@ import android.os.Build
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -31,7 +30,7 @@ import org.junit.runner.RunWith
 class ArithmeticCompositeNativeDeviceTest {
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on device", ArithmeticCompositeNative.isAvailable)
+        assertNativeBackendAvailable()
         
         Log.i("ArithmeticValidation", "Testing backend: $backendName")
         Log.i("ArithmeticValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
@@ -57,7 +56,7 @@ class ArithmeticCompositeNativeDeviceTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", ArithmeticCompositeNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in ArithmeticCompositeValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

@@ -22,12 +22,12 @@ package hu.oandras.ksvg.filtering
  * transparent-black padding semantics, clip-region-only output.
  *
  * Stateless: caller-owned pixel arrays (reused node buffers), no shared state.
- * Availability follows `libksvgblur` ([NativeGaussianBlur.isAvailable]).
+ * Availability follows `libksvgblur` ([NativeBackend.isAvailable]).
  */
 internal object MorphologyNative {
 
     @JvmField
-    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
     external fun apply(

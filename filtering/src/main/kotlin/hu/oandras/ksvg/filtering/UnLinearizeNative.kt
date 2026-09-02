@@ -30,10 +30,10 @@ package hu.oandras.ksvg.filtering
  * are caller-owned scratch (reused buffers), no shared/global state. Avail-
  * ability follows the same `libksvgblur` library as [NativeGaussianBlur].
  */
-internal object UnlinearizeNative {
+internal object UnLinearizeNative {
 
     @JvmField
-    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
     external fun apply(

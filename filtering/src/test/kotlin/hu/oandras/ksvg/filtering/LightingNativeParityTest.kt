@@ -17,7 +17,6 @@
 package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -47,7 +46,7 @@ class LightingNativeParityTest(
 
     @Test
     fun nativeMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on the host JVM", LightingNative.isAvailable)
+        assertNativeBackendAvailable()
 
         val width = 32
         val height = 32

@@ -284,14 +284,14 @@ jint nativeBackendForAbi() {
 } // namespace
 
 extern "C" JNIEXPORT jint JNICALL
-Java_hu_oandras_ksvg_filtering_UnlinearizeNative_nativeBackend(
-        JNIEnv* env, jclass clazz) {
+Java_hu_oandras_ksvg_filtering_UnLinearizeNative_nativeBackend(
+    [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz) {
     return nativeBackendForAbi();
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_UnlinearizeNative_applyForced(
-        JNIEnv* env, jclass clazz,
+Java_hu_oandras_ksvg_filtering_UnLinearizeNative_applyForced(
+        JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jSrc, const jintArray jDst,
         const jint width, const jint height,
         const jbyteArray jTable, const jint simdBackend) {
@@ -332,8 +332,8 @@ Java_hu_oandras_ksvg_filtering_UnlinearizeNative_applyForced(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_UnlinearizeNative_apply(
-        JNIEnv* env, jclass clazz,
+Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
+        JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jSrc, const jintArray jDst,
         const jint width, const jint height,
         const jbyteArray jTable) {

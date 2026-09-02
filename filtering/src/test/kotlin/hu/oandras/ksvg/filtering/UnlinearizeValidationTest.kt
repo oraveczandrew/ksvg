@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -43,16 +42,16 @@ class UnlinearizeValidationTest {
     }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on host", UnlinearizeNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in UnlinearizeValidationCorpus.cases) {
             val expected = case.reference()
             val actual = if (case.inPlace) {
                 val buf = case.freshInput()
-                UnlinearizeNative.applyForced(buf, buf, case.width, case.height, case.table, backend)
+                UnLinearizeNative.applyForced(buf, buf, case.width, case.height, case.table, backend)
                 buf
             } else {
                 val out = IntArray(case.size)
-                UnlinearizeNative.applyForced(
+                UnLinearizeNative.applyForced(
                     case.freshInput(), out, case.width, case.height, case.table, backend
                 )
                 out
@@ -92,11 +91,11 @@ class UnlinearizeValidationTest {
     /** The production dispatcher must select AVX2 on this host (i7-7820X ≥ AVX2). */
     @Test
     fun productionDispatchSelectsAvx2() {
-        assertTrue("libksvgblur not loadable on host", UnlinearizeNative.isAvailable)
+        assertNativeBackendAvailable()
         assertEquals(
             "expected avx2 as the dispatched unlinearize backend on this host",
             SIMD_AVX2 or SIMD_SSSE3 or SIMD_SCALAR,
-            UnlinearizeNative.nativeBackend()
+            UnLinearizeNative.nativeBackend()
         )
     }
 
@@ -107,16 +106,16 @@ class UnlinearizeValidationTest {
      */
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on host", UnlinearizeNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in UnlinearizeValidationCorpus.cases) {
             val expected = case.reference()
             val actual = if (case.inPlace) {
                 val buf = case.freshInput()
-                UnlinearizeNative.apply(buf, buf, case.width, case.height, case.table)
+                UnLinearizeNative.apply(buf, buf, case.width, case.height, case.table)
                 buf
             } else {
                 val out = IntArray(case.size)
-                UnlinearizeNative.apply(case.freshInput(), out, case.width, case.height, case.table)
+                UnLinearizeNative.apply(case.freshInput(), out, case.width, case.height, case.table)
                 out
             }
             assertArrayEquals(

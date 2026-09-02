@@ -110,10 +110,7 @@ class GaussianBlurNativeParityTest {
 
     @Test
     fun blurMatchesReference() {
-        assertTrue(
-            "NativeGaussianBlur not available on this host JVM",
-            NativeGaussianBlur.isAvailable,
-        )
+        assertNativeBackendAvailable()
         val cases = listOf(
             Case(4, 4, 0.5f, 0.5f),
             Case(7, 5, 1.5f, 1.5f),

@@ -28,12 +28,12 @@ package hu.oandras.ksvg.filtering
  * limitingConeAngleDeg] (NaN = no cone).
  *
  * Stateless: caller-owned pixel arrays, no shared state. Availability follows
- * `libksvgblur` ([NativeGaussianBlur.isAvailable]).
+ * `libksvgblur` ([NativeBackend.isAvailable]).
  */
 internal object LightingNative {
 
     @JvmField
-    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
     external fun apply(

@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConvolveValidationTest {
@@ -30,7 +29,7 @@ class ConvolveValidationTest {
     }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on host", ConvolveNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in ConvolveValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -62,7 +61,7 @@ class ConvolveValidationTest {
 
     @Test
     fun productionDispatchSelectsHighest() {
-        assertTrue("libksvgblur not loadable on host", ConvolveNative.isAvailable)
+        assertNativeBackendAvailable()
         assertEquals(
             "expected avx512 as the dispatched convolve backend on this host",
             SIMD_AVX512 or SIMD_AVX2 or SIMD_SSSE3 or SIMD_SCALAR,
@@ -72,7 +71,7 @@ class ConvolveValidationTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on host", ConvolveNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in ConvolveValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

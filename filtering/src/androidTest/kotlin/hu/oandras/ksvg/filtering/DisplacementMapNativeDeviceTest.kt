@@ -20,7 +20,6 @@ import android.os.Build
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -31,7 +30,7 @@ import org.junit.runner.RunWith
 class DisplacementMapNativeDeviceTest {
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on device", DisplacementMapNative.isAvailable)
+        assertNativeBackendAvailable()
         
         Log.i("DisplacementValidation", "Testing backend: $backendName")
         Log.i("DisplacementValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
@@ -67,7 +66,7 @@ class DisplacementMapNativeDeviceTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", DisplacementMapNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in DisplacementMapValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -33,7 +32,7 @@ import org.junit.runners.Parameterized
  * in-place (src == dst) path used by the filter-output transfer.
  */
 @RunWith(Parameterized::class)
-class UnlinearizeNativeParityTest(
+class UnLinearizeNativeParityTest(
     private val width: Int,
     private val height: Int,
     private val table: ByteArray,
@@ -73,7 +72,7 @@ class UnlinearizeNativeParityTest(
 
     @Test
     fun nativeMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on the host JVM", UnlinearizeNative.isAvailable)
+        assertNativeBackendAvailable()
 
         val src = input
         val ref = IntArray(width * height)
@@ -99,7 +98,7 @@ class UnlinearizeNativeParityTest(
      */
     @Test
     fun nativePreservesAllAlphaValues() {
-        assertTrue("libksvgblur not loadable on the host JVM", UnlinearizeNative.isAvailable)
+        assertNativeBackendAvailable()
 
         val width = 16
         val height = 16

@@ -19,12 +19,12 @@ package hu.oandras.ksvg.filtering
 /**
  * feDisplacementMap kernel over unpremultiplied ARGB_8888.
  *
- * Stateless and availability follows `libksvgblur` ([NativeGaussianBlur.isAvailable]).
+ * Stateless and availability follows `libksvgblur` ([NativeBackend.isAvailable]).
  */
 internal object DisplacementMapNative {
 
     @JvmField
-    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
     external fun apply(

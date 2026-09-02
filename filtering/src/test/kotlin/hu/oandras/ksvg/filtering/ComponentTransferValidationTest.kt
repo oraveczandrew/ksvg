@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ComponentTransferValidationTest {
@@ -30,7 +29,7 @@ class ComponentTransferValidationTest {
     }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on host", ComponentTransferNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in ComponentTransferValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -58,7 +57,7 @@ class ComponentTransferValidationTest {
 
     @Test
     fun productionDispatchSelectsHighest() {
-        assertTrue("libksvgblur not loadable on host", ComponentTransferNative.isAvailable)
+        assertNativeBackendAvailable()
         // On this host (i7-7820X) it should be AVX2.
         assertEquals(
             "expected avx2 as the dispatched component_transfer backend on this host",
@@ -69,7 +68,7 @@ class ComponentTransferValidationTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on host", ComponentTransferNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in ComponentTransferValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

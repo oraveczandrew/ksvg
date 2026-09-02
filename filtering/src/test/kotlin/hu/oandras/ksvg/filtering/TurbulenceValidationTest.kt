@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TurbulenceValidationTest {
@@ -30,7 +29,7 @@ class TurbulenceValidationTest {
     }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on host", TurbulenceNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in TurbulenceValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -56,7 +55,7 @@ class TurbulenceValidationTest {
 
     @Test
     fun productionDispatchSelectsScalar() {
-        assertTrue("libksvgblur not loadable on host", TurbulenceNative.isAvailable)
+        assertNativeBackendAvailable()
         assertEquals(
             "expected scalar as the dispatched turbulence backend on this host",
             SIMD_AVX2 or SIMD_SSSE3 or SIMD_SCALAR,
@@ -66,7 +65,7 @@ class TurbulenceValidationTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on host", TurbulenceNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in TurbulenceValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

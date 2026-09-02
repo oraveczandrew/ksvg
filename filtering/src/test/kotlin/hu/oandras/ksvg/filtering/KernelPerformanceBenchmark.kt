@@ -19,7 +19,6 @@ package hu.oandras.ksvg.filtering
 import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
-import kotlin.math.max
 
 class KernelPerformanceBenchmark {
 
@@ -105,8 +104,8 @@ class KernelPerformanceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("Unlinearize", UnlinearizeNative.nativeBackend(), w, h) { b ->
-                UnlinearizeNative.applyForced(src, dst, w, h, table, b)
+            benchmarkSingle("Unlinearize", UnLinearizeNative.nativeBackend(), w, h) { b ->
+                UnLinearizeNative.applyForced(src, dst, w, h, table, b)
             }
         }
     }

@@ -32,7 +32,7 @@ import kotlin.math.abs
 class GaussianBlurNativeDeviceTest {
 
     private fun checkBackend(backend: Int, backendName: String, tolerance: Int = 0) {
-        assertTrue("libksvgblur not loadable on device", NativeGaussianBlur.isAvailable)
+        assertNativeBackendAvailable()
         
         Log.i("BlurValidation", "Testing backend: $backendName")
         Log.i("BlurValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
@@ -89,7 +89,7 @@ class GaussianBlurNativeDeviceTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", NativeGaussianBlur.isAvailable)
+        assertNativeBackendAvailable()
         val scratch = NativeGaussianBlur.createScratch()
         try {
             for (case in GaussianBlurValidationCorpus.cases) {

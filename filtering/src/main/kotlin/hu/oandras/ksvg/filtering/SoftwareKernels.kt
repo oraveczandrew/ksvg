@@ -128,8 +128,8 @@ public object SoftwareKernels {
         height: Int,
         table: ByteArray,
     ) {
-        if (UnlinearizeNative.isAvailable) {
-            UnlinearizeNative.apply(src, dst, width, height, table)
+        if (UnLinearizeNative.isAvailable) {
+            UnLinearizeNative.apply(src, dst, width, height, table)
         } else {
             KotlinKernels.unlinearize(src, dst, width, height, table)
         }

@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DisplacementMapValidationTest {
@@ -30,7 +29,7 @@ class DisplacementMapValidationTest {
     }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on host", DisplacementMapNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in DisplacementMapValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -58,7 +57,7 @@ class DisplacementMapValidationTest {
 
     @Test
     fun productionDispatchSelectsHighest() {
-        assertTrue("libksvgblur not loadable on host", DisplacementMapNative.isAvailable)
+        assertNativeBackendAvailable()
         assertEquals(
             "expected avx512 as the dispatched displacement_map backend on this host",
             SIMD_AVX512 or SIMD_AVX2 or SIMD_SCALAR,
@@ -68,7 +67,7 @@ class DisplacementMapValidationTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on host", DisplacementMapNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in DisplacementMapValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

@@ -21,12 +21,12 @@ package hu.oandras.ksvg.filtering
  *
  * result = clamp(k1 * in1 * in2 + k2 * in1 + k3 * in2 + k4)
  *
- * Stateless and availability follows `libksvgblur` ([NativeGaussianBlur.isAvailable]).
+ * Stateless and availability follows `libksvgblur` ([NativeBackend.isAvailable]).
  */
 internal object ArithmeticCompositeNative {
 
     @JvmField
-    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
     external fun apply(

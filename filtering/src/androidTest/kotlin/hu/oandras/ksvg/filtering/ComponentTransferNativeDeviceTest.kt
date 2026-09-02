@@ -20,7 +20,6 @@ import android.os.Build
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -31,7 +30,7 @@ import org.junit.runner.RunWith
 class ComponentTransferNativeDeviceTest {
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on device", ComponentTransferNative.isAvailable)
+        assertNativeBackendAvailable()
         
         Log.i("CompTransValidation", "Testing backend: $backendName")
         Log.i("CompTransValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
@@ -79,7 +78,7 @@ class ComponentTransferNativeDeviceTest {
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", ComponentTransferNative.isAvailable)
+        assertNativeBackendAvailable()
         for (case in ComponentTransferValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

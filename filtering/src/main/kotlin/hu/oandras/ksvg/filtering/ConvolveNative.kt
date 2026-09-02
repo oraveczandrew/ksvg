@@ -23,12 +23,12 @@ package hu.oandras.ksvg.filtering
  * uses the `ConvolveMatrixEdgeMode` ordinal: 0=duplicate, 1=wrap, 2=none.
  *
  * Stateless: caller-owned pixel/kernel arrays, no shared state. Availability
- * follows `libksvgblur` ([NativeGaussianBlur.isAvailable]).
+ * follows `libksvgblur` ([NativeBackend.isAvailable]).
  */
 internal object ConvolveNative {
 
     @JvmField
-    val isAvailable: Boolean = NativeGaussianBlur.isAvailable
+    val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
     external fun apply(
