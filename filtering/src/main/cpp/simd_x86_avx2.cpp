@@ -218,30 +218,78 @@ void ksvgComponentTransferApplyAvx2(
     }
 }
 
+// One 16-byte LUT row duplicated into both AVX2 128-bit lanes so the per-lane
+// pshufb selects correctly for every byte of the 32-byte register.
+static inline __m256i lutRowBroadcast256(const jbyte* table, int row) {
+    const __m128i v = _mm_loadu_si128(
+            reinterpret_cast<const __m128i*>(table + row * 16));
+    return _mm256_broadcastsi128_si256(v);
+}
+
+// Genuinely vectorized 256-entry LUT lookup over the 32 bytes (8 pixels) of an
+// AVX2 register using the 16-row pshufb scheme (entry = rows[hi][lo]). Because
+// every byte is looked up in the SAME table, the whole register is transformed
+// in one pass — no channel plane extraction or re-interleaving needed.
+static inline __m256i lut256Avx2(__m256i value, const __m256i rows[16]) {
+    const __m256i loMask = _mm256_set1_epi8(0x0f);
+    const __m256i lo = _mm256_and_si256(value, loMask);
+    const __m256i hi = _mm256_and_si256(_mm256_srli_epi16(value, 4), loMask);
+
+    __m256i result = _mm256_setzero_si256();
+    for (int row = 0; row < 16; ++row) {
+        const __m256i candidate = _mm256_shuffle_epi8(rows[row], lo);
+        const __m256i selected =
+                _mm256_cmpeq_epi8(hi, _mm256_set1_epi8(static_cast<char>(row)));
+        result = _mm256_or_si256(result, _mm256_and_si256(candidate, selected));
+    }
+    return result;
+}
+
 void ksvgUnlinearizeApplyAvx2(
         jint* dst, const jint* src, int width, int height, const jbyte* table) {
     const int total = width * height;
+
+    // rows[i] = table[i*16..i*16+15] duplicated into both AVX2 lanes.
+    __m256i rows[16];
+    for (int i = 0; i < 16; ++i) {
+        rows[i] = lutRowBroadcast256(table, i);
+    }
+
+    // 0xff in the alpha byte positions (offset 3, 7, 11, 15, 19, 23, 27, 31),
+    // i.e. one per pixel across the 8 pixels of the 32-byte register.
+    const __m256i alphaMaskBytes = _mm256_setr_epi8(
+            0, 0, 0, -1,
+            0, 0, 0, -1,
+            0, 0, 0, -1,
+            0, 0, 0, -1,
+            0, 0, 0, -1,
+            0, 0, 0, -1,
+            0, 0, 0, -1,
+            0, 0, 0, -1);
+
     int i = 0;
     for (; i + 8 <= total; i += 8) {
-        __m256i p = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src + i));
-        alignas(32) jint pixels[8];
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(pixels), p);
-        alignas(32) jint res[8];
-        for (int k = 0; k < 8; k++) {
-            jint c = pixels[k];
-            res[k] = (c & 0xFF000000) |
-                     ((static_cast<jint>(table[(c >> 16) & 0xFF]) & 0xFF) << 16) |
-                     ((static_cast<jint>(table[(c >> 8) & 0xFF]) & 0xFF) << 8) |
-                     (static_cast<jint>(table[c & 0xFF]) & 0xFF);
-        }
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + i), _mm256_loadu_si256(reinterpret_cast<const __m256i*>(res)));
+        const __m256i p = _mm256_loadu_si256(
+                reinterpret_cast<const __m256i*>(src + i));
+
+        // Every byte (B/G/R/A) is mapped by the shared LUT in one pass.
+        const __m256i transformed = lut256Avx2(p, rows);
+
+        // Restore the original alpha bytes (their transformed value is discarded).
+        const __m256i out = _mm256_or_si256(
+                _mm256_andnot_si256(alphaMaskBytes, transformed),
+                _mm256_and_si256(alphaMaskBytes, p));
+
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + i), out);
     }
-    for (; i < total; i++) {
-        jint c = src[i];
-        dst[i] = (c & 0xFF000000) |
-                 ((static_cast<jint>(table[(c >> 16) & 0xFF]) & 0xFF) << 16) |
-                 ((static_cast<jint>(table[(c >> 8) & 0xFF]) & 0xFF) << 8) |
-                 (static_cast<jint>(table[c & 0xFF]) & 0xFF);
+
+    // Scalar tail for the remainder that does not fit the SIMD width.
+    for (; i < total; ++i) {
+        const jint c = src[i];
+        dst[i] = (c & 0xff000000) |
+                 (static_cast<jint>(static_cast<uint8_t>(table[(c >> 16) & 0xff])) << 16) |
+                 (static_cast<jint>(static_cast<uint8_t>(table[(c >> 8) & 0xff])) << 8) |
+                 static_cast<jint>(static_cast<uint8_t>(table[c & 0xff]));
     }
 }
 

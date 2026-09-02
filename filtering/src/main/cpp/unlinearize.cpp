@@ -37,6 +37,8 @@
 //    table selection (see note vs vqtbl4q below). Pure permutation — bit-exact.
 //  - x86 (SSSE3): 4 px/iteration, pshufb-based 16-row selection scheme
 //    (entry = table[hi*16+lo]). Pure byte permutation — bit-exact.
+//  - x86 (AVX2): 8 px/iteration, same 16-row scheme over a full 32-byte
+//    register with alpha restored by masking. Pure byte permutation — bit-exact.
 //  - armv7 (NEON): 8 px/iteration, same 16-row scheme with vtbl2_u8.
 //  - Anything else: scalar reference loop.
 
@@ -112,59 +114,55 @@ void applyNeon64(const jint* src, jint* dst, const jint width, const jint height
 #if defined(__SSSE3__)
 #include <tmmintrin.h>
 
+static inline __m128i lutRow128(const jbyte* table, int row) {
+    return _mm_loadu_si128(reinterpret_cast<const __m128i*>(table + row * 16));
+}
+
 /**
- * 256-entry LUT gather over the 16 bytes of `valueBytes` using pshufb.
+ * 256-entry LUT over the 16 bytes of `value` using pshufb.
  * The table's natural row-major layout means entry = rows[hi][lo], so for
  * each high-nibble value i we select candidates with one shuffle and mask
- * them in with cmpeq. Pure byte permutation — bit-exact with scalar.
+ * them in with cmpeq. R/G/B share the table, so we transform every byte
+ * (alpha included) in one pass; alpha is restored afterwards by masking.
+ * Pure byte permutation — bit-exact with scalar.
  */
-inline __m128i lutGatherSSSE3(const __m128i* rows, __m128i valueBytes) {
+static inline __m128i lut256Ssse3(__m128i value, const __m128i rows[16]) {
     const __m128i loMask = _mm_set1_epi8(0x0F);
-    const __m128i lo = _mm_and_si128(valueBytes, loMask);
-    const __m128i hi = _mm_and_si128(_mm_srli_epi16(valueBytes, 4), loMask);
+    const __m128i lo = _mm_and_si128(value, loMask);
+    const __m128i hi = _mm_and_si128(_mm_srli_epi16(value, 4), loMask);
     __m128i result = _mm_setzero_si128();
-    for (int i = 0; i < 16; i++) {
-        const __m128i candidate = _mm_shuffle_epi8(_mm_loadu_si128(rows + i), lo);
-        const __m128i sel = _mm_cmpeq_epi8(hi, _mm_set1_epi8(static_cast<char>(i)));
-        result = _mm_or_si128(result, _mm_and_si128(candidate, sel));
+    for (int row = 0; row < 16; ++row) {
+        const __m128i candidate = _mm_shuffle_epi8(rows[row], lo);
+        const __m128i selected = _mm_cmpeq_epi8(hi, _mm_set1_epi8(static_cast<char>(row)));
+        result = _mm_or_si128(result, _mm_and_si128(candidate, selected));
     }
     return result;
 }
 
-inline __m128i extractChannelSSSE3(__m128i pixels4, int lane) {
-    // Pick the byte at position lane+4k of pixel k into byte k.
-    return _mm_shuffle_epi8(pixels4, _mm_set_epi8(
-            static_cast<char>(0x80), static_cast<char>(0x80), static_cast<char>(0x80),
-            static_cast<char>(lane + 12),
-            static_cast<char>(0x80), static_cast<char>(0x80), static_cast<char>(0x80),
-            static_cast<char>(lane + 8),
-            static_cast<char>(0x80), static_cast<char>(0x80), static_cast<char>(0x80),
-            static_cast<char>(lane + 4),
-            static_cast<char>(0x80), static_cast<char>(0x80), static_cast<char>(0x80),
-            static_cast<char>(lane)));
-}
-
 void applySsse3(jint* src, jint* dst, jint width, jint height, const jbyte* table) {
-    alignas(16) __m128i rows[16];
+    __m128i rows[16];
     for (int i = 0; i < 16; i++) {
-        rows[i] = _mm_loadu_si128(reinterpret_cast<const __m128i*>(table + i * 16));
+        rows[i] = lutRow128(table, i);
     }
+
+    // Packed jint is little-endian: [B G R A] [B G R A] ...
+    // Transform B/G/R with the same LUT; restore original alpha bytes (the
+    // 4th byte of each pixel) afterwards.
+    const __m128i alphaMask = _mm_setr_epi8(
+            0, 0, 0, -1,
+            0, 0, 0, -1,
+            0, 0, 0, -1,
+            0, 0, 0, -1);
 
     const jint total = width * height;
     jint i = 0;
     for (; i + 4 <= total; i += 4) {
-        const __m128i pixels4 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src + i));
-        const __m128i outB = lutGatherSSSE3(rows, extractChannelSSSE3(pixels4, 0));
-        const __m128i outG = lutGatherSSSE3(rows, extractChannelSSSE3(pixels4, 1));
-        const __m128i outR = lutGatherSSSE3(rows, extractChannelSSSE3(pixels4, 2));
-        const __m128i outA = extractChannelSSSE3(pixels4, 3);
-        // Interleave back to [B,G,R,A] byte order: two 2-pixel ints in lo, two in hi.
-        const __m128i bg = _mm_unpacklo_epi8(outB, outG);
-        const __m128i ra = _mm_unpacklo_epi8(outR, outA);
-        const __m128i lo = _mm_unpacklo_epi16(bg, ra);
-        const __m128i hi = _mm_unpackhi_epi16(bg, ra);
-        _mm_storel_epi64(reinterpret_cast<__m128i*>(dst + i), lo);
-        _mm_storeh_pi(reinterpret_cast<__m64*>(dst + i + 2), _mm_castsi128_ps(hi));
+        const __m128i p = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src + i));
+        const __m128i transformed = lut256Ssse3(p, rows);
+        const __m128i out = _mm_or_si128(
+                _mm_andnot_si128(alphaMask, transformed),
+                _mm_and_si128(alphaMask, p));
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + i), out);
     }
     for (; i < total; i++) {
         const jint c = src[i];
