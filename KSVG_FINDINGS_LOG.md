@@ -102,3 +102,28 @@ Format for each entry:
 - **Resolution:** `SVG-SUPPORT.md` CSS keywords section updated: `unset`,
   `initial`, `revert` → Partial with behavioral notes; explicit note that
   `var()`/`revert-layer`/`@layer` are unsupported.
+
+---
+
+## feTurbulence stitch tile-size basis (tile from device-pixel extents)
+
+- **Location:** `FilterGeneration.kt` (`doFeTurbulenceFilter`, stitch branch).
+- **What changed:** sting tile size now derives from the device-pixel kernel
+  extents instead of a `ceil` of the user-space region. Replaced
+  `ceil(filterRegion.width().toDouble())` / `ceil(filterRegion.height().toDouble())`
+  with `width.toDouble()` / `height.toDouble()` (`filterRegionPx` extents), the
+  same semantic region librsvg uses (`bounds.width()/bounds.height()` of the
+  output IRect). Kernel, parity test, clip, and geometry untouched.
+- **Similarity on `turbulence_seed_stitch.svg`** (AiVisualDiffTest, software
+  filtering): baseline 0.3492 → after change 0.4012
+  (diffPixels 38832→29213, cornerDiff 11786→9080, meanAbsErr 24.03→18.44).
+  KSVG bfX + both periods now match librsvg; bfY differs only via the row below.
+- **Tests passed:** full `:ksvg:testDebugUnitTest` (5025 tests) — identical
+  12/12 pre-existing failure set before/after, zero new regressions.
+  `TurbulenceKernelParityTest` 2/2 green (forced re-run), kernel unchanged.
+- **Remaining discrepancy (not addressed):** librsvg renders 194 rows vs
+  KSVG's 193 for the fixture. Root cause pinned: librsvg parses the default
+  filter-region percentages (`−10%, 120%`) at f32 precision, so its device
+  bounds.top lands at 15.999999761581421 (below the pixel boundary) →
+  `floor`→15, 194 rows, and an offset tile_y. Matching it exactly would require
+  changing default filter-region geometry for all filters — out of scope.

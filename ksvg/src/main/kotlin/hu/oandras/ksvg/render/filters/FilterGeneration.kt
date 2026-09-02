@@ -81,8 +81,12 @@ internal fun doFeTurbulenceFilter(
     var periodY = 0
 
     if (primitive.stitchTiles == FeStitchTiles.stitch) {
-        val tileWidthPx = ceil(filterRegion.width().toDouble())
-        val tileHeightPx = ceil(filterRegion.height().toDouble())
+        // Stitch tile size = the device-pixel bounds of the primitive region
+        // (the pixels this kernel fills), matching librsvg, which derives the
+        // stitch tile from bounds.width()/bounds.height() of the output IRect
+        // instead of from a ceil of the user-space region.
+        val tileWidthPx = width.toDouble()
+        val tileHeightPx = height.toDouble()
 
         if (tileWidthPx > 0.0 && baseX != 0.0) {
             val freq = baseX
