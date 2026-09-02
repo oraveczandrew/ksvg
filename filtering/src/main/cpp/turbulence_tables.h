@@ -110,8 +110,30 @@ static inline void initBaseTables(
     }
 }
 
+struct ScalarLatticeTables {
+    uint8_t selector[S_TABLE_SIZE];
+    double gradX[4][S_TABLE_SIZE][2];
+};
+
+static inline void initScalarTables(ScalarLatticeTables& t, const int32_t seed) {
+    initBaseTables(t.selector, t.gradX, seed);
+}
+
+#if defined(__i386__) || defined(__x86_64__)
+
+struct X86LatticeTables {
+    uint8_t selector[S_TABLE_SIZE];
+    uint32_t selector32[S_TABLE_SIZE];
+    double gradXSoA[4][2][S_TABLE_SIZE];
+    double gradPackedX[S_TABLE_SIZE][4];
+    double gradPackedY[S_TABLE_SIZE][4];
+};
+
 static inline void initBaseTablesSoA(
         uint8_t selector[S_TABLE_SIZE],
+        uint32_t selector32[S_TABLE_SIZE],
+        double gradPackedX[S_TABLE_SIZE][4],
+        double gradPackedY[S_TABLE_SIZE][4],
         double gradXSoA[4][2][S_TABLE_SIZE],
         const int32_t seed) {
     PnrRandom rand(seed);
@@ -140,42 +162,22 @@ static inline void initBaseTablesSoA(
     }
 
     for (int32_t i = 0; i < S_BSIZE + 2; i++) {
-        selector[S_BSIZE + i] = selector[i];
+        const auto sel = selector[i];
+        selector[S_BSIZE + i] = sel;
+        selector32[i] = sel;
         for (int32_t k = 0; k < 4; k++) {
-            gradXSoA[k][0][S_BSIZE + i] = gradXSoA[k][0][i];
-            gradXSoA[k][1][S_BSIZE + i] = gradXSoA[k][1][i];
+            auto gradX = gradXSoA[k][0][i];
+            auto gradY = gradXSoA[k][1][i];
+            gradXSoA[k][0][S_BSIZE + i] = gradX;
+            gradXSoA[k][1][S_BSIZE + i] = gradY;
+            gradPackedX[i][k] = gradX;
+            gradPackedY[i][k] = gradY;
         }
     }
 }
-
-struct ScalarLatticeTables {
-    uint8_t selector[S_TABLE_SIZE];
-    double gradX[4][S_TABLE_SIZE][2];
-};
-
-static inline void initScalarTables(ScalarLatticeTables& t, const int32_t seed) {
-    initBaseTables(t.selector, t.gradX, seed);
-}
-
-#if defined(__i386__) || defined(__x86_64__)
-
-struct X86LatticeTables {
-    uint8_t selector[S_TABLE_SIZE];
-    uint32_t selector32[S_TABLE_SIZE];
-    double gradXSoA[4][2][S_TABLE_SIZE];
-    double gradPackedX[S_TABLE_SIZE][4];
-    double gradPackedY[S_TABLE_SIZE][4];
-};
 
 static inline void initX86Tables(X86LatticeTables& t, const int32_t seed) {
-    initBaseTablesSoA(t.selector, t.gradXSoA, seed);
-    for (int32_t i = 0; i < S_TABLE_SIZE; i++) {
-        t.selector32[i] = t.selector[i];
-        for (int32_t k = 0; k < 4; k++) {
-            t.gradPackedX[i][k] = t.gradXSoA[k][0][i];
-            t.gradPackedY[i][k] = t.gradXSoA[k][1][i];
-        }
-    }
+    initBaseTablesSoA(t.selector, t.selector32,t.gradPackedX, t.gradPackedY, t.gradXSoA, seed);
 }
 
 #endif
