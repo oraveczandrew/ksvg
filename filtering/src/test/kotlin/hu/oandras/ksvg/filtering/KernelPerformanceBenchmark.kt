@@ -82,17 +82,20 @@ class KernelPerformanceBenchmark {
 
     @Test
     fun benchmarkAll() {
-        benchmarkUnlinearize()
-        benchmarkComponentTransfer()
-        benchmarkMorphology()
-        benchmarkArithmeticComposite()
-        benchmarkConvolveMatrix()
-        benchmarkDisplacementMap()
-        benchmarkLighting()
-        benchmarkTurbulence()
-        benchmarkGaussianBlur()
+        val target = System.getProperty("benchmark.kernel")
+
+        if (target == null || target == "Unlinearize") benchmarkUnlinearize()
+        if (target == null || target == "ComponentTransfer") benchmarkComponentTransfer()
+        if (target == null || target == "Morphology") benchmarkMorphology()
+        if (target == null || target == "ArithmeticComposite") benchmarkArithmeticComposite()
+        if (target == null || target == "ConvolveMatrix") benchmarkConvolveMatrix()
+        if (target == null || target == "DisplacementMap") benchmarkDisplacementMap()
+        if (target == null || target == "Lighting") benchmarkLighting()
+        if (target == null || target == "Turbulence") benchmarkTurbulence()
+        if (target == null || target == "GaussianBlur") benchmarkGaussianBlur()
         
-        val output = File(resolveTmpDir(), "benchmarks_host.csv")
+        val suffix = if (target != null) "_$target" else ""
+        val output = File(resolveTmpDir(), "benchmarks_host$suffix.csv")
         output.parentFile?.mkdirs()
         KernelBenchmarkRunner.report(output)
     }

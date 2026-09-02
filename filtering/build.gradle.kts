@@ -89,6 +89,8 @@ android {
         unitTests {
             all {
                 it.jvmArgs("-Djava.library.path=${layout.buildDirectory.get().asFile.resolve("host-native").absolutePath}")
+                it.systemProperty("benchmark.quick", System.getProperty("benchmark.quick"))
+                it.systemProperty("benchmark.kernel", System.getProperty("benchmark.kernel"))
             }
         }
     }

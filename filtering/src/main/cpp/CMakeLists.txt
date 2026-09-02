@@ -25,7 +25,7 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
     set(BLUR_SOURCES Blur_advsimd64.S)
 endif()
 
-add_library(ksvgblur SHARED gaussian_blur.cpp component_transfer.cpp unlinearize.cpp arithmetic_composite.cpp displacement_map.cpp convolve_matrix.cpp morphology.cpp turbulence.cpp lighting.cpp blur_x86.cpp ${BLUR_SOURCES})
+add_library(ksvgblur SHARED gaussian_blur.cpp component_transfer.cpp unlinearize.cpp arithmetic_composite.cpp displacement_map.cpp convolve_matrix.cpp morphology.cpp turbulence.cpp turbulence_x86.cpp lighting.cpp blur_x86.cpp ${BLUR_SOURCES})
 
 # Bit-exact float parity with the Kotlin reference loops: forbid FMA contraction.
 target_compile_options(ksvgblur PRIVATE -ffp-contract=off)

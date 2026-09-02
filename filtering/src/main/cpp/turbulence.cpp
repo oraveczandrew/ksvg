@@ -20,9 +20,8 @@
 #include <algorithm>
 #include <cassert>
 #include "cpu_dispatch.h"
-
 #include "turbulence_core.h"
-
+#include "turbulence_x86.h"
 
 namespace {
 
@@ -38,6 +37,9 @@ void applyScalar(
         const jdouble originX, const jdouble originY,
         const jdouble unitSizeX, const jdouble unitSizeY,
         const jint seed) {
+    (void)originX;
+    (void)originY;
+
     LatticeTables tables;
     initLattice(tables, seed);
 
@@ -113,7 +115,14 @@ void applyScalar(
 }
 
 jint nativeBackendForAbi() {
-    return SIMD_BACKEND_SCALAR;
+    jint backends = SIMD_BACKEND_SCALAR;
+#if defined(__i386__) || defined(__x86_64__)
+    backends |= SIMD_BACKEND_SSSE3;
+    if (detectSimdLevel() >= SIMD_AVX2) {
+        backends |= SIMD_BACKEND_AVX2;
+    }
+#endif
+    return backends;
 }
 
 } // namespace
@@ -138,16 +147,36 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
         const jdouble originX, const jdouble originY,
         const jdouble unitSizeX, const jdouble unitSizeY,
         const jint seed, const jint simdBackend) {
-    (void)simdBackend;
-    assert(simdBackend == SIMD_BACKEND_SCALAR);
-
     auto* pixels = env->GetIntArrayElements(jPixels, nullptr);
     if (pixels == nullptr) return;
 
-    applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
-                baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
-                invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
-                unitSizeX, unitSizeY, seed);
+    if (simdBackend == SIMD_BACKEND_SCALAR) {
+        applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                    invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                    unitSizeX, unitSizeY, seed);
+    } else {
+#if defined(__i386__) || defined(__x86_64__)
+        if (simdBackend == SIMD_BACKEND_AVX2) {
+            applyAvx2(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                      baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                      invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                      unitSizeX, unitSizeY, seed);
+        } else {
+            assert(simdBackend == SIMD_BACKEND_SSSE3);
+            applySsse3(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                       baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                       invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                       unitSizeX, unitSizeY, seed);
+        }
+#else
+        (void)simdBackend;
+        applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                    invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                    unitSizeX, unitSizeY, seed);
+#endif
+    }
 
     env->ReleaseIntArrayElements(jPixels, pixels, 0);
 }
@@ -169,10 +198,30 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
     auto* pixels = env->GetIntArrayElements(jPixels, nullptr);
     if (pixels == nullptr) return;
 
+#if defined(__i386__) || defined(__x86_64__)
+    SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_AVX2) {
+        applyAvx2(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                  baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                  invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                  unitSizeX, unitSizeY, seed);
+    } else if (level >= SIMD_SSSE3) {
+        applySsse3(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                   baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                   invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                   unitSizeX, unitSizeY, seed);
+    } else {
+        applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                    invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                    unitSizeX, unitSizeY, seed);
+    }
+#else
     applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
                 invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                 unitSizeX, unitSizeY, seed);
+#endif
 
     env->ReleaseIntArrayElements(jPixels, pixels, 0);
 }
