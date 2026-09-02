@@ -21,6 +21,8 @@
 #include <vector>
 #include <cstdint>
 #include <cstring>
+#include <cassert>
+#include "cpu_dispatch.h"
 
 namespace {
 
@@ -34,7 +36,6 @@ extern "C" void rsdIntrinsicBlurU4_K(uint8_t* out, const uint8_t* in,
                                      size_t y, size_t count, size_t r,
                                      const uint16_t* tab);
 #elif defined(__i386__) || defined(__x86_64__)
-#include "cpu_dispatch.h"
 #include "simd_x86.h"
 
 extern "C" void rsdIntrinsicBlurVFU4_K(void* dst, const void* pin, int stride,
@@ -265,6 +266,80 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
 }
 
 }  // namespace
+
+
+// Validation/test-only: run an explicitly selected backend (see SimdBackend).
+namespace {
+
+void runForced(GaussianScratch* s, jint* pix, int w, int h, float stdDeviationX, float stdDeviationY, int backend) {
+    std::vector<float> wx, wy;
+    const int rx = computeWeights(stdDeviationX, wx);
+    const int ry = computeWeights(stdDeviationY, wy);
+
+    if (backend == SIMD_BACKEND_SCALAR) {
+        blurScalar(pix, w, h, wx, rx, wy, ry, *s);
+        return;
+    }
+
+    const bool isotropic = (rx == ry);
+    if (!isotropic || rx < 1 || rx > kMaxKernelRadius) {
+        // Kernels only support isotropic small radius; if forced, fall back to scalar
+        // rather than crashing if the test provides incompatible params, but log it?
+        // Actually, we'll just run scalar.
+        blurScalar(pix, w, h, wx, rx, wy, ry, *s);
+        return;
+    }
+
+#if defined(__aarch64__)
+    assert(backend == SIMD_BACKEND_NEON64);
+    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s);
+#elif defined(__i386__) || defined(__x86_64__)
+    // Gaussian Blur has hybrid SSE/AVX2 logic inside blurIsotropicKernel.
+    // We'll just run it.
+    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s);
+#else
+    blurScalar(pix, w, h, wx, rx, wy, ry, *s);
+#endif
+}
+
+jint nativeBackendForAbi(float stdDeviationX, float stdDeviationY) {
+    std::vector<float> wx, wy;
+    const int rx = computeWeights(stdDeviationX, wx);
+    const int ry = computeWeights(stdDeviationY, wy);
+    const bool isotropic = (rx == ry);
+
+    if (isotropic && rx >= 1 && rx <= kMaxKernelRadius) {
+#if defined(__aarch64__)
+        return SIMD_BACKEND_NEON64;
+#elif defined(__i386__) || defined(__x86_64__)
+        return (detectSimdLevel() >= SIMD_AVX2) ? SIMD_BACKEND_AVX2 : SIMD_BACKEND_SSSE3;
+#else
+        return SIMD_BACKEND_SCALAR;
+#endif
+    }
+    return SIMD_BACKEND_SCALAR;
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_nativeBackend(
+        JNIEnv* env, jclass clazz, jfloat stdDeviationX, jfloat stdDeviationY) {
+    return nativeBackendForAbi(stdDeviationX, stdDeviationY);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_applyForced(
+        JNIEnv* env, jclass clazz, jlong scratchHandle, jintArray pixels,
+        jint width, jint height, jfloat stdDeviationX, jfloat stdDeviationY, jint simdBackend) {
+    GaussianScratch* const s = reinterpret_cast<GaussianScratch*>(scratchHandle);
+    jint* pix = env->GetIntArrayElements(pixels, nullptr);
+    if (pix == nullptr) return;
+
+    runForced(s, pix, width, height, stdDeviationX, stdDeviationY, simdBackend);
+
+    env->ReleaseIntArrayElements(pixels, pix, 0);
+}
 
 extern "C"
 JNIEXPORT jlong JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_createScratch(

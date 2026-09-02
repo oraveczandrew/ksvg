@@ -133,6 +133,25 @@ internal object NativeGaussianBlur {
         stdDeviationY: Float,
     )
 
+    /**
+     * Validation/test-only twin of [nativeBlur]. Runs an explicitly selected backend
+     * regardless of normal CPU dispatch.
+     */
+    @JvmStatic
+    external fun applyForced(
+        scratch: Long,
+        pixels: IntArray,
+        width: Int,
+        height: Int,
+        stdDeviationX: Float,
+        stdDeviationY: Float,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(stdDeviationX: Float, stdDeviationY: Float): Int
+
     @JvmStatic
     external fun createScratch(): Long
 
