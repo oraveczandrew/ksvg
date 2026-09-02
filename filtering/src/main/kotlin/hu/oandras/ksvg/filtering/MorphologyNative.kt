@@ -43,4 +43,28 @@ internal object MorphologyNative {
         clipRight: Int,
         clipBottom: Int,
     )
+
+    /**
+     * Validation/test-only twin of [apply]. Runs an explicitly selected backend
+     * regardless of normal CPU dispatch.
+     */
+    @JvmStatic
+    external fun applyForced(
+        src: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+        radiusX: Int,
+        radiusY: Int,
+        erode: Boolean,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(): Int
 }

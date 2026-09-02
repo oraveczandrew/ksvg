@@ -92,6 +92,7 @@ android {
             }
         }
     }
+
 }
 
 // Host-architecture build of the native kernels (turbulence, blur, lighting, ...)

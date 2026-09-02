@@ -48,4 +48,29 @@ internal object ComponentTransferNative {
         tableG: ByteArray,
         tableB: ByteArray,
     )
+
+    /**
+     * Validation/test-only twin of [apply]. Runs an explicitly selected backend
+     * regardless of normal CPU dispatch.
+     */
+    @JvmStatic
+    external fun applyForced(
+        src: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        tableA: ByteArray,
+        tableR: ByteArray,
+        tableG: ByteArray,
+        tableB: ByteArray,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(): Int
 }

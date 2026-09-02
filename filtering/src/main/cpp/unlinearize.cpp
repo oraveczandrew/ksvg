@@ -16,6 +16,7 @@
 
 #include <jni.h>
 #include <cstdint>
+#include <cassert>
 #include "cpu_dispatch.h"
 #include "simd_x86.h"
 
@@ -228,6 +229,107 @@ void applyNeon32(jint* src, jint* dst, jint width, jint height, const jbyte* tab
 
 } // namespace
 
+// Validation/test-only: run an explicitly selected backend (see SimdBackend).
+// The normal production path (Java_..._UnlinearizeNative_apply) never calls
+// this; on x86 the backend ids also let a test route to a lower ISA than the
+// CPU's highest for independent validation. On the ARM ABIs the only valid
+// backend is the one compiled for the ABI, so anything else is an assertion
+// failure (debug builds) rather than a silent wrong path.
+namespace {
+
+void runForced(jint* src, jint* dst, jint width, jint height,
+               const jbyte* table, jint backend) {
+#if defined(__aarch64__)
+    if (backend == SIMD_BACKEND_SCALAR) {
+        applyScalar(src, dst, width, height, table);
+    } else {
+        assert(backend == SIMD_BACKEND_NEON64);
+        applyNeon64(src, dst, width, height, table);
+    }
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    if (backend == SIMD_BACKEND_SCALAR) {
+        applyScalar(src, dst, width, height, table);
+    } else {
+        assert(backend == SIMD_BACKEND_NEON32);
+        applyNeon32(src, dst, width, height, table);
+    }
+#elif defined(__SSSE3__)
+    switch (backend) {
+        case SIMD_BACKEND_SCALAR: applyScalar(src, dst, width, height, table); break;
+        case SIMD_BACKEND_SSSE3:  applySsse3(src, dst, width, height, table); break;
+        case SIMD_BACKEND_AVX2:   ksvgUnlinearizeApplyAvx2(src, dst, width, height, table); break;
+        default:                  assert(false && "unsupported forced unlinearize backend on x86");
+    }
+#else
+    (void)backend;
+    applyScalar(src, dst, width, height, table);
+#endif
+}
+
+jint nativeBackendForAbi() {
+#if defined(__aarch64__)
+    return SIMD_BACKEND_NEON64;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    return SIMD_BACKEND_NEON32;
+#elif defined(__SSSE3__)
+    // unlinearize routes AVX2 for any x86 CPU at or above AVX2 (AVX-512 has no
+    // dedicated unlinearize kernel), so report the backend it actually runs.
+    return detectSimdLevel() >= SIMD_AVX2 ? SIMD_BACKEND_AVX2 : SIMD_BACKEND_SSSE3;
+#else
+    return SIMD_BACKEND_SCALAR;
+#endif
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_UnlinearizeNative_nativeBackend(
+        JNIEnv* env, jclass clazz) {
+    return nativeBackendForAbi();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_UnlinearizeNative_applyForced(
+        JNIEnv* env, jclass clazz,
+        const jintArray jSrc, const jintArray jDst,
+        const jint width, const jint height,
+        const jbyteArray jTable, const jint simdBackend) {
+    auto* table = env->GetByteArrayElements(jTable, nullptr);
+    if (table == nullptr) {
+        return;
+    }
+    const bool inPlace = env->IsSameObject(jSrc, jDst) == JNI_TRUE;
+    if (inPlace) {
+        auto* buf = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
+        if (buf == nullptr) {
+            env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
+            return;
+        }
+        runForced(buf, buf, width, height, table, simdBackend);
+        env->ReleasePrimitiveArrayCritical(jSrc, buf, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
+        return;
+    }
+
+    auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
+    if (src == nullptr) {
+        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
+        return;
+    }
+    auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    if (dst == nullptr) {
+        env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
+        return;
+    }
+
+    runForced(src, dst, width, height, table, simdBackend);
+
+    env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+    env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_UnlinearizeNative_apply(
         JNIEnv* env, jclass clazz,
@@ -281,7 +383,7 @@ Java_hu_oandras_ksvg_filtering_UnlinearizeNative_apply(
     applyNeon64(src, dst, width, height, table);
 #elif defined(__SSSE3__)
     if (detectSimdLevel() >= SIMD_AVX2) {
-        ksvgUnlinearizeApplyAvx2(dst, src, width, height, table);
+        ksvgUnlinearizeApplyAvx2(src, dst, width, height, table);
     } else {
         applySsse3(src, dst, width, height, table);
     }

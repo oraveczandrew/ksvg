@@ -66,7 +66,7 @@ void ksvgComponentTransferApplyAvx2(
 
 // unlinearize.cpp — flat element-wise LUT pass with alpha passthrough.
 void ksvgUnlinearizeApplyAvx2(
-        jint* dst, const jint* src, jint width, jint height, const jbyte* table);
+        const jint* src, jint* dst, jint width, jint height, const jbyte* table);
 
 // displacement_map.cpp — full frame displacement.
 void ksvgDisplacementMapApplyAvx2(

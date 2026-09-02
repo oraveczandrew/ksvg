@@ -16,26 +16,21 @@
 
 package hu.oandras.ksvg.filtering
 
-import android.os.Build
-import android.util.Log
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
 
-/**
- * Instrumented Android validation test for feComponentTransfer.
- */
-@RunWith(AndroidJUnit4::class)
-class ComponentTransferNativeDeviceTest {
+class ComponentTransferValidationTest {
+
+    companion object {
+        init {
+            System.loadLibrary("ksvgblur")
+        }
+    }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on device", ComponentTransferNative.isAvailable)
-        
-        Log.i("CompTransValidation", "Testing backend: $backendName")
-        Log.i("CompTransValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
-
+        assertTrue("libksvgblur not loadable on host", ComponentTransferNative.isAvailable)
         for (case in ComponentTransferValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -56,30 +51,25 @@ class ComponentTransferNativeDeviceTest {
     fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
 
     @Test
-    fun neon64MatchesKotlin() {
-        val abi = Build.SUPPORTED_ABIS[0]
-        if (abi == "arm64-v8a") {
-            // Note: This is expected to FAIL for channel values >= 64 due to 
-            // vqtbl4q_u8 64-entry limitation in current implementation.
-            checkBackend(UnlinearizeNative.SIMD_NEON64, "neon64")
-        } else {
-            Log.i("CompTransValidation", "Skipping neon64 on $abi")
-        }
-    }
+    fun ssse3MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SSSE3, "ssse3")
 
     @Test
-    fun neon32MatchesKotlin() {
-        val abi = Build.SUPPORTED_ABIS[0]
-        if (abi == "armeabi-v7a") {
-            checkBackend(UnlinearizeNative.SIMD_NEON32, "neon32")
-        } else {
-            Log.i("CompTransValidation", "Skipping neon32 on $abi")
-        }
+    fun avx2MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX2, "avx2")
+
+    @Test
+    fun productionDispatchSelectsHighest() {
+        assertTrue("libksvgblur not loadable on host", ComponentTransferNative.isAvailable)
+        // On this host (i7-7820X) it should be AVX2.
+        assertEquals(
+            "expected avx2 as the dispatched component_transfer backend on this host",
+            UnlinearizeNative.SIMD_AVX2,
+            ComponentTransferNative.nativeBackend()
+        )
     }
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", ComponentTransferNative.isAvailable)
+        assertTrue("libksvgblur not loadable on host", ComponentTransferNative.isAvailable)
         for (case in ComponentTransferValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

@@ -246,7 +246,7 @@ static inline __m256i lut256Avx2(__m256i value, const __m256i rows[16]) {
 }
 
 void ksvgUnlinearizeApplyAvx2(
-        jint* dst, const jint* src, int width, int height, const jbyte* table) {
+        const jint* src, jint* dst, int width, int height, const jbyte* table) {
     const int total = width * height;
 
     // rows[i] = table[i*16..i*16+15] duplicated into both AVX2 lanes.

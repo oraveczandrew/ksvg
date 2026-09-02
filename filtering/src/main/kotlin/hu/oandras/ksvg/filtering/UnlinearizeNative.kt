@@ -32,6 +32,14 @@ package hu.oandras.ksvg.filtering
  */
 internal object UnlinearizeNative {
 
+    /** Backend ids mirrored from `cpu_dispatch.h`'s `SimdBackend` enum. */
+    const val SIMD_SCALAR = 1
+    const val SIMD_SSSE3 = 2
+    const val SIMD_AVX2 = 3
+    const val SIMD_AVX512 = 4
+    const val SIMD_NEON64 = 5
+    const val SIMD_NEON32 = 6
+
     @JvmField
     val isAvailable: Boolean = NativeGaussianBlur.isAvailable
 
@@ -43,4 +51,25 @@ internal object UnlinearizeNative {
         height: Int,
         table: ByteArray,
     )
+
+    /**
+     * Validation/test-only twin of [apply]. Runs an explicitly selected backend
+     * (see [SIMD_SCALAR]..[SIMD_NEON32]) regardless of normal CPU dispatch,
+     * asserted on the native side for ABI/backend validity. Normal production
+     * code must NOT call this — it exists only for the backend-validation
+     * harness, and normal dispatch/`apply` is unchanged.
+     */
+    @JvmStatic
+    external fun applyForced(
+        src: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+        table: ByteArray,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(): Int
 }

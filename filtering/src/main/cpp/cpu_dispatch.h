@@ -50,4 +50,16 @@ inline SimdLevel detectSimdLevel() {
 #endif
 }
 
+// Explicit backend identifiers shared between C++ and the Kotlin test harness.
+// Unlike SimdLevel (the highest ISA a CPU supports), a SimdBackend names the
+// exact implementation to run, so a test can force one regardless of dispatch.
+enum SimdBackend {
+    SIMD_BACKEND_SCALAR = 1,
+    SIMD_BACKEND_SSSE3 = 2,
+    SIMD_BACKEND_AVX2 = 3,
+    SIMD_BACKEND_AVX512 = 4,
+    SIMD_BACKEND_NEON64 = 5,
+    SIMD_BACKEND_NEON32 = 6,
+};
+
 #endif // KSVG_CPU_DISPATCH_H

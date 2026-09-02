@@ -17,6 +17,7 @@
 #include <jni.h>
 #include <cstdint>
 #include <cstring>
+#include <cassert>
 #include "cpu_dispatch.h"
 #include "simd_x86.h"
 
@@ -65,66 +66,111 @@ namespace {
 #ifdef __aarch64__
 #include <arm_neon.h>
 
- uint8x16x4_t loadTable(const jbyte* t) {
-    uint8x16x4_t tab;
-    tab.val[0] = vld1q_u8(reinterpret_cast<const uint8_t*>(t) + 0);
-    tab.val[1] = vld1q_u8(reinterpret_cast<const uint8_t*>(t) + 16);
-    tab.val[2] = vld1q_u8(reinterpret_cast<const uint8_t*>(t) + 32);
-    tab.val[3] = vld1q_u8(reinterpret_cast<const uint8_t*>(t) + 48);
-    return tab;
+static inline uint8x16_t lookup256Neon(
+        uint8x16_t indices,
+        const uint8x16_t table[16]) {
+    const uint8x16_t lo = vandq_u8(indices, vdupq_n_u8(0x0F));
+    const uint8x16_t hi = vshrq_n_u8(indices, 4);
+
+    uint8x16_t result = vdupq_n_u8(0);
+
+    for (int row = 0; row < 16; ++row) {
+        const uint8x16_t value = vqtbl1q_u8(table[row], lo);
+        const uint8x16_t mask =
+                vceqq_u8(hi, vdupq_n_u8(static_cast<uint8_t>(row)));
+        result = vbslq_u8(mask, value, result);
+    }
+
+    return result;
 }
 
- void applyNeonBlock(
-        const jint* src, jint* dst,
-        const uint8x16x4_t& tA, const uint8x16x4_t& tR,
-        const uint8x16x4_t& tG, const uint8x16x4_t& tB) {
-    const uint8x16x4_t pixels = vld4q_u8(reinterpret_cast<const uint8_t*>(src));
-    // vld4q_u8 de-interleaves struct-of-4: val[0] = every byte 0 mod 4 (blue),
-    // val[1] = green, val[2] = red, val[3] = alpha — 16 values each.
+static inline void loadTable256(
+        const jbyte* src,
+        uint8x16_t table[16]) {
+    const uint8_t* t = reinterpret_cast<const uint8_t*>(src);
+
+    for (int i = 0; i < 16; ++i) {
+        table[i] = vld1q_u8(t + i * 16);
+    }
+}
+
+static inline void applyNeonBlock(
+        const jint* src,
+        jint* dst,
+        const uint8x16_t tableA[16],
+        const uint8x16_t tableR[16],
+        const uint8x16_t tableG[16],
+        const uint8x16_t tableB[16]) {
+
+    const uint8x16x4_t pixels =
+            vld4q_u8(reinterpret_cast<const uint8_t*>(src));
+
     uint8x16x4_t out;
-    out.val[0] = vqtbl4q_u8(tB, pixels.val[0]);
-    out.val[1] = vqtbl4q_u8(tG, pixels.val[1]);
-    out.val[2] = vqtbl4q_u8(tR, pixels.val[2]);
-    out.val[3] = vqtbl4q_u8(tA, pixels.val[3]);
+
+    out.val[0] = lookup256Neon(pixels.val[0], tableB);
+    out.val[1] = lookup256Neon(pixels.val[1], tableG);
+    out.val[2] = lookup256Neon(pixels.val[2], tableR);
+    out.val[3] = lookup256Neon(pixels.val[3], tableA);
+
     vst4q_u8(reinterpret_cast<uint8_t*>(dst), out);
 }
 
 void applyNeon64(
-        const jint* src, jint* dst, const jint width, const jint height,
-        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
-        const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB) {
-    const jint total = width * height;
+        const jint* src,
+        jint* dst,
+        const jint width,
+        const jint height,
+        const jint clipLeft,
+        const jint clipTop,
+        const jint clipRight,
+        const jint clipBottom,
+        const jbyte* tableA,
+        const jbyte* tableR,
+        const jbyte* tableG,
+        const jbyte* tableB) {
 
-    const uint32x4_t zero = vdupq_n_u32(0);
-    jint i = 0;
-    for (; i + 4 <= total; i += 4) {
-        vst1q_u32(reinterpret_cast<uint32_t*>(dst) + i, zero);
-    }
-    for (; i < total; i++) {
-        dst[i] = 0;
-    }
+    const size_t total =
+            static_cast<size_t>(width) * static_cast<size_t>(height);
 
-    const uint8x16x4_t tA = loadTable(tableA);
-    const uint8x16x4_t tR = loadTable(tableR);
-    const uint8x16x4_t tG = loadTable(tableG);
-    const uint8x16x4_t tB = loadTable(tableB);
+    memset(dst, 0, total * sizeof(jint));
 
-    const bool fullRow = clipLeft == 0 && clipRight == width;
-    for (jint y = clipTop; y < clipBottom; y++) {
+    uint8x16_t tA[16];
+    uint8x16_t tR[16];
+    uint8x16_t tG[16];
+    uint8x16_t tB[16];
+
+    loadTable256(tableA, tA);
+    loadTable256(tableR, tR);
+    loadTable256(tableG, tG);
+    loadTable256(tableB, tB);
+
+    for (jint y = clipTop; y < clipBottom; ++y) {
         const jint rowOffset = y * width;
         jint x = clipLeft;
-        if (fullRow) {
-            for (; x + 16 <= width; x += 16) {
-                applyNeonBlock(src + rowOffset + x, dst + rowOffset + x, tA, tR, tG, tB);
-            }
+
+        for (; x + 16 <= clipRight; x += 16) {
+            applyNeonBlock(
+                    src + rowOffset + x,
+                    dst + rowOffset + x,
+                    tA, tR, tG, tB);
         }
-        for (; x < clipRight; x++) {
+
+        for (; x < clipRight; ++x) {
             const jint c = src[rowOffset + x];
+
             dst[rowOffset + x] =
-                    (static_cast<jint>(static_cast<uint8_t>(tableA[(c >> 24) & 0xFF])) << 24) |
-                    (static_cast<jint>(static_cast<uint8_t>(tableR[(c >> 16) & 0xFF])) << 16) |
-                    (static_cast<jint>(static_cast<uint8_t>(tableG[(c >> 8) & 0xFF])) << 8) |
-                    static_cast<jint>(static_cast<uint8_t>(tableB[c & 0xFF]));
+                    (static_cast<jint>(
+                            static_cast<uint8_t>(
+                                    tableA[(c >> 24) & 0xFF])) << 24) |
+                    (static_cast<jint>(
+                            static_cast<uint8_t>(
+                                    tableR[(c >> 16) & 0xFF])) << 16) |
+                    (static_cast<jint>(
+                            static_cast<uint8_t>(
+                                    tableG[(c >> 8) & 0xFF])) << 8) |
+                    (static_cast<jint>(
+                            static_cast<uint8_t>(
+                                    tableB[c & 0xFF])));
         }
     }
 }
@@ -153,20 +199,15 @@ inline __m128i lutGatherSSSE3(const __m128i* rows, __m128i valueBytes) {
 }
 
 inline __m128i extractChannelSSSE3(__m128i pixels4, int lane) {
-    // Pick the byte at position lane+4k of pixel k into byte k.
-    return _mm_shuffle_epi8(pixels4, _mm_set_epi8(
-            static_cast<char>(0x80), static_cast<char>(0x80), static_cast<char>(0x80),
-            static_cast<char>(lane + 12),
-            static_cast<char>(0x80), static_cast<char>(0x80), static_cast<char>(0x80),
-            static_cast<char>(lane + 8),
-            static_cast<char>(0x80), static_cast<char>(0x80), static_cast<char>(0x80),
-            static_cast<char>(lane + 4),
-            static_cast<char>(0x80), static_cast<char>(0x80), static_cast<char>(0x80),
-            static_cast<char>(lane)));
+    // Pick the byte at position lane+4k of pixel k into bytes 0, 1, 2, 3.
+    return _mm_shuffle_epi8(pixels4, _mm_setr_epi8(
+            static_cast<char>(lane), static_cast<char>(lane + 4),
+            static_cast<char>(lane + 8), static_cast<char>(lane + 12),
+            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1));
 }
 
 void applySsse3(
-        jint* src, jint* dst, jint width, jint height,
+        const jint* src, jint* dst, jint width, jint height,
         jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB) {
     alignas(16) __m128i rowsA[16], rowsR[16], rowsG[16], rowsB[16];
@@ -193,11 +234,8 @@ void applySsse3(
             // two in hi.
             const __m128i bg = _mm_unpacklo_epi8(outB, outG);
             const __m128i ra = _mm_unpacklo_epi8(outR, outA);
-            const __m128i lo = _mm_unpacklo_epi16(bg, ra);
-            const __m128i hi = _mm_unpackhi_epi16(bg, ra);
-            _mm_storel_epi64(reinterpret_cast<__m128i*>(dst + rowOffset + x), lo);
-            _mm_storeh_pi(reinterpret_cast<__m64*>(dst + rowOffset + x + 2),
-                          _mm_castsi128_ps(hi));
+            const __m128i res = _mm_unpacklo_epi16(bg, ra);
+            _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + rowOffset + x), res);
         }
         for (; x < clipRight; x++) {
             const jint c = src[rowOffset + x];
@@ -234,7 +272,7 @@ inline uint8x8_t lutLookupNeon32(const uint8x8x2_t rows[16], uint8x8_t indices) 
 }
 
 void applyNeon32(
-        jint* src, jint* dst, jint width, jint height,
+        const jint* src, jint* dst, jint width, jint height,
         jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB) {
     const jint total = width * height;
@@ -290,6 +328,120 @@ void applyNeon32(
 #endif // ARM NEON
 
 } // namespace
+
+
+// Validation/test-only: run an explicitly selected backend (see SimdBackend).
+namespace {
+
+void runForced(const jint* src, jint* dst, jint width, jint height,
+               jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+               const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB,
+               jint backend) {
+#if defined(__aarch64__)
+    if (backend == SIMD_BACKEND_SCALAR) {
+        applyScalar(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    tableA, tableR, tableG, tableB);
+    } else {
+        assert(backend == SIMD_BACKEND_NEON64);
+        applyNeon64(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    tableA, tableR, tableG, tableB);
+    }
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    if (backend == SIMD_BACKEND_SCALAR) {
+        applyScalar(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    tableA, tableR, tableG, tableB);
+    } else {
+        assert(backend == SIMD_BACKEND_NEON32);
+        applyNeon32(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    tableA, tableR, tableG, tableB);
+    }
+#elif defined(__SSSE3__)
+    switch (backend) {
+        case SIMD_BACKEND_SCALAR:
+            applyScalar(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                        tableA, tableR, tableG, tableB);
+            break;
+        case SIMD_BACKEND_SSSE3:
+            applySsse3(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                       tableA, tableR, tableG, tableB);
+            break;
+        case SIMD_BACKEND_AVX2:
+            ksvgComponentTransferApplyAvx2(src, dst, width, height,
+                clipLeft, clipTop, clipRight, clipBottom, tableA, tableR, tableG, tableB);
+            break;
+        default:
+            assert(false && "unsupported forced component_transfer backend on x86");
+    }
+#else
+    (void)backend;
+    applyScalar(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                tableA, tableR, tableG, tableB);
+#endif
+}
+
+jint nativeBackendForAbi() {
+#if defined(__aarch64__)
+    return SIMD_BACKEND_NEON64;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    return SIMD_BACKEND_NEON32;
+#elif defined(__SSSE3__)
+    return detectSimdLevel() >= SIMD_AVX2 ? SIMD_BACKEND_AVX2 : SIMD_BACKEND_SSSE3;
+#else
+    return SIMD_BACKEND_SCALAR;
+#endif
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_ComponentTransferNative_nativeBackend(
+        JNIEnv* env, jclass clazz) {
+    return nativeBackendForAbi();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_ComponentTransferNative_applyForced(
+        JNIEnv* env, jclass clazz,
+        const jintArray jSrc, const jintArray jDst,
+        const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jbyteArray jTableA, const jbyteArray jTableR, const jbyteArray jTableG, const jbyteArray jTableB,
+        const jint simdBackend) {
+    auto* tableA = env->GetByteArrayElements(jTableA, nullptr);
+    auto* tableR = env->GetByteArrayElements(jTableR, nullptr);
+    auto* tableG = env->GetByteArrayElements(jTableG, nullptr);
+    auto* tableB = env->GetByteArrayElements(jTableB, nullptr);
+    if (tableA == nullptr || tableR == nullptr || tableG == nullptr || tableB == nullptr) {
+        return;
+    }
+    auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
+    if (src == nullptr) {
+        env->ReleaseByteArrayElements(jTableA, tableA, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableR, tableR, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableG, tableG, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableB, tableB, JNI_ABORT);
+        return;
+    }
+    auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    if (dst == nullptr) {
+        env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableA, tableA, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableR, tableR, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableG, tableG, JNI_ABORT);
+        env->ReleaseByteArrayElements(jTableB, tableB, JNI_ABORT);
+        return;
+    }
+
+    runForced(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+              tableA, tableR, tableG, tableB, simdBackend);
+
+    env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+    env->ReleaseByteArrayElements(jTableB, tableB, JNI_ABORT);
+    env->ReleaseByteArrayElements(jTableG, tableG, JNI_ABORT);
+    env->ReleaseByteArrayElements(jTableR, tableR, JNI_ABORT);
+    env->ReleaseByteArrayElements(jTableA, tableA, JNI_ABORT);
+}
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ComponentTransferNative_apply(
