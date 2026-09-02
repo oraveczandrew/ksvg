@@ -74,14 +74,14 @@ class GaussianBlurNativeDeviceTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
     fun neon64MatchesKotlin() {
         val abi = Build.SUPPORTED_ABIS[0]
         if (abi == "arm64-v8a") {
             // Neon path uses fixed-point math, so expect some diff.
-            checkBackend(UnlinearizeNative.SIMD_NEON64, "neon64", tolerance = 2)
+            checkBackend(SIMD_NEON64, "neon64", tolerance = 2)
         } else {
             Log.i("BlurValidation", "Skipping neon64 on $abi")
         }

@@ -65,13 +65,13 @@ class UnlinearizeValidationTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
-    fun ssse3MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SSSE3, "ssse3")
+    fun ssse3MatchesKotlin() = checkBackend(SIMD_SSSE3, "ssse3")
 
     @Test
-    fun avx2MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX2, "avx2")
+    fun avx2MatchesKotlin() = checkBackend(SIMD_AVX2, "avx2")
 
     /**
      * AVX-512 is not implemented for unlinearize (no dedicated kernel, routes
@@ -95,7 +95,7 @@ class UnlinearizeValidationTest {
         assertTrue("libksvgblur not loadable on host", UnlinearizeNative.isAvailable)
         assertEquals(
             "expected avx2 as the dispatched unlinearize backend on this host",
-            UnlinearizeNative.SIMD_AVX2,
+            SIMD_AVX2,
             UnlinearizeNative.nativeBackend()
         )
     }

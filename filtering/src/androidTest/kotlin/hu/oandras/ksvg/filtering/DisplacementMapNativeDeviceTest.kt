@@ -53,13 +53,13 @@ class DisplacementMapNativeDeviceTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
     fun neon64MatchesKotlin() {
         val abi = Build.SUPPORTED_ABIS[0]
         if (abi == "arm64-v8a") {
-            checkBackend(UnlinearizeNative.SIMD_NEON64, "neon64")
+            checkBackend(SIMD_NEON64, "neon64")
         } else {
             Log.i("DisplacementValidation", "Skipping neon64 on $abi")
         }

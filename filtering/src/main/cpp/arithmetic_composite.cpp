@@ -89,11 +89,19 @@ void applyScalar(const jint* src1, const jint* src2, jint* dst,
     }
 }
 
+jint nativeBackendForAbi() {
+    return SIMD_BACKEND_SCALAR;
+}
+
 } // namespace
 
 extern "C" JNIEXPORT jint JNICALL
 Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_nativeBackend(
         JNIEnv* env, jclass clazz) {
+    return nativeBackendForAbi();
+}
+
+jint nativeBackendForAbi() {
     return SIMD_BACKEND_SCALAR;
 }
 

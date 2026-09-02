@@ -52,14 +52,14 @@ class TurbulenceValidationTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
     fun productionDispatchSelectsScalar() {
         assertTrue("libksvgblur not loadable on host", TurbulenceNative.isAvailable)
         assertEquals(
             "expected scalar as the dispatched turbulence backend on this host",
-            UnlinearizeNative.SIMD_SCALAR,
+            SIMD_SCALAR,
             TurbulenceNative.nativeBackend()
         )
     }

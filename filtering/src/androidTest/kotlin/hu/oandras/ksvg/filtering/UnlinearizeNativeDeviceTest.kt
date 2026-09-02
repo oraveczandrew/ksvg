@@ -62,7 +62,7 @@ class UnlinearizeNativeDeviceTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     /**
      * NEON64 validation. Only runs on AArch64 devices; on other ABIs the native
@@ -72,7 +72,7 @@ class UnlinearizeNativeDeviceTest {
     fun neon64MatchesKotlin() {
         val abi = Build.SUPPORTED_ABIS[0]
         if (abi == "arm64-v8a") {
-            checkBackend(UnlinearizeNative.SIMD_NEON64, "neon64")
+            checkBackend(SIMD_NEON64, "neon64")
         } else {
             Log.i("UnlinearizeValidation", "Skipping neon64 on $abi")
         }
@@ -86,7 +86,7 @@ class UnlinearizeNativeDeviceTest {
     fun neon32MatchesKotlin() {
         val abi = Build.SUPPORTED_ABIS[0]
         if (abi == "armeabi-v7a") {
-            checkBackend(UnlinearizeNative.SIMD_NEON32, "neon32")
+            checkBackend(SIMD_NEON32, "neon32")
         } else {
             Log.i("UnlinearizeValidation", "Skipping neon32 on $abi")
         }

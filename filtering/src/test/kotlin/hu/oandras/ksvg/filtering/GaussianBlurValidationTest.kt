@@ -68,13 +68,13 @@ class GaussianBlurValidationTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
-    fun ssse3MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SSSE3, "ssse3", tolerance = 1)
+    fun ssse3MatchesKotlin() = checkBackend(SIMD_SSSE3, "ssse3", tolerance = 1)
 
     @Test
-    fun avx2MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX2, "avx2", tolerance = 1)
+    fun avx2MatchesKotlin() = checkBackend(SIMD_AVX2, "avx2", tolerance = 1)
 
     @Test
     fun productionApplyMatchesKotlin() {

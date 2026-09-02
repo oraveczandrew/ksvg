@@ -53,7 +53,7 @@ class ComponentTransferNativeDeviceTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
     fun neon64MatchesKotlin() {
@@ -61,7 +61,7 @@ class ComponentTransferNativeDeviceTest {
         if (abi == "arm64-v8a") {
             // Note: This is expected to FAIL for channel values >= 64 due to 
             // vqtbl4q_u8 64-entry limitation in current implementation.
-            checkBackend(UnlinearizeNative.SIMD_NEON64, "neon64")
+            checkBackend(SIMD_NEON64, "neon64")
         } else {
             Log.i("CompTransValidation", "Skipping neon64 on $abi")
         }
@@ -71,7 +71,7 @@ class ComponentTransferNativeDeviceTest {
     fun neon32MatchesKotlin() {
         val abi = Build.SUPPORTED_ABIS[0]
         if (abi == "armeabi-v7a") {
-            checkBackend(UnlinearizeNative.SIMD_NEON32, "neon32")
+            checkBackend(SIMD_NEON32, "neon32")
         } else {
             Log.i("CompTransValidation", "Skipping neon32 on $abi")
         }

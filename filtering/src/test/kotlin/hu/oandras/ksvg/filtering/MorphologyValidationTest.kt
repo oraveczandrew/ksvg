@@ -48,16 +48,16 @@ class MorphologyValidationTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
-    fun ssse3MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SSSE3, "ssse3")
+    fun ssse3MatchesKotlin() = checkBackend(SIMD_SSSE3, "ssse3")
 
     @Test
-    fun avx2MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX2, "avx2")
+    fun avx2MatchesKotlin() = checkBackend(SIMD_AVX2, "avx2")
 
     @Test
-    fun avx512MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX512, "avx512")
+    fun avx512MatchesKotlin() = checkBackend(SIMD_AVX512, "avx512")
 
     @Test
     fun productionDispatchSelectsHighest() {
@@ -65,7 +65,7 @@ class MorphologyValidationTest {
         // On this host (i7-7820X) it should be AVX512.
         assertEquals(
             "expected avx512 as the dispatched morphology backend on this host",
-            UnlinearizeNative.SIMD_AVX512,
+            SIMD_AVX512,
             MorphologyNative.nativeBackend()
         )
     }

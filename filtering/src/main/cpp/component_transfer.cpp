@@ -380,15 +380,18 @@ void runForced(const jint* src, jint* dst, jint width, jint height,
 }
 
 jint nativeBackendForAbi() {
+    jint backends = SIMD_BACKEND_SCALAR;
 #if defined(__aarch64__)
-    return SIMD_BACKEND_NEON64;
+    backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
-    return SIMD_BACKEND_NEON32;
+    backends |= SIMD_BACKEND_NEON32;
 #elif defined(__SSSE3__)
-    return detectSimdLevel() >= SIMD_AVX2 ? SIMD_BACKEND_AVX2 : SIMD_BACKEND_SSSE3;
-#else
-    return SIMD_BACKEND_SCALAR;
+    backends |= SIMD_BACKEND_SSSE3;
+    if (detectSimdLevel() >= SIMD_AVX2) {
+        backends |= SIMD_BACKEND_AVX2;
+    }
 #endif
+    return backends;
 }
 
 } // namespace

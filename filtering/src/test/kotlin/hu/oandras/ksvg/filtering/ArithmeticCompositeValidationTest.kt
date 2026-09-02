@@ -48,14 +48,14 @@ class ArithmeticCompositeValidationTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
     fun productionDispatchSelectsScalar() {
         assertTrue("libksvgblur not loadable on host", ArithmeticCompositeNative.isAvailable)
         assertEquals(
             "expected scalar as the dispatched arithmetic_composite backend on this host",
-            UnlinearizeNative.SIMD_SCALAR,
+            SIMD_SCALAR,
             ArithmeticCompositeNative.nativeBackend()
         )
     }

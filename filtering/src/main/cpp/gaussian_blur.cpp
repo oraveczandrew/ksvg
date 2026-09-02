@@ -303,6 +303,7 @@ void runForced(GaussianScratch* s, jint* pix, int w, int h, float stdDeviationX,
 }
 
 jint nativeBackendForAbi(float stdDeviationX, float stdDeviationY) {
+    jint backends = SIMD_BACKEND_SCALAR;
     std::vector<float> wx, wy;
     const int rx = computeWeights(stdDeviationX, wx);
     const int ry = computeWeights(stdDeviationY, wy);
@@ -310,14 +311,15 @@ jint nativeBackendForAbi(float stdDeviationX, float stdDeviationY) {
 
     if (isotropic && rx >= 1 && rx <= kMaxKernelRadius) {
 #if defined(__aarch64__)
-        return SIMD_BACKEND_NEON64;
+        backends |= SIMD_BACKEND_NEON64;
 #elif defined(__i386__) || defined(__x86_64__)
-        return (detectSimdLevel() >= SIMD_AVX2) ? SIMD_BACKEND_AVX2 : SIMD_BACKEND_SSSE3;
-#else
-        return SIMD_BACKEND_SCALAR;
+        backends |= SIMD_BACKEND_SSSE3;
+        if (detectSimdLevel() >= SIMD_AVX2) {
+            backends |= SIMD_BACKEND_AVX2;
+        }
 #endif
     }
-    return SIMD_BACKEND_SCALAR;
+    return backends;
 }
 
 } // namespace

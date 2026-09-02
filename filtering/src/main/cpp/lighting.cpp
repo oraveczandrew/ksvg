@@ -564,15 +564,17 @@ void runForced(jint* pix, jint* out, jint width, jint height,
 }
 
 jint nativeBackendForAbi() {
+    jint backends = SIMD_BACKEND_SCALAR;
+#ifdef LIGHT_SIMD
 #if defined(__aarch64__)
-    return SIMD_BACKEND_NEON64;
+    backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
-    return SIMD_BACKEND_NEON32;
+    backends |= SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
-    return SIMD_BACKEND_SSSE3;
-#else
-    return SIMD_BACKEND_SCALAR;
+    backends |= SIMD_BACKEND_SSSE3;
 #endif
+#endif
+    return backends;
 }
 
 } // namespace

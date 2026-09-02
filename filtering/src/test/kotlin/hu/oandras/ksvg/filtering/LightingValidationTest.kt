@@ -54,10 +54,10 @@ class LightingValidationTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
-    fun ssse3MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SSSE3, "ssse3")
+    fun ssse3MatchesKotlin() = checkBackend(SIMD_SSSE3, "ssse3")
 
     @Test
     fun productionDispatchSelectsHighest() {
@@ -65,7 +65,7 @@ class LightingValidationTest {
         // Lighting only has one vector path (SSE2 minimum), reported as SSSE3 by dispatcher.
         assertEquals(
             "expected ssse3 as the dispatched lighting backend on this host",
-            UnlinearizeNative.SIMD_SSSE3,
+            SIMD_SSSE3,
             LightingNative.nativeBackend()
         )
     }

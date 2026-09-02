@@ -53,7 +53,7 @@ class ArithmeticCompositeNativeDeviceTest {
     }
 
     @Test
-    fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
+    fun scalarMatchesKotlin() = checkBackend(SIMD_SCALAR, "scalar")
 
     @Test
     fun productionApplyMatchesKotlin() {
