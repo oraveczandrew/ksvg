@@ -16,7 +16,10 @@
 
 #include <jni.h>
 #include <cstring>
+#include <cassert>
+#include <algorithm>
 #include "cpu_dispatch.h"
+#include "simd_x86.h"
 #include "simd_x86.h"
 
 // feMorphology (erode/dilate) over unpremultiplied ARGB_8888 IntArrays.
@@ -96,24 +99,38 @@ namespace {
         }
     }
 
+#ifndef MORPH_SIMD
+#define MORPH_SIMD
+#endif
+
 #ifdef MORPH_SIMD
 
-#if defined(__ARM_NEON__) || defined(__ARM_NEON__)
+#if defined(__ARM_NEON__) || defined(__ARM_NEON)
 #include <arm_neon.h>
     using Vec = uint8x16_t;
     inline Vec vecLoad(const jint *p) { return vld1q_u8(reinterpret_cast<const uint8_t *>(p)); }
     inline Vec vecMin(Vec a, Vec b) { return vminq_u8(a, b); }
     inline Vec vecMax(Vec a, Vec b) { return vmaxq_u8(a, b); }
-    inline Vec vecInit(jint v) { return vdupq_n_u8(static_cast<uint8_t>(v)); }
-    inline jint lane(Vec v, int i) { return static_cast<jint>(vgetq_lane_u8(v, i)); }
+    inline Vec vecInit(jint v) { return vreinterpretq_u8_s32(vdupq_n_s32(v)); }
+    inline Vec vecInitByte(jint v) { return vdupq_n_u8(static_cast<uint8_t>(v)); }
+    inline jint lane(Vec v, int i) {
+        alignas(16) uint8_t bytes[16];
+        vst1q_u8(bytes, v);
+        return static_cast<jint>(bytes[i]);
+    }
 #else
 #include <emmintrin.h>
     using Vec = __m128i;
     inline Vec vecLoad(const jint *p) { return _mm_loadu_si128(reinterpret_cast<const __m128i *>(p)); }
     inline Vec vecMin(Vec a, Vec b) { return _mm_min_epu8(a, b); }
     inline Vec vecMax(Vec a, Vec b) { return _mm_max_epu8(a, b); }
-    inline Vec vecInit(jint v) { return _mm_set1_epi8(static_cast<char>(v)); }
-    inline jint lane(Vec v, int i) { return _mm_cvtsi128_si32(_mm_srli_si128(v, i)) & 0xFF; }
+    inline Vec vecInit(jint v) { return _mm_set1_epi32(v); }
+    inline Vec vecInitByte(jint v) { return _mm_set1_epi8(static_cast<char>(v)); }
+    inline jint lane(Vec v, int i) {
+        alignas(16) uint8_t bytes[16];
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(bytes), v);
+        return static_cast<jint>(bytes[i]);
+    }
 #endif
 
     /**
@@ -129,8 +146,8 @@ namespace {
         const jint left = x - radiusX;
         const jint right = x + radiusX;
 
-        Vec accMin = vecInit(isErode ? 255 : 0);
-        Vec accMax = vecInit(0);
+        Vec accMin = vecInitByte(isErode ? 255 : 0);
+        Vec accMax = vecInitByte(0);
 
         for (jint ky = top; ky <= bottom; ky++) {
             const jint *row = src + ky * width;
@@ -141,23 +158,166 @@ namespace {
                 accMax = vecMax(accMax, c);
             }
             for (; kx <= right; kx++) {
-                const Vec c = vecLoad(row + kx);
-                accMin = vecMin(accMin, c);
-                accMax = vecMax(accMax, c);
+                const jint c = row[kx];
+                const Vec cv = vecInit(c);
+                accMin = vecMin(accMin, cv);
+                accMax = vecMax(accMax, cv);
             }
         }
 
         const Vec acc = isErode ? accMin : accMax;
-        const jint a = lane(acc, 3) & 0xFF;
-        const jint r = lane(acc, 2) & 0xFF;
-        const jint g = lane(acc, 1) & 0xFF;
-        const jint b = lane(acc, 0) & 0xFF;
-        (void) init;
-        dst[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
+        jint resA = 255, resR = 255, resG = 255, resB = 255;
+        if (!isErode) {
+            resA = 0; resR = 0; resG = 0; resB = 0;
+        }
+
+        for (int i = 0; i < 4; i++) {
+            jint a = lane(acc, i * 4 + 3);
+            jint r = lane(acc, i * 4 + 2);
+            jint g = lane(acc, i * 4 + 1);
+            jint b = lane(acc, i * 4 + 0);
+            if (isErode) {
+                resA = std::min(resA, a);
+                resR = std::min(resR, r);
+                resG = std::min(resG, g);
+                resB = std::min(resB, b);
+            } else {
+                resA = std::max(resA, a);
+                resR = std::max(resR, r);
+                resG = std::max(resG, g);
+                resB = std::max(resB, b);
+            }
+        }
+        dst[y * width + x] = (resA << 24) | (resR << 16) | (resG << 8) | resB;
     }
 
 #endif // MORPH_SIMD
 } // namespace
+
+
+// Validation/test-only: run an explicitly selected backend (see SimdBackend).
+namespace {
+
+void runForced(const jint* src, jint* dst, jint width, jint height,
+               jint radiusX, jint radiusY, bool erode,
+               jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+               jint backend) {
+    const jint init = erode ? 255 : 0;
+    std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
+
+    const jint yLo = clipTop;
+    const jint yHi = clipBottom;
+    const jint xLo = clipLeft;
+    const jint xHi = clipRight;
+
+    const jint vyLo = yLo > radiusY ? yLo : radiusY;
+    const jint vyHi = yHi < height - radiusY ? yHi : height - radiusY;
+    const jint vxLo = xLo > radiusX ? xLo : radiusX;
+    const jint vxHi = xHi < width - radiusX ? xHi : width - radiusX;
+
+    for (jint y = yLo; y < vyLo; y++) {
+        for (jint x = xLo; x < xHi; x++) {
+            applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+        }
+    }
+    for (jint y = vyLo; y < vyHi; y++) {
+        for (jint x = xLo; x < vxLo; x++) {
+            applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+        }
+        for (jint x = vxLo; x < vxHi; x++) {
+#if defined(__aarch64__)
+            if (backend == SIMD_BACKEND_SCALAR) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+            } else {
+                assert(backend == SIMD_BACKEND_NEON64);
+                applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
+            }
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+            if (backend == SIMD_BACKEND_SCALAR) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+            } else {
+                assert(backend == SIMD_BACKEND_NEON32);
+                applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
+            }
+#elif defined(__i386__) || defined(__x86_64__)
+            switch (backend) {
+                case SIMD_BACKEND_SCALAR:
+                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                    break;
+                case SIMD_BACKEND_SSSE3:
+                    applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
+                    break;
+                case SIMD_BACKEND_AVX2:
+                    ksvgMorphologyApplyPixelAvx2(src, dst, width, radiusX, radiusY, erode, x, y);
+                    break;
+                case SIMD_BACKEND_AVX512:
+                    ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
+                    break;
+                default:
+                    assert(false && "unsupported forced morphology backend on x86");
+            }
+#else
+            (void)backend;
+            applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+#endif
+        }
+        for (jint x = vxHi; x < xHi; x++) {
+            applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+        }
+    }
+    for (jint y = vyHi; y < yHi; y++) {
+        for (jint x = xLo; x < xHi; x++) {
+            applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+        }
+    }
+}
+
+jint nativeBackendForAbi() {
+#if defined(__aarch64__)
+    return SIMD_BACKEND_NEON64;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    return SIMD_BACKEND_NEON32;
+#elif defined(__i386__) || defined(__x86_64__)
+    switch (detectSimdLevel()) {
+        case SIMD_AVX512: return SIMD_BACKEND_AVX512;
+        case SIMD_AVX2:   return SIMD_BACKEND_AVX2;
+        default:          return SIMD_BACKEND_SSSE3;
+    }
+#else
+    return SIMD_BACKEND_SCALAR;
+#endif
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_MorphologyNative_nativeBackend(
+        JNIEnv* env, jclass clazz) {
+    return nativeBackendForAbi();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForced(
+        JNIEnv* env, jclass clazz,
+        const jintArray jSrc, const jintArray jDst,
+        const jint width, const jint height,
+        const jint radiusX, const jint radiusY, const jboolean erode,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jint simdBackend) {
+    auto* src = env->GetIntArrayElements(jSrc, nullptr);
+    if (src == nullptr) return;
+    auto* dst = env->GetIntArrayElements(jDst, nullptr);
+    if (dst == nullptr) {
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+        return;
+    }
+
+    runForced(src, dst, width, height, radiusX, radiusY, erode == JNI_TRUE,
+              clipLeft, clipTop, clipRight, clipBottom, simdBackend);
+
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+}
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
@@ -166,25 +326,23 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
     const jint width, const jint height,
     const jint radiusX, const jint radiusY, const jboolean erode,
     const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
-    auto *src = static_cast<jint *>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
+    auto* src = env->GetIntArrayElements(jSrc, nullptr);
     if (src == nullptr) return;
-    auto *dst = static_cast<jint *>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    auto* dst = env->GetIntArrayElements(jDst, nullptr);
     if (dst == nullptr) {
-        env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
         return;
     }
 
     const bool isErode = erode == JNI_TRUE;
     const jint init = isErode ? 255 : 0;
 
-    std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
-
+#ifdef MORPH_SIMD
     const jint yLo = clipTop;
     const jint yHi = clipBottom;
     const jint xLo = clipLeft;
     const jint xHi = clipRight;
 
-#ifdef MORPH_SIMD
     // Vectorize only fully-interior windows; borders go to the scalar path.
     const jint vyLo = yLo > radiusY ? yLo : radiusY;
     const jint vyHi = yHi < height - radiusY ? yHi : height - radiusY;
@@ -230,6 +388,6 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
                 clipLeft, clipTop, clipRight, clipBottom);
 #endif
 
-    env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
-    env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
 }

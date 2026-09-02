@@ -16,26 +16,21 @@
 
 package hu.oandras.ksvg.filtering
 
-import android.os.Build
-import android.util.Log
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
 
-/**
- * Instrumented Android validation test for feMorphology.
- */
-@RunWith(AndroidJUnit4::class)
-class MorphologyNativeDeviceTest {
+class MorphologyValidationTest {
+
+    companion object {
+        init {
+            System.loadLibrary("ksvgblur")
+        }
+    }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on device", MorphologyNative.isAvailable)
-        
-        Log.i("MorphologyValidation", "Testing backend: $backendName")
-        Log.i("MorphologyValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
-
+        assertTrue("libksvgblur not loadable on host", MorphologyNative.isAvailable)
         for (case in MorphologyValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -56,28 +51,28 @@ class MorphologyNativeDeviceTest {
     fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
 
     @Test
-    fun neon64MatchesKotlin() {
-        val abi = Build.SUPPORTED_ABIS[0]
-        if (abi == "arm64-v8a") {
-            checkBackend(UnlinearizeNative.SIMD_NEON64, "neon64")
-        } else {
-            Log.i("MorphologyValidation", "Skipping neon64 on $abi")
-        }
-    }
+    fun ssse3MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SSSE3, "ssse3")
 
     @Test
-    fun neon32MatchesKotlin() {
-        val abi = Build.SUPPORTED_ABIS[0]
-        if (abi == "armeabi-v7a") {
-            checkBackend(UnlinearizeNative.SIMD_NEON32, "neon32")
-        } else {
-            Log.i("MorphologyValidation", "Skipping neon32 on $abi")
-        }
+    fun avx2MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX2, "avx2")
+
+    @Test
+    fun avx512MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX512, "avx512")
+
+    @Test
+    fun productionDispatchSelectsHighest() {
+        assertTrue("libksvgblur not loadable on host", MorphologyNative.isAvailable)
+        // On this host (i7-7820X) it should be AVX512.
+        assertEquals(
+            "expected avx512 as the dispatched morphology backend on this host",
+            UnlinearizeNative.SIMD_AVX512,
+            MorphologyNative.nativeBackend()
+        )
     }
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", MorphologyNative.isAvailable)
+        assertTrue("libksvgblur not loadable on host", MorphologyNative.isAvailable)
         for (case in MorphologyValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
