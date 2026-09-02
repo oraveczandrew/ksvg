@@ -46,4 +46,30 @@ internal object ConvolveNative {
         preserveAlpha: Boolean,
         edgeMode: Int,
     )
+
+    /**
+     * Validation/test-only twin of [apply]. Runs an explicitly selected backend
+     * regardless of normal CPU dispatch.
+     */
+    @JvmStatic
+    external fun applyForced(
+        src: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+        kernel: FloatArray,
+        orderX: Int,
+        orderY: Int,
+        targetX: Int,
+        targetY: Int,
+        divisor: Float,
+        bias: Float,
+        preserveAlpha: Boolean,
+        edgeMode: Int,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(): Int
 }

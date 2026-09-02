@@ -16,26 +16,21 @@
 
 package hu.oandras.ksvg.filtering
 
-import android.os.Build
-import android.util.Log
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
 
-/**
- * Instrumented Android validation test for feConvolveMatrix.
- */
-@RunWith(AndroidJUnit4::class)
-class ConvolveNativeDeviceTest {
+class ConvolveValidationTest {
+
+    companion object {
+        init {
+            System.loadLibrary("ksvgblur")
+        }
+    }
 
     private fun checkBackend(backend: Int, backendName: String) {
-        assertTrue("libksvgblur not loadable on device", ConvolveNative.isAvailable)
-        
-        Log.i("ConvolveValidation", "Testing backend: $backendName")
-        Log.i("ConvolveValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
-
+        assertTrue("libksvgblur not loadable on host", ConvolveNative.isAvailable)
         for (case in ConvolveValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)
@@ -57,18 +52,27 @@ class ConvolveNativeDeviceTest {
     fun scalarMatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SCALAR, "scalar")
 
     @Test
-    fun neon64MatchesKotlin() {
-        val abi = Build.SUPPORTED_ABIS[0]
-        if (abi == "arm64-v8a") {
-            checkBackend(UnlinearizeNative.SIMD_NEON64, "neon64")
-        } else {
-            Log.i("ConvolveValidation", "Skipping neon64 on $abi")
-        }
+    fun ssse3MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_SSSE3, "ssse3")
+
+    @Test
+    fun avx2MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX2, "avx2")
+
+    @Test
+    fun avx512MatchesKotlin() = checkBackend(UnlinearizeNative.SIMD_AVX512, "avx512")
+
+    @Test
+    fun productionDispatchSelectsHighest() {
+        assertTrue("libksvgblur not loadable on host", ConvolveNative.isAvailable)
+        assertEquals(
+            "expected avx512 as the dispatched convolve backend on this host",
+            UnlinearizeNative.SIMD_AVX512,
+            ConvolveNative.nativeBackend()
+        )
     }
 
     @Test
     fun productionApplyMatchesKotlin() {
-        assertTrue("libksvgblur not loadable on device", ConvolveNative.isAvailable)
+        assertTrue("libksvgblur not loadable on host", ConvolveNative.isAvailable)
         for (case in ConvolveValidationCorpus.cases) {
             val expected = case.reference()
             val out = IntArray(case.size)

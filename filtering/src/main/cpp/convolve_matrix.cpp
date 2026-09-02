@@ -18,6 +18,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdint>
+#include <cassert>
 #include "cpu_dispatch.h"
 #include "simd_x86.h"
 
@@ -239,6 +240,125 @@ void applySseInterior(
 
 } // namespace
 
+
+// Validation/test-only: run an explicitly selected backend (see SimdBackend).
+namespace {
+
+void runForced(const jint* src, jint* dst, jint width, jint height,
+               const jfloat* kernel, jint orderX, jint orderY,
+               jint targetX, jint targetY, jfloat divisor, jfloat bias,
+               bool preserve, jint edgeMode, jint backend) {
+    if (edgeMode == 0 && height >= orderY && width >= orderX) {
+#if defined(__aarch64__)
+        if (backend == SIMD_BACKEND_SCALAR) {
+            applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, edgeMode);
+        } else {
+            assert(backend == SIMD_BACKEND_NEON64);
+            const jint yLo = targetY;
+            const jint yHi = height - orderY + 1 + targetY;
+            for (jint y = 0; y < yLo; y++) {
+                for (jint x = 0; x < width; x++) convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, 0, x, y);
+            }
+            for (jint y = yHi; y < height; y++) {
+                for (jint x = 0; x < width; x++) convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, 0, x, y);
+            }
+            applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve);
+        }
+#elif defined(__i386__) || defined(__x86_64__)
+        const jint yLo = targetY;
+        const jint yHi = height - orderY + 1 + targetY;
+        auto runInterior = [&]() {
+            for (jint y = 0; y < yLo; y++) {
+                for (jint x = 0; x < width; x++) convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, 0, x, y);
+            }
+            for (jint y = yHi; y < height; y++) {
+                for (jint x = 0; x < width; x++) convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, 0, x, y);
+            }
+        };
+
+        switch (backend) {
+            case SIMD_BACKEND_SCALAR:
+                applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, edgeMode);
+                break;
+            case SIMD_BACKEND_SSSE3:
+                runInterior();
+                applySseInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve);
+                break;
+            case SIMD_BACKEND_AVX2:
+                runInterior();
+                ksvgConvolveApplyInteriorAvx2(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve);
+                break;
+            case SIMD_BACKEND_AVX512:
+                runInterior();
+                ksvgConvolveApplyInteriorAvx512(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve);
+                break;
+            default:
+                assert(false && "unsupported forced convolve backend on x86");
+        }
+#else
+        (void)backend;
+        applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, edgeMode);
+#endif
+        return;
+    }
+    (void)backend;
+    applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, edgeMode);
+}
+
+jint nativeBackendForAbi() {
+#if defined(__aarch64__)
+    return SIMD_BACKEND_NEON64;
+#elif defined(__i386__) || defined(__x86_64__)
+    switch (detectSimdLevel()) {
+        case SIMD_AVX512: return SIMD_BACKEND_AVX512;
+        case SIMD_AVX2:   return SIMD_BACKEND_AVX2;
+        default:          return SIMD_BACKEND_SSSE3;
+    }
+#else
+    return SIMD_BACKEND_SCALAR;
+#endif
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_ConvolveNative_nativeBackend(
+        JNIEnv* env, jclass clazz) {
+    return nativeBackendForAbi();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_ConvolveNative_applyForced(
+        JNIEnv* env, jclass clazz,
+        const jintArray jSrc, const jintArray jDst,
+        jint width, jint height,
+        const jfloatArray jKernel, jint orderX, jint orderY,
+        jint targetX, jint targetY,
+        jfloat divisor, jfloat bias,
+        const jboolean preserveAlpha, const jint edgeMode,
+        jint simdBackend) {
+    auto* kernel = env->GetFloatArrayElements(jKernel, nullptr);
+    if (kernel == nullptr) return;
+
+    auto* src = env->GetIntArrayElements(jSrc, nullptr);
+    if (src == nullptr) {
+        env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
+        return;
+    }
+    auto* dst = env->GetIntArrayElements(jDst, nullptr);
+    if (dst == nullptr) {
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+        env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
+        return;
+    }
+
+    runForced(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha == JNI_TRUE, edgeMode, simdBackend);
+
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
         JNIEnv* env, jclass clazz,
@@ -251,14 +371,14 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
     auto* kernel = env->GetFloatArrayElements(jKernel, nullptr);
     if (kernel == nullptr) return;
 
-    auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
+    auto* src = env->GetIntArrayElements(jSrc, nullptr);
     if (src == nullptr) {
         env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
         return;
     }
-    auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    auto* dst = env->GetIntArrayElements(jDst, nullptr);
     if (dst == nullptr) {
-        env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
         env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
         return;
     }
@@ -297,8 +417,8 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
                                  targetX, targetY, divisor, bias, preserve);
         }
 #endif
-        env->ReleasePrimitiveArrayCritical(jDst, dst, 0);
-        env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+        env->ReleaseIntArrayElements(jDst, dst, 0);
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
         env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
         return;
     }
@@ -307,7 +427,7 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
     applyScalar(src, dst, width, height, kernel,
                 orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
 
-    env->ReleasePrimitiveArrayCritical(jDst, dst, 0);
-    env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
     env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
 }
