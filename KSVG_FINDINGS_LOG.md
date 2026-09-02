@@ -122,8 +122,18 @@ Format for each entry:
   12/12 pre-existing failure set before/after, zero new regressions.
   `TurbulenceKernelParityTest` 2/2 green (forced re-run), kernel unchanged.
 - **Remaining discrepancy (not addressed):** librsvg renders 194 rows vs
-  KSVG's 193 for the fixture. Root cause pinned: librsvg parses the default
-  filter-region percentages (`−10%, 120%`) at f32 precision, so its device
-  bounds.top lands at 15.999999761581421 (below the pixel boundary) →
-  `floor`→15, 194 rows, and an offset tile_y. Matching it exactly would require
-  changing default filter-region geometry for all filters — out of scope.
+  KSVG's 193 for the fixture — now fully diagnosed (see
+  `tmp/PHASE2_INPUT_DIVERGENCE.md`, "193 vs 194 — focused diagnosis").
+  **Root cause:** librsvg tokenizes ALL number/percentage lengths at f32
+  (cssparser), widened to f64 at `length.rs:311`. The default filter region
+  `-10%` becomes `f64(f32(-0.1)) = -0.10000000149011612` instead of the f64
+  `-0.1` KSVG uses, so librsvg's device-space region top lands at
+  `15.999999761581421` (just *below* the pixel boundary) and
+  `y0.floor()` → 15 instead of 16. Bottom is identical (both `ceil` → 209);
+  the extra row comes entirely from the top integer bound (15 vs 16).
+  **Proof:** rebuilt librsvg with only the four default region lengths
+  constructed at f64 (`CssLength::new`, bypassing the tokenizer); re-captured
+  `tss_256` → bounds top moved 15 → 16 exactly (IRect `(0,15,256,209)` H=194 →
+  `(0,16,256,208)` H=192). No fix implemented; matching librsvg's f32
+  percentages (or making librsvg's parse f64) is a librsvg-side choice, and
+  forcing KSVG to mimic the f32 slop would require intentionally wrong lengths.
