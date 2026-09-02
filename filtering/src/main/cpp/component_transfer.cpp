@@ -66,7 +66,7 @@ namespace {
 #ifdef __aarch64__
 #include <arm_neon.h>
 
-static inline uint8x16_t lookup256Neon(
+inline uint8x16_t lookup256Neon(
         uint8x16_t indices,
         const uint8x16_t table[16]) {
     const uint8x16_t lo = vandq_u8(indices, vdupq_n_u8(0x0F));
@@ -84,7 +84,7 @@ static inline uint8x16_t lookup256Neon(
     return result;
 }
 
-static inline void loadTable256(
+inline void loadTable256(
         const jbyte* src,
         uint8x16_t table[16]) {
     const uint8_t* t = reinterpret_cast<const uint8_t*>(src);
@@ -94,7 +94,7 @@ static inline void loadTable256(
     }
 }
 
-static inline void applyNeonBlock(
+inline void applyNeonBlock(
         const jint* src,
         jint* dst,
         const uint8x16_t tableA[16],

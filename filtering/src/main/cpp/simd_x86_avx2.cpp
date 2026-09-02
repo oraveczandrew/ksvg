@@ -21,7 +21,7 @@
 #if defined(__i386__) || defined(__x86_64__)
 
 #include <immintrin.h>
-#include "turbulence_core.h"
+#include "turbulence_tables.h"
 
 namespace {
 
@@ -83,7 +83,7 @@ static inline __m256d abs4(const __m256d value) {
 }
 
 static inline __m256d noise4(
-        const LatticeTables& t,
+        const X86LatticeTables& t,
         const PixelGeometry& g) {
     const double* gx = &t.gradPackedX[g.b00][0];
     const double* gy = &t.gradPackedY[g.b00][0];
@@ -118,7 +118,7 @@ static inline __m256d noise4(
 }
 
 static inline void processPixelAvx2(
-        const LatticeTables& t,
+        const X86LatticeTables& t,
         double sums[4],
         const double px0,
         const double py0,
@@ -147,7 +147,7 @@ static inline void processPixelAvx2(
             si.wrapY = static_cast<int32_t>(std::floor(curtly)) + 4096 + si.height;
         }
 
-        const PixelGeometry g = geometry(t, fx, fy, si, stitchEnabled);
+        const PixelGeometry g = geometry32(t.selector32, fx, fy, si, stitchEnabled);
         __m256d n = noise4(t, g);
         if (fractal) {
             n = _mm256_div_pd(n, _mm256_set1_pd(ratio));
@@ -470,8 +470,8 @@ void applyAvx2(
     (void) originX;
     (void) originY;
 
-    LatticeTables tables;
-    initLattice(tables, seed);
+    X86LatticeTables tables;
+    initX86Tables(tables, seed);
     std::memset(pixels, 0, static_cast<size_t>(width) * height * sizeof(jint));
 
     const bool stitchEnabled = periodX > 0 || periodY > 0;

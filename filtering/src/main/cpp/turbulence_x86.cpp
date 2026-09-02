@@ -18,8 +18,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdint>
-#include <algorithm>
-#include "turbulence_core.h"
+#include "turbulence_tables.h"
 #include "turbulence_x86.h"
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -41,7 +40,7 @@ static inline __m128d abs2(const __m128d value) {
 }
 
 static inline __m128d noise2Channels(
-        const LatticeTables& t,
+        const X86LatticeTables& t,
         const PixelGeometry& g,
         const int channelOffset) {
     const double* gx = &t.gradPackedX[g.b00][channelOffset];
@@ -77,7 +76,7 @@ static inline __m128d noise2Channels(
 }
 
 static inline void processPixelSsse3(
-        const LatticeTables& t,
+        const X86LatticeTables& t,
         double sums[4],
         const double px0,
         const double py0,
@@ -107,7 +106,7 @@ static inline void processPixelSsse3(
             si.wrapY = static_cast<int32_t>(std::floor(curtly)) + 4096 + si.height;
         }
 
-        const PixelGeometry g = geometry(t, fx, fy, si, stitchEnabled);
+        const PixelGeometry g = geometry(t.selector, fx, fy, si, stitchEnabled);
         __m128d n01 = noise2Channels(t, g, 0);
         __m128d n23 = noise2Channels(t, g, 2);
         const __m128d ratioV = _mm_set1_pd(ratio);
@@ -136,18 +135,6 @@ static inline void processPixelSsse3(
     _mm_storeu_pd(sums + 2, sum23);
 }
 
-static inline jint packPixel(const double sums[4], const bool fractal) {
-    jint comps[4];
-    for (int ch = 0; ch < 4; ++ch) {
-        const double finalVal = fractal ? (sums[ch] + 1.0) * 127.5 : sums[ch] * 255.0;
-        jint iv = static_cast<jint>(std::floor(finalVal + 0.5));
-        if (iv < 0) iv = 0;
-        else if (iv > 255) iv = 255;
-        comps[ch] = iv;
-    }
-    return (comps[3] << 24) | (comps[0] << 16) | (comps[1] << 8) | comps[2];
-}
-
 } // namespace
 
 extern "C" {
@@ -165,8 +152,8 @@ void applySsse3(
     (void) originX;
     (void) originY;
 
-    LatticeTables tables;
-    initLattice(tables, seed);
+    X86LatticeTables tables;
+    initX86Tables(tables, seed);
     std::memset(pixels, 0, static_cast<size_t>(width) * height * sizeof(jint));
 
     const bool stitchEnabled = periodX > 0 || periodY > 0;

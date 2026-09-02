@@ -62,7 +62,7 @@ void applyScalar(
 #include <arm_neon.h>
 
 template<int Shift>
-static inline uint32x4_t shiftRightFF(uint32x4_t pixels) {
+ inline uint32x4_t shiftRightFF(uint32x4_t pixels) {
     if constexpr (Shift == 0) {
         return pixels;
     } else {
@@ -72,7 +72,7 @@ static inline uint32x4_t shiftRightFF(uint32x4_t pixels) {
 
 
 template<int XShift, int YShift, int XChannel, int YChannel>
-static inline void applyNeon64Impl(
+inline void applyNeon64Impl(
         const jint* src,
         const jint* map,
         jint* dst,

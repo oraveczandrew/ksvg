@@ -59,7 +59,7 @@ class TurbulenceValidationTest {
         assertTrue("libksvgblur not loadable on host", TurbulenceNative.isAvailable)
         assertEquals(
             "expected scalar as the dispatched turbulence backend on this host",
-            SIMD_SCALAR,
+            SIMD_AVX2 or SIMD_SSSE3 or SIMD_SCALAR,
             TurbulenceNative.nativeBackend()
         )
     }

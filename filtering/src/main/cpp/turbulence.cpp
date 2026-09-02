@@ -20,8 +20,9 @@
 #include <algorithm>
 #include <cassert>
 #include "cpu_dispatch.h"
-#include "turbulence_core.h"
+#include "turbulence_tables.h"
 #include "turbulence_x86.h"
+#include "turbulence_arm.h"
 
 namespace {
 
@@ -40,8 +41,8 @@ void applyScalar(
     (void)originX;
     (void)originY;
 
-    LatticeTables tables;
-    initLattice(tables, seed);
+    ScalarLatticeTables tables;
+    initScalarTables(tables, seed);
 
     std::memset(pixels, 0, static_cast<size_t>(width) * height * sizeof(jint));
 
@@ -54,13 +55,13 @@ void applyScalar(
     for (jint y = clipTop; y < clipBottom; y++) {
         const jdouble userY = userTop + y * invCanvasScaleY;
         const jdouble py0 = userY / unitSizeY * baseFrequencyY;
-        const double tileY = static_cast<double>(y - clipTop);
+        const double tileY = y - clipTop;
         const jint rowOffset = y * width;
 
         for (jint x = clipLeft; x < clipRight; x++) {
             const jdouble userX = userLeft + x * invCanvasScaleX;
             const jdouble px0 = userX / unitSizeX * baseFrequencyX;
-            const double tileX = static_cast<double>(x - clipLeft);
+            const double tileX = x - clipLeft;
 
             double sums[4] = {0.0, 0.0, 0.0, 0.0};
 
@@ -121,6 +122,8 @@ jint nativeBackendForAbi() {
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }
+#elif defined(__aarch64__)
+    //backends |= SIMD_BACKEND_NEON64;
 #endif
     return backends;
 }
@@ -129,13 +132,13 @@ jint nativeBackendForAbi() {
 
 extern "C" JNIEXPORT jint JNICALL
 Java_hu_oandras_ksvg_filtering_TurbulenceNative_nativeBackend(
-        JNIEnv* env, jclass clazz) {
+        [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz) {
     return nativeBackendForAbi();
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
-        JNIEnv* env, jclass clazz,
+        JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jPixels,
         const jint width, const jint height,
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
@@ -162,12 +165,22 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
                       baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
                       invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                       unitSizeX, unitSizeY, seed);
-        } else {
-            assert(simdBackend == SIMD_BACKEND_SSSE3);
+        } else if (simdBackend == SIMD_BACKEND_SSSE3) {
             applySsse3(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
                        baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
                        invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                        unitSizeX, unitSizeY, seed);
+        } else {
+            assert(false && "unsupported forced turbulence backend on x86");
+        }
+#elif defined(__aarch64__)
+        if (simdBackend == SIMD_BACKEND_NEON64) {
+            applyNeon64(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                        baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                        invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                        unitSizeX, unitSizeY, seed);
+        } else {
+            assert(false && "unsupported forced turbulence backend on arm64");
         }
 #else
         (void)simdBackend;
@@ -183,7 +196,7 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
-        JNIEnv* env, jclass clazz,
+        JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jPixels,
         const jint width, const jint height,
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
@@ -216,6 +229,11 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
                     invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                     unitSizeX, unitSizeY, seed);
     }
+/*#elif defined(__aarch64__)
+    applyNeon64(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                unitSizeX, unitSizeY, seed);*/
 #else
     applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
