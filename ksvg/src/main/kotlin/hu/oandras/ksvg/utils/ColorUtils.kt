@@ -21,6 +21,7 @@ import androidx.annotation.ColorInt
 import androidx.annotation.IntRange
 import hu.oandras.ksvg.dom.COLOR_BLACK
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 internal fun pack3Hex(threeHex: Int): Int {
     val h1 = threeHex and 0xf00 // r
@@ -165,4 +166,63 @@ internal fun linearToSRgb(c: Int): Int {
     } else {
         clamp255((1.055f * a.pow(1f / 2.4f) - 0.055f) * 255f)
     }
+}
+
+/**
+ * Precomputed linear→sRGB (unlinearize) lookup table, matching librsvg's
+ * `build.rs` exactly: `UNLINEARIZE[i] = round(unlinearize(i / 255.0) * 255.0)`
+ * where `unlinearize(c) = if c <= 0.0031308: 12.92 * c else: 1.055 * c^(1/2.4) - 0.055`.
+ *
+ * Used by the filter-output linearRGB→sRGB transfer (the equivalent of librsvg's
+ * `FilterContext::into_output` → `unlinearize_surface`).
+ */
+@JvmField
+internal val UN_LINEARIZE: ByteArray = ByteArray(256) { i ->
+    val c = i.toDouble() / 255.0
+    val x = if (c <= 0.0031308) {
+        12.92 * c
+    } else {
+        1.055 * c.pow(1.0 / 2.4) - 0.055
+    }
+    (x * 255.0).roundToInt().toByte()
+}
+
+/**
+ * Batch-converts a straight (non-premultiplied) linear-RGB [IntArray] to straight
+ * sRGB, applying [unLinearizeArgb] to every element.
+ */
+internal fun unLinearizePixels(pixels: IntArray) {
+    var i = 0
+    while (i < pixels.size) {
+        pixels[i] = unLinearizeArgb(pixels[i])
+        i++
+    }
+}
+
+/**
+ * Converts a single straight (non-premultiplied) linear-RGB pixel to straight sRGB.
+ *
+ * KSVG filter-output bitmaps hold straight (non-premultiplied) ARGB, and KSVG
+ * composites them with straight source-over. This is the filter-output
+ * linearRGB→sRGB transfer (the equivalent of librsvg's `FilterContext::into_output`
+ * → `unlinearize_surface`), applied directly to the straight channels: each colour
+ * channel is looked up in [UN_LINEARIZE] and alpha is preserved unchanged.
+ * (librsvg premultiplies → unlinearizes → re-premultiplies and composites
+ * premultiplied; the straight-channel application yields the same final result.)
+ *
+ * @param pixel a straight ARGB_8888 pixel (alpha in bits 24–31)
+ * @return the converted straight sRGB pixel
+ */
+@ColorInt
+internal fun unLinearizeArgb(@ColorInt pixel: Int): Int {
+    val a = pixel and -0x1000000
+    val rIdx = (pixel ushr 16) and 0xff
+    val gIdx = (pixel ushr 8) and 0xff
+    val bIdx = pixel and 0xff
+
+    val rSrgb = UN_LINEARIZE[rIdx].toInt() and 0xff
+    val gSrgb = UN_LINEARIZE[gIdx].toInt() and 0xff
+    val bSrgb = UN_LINEARIZE[bIdx].toInt() and 0xff
+
+    return a or (rSrgb shl 16) or (gSrgb shl 8) or bSrgb
 }

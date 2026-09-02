@@ -24,6 +24,7 @@ import android.graphics.RectF
 import hu.oandras.ksvg.compat.setBlendModeCompat
 import hu.oandras.ksvg.compat.toBlendModeCompat
 import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.style.CSSBlendMode
 import hu.oandras.ksvg.render.FeBlendRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
@@ -67,9 +68,11 @@ import hu.oandras.ksvg.render.filters.doFeSpecularLightingFilter
 import hu.oandras.ksvg.render.filters.doFeTileFilter
 import hu.oandras.ksvg.render.filters.doFeTurbulenceFilter
 import hu.oandras.ksvg.render.filters.getFilterInput
+import hu.oandras.ksvg.render.pool.IntArrayBucket
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.forEachElement
+import hu.oandras.ksvg.utils.unLinearizePixels
 
 /**
  * Software (CPU) filter backend driving the existing Kotlin/native kernel
@@ -94,6 +97,12 @@ internal class SoftwareFilterBackend internal constructor(
      * Drawables/threads.
      */
     private val filterCompositePaint: Paint = Paint()
+
+    /**
+     * Reusable pixel buffer for the filter-output linearRGB→sRGB transfer.
+     * Avoids allocating a fresh IntArray on every filter evaluation.
+     */
+    private val pixelBuffer = IntArrayBucket()
 
     override fun supports(primitives: FilterPrimitiveSet): Boolean = true
 
@@ -259,6 +268,29 @@ internal class SoftwareFilterBackend internal constructor(
         return filterCompositePaint
     }
 
+    /**
+     * Converts a straight (non-premultiplied) linear-RGB bitmap to straight sRGB
+     * in-place. This is the KSVG equivalent of librsvg's `FilterContext::into_output`
+     * → `unlinearize_surface` applied to KSVG's straight-channel representation:
+     * for each pixel, apply the precomputed UNLINEARIZE LUT to each color channel
+     * and keep alpha unchanged. (librsvg premultiplies before unlinearizing and
+     * composites premultiplied, which yields the same final result as unlinearizing
+     * straight channels and compositing straight — see the verified model.)
+     *
+     * Must only be called when [ColorInterpolation.LINEAR_RGB] is active (the SVG default).
+     */
+    private fun unLinearizeBitmap(bitmap: Bitmap) {
+        val width = bitmap.width
+        val height = bitmap.height
+        val size = width * height
+        val pixels = pixelBuffer.getWithSize(size)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        unLinearizePixels(pixels)
+
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+    }
+
     @JvmSynthetic
     internal fun applyFilterToBitmap(
         canvas: Canvas,
@@ -419,6 +451,20 @@ internal class SoftwareFilterBackend internal constructor(
 
                 renderContext.rectFPool.release(lastResultRegion)
                 results.recycle(exclude = lastResult)
+
+                // The filter-output linearRGB→sRGB transfer. KSVG's feTurbulence terminal
+                // emits straight (non-premultiplied) linear-RGB samples; apply the UNLINEARIZE
+                // LUT to those straight channels before compositing (the KSVG equivalent of
+                // librsvg's FilterContext::into_output). Other filter primitives already emit
+                // their own correct output colour space, so the transfer is scoped to
+                // feTurbulence terminals only.
+                if (terminalNode is FeTurbulenceRenderNode &&
+                    filterNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB &&
+                    lastResult != null
+                ) {
+                    unLinearizeBitmap(lastResult)
+                }
+
                 return lastResult
             }
         }
