@@ -16,6 +16,8 @@
 
 #include <jni.h>
 #include <cmath>
+#include <cassert>
+#include "cpu_dispatch.h"
 
 // feDiffuseLighting / feSpecularLighting over unpremultiplied ARGB_8888
 // IntArrays. Bit-exact port of the Kotlin reference loop in
@@ -513,6 +515,121 @@ void applyVector(
 
 } // namespace
 
+
+// Validation/test-only: run an explicitly selected backend (see SimdBackend).
+namespace {
+
+void runForced(jint* pix, jint* out, jint width, jint height,
+               jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+               float ss, jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+               jdouble userLeft, jdouble userTop, jdouble originX, jdouble originY,
+               jdouble unitSizeX, jdouble unitSizeY,
+               float canvasScaleX, float canvasScaleY,
+               jint lightType, bool isSpecular, float k, float exponent,
+               float fr, float fg, float fb, const jdouble* params,
+               bool premultiplied, bool useLinear,
+               jint backend) {
+    const jint span = clipRight - clipLeft + 3;
+
+    if (backend == SIMD_BACKEND_SCALAR || span > kMaxVecRowSpan) {
+        applyScalar(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    ss, invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                    unitSizeX, unitSizeY, canvasScaleX, canvasScaleY,
+                    lightType, isSpecular, k, exponent, fr, fg, fb, params,
+                    premultiplied, useLinear);
+        return;
+    }
+
+#ifdef LIGHT_SIMD
+#if defined(__aarch64__)
+    assert(backend == SIMD_BACKEND_NEON64);
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    assert(backend == SIMD_BACKEND_NEON32);
+#elif defined(__i386__) || defined(__x86_64__)
+    assert(backend == SIMD_BACKEND_SSSE3); // lighting vector path uses SSE2 minimum
+#endif
+    applyVector(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                ss, invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                unitSizeX, unitSizeY, canvasScaleX, canvasScaleY,
+                lightType, isSpecular, k, exponent, fr, fg, fb, params,
+                premultiplied, useLinear);
+#else
+    (void)backend;
+    applyScalar(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                ss, invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                unitSizeX, unitSizeY, canvasScaleX, canvasScaleY,
+                lightType, isSpecular, k, exponent, fr, fg, fb, params,
+                premultiplied, useLinear);
+#endif
+}
+
+jint nativeBackendForAbi() {
+#if defined(__aarch64__)
+    return SIMD_BACKEND_NEON64;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    return SIMD_BACKEND_NEON32;
+#elif defined(__i386__) || defined(__x86_64__)
+    return SIMD_BACKEND_SSSE3;
+#else
+    return SIMD_BACKEND_SCALAR;
+#endif
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_LightingNative_nativeBackend(
+        JNIEnv* env, jclass clazz) {
+    return nativeBackendForAbi();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_LightingNative_applyForced(
+        JNIEnv* env, jclass clazz,
+        const jintArray jPix, const jintArray jOut,
+        jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jfloat surfaceScaleNormalized,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jfloat canvasScaleX, jfloat canvasScaleY,
+        jint lightType, const jboolean specular,
+        jfloat k, jfloat exponent,
+        const jint lightR, const jint lightG, const jint lightB,
+        const jdoubleArray jParams,
+        const jboolean premultipliedOutput,
+        const jboolean useLinearInput,
+        const jint simdBackend) {
+    jdouble* params = env->GetDoubleArrayElements(jParams, nullptr);
+    if (params == nullptr) return;
+
+    jint* pix = env->GetIntArrayElements(jPix, nullptr);
+    if (pix == nullptr) {
+        env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
+        return;
+    }
+    jint* out = env->GetIntArrayElements(jOut, nullptr);
+    if (out == nullptr) {
+        env->ReleaseIntArrayElements(jPix, pix, JNI_ABORT);
+        env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
+        return;
+    }
+
+    runForced(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
+              surfaceScaleNormalized, invCanvasScaleX, invCanvasScaleY,
+              userLeft, userTop, originX, originY, unitSizeX, unitSizeY,
+              canvasScaleX, canvasScaleY, lightType, specular == JNI_TRUE,
+              k, exponent, static_cast<float>(lightR), static_cast<float>(lightG),
+              static_cast<float>(lightB), params, premultipliedOutput == JNI_TRUE,
+              useLinearInput == JNI_TRUE, simdBackend);
+
+    env->ReleaseIntArrayElements(jOut, out, 0);
+    env->ReleaseIntArrayElements(jPix, pix, JNI_ABORT);
+    env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_LightingNative_apply(
         JNIEnv* env, jclass clazz,
@@ -531,20 +648,17 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
         const jdoubleArray jParams,
         const jboolean premultipliedOutput,
         const jboolean useLinearInput) {
-    // Small array first: no JNI call may occur between a
-    // GetPrimitiveArrayCritical pair, so the params must be fetched
-    // BEFORE entering the critical sections.
     jdouble* params = env->GetDoubleArrayElements(jParams, nullptr);
     if (params == nullptr) return;
 
-    auto* pix = static_cast<jint*>(env->GetPrimitiveArrayCritical(jPix, nullptr));
+    jint* pix = env->GetIntArrayElements(jPix, nullptr);
     if (pix == nullptr) {
         env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
         return;
     }
-    auto* out = static_cast<jint*>(env->GetPrimitiveArrayCritical(jOut, nullptr));
+    jint* out = env->GetIntArrayElements(jOut, nullptr);
     if (out == nullptr) {
-        env->ReleasePrimitiveArrayCritical(jPix, pix, JNI_ABORT);
+        env->ReleaseIntArrayElements(jPix, pix, JNI_ABORT);
         env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
         return;
     }
@@ -583,7 +697,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
                     premultiplied, useLinear);
     }
 
-    env->ReleasePrimitiveArrayCritical(jOut, out, JNI_ABORT);
-    env->ReleasePrimitiveArrayCritical(jPix, pix, JNI_ABORT);
+    env->ReleaseIntArrayElements(jOut, out, 0);
+    env->ReleaseIntArrayElements(jPix, pix, JNI_ABORT);
     env->ReleaseDoubleArrayElements(jParams, params, JNI_ABORT);
 }

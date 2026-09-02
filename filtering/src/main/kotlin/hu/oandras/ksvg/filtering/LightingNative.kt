@@ -64,11 +64,50 @@ internal object LightingNative {
         lightG: Int,
         lightB: Int,
         params: DoubleArray,
-        // When true (feSpecularLighting as terminal output), emit premultiplied
-        // (lightColor, intensity) to match cairo; otherwise straight.
         premultipliedOutput: Boolean,
-        // When true (color-interpolation-filters: linearRGB), gamma-correct the
-        // straight RGB output from linear to sRGB (premultiplied terminal unchanged).
         useLinear: Boolean,
     )
+
+    /**
+     * Validation/test-only twin of [apply]. Runs an explicitly selected backend
+     * regardless of normal CPU dispatch.
+     */
+    @JvmStatic
+    @Suppress("LongParameterList")
+    external fun applyForced(
+        pix: IntArray,
+        out: IntArray,
+        width: Int,
+        height: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        surfaceScaleNormalized: Float,
+        invCanvasScaleX: Double,
+        invCanvasScaleY: Double,
+        userLeft: Double,
+        userTop: Double,
+        originX: Double,
+        originY: Double,
+        unitSizeX: Double,
+        unitSizeY: Double,
+        canvasScaleX: Float,
+        canvasScaleY: Float,
+        lightType: Int,
+        specular: Boolean,
+        k: Float,
+        exponent: Float,
+        lightR: Int,
+        lightG: Int,
+        lightB: Int,
+        params: DoubleArray,
+        premultipliedOutput: Boolean,
+        useLinear: Boolean,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(): Int
 }
