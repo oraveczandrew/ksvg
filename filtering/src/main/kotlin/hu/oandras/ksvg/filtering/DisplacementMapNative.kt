@@ -39,4 +39,27 @@ internal object DisplacementMapNative {
         xChannel: Int,
         yChannel: Int,
     )
+
+    /**
+     * Validation/test-only twin of [apply]. Runs an explicitly selected backend
+     * regardless of normal CPU dispatch.
+     */
+    @JvmStatic
+    external fun applyForced(
+        src: IntArray,
+        map: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+        mapWidth: Int,
+        mapHeight: Int,
+        scale: Float,
+        xChannel: Int,
+        yChannel: Int,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(): Int
 }

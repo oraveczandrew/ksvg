@@ -17,6 +17,7 @@
 #include <jni.h>
 #include <algorithm>
 #include <cmath>
+#include <cassert>
 #include "cpu_dispatch.h"
 #include "simd_x86.h"
 
@@ -81,7 +82,7 @@ static inline void applyNeon64Impl(
 
     const float32x4_t vScale = vdupq_n_f32(scale);
     const float32x4_t vHalf = vdupq_n_f32(0.5f);
-    const float32x4_t vInv255 = vdupq_n_f32(1.0f / 255.0f);
+    const float32x4_t v255 = vdupq_n_f32(255.0f);
 
     const uint32x4_t maskFF = vdupq_n_u32(0xFF);
 
@@ -118,14 +119,14 @@ static inline void applyNeon64Impl(
                             maskFF);
 
             const float32x4_t vx =
-                    vmulq_f32(
+                    vdivq_f32(
                             vcvtq_f32_u32(xPixels),
-                            vInv255);
+                            v255);
 
             const float32x4_t vy =
-                    vmulq_f32(
+                    vdivq_f32(
                             vcvtq_f32_u32(yPixels),
-                            vInv255);
+                            v255);
 
             const int32x4_t idx =
                     vcvtq_s32_f32(
@@ -291,38 +292,134 @@ void applyNeon64(
 
 } // namespace
 
+
+// Validation/test-only: run an explicitly selected backend (see SimdBackend).
+namespace {
+
+void runForced(const jint* src, const jint* map, jint* dst, int width, int height,
+               int mapWidth, int mapHeight, float scale, int xChannel, int yChannel,
+               int backend) {
+    if (width == mapWidth && height == mapHeight) {
+#if defined(__aarch64__)
+        if (backend == SIMD_BACKEND_SCALAR) {
+            applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
+        } else {
+            assert(backend == SIMD_BACKEND_NEON64);
+            applyNeon64(src, map, dst, width, height, scale, xChannel, yChannel);
+        }
+#elif defined(__i386__) || defined(__x86_64__)
+        switch (backend) {
+            case SIMD_BACKEND_SCALAR:
+                applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
+                break;
+            case SIMD_BACKEND_AVX2:
+                ksvgDisplacementMapApplyAvx2(src, map, dst, width, height, scale, xChannel, yChannel);
+                break;
+            case SIMD_BACKEND_AVX512:
+                ksvgDisplacementMapApplyAvx512(src, map, dst, width, height, scale, xChannel, yChannel);
+                break;
+            default:
+                assert(false && "unsupported forced displacement_map backend on x86");
+        }
+#else
+        (void)backend;
+        applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
+#endif
+        return;
+    }
+    (void)backend;
+    applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
+}
+
+jint nativeBackendForAbi() {
+#if defined(__aarch64__)
+    return SIMD_BACKEND_NEON64;
+#elif defined(__i386__) || defined(__x86_64__)
+    const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_AVX512) return SIMD_BACKEND_AVX512;
+    if (level >= SIMD_AVX2)   return SIMD_BACKEND_AVX2;
+    return SIMD_BACKEND_SCALAR;
+#else
+    return SIMD_BACKEND_SCALAR;
+#endif
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_DisplacementMapNative_nativeBackend(
+        JNIEnv* env, jclass clazz) {
+    return nativeBackendForAbi();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_DisplacementMapNative_applyForced(
+        JNIEnv* env, jclass clazz,
+        const jintArray jSrc, const jintArray jMap, const jintArray jDst,
+        const jint width, const jint height, const jint mapWidth, const jint mapHeight,
+        const jfloat scale, const jint xChannel, const jint yChannel,
+        const jint simdBackend) {
+    auto* src = env->GetIntArrayElements(jSrc, nullptr);
+    if (src == nullptr) return;
+    auto* map = env->GetIntArrayElements(jMap, nullptr);
+    if (map == nullptr) {
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+        return;
+    }
+    auto* dst = env->GetIntArrayElements(jDst, nullptr);
+    if (dst == nullptr) {
+        env->ReleaseIntArrayElements(jMap, map, JNI_ABORT);
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+        return;
+    }
+
+    runForced(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel, simdBackend);
+
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jMap, map, JNI_ABORT);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_DisplacementMapNative_apply(
         JNIEnv* env, jclass clazz,
         const jintArray jSrc, const jintArray jMap, const jintArray jDst,
         const jint width, const jint height, const jint mapWidth, const jint mapHeight,
         const jfloat scale, const jint xChannel, const jint yChannel) {
-    jint* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
-    jint* map = static_cast<jint*>(env->GetPrimitiveArrayCritical(jMap, nullptr));
-    jint* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    auto* src = env->GetIntArrayElements(jSrc, nullptr);
+    if (src == nullptr) return;
+    auto* map = env->GetIntArrayElements(jMap, nullptr);
+    if (map == nullptr) {
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+        return;
+    }
+    auto* dst = env->GetIntArrayElements(jDst, nullptr);
+    if (dst == nullptr) {
+        env->ReleaseIntArrayElements(jMap, map, JNI_ABORT);
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+        return;
+    }
 
-    if (src && map && dst) {
-        if (width == mapWidth && height == mapHeight) {
+    if (width == mapWidth && height == mapHeight) {
 #if defined(__aarch64__)
-            applyNeon64(src, map, dst, width, height, scale, xChannel, yChannel);
+        applyNeon64(src, map, dst, width, height, scale, xChannel, yChannel);
 #elif defined(__i386__) || defined(__x86_64__)
-            const SimdLevel level = detectSimdLevel();
-            if (level >= SIMD_AVX512) {
-                ksvgDisplacementMapApplyAvx512(src, map, dst, width, height, scale, xChannel, yChannel);
-            } else if (level >= SIMD_AVX2) {
-                ksvgDisplacementMapApplyAvx2(src, map, dst, width, height, scale, xChannel, yChannel);
-            } else {
-                applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
-            }
-#else
-            applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
-#endif
+        const SimdLevel level = detectSimdLevel();
+        if (level >= SIMD_AVX512) {
+            ksvgDisplacementMapApplyAvx512(src, map, dst, width, height, scale, xChannel, yChannel);
+        } else if (level >= SIMD_AVX2) {
+            ksvgDisplacementMapApplyAvx2(src, map, dst, width, height, scale, xChannel, yChannel);
         } else {
             applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
         }
+#else
+        applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
+#endif
+    } else {
+        applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
     }
 
-    if (dst) env->ReleasePrimitiveArrayCritical(jDst, dst, 0);
-    if (map) env->ReleasePrimitiveArrayCritical(jMap, map, JNI_ABORT);
-    if (src) env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jMap, map, JNI_ABORT);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
 }
