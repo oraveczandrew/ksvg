@@ -35,3 +35,19 @@ internal fun pattern(width: Int, height: Int, prime: Int): IntArray {
 
 internal fun argb(a: Int, r: Int, g: Int, b: Int): Int =
         (a shl 24) or (r shl 16) or (g shl 8) or b
+
+/**
+ * ARGB input guaranteed to exercise every 8-bit value (0..255) in each colour
+ * channel: pixel `i` has A=i, R=i, G=(i+85)&0xFF, B=(i*137)&0xFF. 85 and 137 are
+ * coprime with 256, so G and B are permutations of 0..255 exactly like R and A.
+ * This means any single-byte LUT gather bug (e.g. a table that only addresses
+ * 64 entries silently zeroing channels 64..255) is caught for every index.
+ */
+internal fun fullCoverage(width: Int, height: Int): IntArray {
+    val out = IntArray(width * height)
+    for (i in out.indices) {
+        val v = i and 0xFF
+        out[i] = argb(v, v, (v + 85) and 0xFF, (v * 137) and 0xFF)
+    }
+    return out
+}

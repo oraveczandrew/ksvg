@@ -25,6 +25,8 @@ import hu.oandras.ksvg.compat.setBlendModeCompat
 import hu.oandras.ksvg.compat.toBlendModeCompat
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
+import hu.oandras.ksvg.filtering.KotlinKernels
+import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.dom.style.CSSBlendMode
 import hu.oandras.ksvg.render.FeBlendRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
@@ -72,7 +74,6 @@ import hu.oandras.ksvg.render.pool.IntArrayBucket
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.forEachElement
-import hu.oandras.ksvg.utils.unLinearizePixels
 
 /**
  * Software (CPU) filter backend driving the existing Kotlin/native kernel
@@ -286,7 +287,7 @@ internal class SoftwareFilterBackend internal constructor(
         val pixels = pixelBuffer.getWithSize(size)
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
-        unLinearizePixels(pixels)
+        SoftwareKernels.unlinearize(pixels, pixels, width, height, KotlinKernels.UN_LINEARIZE)
 
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
     }

@@ -118,6 +118,23 @@ public object SoftwareKernels {
         }
     }
 
+    // ------------------------------------------------------------- unlinearize
+
+    @JvmStatic
+    public fun unlinearize(
+        src: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+        table: ByteArray,
+    ) {
+        if (UnlinearizeNative.isAvailable) {
+            UnlinearizeNative.apply(src, dst, width, height, table)
+        } else {
+            KotlinKernels.unlinearize(src, dst, width, height, table)
+        }
+    }
+
     // ---------------------------------------------------- feDiffuse / feSpecular
 
     @JvmStatic

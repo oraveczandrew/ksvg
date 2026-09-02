@@ -218,6 +218,33 @@ void ksvgComponentTransferApplyAvx2(
     }
 }
 
+void ksvgUnlinearizeApplyAvx2(
+        jint* dst, const jint* src, int width, int height, const jbyte* table) {
+    const int total = width * height;
+    int i = 0;
+    for (; i + 8 <= total; i += 8) {
+        __m256i p = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src + i));
+        alignas(32) jint pixels[8];
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(pixels), p);
+        alignas(32) jint res[8];
+        for (int k = 0; k < 8; k++) {
+            jint c = pixels[k];
+            res[k] = (c & 0xFF000000) |
+                     ((static_cast<jint>(table[(c >> 16) & 0xFF]) & 0xFF) << 16) |
+                     ((static_cast<jint>(table[(c >> 8) & 0xFF]) & 0xFF) << 8) |
+                     (static_cast<jint>(table[c & 0xFF]) & 0xFF);
+        }
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + i), _mm256_loadu_si256(reinterpret_cast<const __m256i*>(res)));
+    }
+    for (; i < total; i++) {
+        jint c = src[i];
+        dst[i] = (c & 0xFF000000) |
+                 ((static_cast<jint>(table[(c >> 16) & 0xFF]) & 0xFF) << 16) |
+                 ((static_cast<jint>(table[(c >> 8) & 0xFF]) & 0xFF) << 8) |
+                 (static_cast<jint>(table[c & 0xFF]) & 0xFF);
+    }
+}
+
 void ksvgDisplacementMapApplyAvx2(
         const jint* src, const jint* map, jint* dst, int width, int height,
         float scale, int xChannel, int yChannel) {

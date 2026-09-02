@@ -47,6 +47,26 @@ public object KotlinKernels {
     private fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
         (alpha shl 24) or (red shl 16) or (green shl 8) or blue
 
+    /**
+     * Precomputed linear→sRGB (unlinearize) lookup table, matching librsvg's
+     * `build.rs` exactly: `UNLINEARIZE[i] = round(unlinearize(i / 255.0) * 255.0)`
+     * where `unlinearize(c) = if c <= 0.0031308: 12.92 * c else: 1.055 * c^(1/2.4) - 0.055`.
+     *
+     * This is the single authoritative source for the 8-bit transfer table; it is
+     * passed to the native kernels and to [unLinearizeArgb]. (It mirrors what
+     * used to live in `ColorUtils.UN_LINEARIZE` in `:ksvg`.)
+     */
+    @JvmField
+    public val UN_LINEARIZE: ByteArray = ByteArray(256) { i ->
+        val c = i.toDouble() / 255.0
+        val x = if (c <= 0.0031308) {
+            12.92 * c
+        } else {
+            1.055 * c.pow(1.0 / 2.4) - 0.055
+        }
+        (x * 255.0).roundToInt().toByte()
+    }
+
     private fun clamp(v: Float, min: Float, max: Float): Float =
         v.coerceIn(min, max)
 
@@ -217,6 +237,46 @@ public object KotlinKernels {
                             ((tableG[(c shr 8) and 0xFF].toInt() and 0xFF) shl 8) or
                             (tableB[c and 0xFF].toInt() and 0xFF)
             }
+        }
+    }
+
+    // --------------------------------------------------------------- unlinearize
+
+    /**
+     * Converts a single straight (non-premultiplied) linear-RGB pixel to straight
+     * sRGB using [table] (normally [UN_LINEARIZE]): each colour channel is looked
+     * up and alpha is preserved unchanged. Element-wise reference for both
+     * [unlinearize] and `unlinearize.cpp`'s scalar loop.
+     */
+    @JvmStatic
+    public fun unLinearizeArgb(pixel: Int, table: ByteArray): Int {
+        val a = pixel and -0x1000000
+        val rIdx = (pixel ushr 16) and 0xff
+        val gIdx = (pixel ushr 8) and 0xff
+        val bIdx = pixel and 0xff
+        return a or
+            ((table[rIdx].toInt() and 0xff) shl 16) or
+            ((table[gIdx].toInt() and 0xff) shl 8) or
+            (table[bIdx].toInt() and 0xff)
+    }
+
+    /**
+     * Linear→sRGB (unlinearize) filter-output transfer over straight ARGB_8888
+     * pixels. Each pixel's straight R/G/B channel is looked up in a single shared
+     * 256-entry byte [table] and alpha is passed through unchanged (identical to
+     * [unLinearizeArgb]). Element-wise byte map, so [src] and [dst] may be the
+     * same array (in-place). Bit-exact reference for `unlinearize.cpp`.
+     */
+    public fun unlinearize(
+        src: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+        table: ByteArray,
+    ) {
+        val total = width * height
+        for (i in 0 until total) {
+            dst[i] = unLinearizeArgb(src[i], table)
         }
     }
 
