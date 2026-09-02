@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg.filtering
 
-import android.os.Build
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -60,26 +59,6 @@ class KernelPerformanceDeviceBenchmark {
     }
 
     private val sizes = listOf(512 to 512, 2048 to 2048)
-
-    private fun benchmark(name: String, highestBackend: Int, numBuffers: Int = 2, run: (Int, Int, Int) -> Unit) {
-        val backends = getBackendsFor(highestBackend)
-        val isQuick = InstrumentationRegistry.getArguments().getString("quick") == "true"
-        
-        for ((w, h) in sizes) {
-            val iterations = if (isQuick) 1 else (if (w <= 512) 20 else 2)
-            for (b in backends) {
-                KernelBenchmarkRunner.runBenchmark(
-                    kernel = name,
-                    backendName = backendName(b),
-                    width = w,
-                    height = h,
-                    iterations = iterations,
-                    numBuffers = numBuffers,
-                    runKernel = { run(w, h, b) }
-                )
-            }
-        }
-    }
 
     @Test
     fun benchmarkAll() {
