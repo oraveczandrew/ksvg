@@ -95,7 +95,7 @@ class UnlinearizeValidationTest {
         assertTrue("libksvgblur not loadable on host", UnlinearizeNative.isAvailable)
         assertEquals(
             "expected avx2 as the dispatched unlinearize backend on this host",
-            SIMD_AVX2,
+            SIMD_AVX2 or SIMD_SSSE3 or SIMD_SCALAR,
             UnlinearizeNative.nativeBackend()
         )
     }

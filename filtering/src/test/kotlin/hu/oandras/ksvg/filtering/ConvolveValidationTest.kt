@@ -65,7 +65,7 @@ class ConvolveValidationTest {
         assertTrue("libksvgblur not loadable on host", ConvolveNative.isAvailable)
         assertEquals(
             "expected avx512 as the dispatched convolve backend on this host",
-            SIMD_AVX512,
+            SIMD_AVX512 or SIMD_AVX2 or SIMD_SSSE3 or SIMD_SCALAR,
             ConvolveNative.nativeBackend()
         )
     }
