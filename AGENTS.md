@@ -93,7 +93,7 @@ Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/N
      ```bash
      ./gradlew :filtering:testDebugUnitTest --tests "hu.oandras.ksvg.filtering.TurbulenceNativeParityTest"
      ```
-     The host CMake project lives at `tmp/native-host/` (git-ignored); touching any native filter
+     The host CMake project lives at `filtering/host-native/`; touching any native filter
      source or that CMakeLists invalidates the up-to-date check and rebuilds. If the host lib is
      absent/unloadable the test fails loudly (it asserts the native path actually ran), rather than
      silently comparing Kotlin against Kotlin.

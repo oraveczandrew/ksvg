@@ -113,9 +113,9 @@ val buildHostNativeLib = tasks.register<Exec>("buildHostNativeLib") {
     group = "verification"
     description = "Builds a host-architecture libksvgblur for native-vs-Kotlin kernel parity tests."
     inputs.files(hostNativeCpp)
-    inputs.file(rootProject.file("tmp/native-host/CMakeLists.txt"))
+    inputs.file(rootProject.file("filtering/host-native/CMakeLists.txt"))
     outputs.file(hostNativeOutputDir.resolve(hostLibName))
-    workingDir(rootProject.file("tmp/native-host"))
+    workingDir(rootProject.file("filtering/host-native"))
     val configureDir = hostNativeOutputDir.resolve("cmake")
     commandLine(
         "sh", "-c",
@@ -130,7 +130,7 @@ tasks.matching { it.name == "testDebugUnitTest" }.configureEach { dependsOn(buil
 
 //noinspection UseTomlInstead
 dependencies {
-    implementation("androidx.annotation:annotation:1.9.1")
+    implementation("androidx.annotation:annotation:1.10.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")

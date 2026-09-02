@@ -28,7 +28,7 @@ import org.junit.runners.Parameterized
  * pure-Kotlin reference ([KotlinKernels.turbulence]).
  *
  * This is a host JVM test: it loads a host-architecture build of `libksvgblur`
- * (produced for `x86_64` by the CMake project in `tmp/native-host/`) so the
+ * (produced for `x86_64` by the CMake project in `filtering/host-native/`) so the
  * natively-dispatched path is genuinely exercised, not just the Kotlin fallback.
  *
  * Precondition: the shared object must be present where `-Djava.library.path`
