@@ -17,6 +17,8 @@
 #include <jni.h>
 #include <cmath>
 #include <algorithm>
+#include <cassert>
+#include "cpu_dispatch.h"
 
 namespace {
 
@@ -49,7 +51,73 @@ inline uint8_t arithmeticChannel(uint8_t in1, uint8_t in2, float k1, float k2, f
     return clamp255((k1 * a * b + k2 * a + k3 * b + k4) * 255.f);
 }
 
+void applyScalar(const jint* src1, const jint* src2, jint* dst,
+                 jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+                 float k1, float k2, float k3, float k4, bool useLinear) {
+    for (jint y = clipTop; y < clipBottom; y++) {
+        jint rowOffset = y * width;
+        for (jint x = clipLeft; x < clipRight; x++) {
+            jint i = rowOffset + x;
+            jint p = src1[i];
+            jint q = src2[i];
+
+            uint8_t a1 = (p >> 24) & 0xFF;
+            uint8_t r1 = (p >> 16) & 0xFF;
+            uint8_t g1 = (p >> 8) & 0xFF;
+            uint8_t b1 = p & 0xFF;
+
+            uint8_t a2 = (q >> 24) & 0xFF;
+            uint8_t r2 = (q >> 16) & 0xFF;
+            uint8_t g2 = (q >> 8) & 0xFF;
+            uint8_t b2 = q & 0xFF;
+
+            uint8_t outA = arithmeticChannel(a1, a2, k1, k2, k3, k4);
+            uint8_t outR, outG, outB;
+
+            if (useLinear) {
+                outR = linearToSRgb(arithmeticChannel(sRgbToLinear(r1), sRgbToLinear(r2), k1, k2, k3, k4));
+                outG = linearToSRgb(arithmeticChannel(sRgbToLinear(g1), sRgbToLinear(g2), k1, k2, k3, k4));
+                outB = linearToSRgb(arithmeticChannel(sRgbToLinear(b1), sRgbToLinear(b2), k1, k2, k3, k4));
+            } else {
+                outR = arithmeticChannel(r1, r2, k1, k2, k3, k4);
+                outG = arithmeticChannel(g1, g2, k1, k2, k3, k4);
+                outB = arithmeticChannel(b1, b2, k1, k2, k3, k4);
+            }
+
+            dst[i] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
+        }
+    }
+}
+
 } // namespace
+
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_nativeBackend(
+        JNIEnv* env, jclass clazz) {
+    return SIMD_BACKEND_SCALAR;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyForced(
+        JNIEnv* env, jclass clazz,
+        jintArray jSrc1, jintArray jSrc2, jintArray jDst,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jfloat k1, jfloat k2, jfloat k3, jfloat k4, jboolean useLinear, jint simdBackend) {
+    (void)simdBackend;
+    assert(simdBackend == SIMD_BACKEND_SCALAR);
+
+    jint* src1 = env->GetIntArrayElements(jSrc1, nullptr);
+    jint* src2 = env->GetIntArrayElements(jSrc2, nullptr);
+    jint* dst = env->GetIntArrayElements(jDst, nullptr);
+
+    if (src1 && src2 && dst) {
+        applyScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom, k1, k2, k3, k4, useLinear == JNI_TRUE);
+    }
+
+    if (dst) env->ReleaseIntArrayElements(jDst, dst, 0);
+    if (src2) env->ReleaseIntArrayElements(jSrc2, src2, JNI_ABORT);
+    if (src1) env->ReleaseIntArrayElements(jSrc1, src1, JNI_ABORT);
+}
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_apply(
@@ -57,47 +125,15 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_apply(
         jintArray jSrc1, jintArray jSrc2, jintArray jDst,
         jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
         jfloat k1, jfloat k2, jfloat k3, jfloat k4, jboolean useLinear) {
-    jint* src1 = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc1, nullptr));
-    jint* src2 = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc2, nullptr));
-    jint* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
+    jint* src1 = env->GetIntArrayElements(jSrc1, nullptr);
+    jint* src2 = env->GetIntArrayElements(jSrc2, nullptr);
+    jint* dst = env->GetIntArrayElements(jDst, nullptr);
 
     if (src1 && src2 && dst) {
-        for (jint y = clipTop; y < clipBottom; y++) {
-            jint rowOffset = y * width;
-            for (jint x = clipLeft; x < clipRight; x++) {
-                jint i = rowOffset + x;
-                jint p = src1[i];
-                jint q = src2[i];
-
-                uint8_t a1 = (p >> 24) & 0xFF;
-                uint8_t r1 = (p >> 16) & 0xFF;
-                uint8_t g1 = (p >> 8) & 0xFF;
-                uint8_t b1 = p & 0xFF;
-
-                uint8_t a2 = (q >> 24) & 0xFF;
-                uint8_t r2 = (q >> 16) & 0xFF;
-                uint8_t g2 = (q >> 8) & 0xFF;
-                uint8_t b2 = q & 0xFF;
-
-                uint8_t outA = arithmeticChannel(a1, a2, k1, k2, k3, k4);
-                uint8_t outR, outG, outB;
-
-                if (useLinear) {
-                    outR = linearToSRgb(arithmeticChannel(sRgbToLinear(r1), sRgbToLinear(r2), k1, k2, k3, k4));
-                    outG = linearToSRgb(arithmeticChannel(sRgbToLinear(g1), sRgbToLinear(g2), k1, k2, k3, k4));
-                    outB = linearToSRgb(arithmeticChannel(sRgbToLinear(b1), sRgbToLinear(b2), k1, k2, k3, k4));
-                } else {
-                    outR = arithmeticChannel(r1, r2, k1, k2, k3, k4);
-                    outG = arithmeticChannel(g1, g2, k1, k2, k3, k4);
-                    outB = arithmeticChannel(b1, b2, k1, k2, k3, k4);
-                }
-
-                dst[i] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
-            }
-        }
+        applyScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom, k1, k2, k3, k4, useLinear == JNI_TRUE);
     }
 
-    if (dst) env->ReleasePrimitiveArrayCritical(jDst, dst, 0);
-    if (src2) env->ReleasePrimitiveArrayCritical(jSrc2, src2, JNI_ABORT);
-    if (src1) env->ReleasePrimitiveArrayCritical(jSrc1, src1, JNI_ABORT);
+    if (dst) env->ReleaseIntArrayElements(jDst, dst, 0);
+    if (src2) env->ReleaseIntArrayElements(jSrc2, src2, JNI_ABORT);
+    if (src1) env->ReleaseIntArrayElements(jSrc1, src1, JNI_ABORT);
 }

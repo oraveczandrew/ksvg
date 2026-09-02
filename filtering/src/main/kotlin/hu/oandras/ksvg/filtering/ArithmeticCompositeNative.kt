@@ -44,4 +44,30 @@ internal object ArithmeticCompositeNative {
         k4: Float,
         useLinear: Boolean,
     )
+
+    /**
+     * Validation/test-only twin of [apply]. Runs an explicitly selected backend
+     * regardless of normal CPU dispatch.
+     */
+    @JvmStatic
+    external fun applyForced(
+        src1: IntArray,
+        src2: IntArray,
+        dst: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        k1: Float,
+        k2: Float,
+        k3: Float,
+        k4: Float,
+        useLinear: Boolean,
+        simdBackend: Int,
+    )
+
+    /** Reports the backend the production dispatcher actually selects on this ABI. */
+    @JvmStatic
+    external fun nativeBackend(): Int
 }
