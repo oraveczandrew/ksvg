@@ -26,6 +26,10 @@ android {
     namespace = "hu.oandras.filtering"
     compileSdk = 37
 
+    testFixtures {
+        enable = true
+    }
+
     defaultConfig.apply {
         minSdk = 26
 
@@ -133,6 +137,9 @@ dependencies {
     implementation("androidx.annotation:annotation:1.10.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation(testFixtures(project(":filtering")))
+
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation(testFixtures(project(":filtering")))
 }
