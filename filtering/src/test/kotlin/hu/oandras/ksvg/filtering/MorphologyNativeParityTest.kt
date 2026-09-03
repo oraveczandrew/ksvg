@@ -33,19 +33,6 @@ class MorphologyNativeParityTest(
     private val backend: Int,
 ) {
     companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
-
-        private fun backendName(backend: Int): String = when (backend) {
-            SIMD_SCALAR -> "scalar"
-            SIMD_SSSE3 -> "ssse3"
-            SIMD_AVX2 -> "avx2"
-            SIMD_AVX512 -> "avx512"
-            SIMD_NEON64 -> "neon64"
-            SIMD_NEON32 -> "neon32"
-            else -> backend.toString()
-        }
 
         @JvmStatic
         @Parameterized.Parameters

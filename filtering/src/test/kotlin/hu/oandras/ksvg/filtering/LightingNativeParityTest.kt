@@ -28,9 +28,6 @@ class LightingNativeParityTest(
     private val params: DoubleArray,
 ) {
     companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
 
         @JvmStatic
         @Parameterized.Parameters

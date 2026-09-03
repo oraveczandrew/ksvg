@@ -22,12 +22,6 @@ import org.junit.Test
 
 class ArithmeticCompositeValidationTest {
 
-    companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
-    }
-
     private fun checkBackend(backend: Int, backendName: String) {
         assertNativeBackendAvailable()
         for (case in ArithmeticCompositeValidationCorpus.cases) {

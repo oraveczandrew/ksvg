@@ -23,12 +23,6 @@ import kotlin.math.abs
 
 class GaussianBlurValidationTest {
 
-    companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
-    }
-
     private fun checkBackend(backend: Int, backendName: String, tolerance: Int = 0) {
         assertNativeBackendAvailable()
         val scratch = NativeGaussianBlur.createScratch()

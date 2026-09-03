@@ -40,9 +40,6 @@ class UnLinearizeNativeParityTest(
     private val input: IntArray,
 ) {
     companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
 
         @JvmStatic
         @Parameterized.Parameters

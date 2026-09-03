@@ -22,12 +22,6 @@ import org.junit.Test
 
 class TurbulenceValidationTest {
 
-    companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
-    }
-
     private fun checkBackend(backend: Int, backendName: String) {
         assertNativeBackendAvailable()
         for (case in TurbulenceValidationCorpus.cases) {

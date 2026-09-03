@@ -27,9 +27,6 @@ class ArithmeticCompositeNativeParityTest(
     private val useLinear: Boolean,
 ) {
     companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
 
         @JvmStatic
         @Parameterized.Parameters

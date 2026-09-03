@@ -28,9 +28,6 @@ class ConvolveNativeParityTest(
     private val edgeMode: Int,
 ) {
     companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
 
         private const val EDGE_DUPLICATE = 0
         private const val EDGE_WRAP = 1

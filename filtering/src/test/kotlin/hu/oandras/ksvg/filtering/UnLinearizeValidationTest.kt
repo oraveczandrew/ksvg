@@ -33,13 +33,7 @@ import org.junit.Test
  * On the i7-7820X the implemented unlinearize backends are scalar/SSSE3/AVX2
  * (AVX-512 is NOT implemented for unlinearize — see tmp/NATIVE_VALIDATION).
  */
-class UnlinearizeValidationTest {
-
-    companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
-    }
+class UnLinearizeValidationTest {
 
     private fun checkBackend(backend: Int, backendName: String) {
         assertNativeBackendAvailable()

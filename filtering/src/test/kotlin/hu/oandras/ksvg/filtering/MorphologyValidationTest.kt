@@ -22,12 +22,6 @@ import org.junit.Test
 
 class MorphologyValidationTest {
 
-    companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
-    }
-
     private fun checkBackend(backend: Int, backendName: String) {
         assertNativeBackendAvailable()
         for (case in MorphologyValidationCorpus.cases) {

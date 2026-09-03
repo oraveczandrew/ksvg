@@ -28,9 +28,6 @@ class DisplacementMapNativeParityTest(
     private val yChannel: Int,
 ) {
     companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
 
         @JvmStatic
         @Parameterized.Parameters

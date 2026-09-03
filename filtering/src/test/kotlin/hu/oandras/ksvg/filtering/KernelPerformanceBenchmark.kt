@@ -31,7 +31,7 @@ class KernelPerformanceBenchmark {
         @BeforeClass
         @JvmStatic
         fun setup() {
-            System.loadLibrary("ksvgblur")
+            assertNativeBackendAvailable()
             KernelBenchmarkRunner.clear()
         }
         
@@ -45,16 +45,6 @@ class KernelPerformanceBenchmark {
                 SIMD_NEON32
             )
             return all.filter { (flags and it) != 0 }
-        }
-
-        private fun backendName(id: Int) = when (id) {
-            SIMD_SCALAR -> "scalar"
-            SIMD_SSSE3 -> "ssse3"
-            SIMD_AVX2 -> "avx2"
-            SIMD_AVX512 -> "avx512"
-            SIMD_NEON64 -> "neon64"
-            SIMD_NEON32 -> "neon32"
-            else -> "unknown"
         }
     }
 

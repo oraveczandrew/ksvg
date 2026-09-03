@@ -36,9 +36,6 @@ import kotlin.random.Random
 class GaussianBlurNativeParityTest {
 
     companion object {
-        init {
-            System.loadLibrary("ksvgblur")
-        }
 
         private data class Case(val w: Int, val h: Int, val sx: Float, val sy: Float)
 
