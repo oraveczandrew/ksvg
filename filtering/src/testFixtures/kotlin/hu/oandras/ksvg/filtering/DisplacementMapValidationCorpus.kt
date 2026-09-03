@@ -19,23 +19,23 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feDisplacementMap.
  */
-object DisplacementMapValidationCorpus {
+public object DisplacementMapValidationCorpus {
 
-    class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val mapWidth: Int,
-        val mapHeight: Int,
-        val scale: Float,
-        val xChannel: Int,
-        val yChannel: Int,
-        val src: IntArray,
-        val map: IntArray,
+    public class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val mapWidth: Int,
+        public val mapHeight: Int,
+        public val scale: Float,
+        public val xChannel: Int,
+        public val yChannel: Int,
+        public val src: IntArray,
+        public val map: IntArray,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             val out = IntArray(size)
             KotlinKernels.displacementMap(
                 src, map, out, width, height, mapWidth, mapHeight,
@@ -45,7 +45,7 @@ object DisplacementMapValidationCorpus {
         }
     }
 
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Full size match
         add(Case("match 16x16", 16, 16, 16, 16, 10f, 0, 1, 
             UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16),

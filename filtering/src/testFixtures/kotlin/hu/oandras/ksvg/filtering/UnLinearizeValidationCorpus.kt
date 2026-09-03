@@ -26,21 +26,21 @@ package hu.oandras.ksvg.filtering
  * Same bytes on every ABI, so every executable native backend is compared
  * against the exact same [KotlinKernels.unLinearize] oracle (NATIVE_TESTING:
  * "shared deterministic test suite with the same input corpus on every
- * architecture"). This file is never compiled into the library (it lives under
- * src/sharedTest, wired into both test source sets only).
+ * architecture"). This file lives under src/testFixtures and is wired into both
+ * the host JVM and the Android instrumented test source sets only.
  */
-object UnLinearizeValidationCorpus {
+public object UnLinearizeValidationCorpus {
 
     // ------------------------------------------------------------------ shapes
 
     /** Flat pixel-count buffers around every vector width (4/8/16 px) and its scalar tail. */
-    val boundarySizes = intArrayOf(
+    public val boundarySizes: IntArray = intArrayOf(
         0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17,
         31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 257,
     )
 
     /** Image-shaped buffers: odd/non-multiple widths, single/multiple rows. */
-    val shapes: Array<Pair<Int, Int>> = arrayOf(
+    public val shapes: Array<Pair<Int, Int>> = arrayOf(
         1 to 1, 1 to 5, 2 to 3, 3 to 3, 5 to 7, 7 to 5, 9 to 9,
         16 to 1, 1 to 16, 33 to 9, 8 to 17, 64 to 1, 65 to 33,
     )
@@ -54,7 +54,7 @@ object UnLinearizeValidationCorpus {
      * Guarantees every 8-bit value 0..255 appears in each colour channel AND in
      * alpha (i has A=i, R=i, G=(i+85)&255, B=(i*137)&255). Exhaustive LUT domain.
      */
-    fun exhaustiveLut(size: Int): IntArray {
+    public fun exhaustiveLut(size: Int): IntArray {
         val out = IntArray(size)
         for (i in out.indices) {
             val v = i and 0xFF
@@ -64,7 +64,7 @@ object UnLinearizeValidationCorpus {
     }
 
     /** Fixed RGB; alpha sweeps all 256 values (alpha-passthrough contract). */
-    fun allAlpha(size: Int): IntArray {
+    public fun allAlpha(size: Int): IntArray {
         val out = IntArray(size)
         for (i in out.indices) {
             out[i] = argb(i and 0xFF, 0x12, 0x34, 0x56)
@@ -77,7 +77,7 @@ object UnLinearizeValidationCorpus {
      * drives R=0..255 (G/B/A fixed), then G, then B. Catches per-channel gather bugs
      * more directly than the interleaved [exhaustiveLut].
      */
-    fun perChannelDomain(size: Int): IntArray {
+    public fun perChannelDomain(size: Int): IntArray {
         val out = IntArray(size)
         var i = 0
         var k = 0
@@ -94,10 +94,10 @@ object UnLinearizeValidationCorpus {
     }
 
     /** Hard boundaries: repeated 0, repeated 255, and alternating 0xFFFFFFFF/0x00000000. */
-    fun alternating(size: Int): IntArray = IntArray(size) { if (it % 2 == 0) 0xFFFFFFFF.toInt() else 0 }
+    public fun alternating(size: Int): IntArray = IntArray(size) { if (it % 2 == 0) 0xFFFFFFFF.toInt() else 0 }
 
     /** Fixed-seed deterministic pseudo-random ARGB (alpha included). */
-    fun fixedSeedRandom(size: Int): IntArray {
+    public fun fixedSeedRandom(size: Int): IntArray {
         val out = IntArray(size)
         var state = 0x9E3779B9.toInt()
         for (i in out.indices) {
@@ -114,10 +114,10 @@ object UnLinearizeValidationCorpus {
     // ------------------------------------------------------------------ tables
 
     /** The library's production UNLINEARIZE table (the oracle's own table). */
-    val realTable: ByteArray get() = KotlinKernels.UN_LINEARIZE
+    public val realTable: ByteArray get() = KotlinKernels.UN_LINEARIZE
 
     /** Non-identity stepping table; alpha passthrough must still hold. */
-    val steppingTable: ByteArray = ByteArray(256) { ((it * 7) and 0xFF).toByte() }
+    public val steppingTable: ByteArray = ByteArray(256) { ((it * 7) and 0xFF).toByte() }
 
     // ------------------------------------------------------------------ case
 
@@ -126,29 +126,29 @@ object UnLinearizeValidationCorpus {
      * run the JNI in-place (src == dst) path. Byte-exact compare against
      * [KotlinKernels.unLinearize] for every forced backend.
      */
-    class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val table: ByteArray,
-        val inPlace: Boolean,
-        val input: IntArray,
+    public class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val table: ByteArray,
+        public val inPlace: Boolean,
+        public val input: IntArray,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
         /** Reference oracle (never calls native). */
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             val out = IntArray(size)
             KotlinKernels.unLinearize(input, out, width, height, table)
             return out
         }
 
         /** Independent fresh copy so a native backend cannot mutate the shared input. */
-        fun freshInput(): IntArray = input.copyOf()
+        public fun freshInput(): IntArray = input.copyOf()
     }
 
     /** The full corpus of cases for unlinearize validation. */
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Exhaustive LUT over SIMD-aligned and odd-tail sizes, separate src/dst.
         for ((w, h) in listOf(32 to 8, 16 to 16, 33 to 9, 65 to 33, 16 to 1)) {
             add(Case("exhaustive ${w}x$h", w, h, realTable, inPlace = false, exhaustiveLut(w * h)))

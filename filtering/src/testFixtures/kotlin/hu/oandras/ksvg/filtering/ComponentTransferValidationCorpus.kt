@@ -19,35 +19,35 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feComponentTransfer.
  */
-object ComponentTransferValidationCorpus {
+public object ComponentTransferValidationCorpus {
 
-    val boundarySizes: IntArray = UnLinearizeValidationCorpus.boundarySizes
-    val shapes: Array<Pair<Int, Int>> = UnLinearizeValidationCorpus.shapes
+    public val boundarySizes: IntArray = UnLinearizeValidationCorpus.boundarySizes
+    public val shapes: Array<Pair<Int, Int>> = UnLinearizeValidationCorpus.shapes
 
-    val identityTable = ByteArray(256) { it.toByte() }
-    val reverseTable = ByteArray(256) { (255 - it).toByte() }
-    val alphaTable = ByteArray(256) { ((it * 3) and 0xFF).toByte() } // Non-identity alpha
-    val redTable = ByteArray(256) { ((it + 128) and 0xFF).toByte() }
-    val greenTable = ByteArray(256) { (it / 2).toByte() }
-    val blueTable = ByteArray(256) { ((it * it) shr 8).toByte() }
+    public val identityTable: ByteArray = ByteArray(256) { it.toByte() }
+    public val reverseTable: ByteArray = ByteArray(256) { (255 - it).toByte() }
+    public val alphaTable: ByteArray = ByteArray(256) { ((it * 3) and 0xFF).toByte() } // Non-identity alpha
+    public val redTable: ByteArray = ByteArray(256) { ((it + 128) and 0xFF).toByte() }
+    public val greenTable: ByteArray = ByteArray(256) { (it / 2).toByte() }
+    public val blueTable: ByteArray = ByteArray(256) { ((it * it) shr 8).toByte() }
 
-    class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val clipLeft: Int,
-        val clipTop: Int,
-        val clipRight: Int,
-        val clipBottom: Int,
-        val tableA: ByteArray,
-        val tableR: ByteArray,
-        val tableG: ByteArray,
-        val tableB: ByteArray,
-        val input: IntArray,
+    public class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val clipLeft: Int,
+        public val clipTop: Int,
+        public val clipRight: Int,
+        public val clipBottom: Int,
+        public val tableA: ByteArray,
+        public val tableR: ByteArray,
+        public val tableG: ByteArray,
+        public val tableB: ByteArray,
+        public val input: IntArray,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             val out = IntArray(size)
             KotlinKernels.componentTransfer(
                 input, out, width,
@@ -57,10 +57,10 @@ object ComponentTransferValidationCorpus {
             return out
         }
 
-        fun freshInput(): IntArray = input.copyOf()
+        public fun freshInput(): IntArray = input.copyOf()
     }
 
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Full clip region
         for ((w, h) in listOf(32 to 8, 33 to 9, 16 to 1)) {
             add(Case("full $w x $h", w, h, 0, 0, w, h, 

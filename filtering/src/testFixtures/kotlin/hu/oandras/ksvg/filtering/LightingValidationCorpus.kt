@@ -19,42 +19,42 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feDiffuseLighting / feSpecularLighting.
  */
-object LightingValidationCorpus {
+public object LightingValidationCorpus {
 
-    class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val clipLeft: Int,
-        val clipTop: Int,
-        val clipRight: Int,
-        val clipBottom: Int,
-        val surfaceScale: Float,
-        val invCanvasScaleX: Double,
-        val invCanvasScaleY: Double,
-        val userLeft: Double,
-        val userTop: Double,
-        val originX: Double,
-        val originY: Double,
-        val unitSizeX: Double,
-        val unitSizeY: Double,
-        val canvasScaleX: Float,
-        val canvasScaleY: Float,
-        val lightType: Int,
-        val specular: Boolean,
-        val k: Float,
-        val exponent: Float,
-        val lightR: Int,
-        val lightG: Int,
-        val lightB: Int,
-        val params: DoubleArray,
-        val premultiplied: Boolean,
-        val useLinear: Boolean,
-        val input: IntArray,
+    public class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val clipLeft: Int,
+        public val clipTop: Int,
+        public val clipRight: Int,
+        public val clipBottom: Int,
+        public val surfaceScale: Float,
+        public val invCanvasScaleX: Double,
+        public val invCanvasScaleY: Double,
+        public val userLeft: Double,
+        public val userTop: Double,
+        public val originX: Double,
+        public val originY: Double,
+        public val unitSizeX: Double,
+        public val unitSizeY: Double,
+        public val canvasScaleX: Float,
+        public val canvasScaleY: Float,
+        public val lightType: Int,
+        public val specular: Boolean,
+        public val k: Float,
+        public val exponent: Float,
+        public val lightR: Int,
+        public val lightG: Int,
+        public val lightB: Int,
+        public val params: DoubleArray,
+        public val premultiplied: Boolean,
+        public val useLinear: Boolean,
+        public val input: IntArray,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             val out = IntArray(size)
             KotlinKernels.lighting(
                 input, out, width, height,
@@ -71,7 +71,7 @@ object LightingValidationCorpus {
         }
     }
 
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Distant light, diffuse
         add(Case("distant diffuse 16x16", 16, 16, 0, 0, 16, 16, 1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f, 0, false, 1f, 1f, 255, 255, 255, doubleArrayOf(45.0, 45.0), false, false, 
             UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))

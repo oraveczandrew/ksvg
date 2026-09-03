@@ -19,27 +19,27 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feMorphology.
  */
-object MorphologyValidationCorpus {
+public object MorphologyValidationCorpus {
 
-    val boundarySizes: IntArray = UnLinearizeValidationCorpus.boundarySizes
-    val shapes: Array<Pair<Int, Int>> = UnLinearizeValidationCorpus.shapes
+    public val boundarySizes: IntArray = UnLinearizeValidationCorpus.boundarySizes
+    public val shapes: Array<Pair<Int, Int>> = UnLinearizeValidationCorpus.shapes
 
-    class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val radiusX: Int,
-        val radiusY: Int,
-        val erode: Boolean,
-        val clipLeft: Int,
-        val clipTop: Int,
-        val clipRight: Int,
-        val clipBottom: Int,
-        val input: IntArray,
+    public class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val radiusX: Int,
+        public val radiusY: Int,
+        public val erode: Boolean,
+        public val clipLeft: Int,
+        public val clipTop: Int,
+        public val clipRight: Int,
+        public val clipBottom: Int,
+        public val input: IntArray,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             val out = IntArray(size)
             KotlinKernels.morphology(
                 input, out, width, height,
@@ -49,10 +49,10 @@ object MorphologyValidationCorpus {
             return out
         }
 
-        fun freshInput(): IntArray = input.copyOf()
+        public fun freshInput(): IntArray = input.copyOf()
     }
 
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Erode and Dilate over various shapes
         for (erode in listOf(true, false)) {
             val op = if (erode) "erode" else "dilate"

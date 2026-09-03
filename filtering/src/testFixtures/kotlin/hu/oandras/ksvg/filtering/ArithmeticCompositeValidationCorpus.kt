@@ -19,27 +19,27 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feComposite operator="arithmetic".
  */
-object ArithmeticCompositeValidationCorpus {
+public object ArithmeticCompositeValidationCorpus {
 
-    class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val clipLeft: Int,
-        val clipTop: Int,
-        val clipRight: Int,
-        val clipBottom: Int,
-        val k1: Float,
-        val k2: Float,
-        val k3: Float,
-        val k4: Float,
-        val useLinear: Boolean,
-        val input1: IntArray,
-        val input2: IntArray,
+    public class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val clipLeft: Int,
+        public val clipTop: Int,
+        public val clipRight: Int,
+        public val clipBottom: Int,
+        public val k1: Float,
+        public val k2: Float,
+        public val k3: Float,
+        public val k4: Float,
+        public val useLinear: Boolean,
+        public val input1: IntArray,
+        public val input2: IntArray,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             val out = IntArray(size)
             KotlinKernels.arithmeticComposite(
                 input1, input2, out, width,
@@ -50,7 +50,7 @@ object ArithmeticCompositeValidationCorpus {
         }
     }
 
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Various coefficients and sRGB/linear settings
         for (useLinear in listOf(false, true)) {
             val space = if (useLinear) "linear" else "sRGB"

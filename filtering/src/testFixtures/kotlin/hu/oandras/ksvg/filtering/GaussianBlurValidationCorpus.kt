@@ -24,19 +24,19 @@ import kotlin.math.sqrt
 /**
  * Deterministic validation corpus for feGaussianBlur.
  */
-object GaussianBlurValidationCorpus {
+public object GaussianBlurValidationCorpus {
 
-    class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val stdDeviationX: Float,
-        val stdDeviationY: Float,
-        val input: IntArray,
+    public class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val stdDeviationX: Float,
+        public val stdDeviationY: Float,
+        public val input: IntArray,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             return referenceGaussian(input, width, height, stdDeviationX, stdDeviationY)
         }
     }
@@ -106,7 +106,7 @@ object GaussianBlurValidationCorpus {
         return out
     }
 
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Small isotropic
         add(Case("isotropic 1.5 16x16", 16, 16, 1.5f, 1.5f, 
             UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))

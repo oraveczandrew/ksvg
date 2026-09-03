@@ -19,26 +19,26 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feConvolveMatrix.
  */
-object ConvolveValidationCorpus {
+public object ConvolveValidationCorpus {
 
-    class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val kernel: FloatArray,
-        val orderX: Int,
-        val orderY: Int,
-        val targetX: Int,
-        val targetY: Int,
-        val divisor: Float,
-        val bias: Float,
-        val preserveAlpha: Boolean,
-        val edgeMode: Int,
-        val input: IntArray,
+    public class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val kernel: FloatArray,
+        public val orderX: Int,
+        public val orderY: Int,
+        public val targetX: Int,
+        public val targetY: Int,
+        public val divisor: Float,
+        public val bias: Float,
+        public val preserveAlpha: Boolean,
+        public val edgeMode: Int,
+        public val input: IntArray,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             val out = IntArray(size)
             KotlinKernels.convolveMatrix(
                 input, out, width, height,
@@ -49,7 +49,7 @@ object ConvolveValidationCorpus {
         }
     }
 
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Simple 3x3 sharpen
         val sharpen = floatArrayOf(
             0f, -1f, 0f,

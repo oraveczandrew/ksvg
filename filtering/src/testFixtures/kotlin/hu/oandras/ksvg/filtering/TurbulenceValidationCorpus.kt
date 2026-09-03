@@ -19,35 +19,35 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feTurbulence.
  */
-object TurbulenceValidationCorpus {
+public object TurbulenceValidationCorpus {
 
-    data class Case(
-        val name: String,
-        val width: Int,
-        val height: Int,
-        val clipLeft: Int,
-        val clipTop: Int,
-        val clipRight: Int,
-        val clipBottom: Int,
-        val baseFrequencyX: Double,
-        val baseFrequencyY: Double,
-        val periodX: Int,
-        val periodY: Int,
-        val octaves: Int,
-        val fractalNoise: Boolean,
-        val invCanvasScaleX: Double,
-        val invCanvasScaleY: Double,
-        val userLeft: Double,
-        val userTop: Double,
-        val originX: Double,
-        val originY: Double,
-        val unitSizeX: Double,
-        val unitSizeY: Double,
-        val seed: Int,
+    public data class Case(
+        public val name: String,
+        public val width: Int,
+        public val height: Int,
+        public val clipLeft: Int,
+        public val clipTop: Int,
+        public val clipRight: Int,
+        public val clipBottom: Int,
+        public val baseFrequencyX: Double,
+        public val baseFrequencyY: Double,
+        public val periodX: Int,
+        public val periodY: Int,
+        public val octaves: Int,
+        public val fractalNoise: Boolean,
+        public val invCanvasScaleX: Double,
+        public val invCanvasScaleY: Double,
+        public val userLeft: Double,
+        public val userTop: Double,
+        public val originX: Double,
+        public val originY: Double,
+        public val unitSizeX: Double,
+        public val unitSizeY: Double,
+        public val seed: Int,
     ) {
-        val size: Int get() = width * height
+        public val size: Int get() = width * height
 
-        fun reference(): IntArray {
+        public fun reference(): IntArray {
             val out = IntArray(size)
             val lcg = LcgRandom(seed)
             val p = IntArray(SvgPathNoise.LATTICE_SIZE)
@@ -67,7 +67,7 @@ object TurbulenceValidationCorpus {
         }
     }
 
-    val cases: List<Case> = buildList {
+    public val cases: List<Case> = buildList {
         // Basic noise
         add(Case("noise 16x16", 16, 16, 0, 0, 16, 16, 0.05, 0.05, 0, 0, 1, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0))
 
