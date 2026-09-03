@@ -245,6 +245,7 @@ class TurbulenceKernelParityTest {
         var ksvgRuleByteMismatch = 0L
 
         fun render(): String {
+            @Suppress("IntroduceWhenSubject")
             val status: String = when {
                 // Kernel math (noise2 + lattice + sum) identical under librsvg's own
                 // inputs AND under KSVG's wrap derivation; accelerometer rule eagerly

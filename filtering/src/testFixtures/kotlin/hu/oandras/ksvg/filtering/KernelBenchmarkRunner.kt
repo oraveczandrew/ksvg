@@ -17,7 +17,7 @@
 package hu.oandras.ksvg.filtering
 
 import java.io.File
-import java.util.Locale
+import java.util.*
 
 /**
  * Shared performance benchmark harness for filter kernels, used by both the
@@ -51,7 +51,7 @@ public object KernelBenchmarkRunner {
         numBuffers: Int = 2, // src + dst usually
         runKernel: () -> Unit,
         verify: (() -> Unit)? = null
-    ): Unit {
+    ) {
         // Verification (once)
         verify?.invoke()
 
@@ -94,7 +94,7 @@ public object KernelBenchmarkRunner {
         )
     }
 
-    public fun report(outputFile: File): Unit {
+    public fun report(outputFile: File) {
         val header = "Kernel,Backend,Size,AvgMs,MPix/s,GB/s,Speedup"
         val csv = StringBuilder(header + "\n")
 
@@ -138,7 +138,7 @@ public object KernelBenchmarkRunner {
         }
     }
 
-    public fun clear(): Unit {
+    public fun clear() {
         results.clear()
     }
 }

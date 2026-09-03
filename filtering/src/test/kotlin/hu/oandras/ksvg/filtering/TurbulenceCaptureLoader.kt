@@ -225,7 +225,7 @@ internal class TurbulenceRecord(
     val baseFx: Double,
     val baseFy: Double,
     val colorChannel: Int,
-    val octaves: Array<TurbulenceRecord.Octave>,
+    val octaves: Array<Octave>,
 ) {
     /** Per-octave captured kernel state, mirroring librsvg's `turbulence()` loop. */
     class Octave(
