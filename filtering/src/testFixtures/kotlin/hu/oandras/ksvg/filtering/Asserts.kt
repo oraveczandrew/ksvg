@@ -18,9 +18,10 @@ package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertTrue
 
-fun assertNativeBackendAvailable() {
+/** Shared by the host JVM parity tests and the Android instrumented tests. */
+public fun assertNativeBackendAvailable(): Unit {
     assertTrue(
-        "NativeGaussianBlur not available on this host JVM",
+        "NativeBackend not available on this host JVM",
         NativeBackend.isAvailable,
     )
 }

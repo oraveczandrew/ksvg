@@ -136,6 +136,8 @@ tasks.matching { it.name == "testDebugUnitTest" }.configureEach { dependsOn(buil
 dependencies {
     implementation("androidx.annotation:annotation:1.10.0")
 
+    testFixturesImplementation("junit:junit:4.13.2")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation(testFixtures(project(":filtering")))
 
