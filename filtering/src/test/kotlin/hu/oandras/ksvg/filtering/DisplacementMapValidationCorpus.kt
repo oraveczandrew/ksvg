@@ -21,7 +21,7 @@ package hu.oandras.ksvg.filtering
  */
 public object DisplacementMapValidationCorpus {
 
-    data class Case(
+    class Case(
         val name: String,
         val width: Int,
         val height: Int,
@@ -58,6 +58,16 @@ public object DisplacementMapValidationCorpus {
 
         // Large scale
         add(Case("large scale 16x16", 16, 16, 16, 16, 100f, 1, 2,
+            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+
+        // Negative scale (displacement directions invert).
+        add(Case("negative scale 16x16", 16, 16, 16, 16, -5f, 1, 1,
+            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+
+        // Identity scale zero: pixels land unshifted (R, R channel).
+        add(Case("identity 16x16", 16, 16, 16, 16, 0f, 0, 0,
             UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
             UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
     }

@@ -70,7 +70,7 @@ public object TurbulenceValidationCorpus {
     val cases: List<Case> = buildList {
         // Basic noise
         add(Case("noise 16x16", 16, 16, 0, 0, 16, 16, 0.05, 0.05, 0, 0, 1, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0))
-        
+
         // Fractal noise with octaves
         add(Case("fractal octaves 32x8", 32, 8, 0, 0, 32, 8, 0.1, 0.1, 0, 0, 3, true, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 123))
 
@@ -79,5 +79,23 @@ public object TurbulenceValidationCorpus {
 
         // Sub-clip
         add(Case("subclip 32x32", 32, 32, 4, 4, 28, 28, 0.05, 0.05, 0, 0, 1, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 789))
+
+        // Single octave, no stitching.
+        add(Case("plain", 64, 64, 0, 0, 64, 64, 0.05, 0.05, 0, 0, 1, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 7))
+
+        // Fractal noise, multiple octaves.
+        add(Case("fractal4", 64, 64, 0, 0, 64, 64, 0.08, 0.06, 0, 0, 4, true, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 42))
+
+        // Anisotropic / sub-rectangle clip region (transparent fill outside).
+        add(Case("clip", 96, 80, 12, 8, 84, 72, 0.03, 0.05, 0, 0, 2, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1234))
+
+        // Non-integer origin / anchor + non-unit primitive units.
+        add(Case("fractional", 50, 50, 0, 0, 50, 50, 0.1, 0.1, 0, 0, 1, true, 1.0, 1.0, 3.5, -1.25, 2.0, 7.5, 0.75, 1.25, 3))
+
+        // Stitch tiles: whole lattice periods so edges wrap seamlessly.
+        add(Case("stitch tiles 128x128", 128, 128, 0, 0, 128, 128, 0.02, 0.02, 7, 9, 1, true, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 99))
+
+        // Downscaled canvas (canvas scale 2.0 -> frequency doubles in user space).
+        add(Case("scaled", 32, 32, 0, 0, 32, 32, 0.05, 0.05, 0, 0, 3, false, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 55))
     }
 }

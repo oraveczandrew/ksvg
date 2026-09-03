@@ -20,7 +20,7 @@ package hu.oandras.ksvg.filtering
  * Deterministic, architecture-independent validation corpus for the native
  * unlinearize kernels, shared verbatim by:
  *
- *  - the host JVM harness (`UnlinearizeValidationTest`, src/test);
+ *  - the host JVM harness (`UnLinearizeNativeParityTest`, src/test);
  *  - the Android instrumented test (`UnlinearizeNativeDeviceTest`, src/androidTest).
  *
  * Same bytes on every ABI, so every executable native backend is compared
@@ -126,7 +126,7 @@ public object UnlinearizeValidationCorpus {
      * run the JNI in-place (src == dst) path. Byte-exact compare against
      * [KotlinKernels.unLinearize] for every forced backend.
      */
-    data class Case(
+    class Case(
         val name: String,
         val width: Int,
         val height: Int,

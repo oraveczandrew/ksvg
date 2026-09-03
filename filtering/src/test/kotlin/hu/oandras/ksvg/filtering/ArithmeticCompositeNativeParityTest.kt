@@ -21,43 +21,51 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
+/**
+ * Byte-exact parity between the native `arithmetic_composite.cpp` SIMD kernels
+ * ([ArithmeticCompositeNative.applyForced]) and the pure-Kotlin reference
+ * ([KotlinKernels.arithmeticComposite]). For every configuration in the shared
+ * [ArithmeticCompositeValidationCorpus], every SIMD backend this host advertises
+ * is forced and compared byte-for-byte.
+ */
 @RunWith(Parameterized::class)
 class ArithmeticCompositeNativeParityTest(
-    private val k: FloatArray,
-    private val useLinear: Boolean,
+    private val name: String,
+    private val case: ArithmeticCompositeValidationCorpus.Case,
+    private val backend: Int,
 ) {
     companion object {
 
         @JvmStatic
-        @Parameterized.Parameters
-        fun data(): List<Array<Any>> = listOf(
-            arrayOf(floatArrayOf(1f, 0f, 0f, 0f), false), // multiply
-            arrayOf(floatArrayOf(0f, 1f, 1f, 0f), false), // add
-            arrayOf(floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f), true), // mixed linear
-            arrayOf(floatArrayOf(0f, 0f, 0f, 0.25f), false), // constant bias
-        )
+        @Parameterized.Parameters(name = "{0}")
+        fun data(): List<Array<Any?>> {
+            val backends = KernelPerformanceBenchmark.getBackendsFor(ArithmeticCompositeNative.nativeBackend())
+            return buildList {
+                for (case in ArithmeticCompositeValidationCorpus.cases) {
+                    for (b in backends) {
+                        add(arrayOf("${case.name} [${backendName(b)}]", case, b))
+                    }
+                }
+            }
+        }
     }
 
     @Test
     fun nativeMatchesKotlin() {
         assertNativeBackendAvailable()
 
-        val width = 32
-        val height = 32
-        val src1 = pattern(width, height, k.contentHashCode() + 1)
-        val src2 = pattern(width, height, k.contentHashCode() + 2)
-        val ref = IntArray(width * height)
-        val native = IntArray(width * height)
-
-        KotlinKernels.arithmeticComposite(
-            src1, src2, ref, width, 0, 0, width, height,
-            k[0], k[1], k[2], k[3], useLinear
-        )
-        SoftwareKernels.arithmeticComposite(
-            src1, src2, native, width, 0, 0, width, height,
-            k[0], k[1], k[2], k[3], useLinear
+        val ref = case.reference()
+        val out = IntArray(case.size)
+        ArithmeticCompositeNative.applyForced(
+            case.input1, case.input2, out, case.width,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom,
+            case.k1, case.k2, case.k3, case.k4, case.useLinear,
+            backend
         )
 
-        assertArrayEquals("arithmeticComposite mismatch", ref, native)
+        assertArrayEquals(
+            "arithmeticComposite mismatch on [$name] backend ${backendName(backend)}",
+            ref, out,
+        )
     }
 }

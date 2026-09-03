@@ -26,7 +26,7 @@ import kotlin.math.sqrt
  */
 public object GaussianBlurValidationCorpus {
 
-    data class Case(
+    class Case(
         val name: String,
         val width: Int,
         val height: Int,
@@ -114,6 +114,14 @@ public object GaussianBlurValidationCorpus {
         // Optimized path isotropic (radius 8, sigma ~2.6)
         add(Case("isotropic 2.6 32x24", 32, 24, 2.6f, 2.6f,
             UnlinearizeValidationCorpus.fixedSeedRandom(32 * 24)))
+
+        // Large radius (routes to the optimized scalar path).
+        add(Case("optimized 8.0 48x48", 48, 48, 8f, 8f,
+            UnlinearizeValidationCorpus.fixedSeedRandom(48 * 48)))
+
+        // Small isotropic (small radius, scalar tail).
+        add(Case("isotropic 0.5 8x8", 8, 8, 0.5f, 0.5f,
+            UnlinearizeValidationCorpus.fixedSeedRandom(8 * 8)))
 
         // Anisotropic
         add(Case("anisotropic 2.0 4.0 16x16", 16, 16, 2f, 4f,

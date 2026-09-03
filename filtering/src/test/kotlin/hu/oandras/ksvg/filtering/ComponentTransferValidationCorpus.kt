@@ -16,9 +16,6 @@
 
 package hu.oandras.ksvg.filtering
 
-import kotlin.math.max
-import kotlin.math.min
-
 /**
  * Deterministic validation corpus for feComponentTransfer.
  */
@@ -34,7 +31,7 @@ public object ComponentTransferValidationCorpus {
     val greenTable = ByteArray(256) { (it / 2).toByte() }
     val blueTable = ByteArray(256) { ((it * it) shr 8).toByte() }
 
-    data class Case(
+    class Case(
         val name: String,
         val width: Int,
         val height: Int,

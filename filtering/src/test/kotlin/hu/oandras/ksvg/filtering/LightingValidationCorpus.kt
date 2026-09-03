@@ -21,7 +21,7 @@ package hu.oandras.ksvg.filtering
  */
 public object LightingValidationCorpus {
 
-    data class Case(
+    class Case(
         val name: String,
         val width: Int,
         val height: Int,
@@ -82,6 +82,18 @@ public object LightingValidationCorpus {
 
         // Spot light, diffuse, linear
         add(Case("spot diffuse linear 16x16", 16, 16, 0, 0, 16, 16, 1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f, 2, false, 1f, 1f, 255, 255, 255, doubleArrayOf(8.0, 8.0, 100.0, 8.0, 8.0, 0.0, 30.0), false, true,
+            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+
+        // Distant light, specular (exponent drives the specular falloff).
+        add(Case("distant specular 16x16", 16, 16, 0, 0, 16, 16, 1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f, 0, true, 1f, 20f, 255, 255, 255, doubleArrayOf(30.0, 60.0), false, false,
+            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+
+        // Point light, diffuse.
+        add(Case("point diffuse 24x16", 24, 16, 0, 0, 24, 16, 1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f, 1, false, 1f, 1f, 255, 255, 255, doubleArrayOf(12.0, 8.0, 50.0), false, true,
+            UnlinearizeValidationCorpus.fixedSeedRandom(24 * 16)))
+
+        // Spot light, specular, premultiplied output (no limiting cone -> NaN).
+        add(Case("spot specular premult 16x16", 16, 16, 0, 0, 16, 16, 1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f, 2, true, 1f, 20f, 255, 255, 255, doubleArrayOf(8.0, 8.0, 50.0, 0.0, 0.0, 0.0, Double.NaN), true, false,
             UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
     }
 }

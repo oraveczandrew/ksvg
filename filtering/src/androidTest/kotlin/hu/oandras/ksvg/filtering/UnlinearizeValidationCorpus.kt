@@ -20,7 +20,7 @@ package hu.oandras.ksvg.filtering
  * Deterministic, architecture-independent validation corpus for the native
  * unlinearize kernels, shared verbatim by:
  *
- *  - the host JVM harness (`UnlinearizeValidationTest`, src/test);
+ *  - the host JVM harness (`UnLinearizeNativeParityTest`, src/test);
  *  - the Android instrumented test (`UnlinearizeNativeDeviceTest`, src/androidTest).
  *
  * Same bytes on every ABI, so every executable native backend is compared

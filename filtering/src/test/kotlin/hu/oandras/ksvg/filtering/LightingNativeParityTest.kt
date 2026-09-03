@@ -21,68 +21,58 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
+/**
+ * Byte-exact parity between the native `lighting.cpp` SIMD kernels
+ * ([LightingNative.applyForced]) and the pure-Kotlin reference
+ * ([KotlinKernels.lighting]). For every configuration in the shared
+ * [LightingValidationCorpus], every SIMD backend this host advertises is forced
+ * and compared byte-for-byte, covering distant/point/spot lights, diffuse and
+ * specular, and linear/sRGB premultiplied output.
+ */
 @RunWith(Parameterized::class)
 class LightingNativeParityTest(
-    private val lightType: Int,
-    private val specular: Boolean,
-    private val params: DoubleArray,
+    private val name: String,
+    private val case: LightingValidationCorpus.Case,
+    private val backend: Int,
 ) {
     companion object {
 
         @JvmStatic
-        @Parameterized.Parameters
-        fun data(): List<Array<Any>> = listOf(
-            arrayOf(0, false, doubleArrayOf(45.0, 30.0)), // distant, diffuse
-            arrayOf(0, true, doubleArrayOf(90.0, 60.0)), // distant, specular
-            arrayOf(1, false, doubleArrayOf(20.0, 25.0, 60.0)), // point, diffuse
-            arrayOf(1, true, doubleArrayOf(10.0, 10.0, 40.0)), // point, specular
-            arrayOf(2, false, doubleArrayOf(15.0, 20.0, 50.0, 0.0, 0.0, 0.0, 20.0)), // spot, cone
-            arrayOf(2, true, doubleArrayOf(15.0, 20.0, 50.0, 0.0, 0.0, 0.0, Double.NaN)), // spot, no cone
-        )
+        @Parameterized.Parameters(name = "{0}")
+        fun data(): List<Array<Any?>> {
+            val backends = KernelPerformanceBenchmark.getBackendsFor(LightingNative.nativeBackend())
+            return buildList {
+                for (case in LightingValidationCorpus.cases) {
+                    for (b in backends) {
+                        add(arrayOf("${case.name} [${backendName(b)}]", case, b))
+                    }
+                }
+            }
+        }
     }
 
     @Test
     fun nativeMatchesKotlin() {
         assertNativeBackendAvailable()
 
-        val width = 32
-        val height = 32
-        for (useLinear in listOf(false, true)) {
-            for (premultiplied in listOf(false, true)) {
-                if (premultiplied && !specular) continue
+        val ref = case.reference()
+        val out = IntArray(case.size)
+        LightingNative.applyForced(
+            case.input, out, case.width, case.height,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom,
+            case.surfaceScale, case.invCanvasScaleX, case.invCanvasScaleY,
+            case.userLeft, case.userTop, case.originX, case.originY,
+            case.unitSizeX, case.unitSizeY,
+            case.canvasScaleX, case.canvasScaleY,
+            case.lightType, case.specular, case.k, case.exponent,
+            case.lightR, case.lightG, case.lightB, case.params,
+            case.premultiplied, case.useLinear,
+            backend
+        )
 
-                val src = pattern(width, height, lightType * 13 + specular.hashCode())
-                val ref = IntArray(width * height)
-                val native = IntArray(width * height)
-
-                KotlinKernels.lighting(
-                    src, ref, width, height, 0, 0, width, height,
-                    surfaceScaleNormalized = 1f,
-                    invCanvasScaleX = 1.0, invCanvasScaleY = 1.0,
-                    userLeft = 0.0, userTop = 0.0, originX = 0.0, originY = 0.0,
-                    unitSizeX = 1.0, unitSizeY = 1.0,
-                    canvasScaleX = 1f, canvasScaleY = 1f,
-                    lightType = lightType, specular = specular,
-                    k = 1f, exponent = 20f, lightR = 255, lightG = 255, lightB = 255,
-                    params = params, premultipliedOutput = premultiplied, useLinear = useLinear,
-                )
-                SoftwareKernels.lighting(
-                    src, native, width, height, 0, 0, width, height,
-                    surfaceScaleNormalized = 1f,
-                    invCanvasScaleX = 1.0, invCanvasScaleY = 1.0,
-                    userLeft = 0.0, userTop = 0.0, originX = 0.0, originY = 0.0,
-                    unitSizeX = 1.0, unitSizeY = 1.0,
-                    canvasScaleX = 1f, canvasScaleY = 1f,
-                    lightType = lightType, specular = specular,
-                    k = 1f, exponent = 20f, lightR = 255, lightG = 255, lightB = 255,
-                    params = params, premultipliedOutput = premultiplied, useLinear = useLinear,
-                )
-
-                assertArrayEquals(
-                    "lighting mismatch: type=$lightType specular=$specular useLinear=$useLinear premult=$premultiplied",
-                    ref, native,
-                )
-            }
-        }
+        assertArrayEquals(
+            "lighting mismatch on [$name] backend ${backendName(backend)}",
+            ref, out,
+        )
     }
 }

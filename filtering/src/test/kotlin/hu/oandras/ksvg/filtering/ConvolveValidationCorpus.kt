@@ -21,7 +21,7 @@ package hu.oandras.ksvg.filtering
  */
 public object ConvolveValidationCorpus {
 
-    data class Case(
+    class Case(
         val name: String,
         val width: Int,
         val height: Int,
@@ -74,5 +74,14 @@ public object ConvolveValidationCorpus {
         val asym = floatArrayOf(1f, 2f, 3f)
         add(Case("asym 1x3 32x32", 32, 32, asym, 3, 1, 1, 0, 1f, 0f, true, 0,
             UnlinearizeValidationCorpus.fixedSeedRandom(32 * 32)))
+
+        // Anchor at top-left (target 0,0): shift the convolution start.
+        add(Case("anchor 0,0 3x3 16x16", 16, 16, sharpen, 3, 3, 0, 0, 1f, 0f, false, 0,
+            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+
+        // Non-square 3x2 duplicate-edge kernel (orderX != orderY with duplicate).
+        val box32 = floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
+        add(Case("box 3x2 duplicate 16x16", 16, 16, box32, 3, 2, 1, 1, 1f, 0.15f, false, 0,
+            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
     }
 }

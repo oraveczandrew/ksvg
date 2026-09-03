@@ -21,44 +21,51 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
+/**
+ * Byte-exact parity between the native `displacement_map.cpp` SIMD kernels
+ * ([DisplacementMapNative.applyForced]) and the pure-Kotlin reference
+ * ([KotlinKernels.displacementMap]). For every configuration in the shared
+ * [DisplacementMapValidationCorpus], every SIMD backend this host advertises is
+ * forced and compared byte-for-byte.
+ */
 @RunWith(Parameterized::class)
 class DisplacementMapNativeParityTest(
-    private val scale: Float,
-    private val xChannel: Int,
-    private val yChannel: Int,
+    private val name: String,
+    private val case: DisplacementMapValidationCorpus.Case,
+    private val backend: Int,
 ) {
     companion object {
 
         @JvmStatic
-        @Parameterized.Parameters
-        fun data(): List<Array<Any>> = listOf(
-            arrayOf(10f, 0, 1), // R, G
-            arrayOf(20f, 2, 3), // B, A
-            arrayOf(-5f, 1, 1), // G, G, negative scale
-            arrayOf(0f, 0, 0),  // identity
-        )
+        @Parameterized.Parameters(name = "{0}")
+        fun data(): List<Array<Any?>> {
+            val backends = KernelPerformanceBenchmark.getBackendsFor(DisplacementMapNative.nativeBackend())
+            return buildList {
+                for (case in DisplacementMapValidationCorpus.cases) {
+                    for (b in backends) {
+                        add(arrayOf("${case.name} [${backendName(b)}]", case, b))
+                    }
+                }
+            }
+        }
     }
 
     @Test
     fun nativeMatchesKotlin() {
         assertNativeBackendAvailable()
 
-        val width = 32
-        val height = 32
-        val mapWidth = 24
-        val mapHeight = 40
-        val src = pattern(width, height, 1)
-        val map = pattern(mapWidth, mapHeight, 2)
-        val ref = IntArray(width * height)
-        val native = IntArray(width * height)
-
-        KotlinKernels.displacementMap(
-            src, map, ref, width, height, mapWidth, mapHeight, scale, xChannel, yChannel
-        )
-        SoftwareKernels.displacementMap(
-            src, map, native, width, height, mapWidth, mapHeight, scale, xChannel, yChannel
+        val ref = case.reference()
+        val out = IntArray(case.size)
+        DisplacementMapNative.applyForced(
+            case.src, case.map, out, case.width, case.height,
+            case.mapWidth, case.mapHeight, case.scale,
+            case.xChannel, case.yChannel,
+            backend
         )
 
-        assertArrayEquals("displacementMap mismatch", ref, native)
+        assertArrayEquals(
+            "displacementMap mismatch on [$name] backend ${backendName(backend)}",
+            ref, out,
+        )
     }
 }

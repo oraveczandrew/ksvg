@@ -21,44 +21,30 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
+/**
+ * Bit-exact parity check between the native feMorphology kernel and the
+ * pure-Kotlin reference. For every configuration in the shared
+ * [MorphologyValidationCorpus], every SIMD backend this host advertises is
+ * forced via [MorphologyNative.applyForced] and compared byte-for-byte.
+ */
 @RunWith(Parameterized::class)
 class MorphologyNativeParityTest(
-    private val clipLeft: Int,
-    private val clipTop: Int,
-    private val clipRight: Int,
-    private val clipBottom: Int,
-    private val radiusX: Int,
-    private val radiusY: Int,
-    private val erode: Boolean,
+    private val name: String,
+    private val case: MorphologyValidationCorpus.Case,
     private val backend: Int,
 ) {
     companion object {
 
         @JvmStatic
-        @Parameterized.Parameters
-        fun data(): List<Array<Any>> {
-            val cases = listOf<Array<Any>>(
-                // full frame, erode, radius 1
-                arrayOf(0, 0, 32, 32, 1, 1, true),
-                // full frame, dilate, radius 1
-                arrayOf(0, 0, 32, 32, 1, 1, false),
-                // anisotropic radius, dilate
-                arrayOf(0, 0, 40, 30, 3, 2, false),
-                // clip sub-rectangle, erode, radius touches edges
-                arrayOf(4, 6, 28, 26, 2, 2, true),
-                // large radius (kernel spans whole frame), dilate
-                arrayOf(0, 0, 24, 24, 30, 30, false),
-            )
+        @Parameterized.Parameters(name = "{0}")
+        fun data(): List<Array<Any?>> {
             // Force every backend this host actually advertises, mirroring
             // KernelPerformanceBenchmark.getBackendsFor.
             val backends = KernelPerformanceBenchmark.getBackendsFor(MorphologyNative.nativeBackend())
             return buildList {
-                for (case in cases) {
+                for (case in MorphologyValidationCorpus.cases) {
                     for (b in backends) {
-                        add(buildList {
-                            addAll(case)
-                            add(b)
-                        }.toTypedArray())
+                        add(arrayOf("${case.name} [${backendName(b)}]", case, b))
                     }
                 }
             }
@@ -69,23 +55,23 @@ class MorphologyNativeParityTest(
     fun nativeMatchesKotlin() {
         assertNativeBackendAvailable()
 
-        val width = 32
-        val height = 32
-        val src = pattern(width, height, erode.hashCode() + radiusX * 7 + radiusY)
-        val ref = IntArray(width * height)
-        val native = IntArray(width * height)
+        val src = case.freshInput()
+        val ref = IntArray(case.size)
+        val native = IntArray(case.size)
 
         KotlinKernels.morphology(
-            src, ref, width, height, radiusX, radiusY, erode,
-            clipLeft, clipTop, clipRight, clipBottom,
+            src, ref, case.width, case.height,
+            case.radiusX, case.radiusY, case.erode,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom,
         )
         MorphologyNative.applyForced(
-            src, native, width, height, radiusX, radiusY, erode,
-            clipLeft, clipTop, clipRight, clipBottom, backend,
+            case.freshInput(), native, case.width, case.height,
+            case.radiusX, case.radiusY, case.erode,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom, backend,
         )
 
         assertArrayEquals(
-            "morphology mismatch on ${backendName(backend)}",
+            "morphology mismatch on [$name] backend ${backendName(backend)}",
             ref, native,
         )
     }

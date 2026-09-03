@@ -21,7 +21,7 @@ package hu.oandras.ksvg.filtering
  */
 public object ArithmeticCompositeValidationCorpus {
 
-    data class Case(
+    class Case(
         val name: String,
         val width: Int,
         val height: Int,
@@ -74,6 +74,11 @@ public object ArithmeticCompositeValidationCorpus {
             add(Case("subclip $space 32x32", 32, 32, 4, 4, 28, 28, 0.5f, 0.5f, 0.5f, 0.1f, useLinear,
                 UnlinearizeValidationCorpus.fixedSeedRandom(32 * 32),
                 UnlinearizeValidationCorpus.fixedSeedRandom(32 * 32).reversedArray()))
+
+            // Constant bias only (k4 > 0): result = k4 everywhere.
+            add(Case("bias $space 16x16", 16, 16, 0, 0, 16, 16, 0f, 0f, 0f, 0.25f, useLinear,
+                UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+                UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
         }
     }
 }

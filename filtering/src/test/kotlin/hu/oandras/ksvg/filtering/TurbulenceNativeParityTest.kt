@@ -24,7 +24,9 @@ import org.junit.runners.Parameterized
 /**
  * Bit-exact parity check between the native feTurbulence kernel
  * ([TurbulenceNative], driven through the [SoftwareKernels] facade) and the
- * pure-Kotlin reference ([KotlinKernels.turbulence]).
+ * pure-Kotlin reference ([KotlinKernels.turbulence]). Every configuration in
+ * the shared [TurbulenceValidationCorpus] is forced through every SIMD backend
+ * this host advertises.
  *
  * This is a host JVM test: it loads a host-architecture build of `libksvgblur`
  * (produced for `x86_64` by the CMake project in `filtering/host-native/`) so the
@@ -38,27 +40,7 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 class TurbulenceNativeParityTest(
     private val name: String,
-    private val width: Int,
-    private val height: Int,
-    private val clipLeft: Int,
-    private val clipTop: Int,
-    private val clipRight: Int,
-    private val clipBottom: Int,
-    private val baseFrequencyX: Double,
-    private val baseFrequencyY: Double,
-    private val periodX: Int,
-    private val periodY: Int,
-    private val octaves: Int,
-    private val fractalNoise: Boolean,
-    private val invCanvasScaleX: Double,
-    private val invCanvasScaleY: Double,
-    private val userLeft: Double,
-    private val userTop: Double,
-    private val originX: Double,
-    private val originY: Double,
-    private val unitSizeX: Double,
-    private val unitSizeY: Double,
-    private val seed: Int,
+    private val case: TurbulenceValidationCorpus.Case,
     private val backend: Int,
 ) {
 
@@ -78,85 +60,48 @@ class TurbulenceNativeParityTest(
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun data(): List<Array<Any?>> {
-            val configs = listOf(
-                // Turbulence, single octave, no stitching.
-                config("plain", 64, 64, 0, 0, 64, 64, 0.05, 0.05, 0, 0, 1, false, seed = 7),
-                // Fractal noise, multiple octaves.
-                config("fractal4", 64, 64, 0, 0, 64, 64, 0.08, 0.06, 0, 0, 4, true, seed = 42),
-                // Anisotropic / sub-rectangle clip region (transparent fill outside).
-                config("clip", 96, 80, 12, 8, 84, 72, 0.03, 0.05, 0, 0, 2, false, seed = 1234),
-                // Non-integer origin / anchor + non-unit primitive units.
-                config("fractional", 50, 50, 0, 0, 50, 50, 0.1, 0.1, 0, 0, 1, true, userLeft = 3.5, userTop = -1.25, originX = 2.0, originY = 7.5, unitSizeX = 0.75, unitSizeY = 1.25, seed = 3),
-                // Stitch tiles: whole lattice periods so edges wrap seamlessly.
-                config("stitch", 128, 128, 0, 0, 128, 128, 0.02, 0.02, 7, 9, 1, true, seed = 99),
-                // Downscaled canvas (canvas scale 2.0 -> frequency doubles in user space).
-                config("scaled", 32, 32, 0, 0, 32, 32, 0.05, 0.05, 0, 0, 3, false, invCanvasScaleX = 0.5, invCanvasScaleY = 0.5, seed = 55),
-            )
             // Force every backend this host actually advertises, mirroring
             // KernelPerformanceBenchmark.getBackendsFor.
             val backends = KernelPerformanceBenchmark.getBackendsFor(TurbulenceNative.nativeBackend())
             return buildList {
-                for (config in configs) {
+                for (case in TurbulenceValidationCorpus.cases) {
                     for (b in backends) {
-                        add(buildList {
-                            addAll(config)
-                            add(b)
-                        }.toTypedArray())
+                        // First element is the JUnit display label: include the
+                        // backend name so every case/backend pair is identifiable.
+                        add(arrayOf("${case.name} [${backendName(b)}]", case, b))
                     }
                 }
             }
         }
-
-        private fun config(
-            name: String,
-            width: Int,
-            height: Int,
-            clipLeft: Int,
-            clipTop: Int,
-            clipRight: Int,
-            clipBottom: Int,
-            baseFrequencyX: Double,
-            baseFrequencyY: Double,
-            periodX: Int,
-            periodY: Int,
-            octaves: Int,
-            fractalNoise: Boolean,
-            invCanvasScaleX: Double = 1.0,
-            invCanvasScaleY: Double = 1.0,
-            userLeft: Double = 0.0,
-            userTop: Double = 0.0,
-            originX: Double = 0.0,
-            originY: Double = 0.0,
-            unitSizeX: Double = 1.0,
-            unitSizeY: Double = 1.0,
-            seed: Int,
-        ): Array<Any?> = arrayOf(
-            name, width, height, clipLeft, clipTop, clipRight, clipBottom,
-            baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
-            invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
-            unitSizeX, unitSizeY, seed,
-        )
     }
 
     @Test
     fun nativeMatchesKotlin() {
         assertNativeBackendAvailable()
 
-        val kotlinOut = IntArray(width * height)
-        val nativeOut = IntArray(width * height)
+        val kotlinOut = IntArray(case.size)
+        val nativeOut = IntArray(case.size)
 
         KotlinKernels.turbulence(
-            kotlinOut, width, height, clipLeft, clipTop, clipRight, clipBottom,
-            baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
-            invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
-            unitSizeX, unitSizeY, seed, generators(seed),
+            kotlinOut, case.width, case.height,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom,
+            case.baseFrequencyX, case.baseFrequencyY,
+            case.periodX, case.periodY, case.octaves, case.fractalNoise,
+            case.invCanvasScaleX, case.invCanvasScaleY,
+            case.userLeft, case.userTop, case.originX, case.originY,
+            case.unitSizeX, case.unitSizeY, case.seed,
+            generators(case.seed),
         )
 
         TurbulenceNative.applyForced(
-            nativeOut, width, height, clipLeft, clipTop, clipRight, clipBottom,
-            baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
-            invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
-            unitSizeX, unitSizeY, seed, backend,
+            nativeOut, case.width, case.height,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom,
+            case.baseFrequencyX, case.baseFrequencyY,
+            case.periodX, case.periodY, case.octaves, case.fractalNoise,
+            case.invCanvasScaleX, case.invCanvasScaleY,
+            case.userLeft, case.userTop, case.originX, case.originY,
+            case.unitSizeX, case.unitSizeY, case.seed,
+            backend,
         )
 
         assertArrayEquals(

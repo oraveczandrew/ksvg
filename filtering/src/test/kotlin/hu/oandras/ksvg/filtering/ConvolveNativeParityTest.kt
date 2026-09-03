@@ -21,65 +21,53 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
+/**
+ * Byte-exact parity between the native `convolve_matrix.cpp` SIMD kernels
+ * ([ConvolveNative.applyForced]) and the pure-Kotlin reference
+ * ([KotlinKernels.convolveMatrix]). For every configuration in the shared
+ * [ConvolveValidationCorpus], every SIMD backend this host advertises is forced
+ * and compared byte-for-byte, covering kernel orders, anchors, divisors,
+ * preserveAlpha, and the duplicate/wrap/none edge modes.
+ */
 @RunWith(Parameterized::class)
 class ConvolveNativeParityTest(
-    private val kernel: FloatArray,
-    private val orderY: Int,
-    private val edgeMode: Int,
+    private val name: String,
+    private val case: ConvolveValidationCorpus.Case,
+    private val backend: Int,
 ) {
     companion object {
 
-        private const val EDGE_DUPLICATE = 0
-        private const val EDGE_WRAP = 1
-        private const val EDGE_NONE = 2
-
         @JvmStatic
-        @Parameterized.Parameters
-        fun data(): List<Array<Any>> = listOf(
-            // duplicate edge, 3x3 identity-ish kernel with divisor
-            arrayOf(floatArrayOf(0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f), 3, EDGE_DUPLICATE),
-            // wrap edge, 3x3 box-like kernel, bias
-            arrayOf(floatArrayOf(1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f), 3, EDGE_WRAP),
-            // none edge (transparent padding), 3x3, with bias
-            arrayOf(floatArrayOf(1f, 0f, -1f, 0f, 0f, 0f, -1f, 0f, 1f), 3, EDGE_NONE),
-            // non-square 3x2 kernel
-            arrayOf(floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f), 2, EDGE_DUPLICATE),
-        )
+        @Parameterized.Parameters(name = "{0}")
+        fun data(): List<Array<Any?>> {
+            val backends = KernelPerformanceBenchmark.getBackendsFor(ConvolveNative.nativeBackend())
+            return buildList {
+                for (case in ConvolveValidationCorpus.cases) {
+                    for (b in backends) {
+                        add(arrayOf("${case.name} [${backendName(b)}]", case, b))
+                    }
+                }
+            }
+        }
     }
 
     @Test
     fun nativeMatchesKotlin() {
         assertNativeBackendAvailable()
 
-        val width = 40
-        val height = 34
-        val orderX = kernel.size / orderY
-        val src = pattern(width, height, edgeMode * 31 + kernel.size)
+        val ref = case.reference()
+        val out = IntArray(case.size)
+        ConvolveNative.applyForced(
+            case.input, out, case.width, case.height,
+            case.kernel, case.orderX, case.orderY,
+            case.targetX, case.targetY,
+            case.divisor, case.bias, case.preserveAlpha, case.edgeMode,
+            backend
+        )
 
-        for (target in 0..1) {
-            for (preserveAlpha in listOf(false, true)) {
-                val divisor = maxOf(1f, kernel.sum())
-                val ref = IntArray(width * height)
-                val native = IntArray(width * height)
-
-                KotlinKernels.convolveMatrix(
-                    src, ref, width, height, kernel, orderX, orderY,
-                    targetX = target, targetY = target,
-                    divisor = divisor, bias = 0.15f,
-                    preserveAlpha = preserveAlpha, edgeMode = edgeMode,
-                )
-                SoftwareKernels.convolveMatrix(
-                    src, native, width, height, kernel, orderX, orderY,
-                    targetX = target, targetY = target,
-                    divisor = divisor, bias = 0.15f,
-                    preserveAlpha = preserveAlpha, edgeMode = edgeMode,
-                )
-
-                assertArrayEquals(
-                    "convolve mismatch: order=${orderX}x$orderY edge=$edgeMode target=$target preserveAlpha=$preserveAlpha",
-                    ref, native,
-                )
-            }
-        }
+        assertArrayEquals(
+            "convolve mismatch on [$name] backend ${backendName(backend)}",
+            ref, out,
+        )
     }
 }

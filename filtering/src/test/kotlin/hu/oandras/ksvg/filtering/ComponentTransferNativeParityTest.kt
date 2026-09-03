@@ -21,49 +21,52 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
+/**
+ * Byte-exact parity between the native `component_transfer.cpp` SIMD kernels
+ * ([ComponentTransferNative.applyForced]) and the pure-Kotlin reference
+ * ([KotlinKernels.componentTransfer]). For every configuration in the shared
+ * [ComponentTransferValidationCorpus], every SIMD backend this host advertises
+ * is forced and compared byte-for-byte, covering clip/table edge cases and the
+ * outer-pixel transparent-black fill.
+ */
 @RunWith(Parameterized::class)
 class ComponentTransferNativeParityTest(
-    private val clipLeft: Int,
-    private val clipTop: Int,
-    private val table: ByteArray,
+    private val name: String,
+    private val case: ComponentTransferValidationCorpus.Case,
+    private val backend: Int,
 ) {
     companion object {
 
         @JvmStatic
-        @Parameterized.Parameters
-        fun data(): List<Array<Any>> = listOf(
-            arrayOf(0, 0, ByteArray(256) { it.toByte() }), // identity
-            arrayOf(4, 3, ByteArray(256) { (255 - it).toByte() }), // inverted
-            arrayOf(2, 2, ByteArray(256) { ((it * 7) and 0xFF).toByte() }), // stepping table
-        )
+        @Parameterized.Parameters(name = "{0}")
+        fun data(): List<Array<Any?>> {
+            val backends = KernelPerformanceBenchmark.getBackendsFor(ComponentTransferNative.nativeBackend())
+            return buildList {
+                for (case in ComponentTransferValidationCorpus.cases) {
+                    for (b in backends) {
+                        add(arrayOf("${case.name} [${backendName(b)}]", case, b))
+                    }
+                }
+            }
+        }
     }
 
     @Test
     fun nativeMatchesKotlin() {
         assertNativeBackendAvailable()
 
-        val width = 36
-        val height = 30
-        val clipRight = if (clipLeft == 0) width else 32
-        val clipBottom = if (clipTop == 0) height else 27
-        val src = pattern(width, height, 31)
-        val ref = IntArray(width * height)
-        val native = IntArray(width * height)
-
-        val tableA = table
-        val tableR = ByteArray(256) { (table[it].toInt() + 31).toByte() }
-        val tableG = ByteArray(256) { (table[it].toInt() * 3).toByte() }
-        val tableB = ByteArray(256) { (255 - (table[it].toInt() and 0xFF)).toByte() }
-
-        KotlinKernels.componentTransfer(
-            src, ref, width, clipLeft, clipTop, clipRight, clipBottom,
-            tableA, tableR, tableG, tableB,
-        )
-        SoftwareKernels.componentTransfer(
-            src, native, width, height, clipLeft, clipTop, clipRight, clipBottom,
-            tableA, tableR, tableG, tableB,
+        val ref = case.reference()
+        val out = IntArray(case.size)
+        ComponentTransferNative.applyForced(
+            case.freshInput(), out, case.width, case.height,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom,
+            case.tableA, case.tableR, case.tableG, case.tableB,
+            backend
         )
 
-        assertArrayEquals("componentTransfer mismatch", ref, native)
+        assertArrayEquals(
+            "componentTransfer mismatch on [$name] backend ${backendName(backend)}",
+            ref, out,
+        )
     }
 }
