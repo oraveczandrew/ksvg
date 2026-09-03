@@ -60,25 +60,6 @@ class KernelPerformanceBenchmark {
 
     private val sizes = listOf(512 to 512, 2048 to 2048)
 
-    private fun benchmark(name: String, highestBackend: Int, numBuffers: Int = 2, run: (Int, Int, Int) -> Unit) {
-        val backends = getBackendsFor(highestBackend)
-        val isQuick = System.getProperty("benchmark.quick") == "true"
-        for ((w, h) in sizes) {
-            val iterations = if (isQuick) 1 else (if (w <= 512) 50 else 5)
-            for (b in backends) {
-                KernelBenchmarkRunner.runBenchmark(
-                    kernel = name,
-                    backendName = backendName(b),
-                    width = w,
-                    height = h,
-                    iterations = iterations,
-                    numBuffers = numBuffers,
-                    runKernel = { run(w, h, b) }
-                )
-            }
-        }
-    }
-
     @Test
     fun benchmarkAll() {
         val target = System.getProperty("benchmark.kernel")
