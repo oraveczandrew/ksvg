@@ -30,26 +30,52 @@ class MorphologyNativeParityTest(
     private val radiusX: Int,
     private val radiusY: Int,
     private val erode: Boolean,
+    private val backend: Int,
 ) {
     companion object {
         init {
             System.loadLibrary("ksvgblur")
         }
 
+        private fun backendName(backend: Int): String = when (backend) {
+            SIMD_SCALAR -> "scalar"
+            SIMD_SSSE3 -> "ssse3"
+            SIMD_AVX2 -> "avx2"
+            SIMD_AVX512 -> "avx512"
+            SIMD_NEON64 -> "neon64"
+            SIMD_NEON32 -> "neon32"
+            else -> backend.toString()
+        }
+
         @JvmStatic
         @Parameterized.Parameters
-        fun data(): List<Array<Any>> = listOf(
-            // full frame, erode, radius 1
-            arrayOf(0, 0, 32, 32, 1, 1, true),
-            // full frame, dilate, radius 1
-            arrayOf(0, 0, 32, 32, 1, 1, false),
-            // anisotropic radius, dilate
-            arrayOf(0, 0, 40, 30, 3, 2, false),
-            // clip sub-rectangle, erode, radius touches edges
-            arrayOf(4, 6, 28, 26, 2, 2, true),
-            // large radius (kernel spans whole frame), dilate
-            arrayOf(0, 0, 24, 24, 30, 30, false),
-        )
+        fun data(): List<Array<Any>> {
+            val cases = listOf<Array<Any>>(
+                // full frame, erode, radius 1
+                arrayOf(0, 0, 32, 32, 1, 1, true),
+                // full frame, dilate, radius 1
+                arrayOf(0, 0, 32, 32, 1, 1, false),
+                // anisotropic radius, dilate
+                arrayOf(0, 0, 40, 30, 3, 2, false),
+                // clip sub-rectangle, erode, radius touches edges
+                arrayOf(4, 6, 28, 26, 2, 2, true),
+                // large radius (kernel spans whole frame), dilate
+                arrayOf(0, 0, 24, 24, 30, 30, false),
+            )
+            // Force every backend this host actually advertises, mirroring
+            // KernelPerformanceBenchmark.getBackendsFor.
+            val backends = KernelPerformanceBenchmark.getBackendsFor(MorphologyNative.nativeBackend())
+            return buildList {
+                for (case in cases) {
+                    for (b in backends) {
+                        add(buildList {
+                            addAll(case)
+                            add(b)
+                        }.toTypedArray())
+                    }
+                }
+            }
+        }
     }
 
     @Test
@@ -66,11 +92,14 @@ class MorphologyNativeParityTest(
             src, ref, width, height, radiusX, radiusY, erode,
             clipLeft, clipTop, clipRight, clipBottom,
         )
-        SoftwareKernels.morphology(
+        MorphologyNative.applyForced(
             src, native, width, height, radiusX, radiusY, erode,
-            clipLeft, clipTop, clipRight, clipBottom,
+            clipLeft, clipTop, clipRight, clipBottom, backend,
         )
 
-        assertArrayEquals("morphology mismatch", ref, native)
+        assertArrayEquals(
+            "morphology mismatch on ${backendName(backend)}",
+            ref, native,
+        )
     }
 }
