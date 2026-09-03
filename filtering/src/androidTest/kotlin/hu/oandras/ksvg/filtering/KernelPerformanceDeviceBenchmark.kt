@@ -28,6 +28,15 @@ import java.io.File
 class KernelPerformanceDeviceBenchmark {
 
     companion object {
+
+        val isQuick = run {
+            val isQuick = InstrumentationRegistry.getArguments().getString("benchmark.quick") == "true"
+            if (isQuick) {
+                println("Running quick benchmark")
+            }
+            isQuick
+        }
+
         @BeforeClass
         @JvmStatic
         fun setup() {
@@ -41,7 +50,7 @@ class KernelPerformanceDeviceBenchmark {
     @Test
     fun benchmarkAll() {
         Log.i("Benchmark", "Starting selective benchmark on device")
-        val target = InstrumentationRegistry.getArguments().getString("kernel")
+        val target = InstrumentationRegistry.getArguments().getString("benchmark.kernel")
 
         if (target == null || target == "UnLinearize") benchmarkUnLinearize()
         if (target == null || target == "ComponentTransfer") benchmarkComponentTransfer()
@@ -355,7 +364,6 @@ class KernelPerformanceDeviceBenchmark {
         run: (Int) -> Unit
     ) {
         val backends = getBackendsFor(backendFlags)
-        val isQuick = InstrumentationRegistry.getArguments().getString("quick") == "true"
         val iterations = if (isQuick) 1 else (if (w <= 512) 20 else 2)
         for (b in backends) {
             KernelBenchmarkRunner.runBenchmark(

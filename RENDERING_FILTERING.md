@@ -232,6 +232,45 @@ helpers are used (see AGENTS.md).
 
 Full suite: `./gradlew :ksvg:testDebugUnitTest -Dorg.gradle.warning.mode=none`
 
+### 6.1 Kernel performance benchmarks (`:filtering`)
+
+The 9 native kernels (`:filtering`, §4) have a shared throughput harness
+(`KernelBenchmarkRunner`) driven from two places — a host JVM benchmark for the
+x86 build and an instrumented device benchmark for ARM64. Both report the same
+CSV columns (`Kernel,Backend,Size,AvgMs,MPix/s,GB/s,Speedup`).
+
+**Host (x86)** — `KernelPerformanceBenchmark`, output → `tmp/benchmarks_host*.csv`:
+
+```bash
+# single kernel, quick (1 iteration) — omit -D... for the full suite
+./gradlew :filtering:testDebugUnitTest \
+  --tests "hu.oandras.ksvg.filtering.KernelPerformanceBenchmark" \
+  -Dbenchmark.kernel=Turbulence -Dbenchmark.quick=true -Dorg.gradle.warning.mode=none
+```
+
+The host parity run depends on `buildHostNativeLib` (compiles `libksvgblur` for
+the host CPU); the `benchmark.*` JVM system props are forwarded to the test fork
+by `testOptions.unitTests` in `filtering/build.gradle.kts`.
+
+**Device (ARM64)** — `runDeviceBenchmark` wrapper (runs `connectedDebugAndroidTest`,
+auto-`adb pull`s the CSV from the device's `externalCacheDir` into `tmp/`, then
+prints it as a Markdown table):
+
+```bash
+./gradlew :filtering:runDeviceBenchmark \
+  -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
+  -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
+```
+
+- The instrumentation args the benchmark reads are `benchmark.kernel` (name filter; omit
+  for the full suite) and `benchmark.quick` (`true` = 1 iteration).
+- Requires a connected device. The pull works because the project enables
+  `android.injected.androidTest.leaveApksInstalledAfterRun=true` (the test APK —
+  and its cache dir) is left installed after the run, and the pull reads the
+  canonical `/storage/emulated/0/Android/data/<pkg>/cache/` path.
+- `class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark` restricts
+  the run to the benchmark so the parity/device tests don't also execute.
+
 ---
 
 ## 7. Change log (append)
@@ -247,3 +286,10 @@ Full suite: `./gradlew :ksvg:testDebugUnitTest -Dorg.gradle.warning.mode=none`
   bit-exact. Validated: `lighting_point_spot` 0.425 → 0.722; `filter_specular.svg`
   unchanged (0.981); native builds on all 4 ABIs. Residual gap to 0.95 is the
   separate diffuse-brightness divergence (§3.3).
+- 2026-09-03 — Documented the `:filtering` kernel benchmark commands (host +
+  device) in §6.1 (see NATIVE_VALIDATION_WORKLOG 2026-09-02 for the measured
+  results). Added the `runDeviceBenchmark` wrapper task, which forwards
+  `-Pandroid.testInstrumentationRunnerArguments.*` (class/kernel/benchmark.quick)
+  to `connectedDebugAndroidTest`, then pulls `benchmarks_device*.csv` from the
+  device cache dir into `tmp/` and prints it as a Markdown table. The pull relies
+  on `android.injected.androidTest.leaveApksInstalledAfterRun=true`.

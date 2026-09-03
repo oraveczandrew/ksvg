@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 /*
  *    Copyright 2026 András Oravecz <info@oandras.hu>
  *
@@ -131,6 +133,129 @@ val buildHostNativeLib = tasks.register<Exec>("buildHostNativeLib") {
     )
 }
 tasks.matching { it.name == "testDebugUnitTest" }.configureEach { dependsOn(buildHostNativeLib) }
+
+/*
+ * Device kernel benchmark wrapper.
+ *
+ * Runs the instrumented `KernelPerformanceDeviceBenchmark` on the connected
+ * device, pulls the generated CSV files into `<repo>/tmp/`, and dumps them as
+ * a Markdown table to the terminal.
+ *
+ * The benchmark reads a `kernel` (kernel name filter) and `quick` (boolean)
+ * instrumentation argument. Both are forwarded from the optional project
+ * properties `benchmark.kernel` and `benchmark.quick` so the invocation stays
+ * consistent with the host benchmark (`KernelPerformanceBenchmark`, which reads
+ * the same `benchmark.*` system properties). Without them the whole suite runs
+ * (a couple of minutes on a phone).
+ *
+ *   ./gradlew :filtering:runDeviceBenchmark \
+ *       -Pbenchmark.kernel=Turbulence -Pbenchmark.quick=true
+ *
+ * Results are pulled with `adb pull` once the instrumentation run finishes.
+ * `android.injected.androidTest.leaveApksInstalledAfterRun=true` keeps the
+ * test APK (and its cache dir) on the device so the file survives the run
+ * window long enough to be pulled.
+ */
+val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
+    group = "verification"
+    description = "Runs the device kernel benchmark, pulls the CSV results into tmp/, and prints them."
+
+    // Instrumentation arguments are forwarded the AGP-native way, on the
+    // command line, e.g.:
+    //   ./gradlew :filtering:runDeviceBenchmark \
+    //       -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
+    //       -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
+
+    // Resolve adb and the tmp dir once, at configuration time, so the doLast
+    // action only touches serializable File/String values (configuration-cache
+    // safe). Prefer ANDROID_HOME/platform-tools/adb, else fall back to PATH.
+    val adb: File = System.getenv("ANDROID_HOME")?.let { h -> File(h, "platform-tools/adb") }
+        ?.takeIf { it.exists() } ?: File("adb")
+    val tmpDir: File = rootProject.file("tmp")
+
+    val connectedTest = tasks.named("connectedDebugAndroidTest")
+
+    dependsOn(connectedTest)
+
+    doLast {
+        tmpDir.mkdirs()
+
+        fun adbRun(vararg args: String): String {
+            val proc = ProcessBuilder(listOf(adb.absolutePath) + args.toList())
+                .redirectErrorStream(true)
+                .start()
+            val out = proc.inputStream.readBytes().toString(Charsets.UTF_8).trim()
+            proc.waitFor()
+            if (proc.exitValue() != 0) {
+                logger.warn("adb ${args.joinToString(" ")} exited ${proc.exitValue()}:\n$out")
+            }
+            return out
+        }
+
+        // The instrumented run leaves the adb server in a stale state that can
+        // return "error: device '' not found" for a freshly-spawned adb client.
+        // Restart the server, wait for the USB device to come back, then target
+        // its serial explicitly with -s for both the find and the pull.
+        adbRun("kill-server")
+        adbRun("start-server")
+        var serial: String? = null
+        for (attempt in 1..10) {
+            val devices = adbRun("devices")
+            serial = devices.lineSequence()
+                .map { it.trim() }
+                .firstOrNull { it.endsWith("\tdevice") }
+                .takeIf { it != null }?.substringBefore('\t')
+            if (serial != null) break
+            Thread.sleep(1000L)
+        }
+        if (serial == null) {
+            logger.warn("runDeviceBenchmark: no adb device available after server restart (connect one and re-run)")
+            return@doLast
+        }
+
+        // Locate every benchmark CSV the run left behind and pull it into tmp/.
+        // The benchmark writes to Context.externalCacheDir, i.e. the canonical
+        // /storage/emulated/0/Android/data/<pkg>/cache/ path. adb pull needs that
+        // exact path, not the /sdcard symlink. `find` also prints "find: <path>:
+        // Permission denied" noise to stderr, which adb merges into stdout; only
+        // accept lines that are real absolute paths to a benchmarks_device CSV.
+        val remote = adbRun(
+            "-s", serial, "shell", "find", "/storage/emulated/0/Android/data",
+            "-name", "benchmarks_device*.csv", "-type", "f",
+        )
+        val pulled = mutableListOf<File>()
+        remote.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("/storage/emulated/0/Android/data/") && it.endsWith(".csv") }
+            .forEach { path ->
+                val dest = tmpDir.resolve(path.substringAfterLast('/'))
+                val pull = adbRun("-s", serial, "pull", path, dest.absolutePath)
+                if ("1 file pulled" in pull || dest.exists()) {
+                    pulled.add(dest)
+                }
+            }
+
+        if (pulled.isEmpty()) {
+            logger.warn("runDeviceBenchmark: no benchmarks_device*.csv found on device (did the instrumentation run?)")
+            return@doLast
+        }
+
+        pulled.forEach { p -> logger.lifecycle("runDeviceBenchmark: pulled ${p.absolutePath}") }
+
+        // Dump each pulled CSV as a Markdown table, matching the host report format.
+        pulled.forEach { reportFile ->
+            val lines = reportFile.readLines().map { it.trim() }.filter { it.isNotEmpty() }
+            if (lines.isEmpty()) return@forEach
+            logger.lifecycle("\n### ${reportFile.name}")
+            val header = lines.first().split(",")
+            logger.lifecycle("| ${header.joinToString(" | ")} |")
+            logger.lifecycle("| ${header.joinToString(" | ") { ":---" }} |")
+            for (row in lines.drop(1)) {
+                logger.lifecycle("| ${row.split(",").joinToString(" | ")} |")
+            }
+        }
+    }
+}
 
 //noinspection UseTomlInstead
 dependencies {
