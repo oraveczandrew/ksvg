@@ -25,7 +25,17 @@ constexpr int S_TABLE_SIZE = S_BSIZE + S_BSIZE + 2;
 
 struct PnrRandom {
     int32_t last;
-    explicit PnrRandom(const int32_t seed) {
+    explicit PnrRandom(int32_t seed) {
+        // Mirror Kotlin LcgRandom.setupSeed: resolve seed <= 0 and clamp the
+        // upper bound so the native lattice matches the reference sequence
+        // (librsvg / SVG 1.1 §15.25).
+        const int32_t kMaxSeed = 2147483647 - 1; // 2147483646
+        if (seed <= 0) {
+            seed = -(seed % kMaxSeed) + 1;
+        }
+        if (seed > kMaxSeed) {
+            seed = kMaxSeed;
+        }
         last = seed;
     }
     int32_t next() {
@@ -165,6 +175,7 @@ static inline void initBaseTablesSoA(
         const auto sel = selector[i];
         selector[S_BSIZE + i] = sel;
         selector32[i] = sel;
+        selector32[S_BSIZE + i] = sel;
         for (int32_t k = 0; k < 4; k++) {
             auto gradX = gradXSoA[k][0][i];
             auto gradY = gradXSoA[k][1][i];
@@ -172,6 +183,8 @@ static inline void initBaseTablesSoA(
             gradXSoA[k][1][S_BSIZE + i] = gradY;
             gradPackedX[i][k] = gradX;
             gradPackedY[i][k] = gradY;
+            gradPackedX[S_BSIZE + i][k] = gradX;
+            gradPackedY[S_BSIZE + i][k] = gradY;
         }
     }
 }
