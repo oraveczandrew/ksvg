@@ -17,28 +17,31 @@
 package hu.oandras.ksvg.filtering
 
 import java.io.File
-import java.util.*
-import kotlin.math.abs
+import java.util.Locale
 
 /**
- * Shared performance benchmark harness for filter kernels.
+ * Shared performance benchmark harness for filter kernels, used by both the
+ * host JVM benchmark (`KernelPerformanceBenchmark`, src/test) and the Android
+ * instrumented benchmark (`KernelPerformanceDeviceBenchmark`, src/androidTest).
+ * On Android `println` is routed into logcat, so no explicit `Log` calls are
+ * needed here.
  */
-object KernelBenchmarkRunner {
+public object KernelBenchmarkRunner {
 
-    data class Result(
-        val kernel: String,
-        val backend: String,
-        val width: Int,
-        val height: Int,
-        val avgMs: Double,
-        val mpixSec: Double,
-        val gbSec: Double,
-        val speedup: Double = 1.0
+    public data class Result(
+        public val kernel: String,
+        public val backend: String,
+        public val width: Int,
+        public val height: Int,
+        public val avgMs: Double,
+        public val mPixSec: Double,
+        public val gbSec: Double,
+        public val speedup: Double = 1.0
     )
 
-    private val results = mutableListOf<Result>()
+    private val results: MutableList<Result> = mutableListOf()
 
-    fun runBenchmark(
+    public fun runBenchmark(
         kernel: String,
         backendName: String,
         width: Int,
@@ -48,7 +51,7 @@ object KernelBenchmarkRunner {
         numBuffers: Int = 2, // src + dst usually
         runKernel: () -> Unit,
         verify: (() -> Unit)? = null
-    ) {
+    ): Unit {
         // Verification (once)
         verify?.invoke()
 
@@ -67,38 +70,49 @@ object KernelBenchmarkRunner {
         val totalNs = (end - start).toDouble()
         val avgNs = totalNs / iterations
         val avgMs = avgNs / 1_000_000.0
-        
+
         val totalPixels = width.toDouble() * height * iterations
-        val mpixSec = (totalPixels / (totalNs / 1_000_000_000.0)) / 1_000_000.0
-        
+        val mPixSec = (totalPixels / (totalNs / 1_000_000_000.0)) / 1_000_000.0
+
         // GB/s = (bytes per pixel * pixels * iterations * numBuffers) / seconds / 1e9
         val bytesReadWrite = 4.0 * width * height * iterations * numBuffers
         val gbSec = (bytesReadWrite / (totalNs / 1_000_000_000.0)) / 1_000_000_000.0
 
-        val scalarMs = results.find { it.kernel == kernel && it.backend == "scalar" && it.width == width && it.height == height }?.avgMs
+        val scalarMs = results.find {
+            it.kernel == kernel && it.backend == "scalar" && it.width == width && it.height == height
+        }?.avgMs
         val speedup = if (scalarMs != null) scalarMs / avgMs else 1.0
 
-        results.add(Result(kernel, backendName, width, height, avgMs, mpixSec, gbSec, speedup))
-        
-        println(String.format(Locale.US, "[%s] %s %dx%d: %.3f ms, %.2f MPix/s, %.2f GB/s (x%.2f)", 
-            kernel, backendName, width, height, avgMs, mpixSec, gbSec, speedup))
+        results.add(Result(kernel, backendName, width, height, avgMs, mPixSec, gbSec, speedup))
+
+        println(
+            String.format(
+                Locale.US,
+                "[%s] %s %dx%d: %.3f ms, %.2f MPix/s, %.2f GB/s (x%.2f)",
+                kernel, backendName, width, height, avgMs, mPixSec, gbSec, speedup,
+            ),
+        )
     }
 
-    fun report(outputFile: File) {
+    public fun report(outputFile: File): Unit {
         val header = "Kernel,Backend,Size,AvgMs,MPix/s,GB/s,Speedup"
         val csv = StringBuilder(header + "\n")
-        
+
         val mdHeader = "| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup |"
         val mdSep = "| :--- | :--- | :---: | ---: | ---: | ---: | ---: |"
         val md = StringBuilder("$mdHeader\n$mdSep\n")
 
         for (r in results) {
-            val line = String.format(Locale.US, "%s,%s,%dx%d,%.3f,%.2f,%.2f,%.2f",
-                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mpixSec, r.gbSec, r.speedup)
+            val line = String.format(
+                Locale.US, "%s,%s,%dx%d,%.3f,%.2f,%.2f,%.2f",
+                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, r.speedup,
+            )
             csv.append(line + "\n")
-            
-            val mdLine = String.format(Locale.US, "| %s | %s | %dx%d | %.3f | %.2f | %.2f | %.2fx |",
-                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mpixSec, r.gbSec, r.speedup)
+
+            val mdLine = String.format(
+                Locale.US, "| %s | %s | %dx%d | %.3f | %.2f | %.2f | %.2fx |",
+                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, r.speedup,
+            )
             md.append(mdLine + "\n")
         }
 
@@ -106,7 +120,7 @@ object KernelBenchmarkRunner {
         println("\nBenchmark results saved to ${outputFile.absolutePath}")
         println("\nHuman-readable report:\n")
         println(md.toString())
-        
+
         // Fastest backend summary
         println("\n### Fastest Backend Summary")
         val kernels = results.map { it.kernel }.distinct()
@@ -123,21 +137,8 @@ object KernelBenchmarkRunner {
             }
         }
     }
-    
-    fun clear() {
+
+    public fun clear(): Unit {
         results.clear()
-    }
-    
-    // Tolerance helper for verification
-    fun assertTolerance(expected: IntArray, actual: IntArray, tolerance: Int, message: String) {
-        for (i in expected.indices) {
-            for (ch in 0..3) {
-                val shift = ch * 8
-                val d = abs(((actual[i] shr shift) and 0xff) - ((expected[i] shr shift) and 0xff))
-                if (d > tolerance) {
-                    throw AssertionError("$message at index $i channel $ch: expected ${((expected[i] shr shift) and 0xff)} but was ${((actual[i] shr shift) and 0xff)} (diff $d > $tolerance)")
-                }
-            }
-        }
     }
 }
