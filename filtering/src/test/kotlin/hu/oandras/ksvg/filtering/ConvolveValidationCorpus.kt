@@ -19,7 +19,7 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feConvolveMatrix.
  */
-public object ConvolveValidationCorpus {
+object ConvolveValidationCorpus {
 
     class Case(
         val name: String,
@@ -57,31 +57,31 @@ public object ConvolveValidationCorpus {
             0f, -1f, 0f
         )
         add(Case("sharpen 16x16", 16, 16, sharpen, 3, 3, 1, 1, 1f, 0f, true, 0, 
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
         
         // 5x5 blur
         val blur5x5 = FloatArray(25) { 1f / 25f }
         add(Case("blur5x5 32x8", 32, 8, blur5x5, 5, 5, 2, 2, 1f, 0f, false, 0,
-            UnlinearizeValidationCorpus.fixedSeedRandom(32 * 8)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(32 * 8)))
 
         // Edge modes: wrap and none
         add(Case("wrap 16x16", 16, 16, sharpen, 3, 3, 1, 1, 1f, 0f, true, 1,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
         add(Case("none 16x16", 16, 16, sharpen, 3, 3, 1, 1, 1f, 0f, true, 2,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
         
         // Asymmetric kernel
         val asym = floatArrayOf(1f, 2f, 3f)
         add(Case("asym 1x3 32x32", 32, 32, asym, 3, 1, 1, 0, 1f, 0f, true, 0,
-            UnlinearizeValidationCorpus.fixedSeedRandom(32 * 32)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(32 * 32)))
 
         // Anchor at top-left (target 0,0): shift the convolution start.
         add(Case("anchor 0,0 3x3 16x16", 16, 16, sharpen, 3, 3, 0, 0, 1f, 0f, false, 0,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
 
         // Non-square 3x2 duplicate-edge kernel (orderX != orderY with duplicate).
         val box32 = floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
         add(Case("box 3x2 duplicate 16x16", 16, 16, box32, 3, 2, 1, 1, 1f, 0.15f, false, 0,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
     }
 }

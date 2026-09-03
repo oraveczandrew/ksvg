@@ -26,7 +26,7 @@ import org.junit.runners.Parameterized
  * Byte-exact parity between the native `unlinearize.cpp` SIMD kernels
  * ([UnLinearizeNative.applyForced]) and the pure-Kotlin reference
  * ([KotlinKernels.unLinearize]). For every configuration in the shared
- * [UnlinearizeValidationCorpus], every SIMD backend this host advertises is
+ * [UnLinearizeValidationCorpus], every SIMD backend this host advertises is
  * forced and compared byte-for-byte, covering the NEON/SSSE3/AVX2 vector tails,
  * separate src/dst, and the in-place (src == dst) path used by the
  * filter-output transfer.
@@ -34,7 +34,7 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 class UnLinearizeNativeParityTest(
     private val name: String,
-    private val case: UnlinearizeValidationCorpus.Case,
+    private val case: UnLinearizeValidationCorpus.Case,
     private val backend: Int,
 ) {
     companion object {
@@ -44,7 +44,7 @@ class UnLinearizeNativeParityTest(
         fun data(): List<Array<Any?>> {
             val backends = KernelPerformanceBenchmark.getBackendsFor(UnLinearizeNative.nativeBackend())
             return buildList {
-                for (case in UnlinearizeValidationCorpus.cases) {
+                for (case in UnLinearizeValidationCorpus.cases) {
                     for (b in backends) {
                         add(arrayOf("${case.name} [${backendName(b)}]", case, b))
                     }
@@ -87,8 +87,8 @@ class UnLinearizeNativeParityTest(
 
         val width = 16
         val height = 16
-        val src = UnlinearizeValidationCorpus.allAlpha(width * height) // alpha = i & 0xFF covers 0..255
-        val table = UnlinearizeValidationCorpus.steppingTable
+        val src = UnLinearizeValidationCorpus.allAlpha(width * height) // alpha = i & 0xFF covers 0..255
+        val table = UnLinearizeValidationCorpus.steppingTable
 
         // Force every advertised backend; each must preserve alpha.
         val backends = KernelPerformanceBenchmark.getBackendsFor(UnLinearizeNative.nativeBackend())

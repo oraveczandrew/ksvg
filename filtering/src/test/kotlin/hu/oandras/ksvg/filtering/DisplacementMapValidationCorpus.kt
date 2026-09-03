@@ -19,7 +19,7 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feDisplacementMap.
  */
-public object DisplacementMapValidationCorpus {
+object DisplacementMapValidationCorpus {
 
     class Case(
         val name: String,
@@ -48,27 +48,27 @@ public object DisplacementMapValidationCorpus {
     val cases: List<Case> = buildList {
         // Full size match
         add(Case("match 16x16", 16, 16, 16, 16, 10f, 0, 1, 
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
         
         // Different map size (routes to scalar)
         add(Case("different 32x8", 32, 8, 16, 4, 20f, 2, 3,
-            UnlinearizeValidationCorpus.fixedSeedRandom(32 * 8),
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 4)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(32 * 8),
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 4)))
 
         // Large scale
         add(Case("large scale 16x16", 16, 16, 16, 16, 100f, 1, 2,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
 
         // Negative scale (displacement directions invert).
         add(Case("negative scale 16x16", 16, 16, 16, 16, -5f, 1, 1,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
 
         // Identity scale zero: pixels land unshifted (R, R channel).
         add(Case("identity 16x16", 16, 16, 16, 16, 0f, 0, 0,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
     }
 }

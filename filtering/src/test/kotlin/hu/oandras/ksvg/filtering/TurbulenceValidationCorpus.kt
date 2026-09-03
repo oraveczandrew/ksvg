@@ -19,7 +19,7 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feTurbulence.
  */
-public object TurbulenceValidationCorpus {
+object TurbulenceValidationCorpus {
 
     data class Case(
         val name: String,

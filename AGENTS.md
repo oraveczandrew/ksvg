@@ -104,6 +104,7 @@ Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/N
 
 ## Common Gotchas
 *   **Explicit API mode is ON**: all public declarations (classes, objects, functions, properties, consts) need explicit visibility modifiers and explicit return/property types. Missing ones are compile errors, not warnings.
+*   **`public` is NOT needed in test source sets** (`src/test`, `src/androidTest`, `src/testShared`/the filtering corpus files): `public` is the Kotlin default there, so the explicit modifier is redundant noise. Only `src/main` code needs the explicit `public` (for Explicit API mode). Do not add `public` to test corpus objects/classes/members.
 *   **`Paint.setFontVariationSettings`**: Throws `NoSuchMethodError` in Robolectric; avoid testing complex text layouts in unit tests if they rely on variable fonts.
 *   **`stroke-dasharray`**: Requires normalization (doubling the array if length is odd) before it can be used with Android's `DashPathEffect`.
 *   **`accumulate="sum"`**: For colors (ARGB), "sum" is ignored per SVG spec.

@@ -19,7 +19,7 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feComposite operator="arithmetic".
  */
-public object ArithmeticCompositeValidationCorpus {
+object ArithmeticCompositeValidationCorpus {
 
     class Case(
         val name: String,
@@ -57,28 +57,28 @@ public object ArithmeticCompositeValidationCorpus {
             
             // Addition: k1=0, k2=1, k3=1, k4=0
             add(Case("add $space 16x16", 16, 16, 0, 0, 16, 16, 0f, 1f, 1f, 0f, useLinear,
-                UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
-                UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
+                UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+                UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
             
             // Subtraction: k1=0, k2=1, k3=-1, k4=0
             add(Case("sub $space 32x8", 32, 8, 0, 0, 32, 8, 0f, 1f, -1f, 0f, useLinear,
-                UnlinearizeValidationCorpus.fixedSeedRandom(32 * 8),
-                UnlinearizeValidationCorpus.fixedSeedRandom(32 * 8).reversedArray()))
+                UnLinearizeValidationCorpus.fixedSeedRandom(32 * 8),
+                UnLinearizeValidationCorpus.fixedSeedRandom(32 * 8).reversedArray()))
 
             // Multiply: k1=1, k2=0, k3=0, k4=0
             add(Case("mul $space 16x16", 16, 16, 0, 0, 16, 16, 1f, 0f, 0f, 0f, useLinear,
-                UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
-                UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
+                UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+                UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
 
             // Sub-clip region
             add(Case("subclip $space 32x32", 32, 32, 4, 4, 28, 28, 0.5f, 0.5f, 0.5f, 0.1f, useLinear,
-                UnlinearizeValidationCorpus.fixedSeedRandom(32 * 32),
-                UnlinearizeValidationCorpus.fixedSeedRandom(32 * 32).reversedArray()))
+                UnLinearizeValidationCorpus.fixedSeedRandom(32 * 32),
+                UnLinearizeValidationCorpus.fixedSeedRandom(32 * 32).reversedArray()))
 
             // Constant bias only (k4 > 0): result = k4 everywhere.
             add(Case("bias $space 16x16", 16, 16, 0, 0, 16, 16, 0f, 0f, 0f, 0.25f, useLinear,
-                UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16),
-                UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
+                UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16),
+                UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16).reversedArray()))
         }
     }
 }

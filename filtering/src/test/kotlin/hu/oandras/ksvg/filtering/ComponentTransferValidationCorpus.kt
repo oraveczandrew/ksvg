@@ -19,10 +19,10 @@ package hu.oandras.ksvg.filtering
 /**
  * Deterministic validation corpus for feComponentTransfer.
  */
-public object ComponentTransferValidationCorpus {
+object ComponentTransferValidationCorpus {
 
-    val boundarySizes: List<Int> = UnlinearizeValidationCorpus.boundarySizes
-    val shapes: List<Pair<Int, Int>> = UnlinearizeValidationCorpus.shapes
+    val boundarySizes: IntArray = UnLinearizeValidationCorpus.boundarySizes
+    val shapes: Array<Pair<Int, Int>> = UnLinearizeValidationCorpus.shapes
 
     val identityTable = ByteArray(256) { it.toByte() }
     val reverseTable = ByteArray(256) { (255 - it).toByte() }
@@ -65,27 +65,27 @@ public object ComponentTransferValidationCorpus {
         for ((w, h) in listOf(32 to 8, 33 to 9, 16 to 1)) {
             add(Case("full $w x $h", w, h, 0, 0, w, h, 
                 alphaTable, redTable, greenTable, blueTable, 
-                UnlinearizeValidationCorpus.fixedSeedRandom(w * h)))
+                UnLinearizeValidationCorpus.fixedSeedRandom(w * h)))
         }
         // Sub-clip region (crucial for component_transfer)
         add(Case("subclip 32x32", 32, 32, 4, 4, 28, 28,
             identityTable, identityTable, identityTable, identityTable,
-            UnlinearizeValidationCorpus.fixedSeedRandom(32 * 32)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(32 * 32)))
         
         // Edge cases for clip
         add(Case("clip top-left 16x16", 16, 16, 0, 0, 8, 8,
             reverseTable, redTable, greenTable, blueTable,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
         
         add(Case("clip bottom-right 16x16", 16, 16, 8, 8, 16, 16,
             alphaTable, reverseTable, identityTable, blueTable,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
 
         // Non-SIMD boundary sizes
         for (pixels in boundarySizes.filter { it > 0 }) {
             add(Case("tail $pixels x 1", pixels, 1, 0, 0, pixels, 1,
                 alphaTable, redTable, greenTable, blueTable,
-                UnlinearizeValidationCorpus.fixedSeedRandom(pixels)))
+                UnLinearizeValidationCorpus.fixedSeedRandom(pixels)))
         }
     }
 }
