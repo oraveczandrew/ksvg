@@ -42,3 +42,13 @@ public const val SIMD_AVX2: Int = 1 shl 2
 public const val SIMD_AVX512: Int = 1 shl 3
 public const val SIMD_NEON64: Int = 1 shl 4
 public const val SIMD_NEON32: Int = 1 shl 5
+
+internal fun backendName(backend: Int): String = when (backend) {
+    SIMD_SCALAR -> "scalar"
+    SIMD_SSSE3 -> "ssse3"
+    SIMD_AVX2 -> "avx2"
+    SIMD_AVX512 -> "avx512"
+    SIMD_NEON64 -> "neon64"
+    SIMD_NEON32 -> "neon32"
+    else -> backend.toString()
+}

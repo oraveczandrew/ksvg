@@ -17,7 +17,6 @@
 package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -60,15 +59,10 @@ class TurbulenceNativeParityTest(
     private val unitSizeX: Double,
     private val unitSizeY: Double,
     private val seed: Int,
+    private val backend: Int,
 ) {
 
     companion object {
-        init {
-            // Load the host libksvgblur before any native dispatch is observed, so
-            // TurbulenceNative.isAvailable resolves true and SoftwareKernels routes to
-            // the native kernel. Throws (test error) if the host build is absent.
-            System.loadLibrary("ksvgblur")
-        }
 
         private fun generators(seed: Int): Array<SvgPathNoise> {
             // Mirror RenderTreeBuilder's construction order exactly: the four
@@ -83,20 +77,35 @@ class TurbulenceNativeParityTest(
 
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
-        fun data(): List<Array<Any?>> = listOf(
-            // Turbulence, single octave, no stitching.
-            config("plain", 64, 64, 0, 0, 64, 64, 0.05, 0.05, 0, 0, 1, false, seed = 7),
-            // Fractal noise, multiple octaves.
-            config("fractal4", 64, 64, 0, 0, 64, 64, 0.08, 0.06, 0, 0, 4, true, seed = 42),
-            // Anisotropic / sub-rectangle clip region (transparent fill outside).
-            config("clip", 96, 80, 12, 8, 84, 72, 0.03, 0.05, 0, 0, 2, false, seed = 1234),
-            // Non-integer origin / anchor + non-unit primitive units.
-            config("fractional", 50, 50, 0, 0, 50, 50, 0.1, 0.1, 0, 0, 1, true, userLeft = 3.5, userTop = -1.25, originX = 2.0, originY = 7.5, unitSizeX = 0.75, unitSizeY = 1.25, seed = 3),
-            // Stitch tiles: whole lattice periods so edges wrap seamlessly.
-            config("stitch", 128, 128, 0, 0, 128, 128, 0.02, 0.02, 7, 9, 1, true, seed = 99),
-            // Downscaled canvas (canvas scale 2.0 -> frequency doubles in user space).
-            config("scaled", 32, 32, 0, 0, 32, 32, 0.05, 0.05, 0, 0, 3, false, invCanvasScaleX = 0.5, invCanvasScaleY = 0.5, seed = 55),
-        )
+        fun data(): List<Array<Any?>> {
+            val configs = listOf(
+                // Turbulence, single octave, no stitching.
+                config("plain", 64, 64, 0, 0, 64, 64, 0.05, 0.05, 0, 0, 1, false, seed = 7),
+                // Fractal noise, multiple octaves.
+                config("fractal4", 64, 64, 0, 0, 64, 64, 0.08, 0.06, 0, 0, 4, true, seed = 42),
+                // Anisotropic / sub-rectangle clip region (transparent fill outside).
+                config("clip", 96, 80, 12, 8, 84, 72, 0.03, 0.05, 0, 0, 2, false, seed = 1234),
+                // Non-integer origin / anchor + non-unit primitive units.
+                config("fractional", 50, 50, 0, 0, 50, 50, 0.1, 0.1, 0, 0, 1, true, userLeft = 3.5, userTop = -1.25, originX = 2.0, originY = 7.5, unitSizeX = 0.75, unitSizeY = 1.25, seed = 3),
+                // Stitch tiles: whole lattice periods so edges wrap seamlessly.
+                config("stitch", 128, 128, 0, 0, 128, 128, 0.02, 0.02, 7, 9, 1, true, seed = 99),
+                // Downscaled canvas (canvas scale 2.0 -> frequency doubles in user space).
+                config("scaled", 32, 32, 0, 0, 32, 32, 0.05, 0.05, 0, 0, 3, false, invCanvasScaleX = 0.5, invCanvasScaleY = 0.5, seed = 55),
+            )
+            // Force every backend this host actually advertises, mirroring
+            // KernelPerformanceBenchmark.getBackendsFor.
+            val backends = KernelPerformanceBenchmark.getBackendsFor(TurbulenceNative.nativeBackend())
+            return buildList {
+                for (config in configs) {
+                    for (b in backends) {
+                        add(buildList {
+                            addAll(config)
+                            add(b)
+                        }.toTypedArray())
+                    }
+                }
+            }
+        }
 
         private fun config(
             name: String,
@@ -131,10 +140,7 @@ class TurbulenceNativeParityTest(
 
     @Test
     fun nativeMatchesKotlin() {
-        assertTrue(
-            "libksvgblur not loadable on the host JVM; the native path is not being tested here.",
-            TurbulenceNative.isAvailable,
-        )
+        assertNativeBackendAvailable()
 
         val kotlinOut = IntArray(width * height)
         val nativeOut = IntArray(width * height)
@@ -146,15 +152,15 @@ class TurbulenceNativeParityTest(
             unitSizeX, unitSizeY, seed, generators(seed),
         )
 
-        SoftwareKernels.turbulence(
+        TurbulenceNative.applyForced(
             nativeOut, width, height, clipLeft, clipTop, clipRight, clipBottom,
             baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
             invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
-            unitSizeX, unitSizeY, seed, generators(seed),
+            unitSizeX, unitSizeY, seed, backend,
         )
 
         assertArrayEquals(
-            "native != kotlin for [$name]",
+            "native != kotlin for [$name] on ${backendName(backend)}",
             kotlinOut, nativeOut,
         )
     }
