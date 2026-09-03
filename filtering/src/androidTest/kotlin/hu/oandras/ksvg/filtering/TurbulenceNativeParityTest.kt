@@ -60,7 +60,8 @@ class TurbulenceNativeParityTest(
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun data(): List<Array<Any?>> {
-            // Force every SIMD backend this host actually advertises.
+            // Force every backend this host actually advertises, mirroring
+            // KernelPerformanceBenchmark.getBackendsFor.
             val backends = getBackendsFor(TurbulenceNative.nativeBackend())
             return buildList {
                 for (case in TurbulenceValidationCorpus.cases) {

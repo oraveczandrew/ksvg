@@ -38,9 +38,8 @@ class MorphologyNativeParityTest(
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun data(): List<Array<Any?>> {
-            // Force every backend this host actually advertises, mirroring
-            // KernelPerformanceBenchmark.getBackendsFor.
-            val backends = KernelPerformanceBenchmark.getBackendsFor(MorphologyNative.nativeBackend())
+            // Force every SIMD backend this host actually advertises.
+            val backends = getBackendsFor(MorphologyNative.nativeBackend())
             return buildList {
                 for (case in MorphologyValidationCorpus.cases) {
                     for (b in backends) {

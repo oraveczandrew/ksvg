@@ -34,22 +34,6 @@ class KernelPerformanceDeviceBenchmark {
             assertNativeBackendAvailable()
             KernelBenchmarkRunner.clear()
         }
-        
-        fun getBackendsFor(flags: Int): List<Int> {
-            val all = arrayOf(
-                SIMD_SCALAR,
-                SIMD_NEON64,
-                SIMD_NEON32
-            )
-            return all.filter { (flags and it) != 0 }
-        }
-
-        private fun backendName(id: Int) = when (id) {
-            SIMD_SCALAR -> "scalar"
-            SIMD_NEON64 -> "neon64"
-            SIMD_NEON32 -> "neon32"
-            else -> "unknown"
-        }
     }
 
     private val sizes: Array<Pair<Int, Int>> = arrayOf(512 to 512, 2048 to 2048)
@@ -82,7 +66,12 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("UnLinearize", UnLinearizeNative.nativeBackend(), w, h) { b ->
+            benchmarkSingle(
+                name = "UnLinearize",
+                backendFlags = UnLinearizeNative.nativeBackend(),
+                w = w,
+                h = h
+            ) { b ->
                 UnLinearizeNative.applyForced(
                     src = src,
                     dst = dst,
@@ -100,7 +89,12 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("ComponentTransfer", ComponentTransferNative.nativeBackend(), w, h) { b ->
+            benchmarkSingle(
+                name = "ComponentTransfer",
+                backendFlags = ComponentTransferNative.nativeBackend(),
+                w = w,
+                h = h
+            ) { b ->
                 ComponentTransferNative.applyForced(
                     src = src,
                     dst = dst,
@@ -124,7 +118,12 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("Morphology", MorphologyNative.nativeBackend(), w, h) { b ->
+            benchmarkSingle(
+                name = "Morphology",
+                backendFlags = MorphologyNative.nativeBackend(),
+                w = w,
+                h = h
+            ) { b ->
                 MorphologyNative.applyForced(
                     src = src,
                     dst = dst,
@@ -148,7 +147,12 @@ class KernelPerformanceDeviceBenchmark {
             val src1 = IntArray(w * h)
             val src2 = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("ArithmeticComposite", ArithmeticCompositeNative.nativeBackend(), w, h) { b ->
+            benchmarkSingle(
+                name = "ArithmeticComposite",
+                backendFlags = ArithmeticCompositeNative.nativeBackend(),
+                w = w,
+                h = h
+            ) { b ->
                 ArithmeticCompositeNative.applyForced(
                     src1 = src1,
                     src2 = src2,
@@ -174,7 +178,12 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("ConvolveMatrix", ConvolveNative.nativeBackend(), w, h) { b ->
+            benchmarkSingle(
+                name = "ConvolveMatrix",
+                backendFlags = ConvolveNative.nativeBackend(),
+                w = w,
+                h = h
+            ) { b ->
                 ConvolveNative.applyForced(
                     src = src,
                     dst = dst,
@@ -200,7 +209,13 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val map = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("DisplacementMap", DisplacementMapNative.nativeBackend(), w, h, numBuffers = 3) { b ->
+            benchmarkSingle(
+                name = "DisplacementMap",
+                backendFlags = DisplacementMapNative.nativeBackend(),
+                w = w,
+                h = h,
+                numBuffers = 3
+            ) { b ->
                 DisplacementMapNative.applyForced(
                     src = src,
                     map = map,
@@ -223,7 +238,12 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes) {
             val pix = IntArray(w * h)
             val out = IntArray(w * h)
-            benchmarkSingle("Lighting", LightingNative.nativeBackend(), w, h) { b ->
+            benchmarkSingle(
+                name = "Lighting",
+                backendFlags = LightingNative.nativeBackend(),
+                w = w,
+                h = h
+            ) { b ->
                 LightingNative.applyForced(
                     pix = pix,
                     out = out,
@@ -263,7 +283,13 @@ class KernelPerformanceDeviceBenchmark {
     private fun benchmarkTurbulence() {
         for ((w, h) in sizes) {
             val pix = IntArray(w * h)
-            benchmarkSingle("Turbulence", TurbulenceNative.nativeBackend(), w, h, numBuffers = 1) { b ->
+            benchmarkSingle(
+                name = "Turbulence",
+                backendFlags = TurbulenceNative.nativeBackend(),
+                w = w,
+                h = h,
+                numBuffers = 1
+            ) { b ->
                 TurbulenceNative.applyForced(
                     pixels = pix,
                     width = w,
@@ -298,7 +324,12 @@ class KernelPerformanceDeviceBenchmark {
         try {
             for ((w, h) in sizes) {
                 val pix = IntArray(w * h)
-                benchmarkSingle("GaussianBlur", NativeGaussianBlur.nativeBackend(5f, 5f), w, h) { b ->
+                benchmarkSingle(
+                    name = "GaussianBlur",
+                    backendFlags = NativeGaussianBlur.nativeBackend(5f, 5f),
+                    w = w,
+                    h = h
+                ) { b ->
                     NativeGaussianBlur.applyForced(
                         scratch = scratch,
                         pixels = pix,
@@ -315,8 +346,15 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkSingle(name: String, highestBackend: Int, w: Int, h: Int, numBuffers: Int = 2, run: (Int) -> Unit) {
-        val backends = getBackendsFor(highestBackend)
+    private fun benchmarkSingle(
+        name: String,
+        @SimdBackend backendFlags: Int,
+        w: Int,
+        h: Int,
+        numBuffers: Int = 2,
+        run: (Int) -> Unit
+    ) {
+        val backends = getBackendsFor(backendFlags)
         val isQuick = InstrumentationRegistry.getArguments().getString("quick") == "true"
         val iterations = if (isQuick) 1 else (if (w <= 512) 20 else 2)
         for (b in backends) {

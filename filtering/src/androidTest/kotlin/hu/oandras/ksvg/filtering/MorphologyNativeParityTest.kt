@@ -22,17 +22,15 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Byte-exact parity between the native `component_transfer.cpp` SIMD kernels
- * ([ComponentTransferNative.applyForced]) and the pure-Kotlin reference
- * ([KotlinKernels.componentTransfer]). For every configuration in the shared
- * [ComponentTransferValidationCorpus], every SIMD backend this host advertises
- * is forced and compared byte-for-byte, covering clip/table edge cases and the
- * outer-pixel transparent-black fill.
+ * Bit-exact parity check between the native feMorphology kernel and the
+ * pure-Kotlin reference. For every configuration in the shared
+ * [MorphologyValidationCorpus], every SIMD backend this host advertises is
+ * forced via [MorphologyNative.applyForced] and compared byte-for-byte.
  */
 @RunWith(Parameterized::class)
-class ComponentTransferNativeParityTest(
+class MorphologyNativeParityTest(
     private val name: String,
-    private val case: ComponentTransferValidationCorpus.Case,
+    private val case: MorphologyValidationCorpus.Case,
     private val backend: Int,
 ) {
     companion object {
@@ -40,9 +38,11 @@ class ComponentTransferNativeParityTest(
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun data(): List<Array<Any?>> {
-            val backends = getBackendsFor(ComponentTransferNative.nativeBackend())
+            // Force every backend this host actually advertises, mirroring
+            // KernelPerformanceBenchmark.getBackendsFor.
+            val backends = getBackendsFor(MorphologyNative.nativeBackend())
             return buildList {
-                for (case in ComponentTransferValidationCorpus.cases) {
+                for (case in MorphologyValidationCorpus.cases) {
                     for (b in backends) {
                         add(arrayOf("${case.name} [${backendName(b)}]", case, b))
                     }
@@ -55,18 +55,24 @@ class ComponentTransferNativeParityTest(
     fun nativeMatchesKotlin() {
         assertNativeBackendAvailable()
 
-        val ref = case.reference()
-        val out = IntArray(case.size)
-        ComponentTransferNative.applyForced(
-            case.freshInput(), out, case.width, case.height,
+        val src = case.freshInput()
+        val ref = IntArray(case.size)
+        val native = IntArray(case.size)
+
+        KotlinKernels.morphology(
+            src, ref, case.width, case.height,
+            case.radiusX, case.radiusY, case.erode,
             case.clipLeft, case.clipTop, case.clipRight, case.clipBottom,
-            case.tableA, case.tableR, case.tableG, case.tableB,
-            backend
+        )
+        MorphologyNative.applyForced(
+            case.freshInput(), native, case.width, case.height,
+            case.radiusX, case.radiusY, case.erode,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom, backend,
         )
 
         assertArrayEquals(
-            "componentTransfer mismatch on [$name] backend ${backendName(backend)}",
-            ref, out,
+            "morphology mismatch on [$name] backend ${backendName(backend)}",
+            ref, native,
         )
     }
 }
