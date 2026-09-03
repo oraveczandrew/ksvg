@@ -64,7 +64,7 @@ class KernelPerformanceBenchmark {
     fun benchmarkAll() {
         val target = System.getProperty("benchmark.kernel")
 
-        if (target == null || target == "Unlinearize") benchmarkUnlinearize()
+        if (target == null || target == "UnLinearize") benchmarkUnLinearize()
         if (target == null || target == "ComponentTransfer") benchmarkComponentTransfer()
         if (target == null || target == "Morphology") benchmarkMorphology()
         if (target == null || target == "ArithmeticComposite") benchmarkArithmeticComposite()
@@ -80,12 +80,12 @@ class KernelPerformanceBenchmark {
         KernelBenchmarkRunner.report(output)
     }
 
-    private fun benchmarkUnlinearize() {
+    private fun benchmarkUnLinearize() {
         val table = ByteArray(256) { it.toByte() }
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("Unlinearize", UnLinearizeNative.nativeBackend(), w, h) { b ->
+            benchmarkSingle("UnLinearize", UnLinearizeNative.nativeBackend(), w, h) { b ->
                 UnLinearizeNative.applyForced(src, dst, w, h, table, b)
             }
         }

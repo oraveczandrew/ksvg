@@ -24,7 +24,7 @@ import org.junit.Test
 /**
  * Correctness of the linear→sRGB (unlinearize) filter-output transfer reference:
  * the [KotlinKernels.UN_LINEARIZE] table, [KotlinKernels.unLinearizeArgb] single-
- * pixel semantics and [KotlinKernels.unlinearize] batch op. These tests were
+ * pixel semantics and [KotlinKernels.unLinearize] batch op. These tests were
  * migrated from `:ksvg`'s `ColorUtilsTest` when the transfer moved into the
  * `:filtering` module.
  */
@@ -127,7 +127,7 @@ class UnlinearizeKernelTest {
     fun unLinearize_allTransparent_inPlace() {
         // Transparent pixels keep their (LUT-mapped) channels but stay transparent.
         val pixels = intArrayOf(0x00000000, 0x00FF0000.toInt(), 0x0000FF00)
-        KotlinKernels.unlinearize(pixels, pixels, pixels.size, 1, KotlinKernels.UN_LINEARIZE)
+        KotlinKernels.unLinearize(pixels, pixels, pixels.size, 1, KotlinKernels.UN_LINEARIZE)
         assertEquals(0x00000000, pixels[0])
         // LUT[255]=255, LUT[0]=0 — transparent pixels keep channels but pixel is transparent.
         assertEquals(0x00FF0000.toInt(), pixels[1])
@@ -140,7 +140,7 @@ class UnlinearizeKernelTest {
         val expected = KotlinKernels.unLinearizeArgb(pixel, KotlinKernels.UN_LINEARIZE)
         val pixels = intArrayOf(pixel)
         val out = IntArray(1)
-        KotlinKernels.unlinearize(pixels, out, 1, 1, KotlinKernels.UN_LINEARIZE)
+        KotlinKernels.unLinearize(pixels, out, 1, 1, KotlinKernels.UN_LINEARIZE)
         assertArrayEquals(intArrayOf(expected), out)
     }
 
@@ -151,7 +151,7 @@ class UnlinearizeKernelTest {
         val height = 13
         val src = pattern(width, height, 47)
         val dst = IntArray(width * height)
-        KotlinKernels.unlinearize(src, dst, width, height, KotlinKernels.UN_LINEARIZE)
+        KotlinKernels.unLinearize(src, dst, width, height, KotlinKernels.UN_LINEARIZE)
         for (i in src.indices) {
             assertEquals(
                 "alpha passthrough at $i",
@@ -186,7 +186,7 @@ class UnlinearizeKernelTest {
         val height = 16
         val src = fullCoverage(width, height)
         val dst = IntArray(width * height)
-        KotlinKernels.unlinearize(src, dst, width, height, KotlinKernels.UN_LINEARIZE)
+        KotlinKernels.unLinearize(src, dst, width, height, KotlinKernels.UN_LINEARIZE)
         val table = KotlinKernels.UN_LINEARIZE
         for (i in src.indices) {
             assertEquals(

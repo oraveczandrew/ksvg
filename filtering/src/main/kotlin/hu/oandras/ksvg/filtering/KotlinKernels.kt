@@ -246,7 +246,7 @@ public object KotlinKernels {
      * Converts a single straight (non-premultiplied) linear-RGB pixel to straight
      * sRGB using [table] (normally [UN_LINEARIZE]): each colour channel is looked
      * up and alpha is preserved unchanged. Element-wise reference for both
-     * [unlinearize] and `unlinearize.cpp`'s scalar loop.
+     * [unLinearize] and `unlinearize.cpp`'s scalar loop.
      */
     @JvmStatic
     public fun unLinearizeArgb(pixel: Int, table: ByteArray): Int {
@@ -267,7 +267,7 @@ public object KotlinKernels {
      * [unLinearizeArgb]). Element-wise byte map, so [src] and [dst] may be the
      * same array (in-place). Bit-exact reference for `unlinearize.cpp`.
      */
-    public fun unlinearize(
+    public fun unLinearize(
         src: IntArray,
         dst: IntArray,
         width: Int,

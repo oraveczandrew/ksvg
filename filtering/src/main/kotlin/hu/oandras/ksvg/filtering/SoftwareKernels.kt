@@ -121,7 +121,7 @@ public object SoftwareKernels {
     // ------------------------------------------------------------- unlinearize
 
     @JvmStatic
-    public fun unlinearize(
+    public fun unLinearize(
         src: IntArray,
         dst: IntArray,
         width: Int,
@@ -131,7 +131,7 @@ public object SoftwareKernels {
         if (UnLinearizeNative.isAvailable) {
             UnLinearizeNative.apply(src, dst, width, height, table)
         } else {
-            KotlinKernels.unlinearize(src, dst, width, height, table)
+            KotlinKernels.unLinearize(src, dst, width, height, table)
         }
     }
 

@@ -24,7 +24,7 @@ package hu.oandras.ksvg.filtering
  *  - the Android instrumented test (`UnlinearizeNativeDeviceTest`, src/androidTest).
  *
  * Same bytes on every ABI, so every executable native backend is compared
- * against the exact same [KotlinKernels.unlinearize] oracle (NATIVE_TESTING:
+ * against the exact same [KotlinKernels.unLinearize] oracle (NATIVE_TESTING:
  * "shared deterministic test suite with the same input corpus on every
  * architecture"). This file is never compiled into the library (it lives under
  * src/sharedTest, wired into both test source sets only).
@@ -124,7 +124,7 @@ public object UnlinearizeValidationCorpus {
     /**
      * One named validation case: a shape, a table, an input kind, and whether to
      * run the JNI in-place (src == dst) path. Byte-exact compare against
-     * [KotlinKernels.unlinearize] for every forced backend.
+     * [KotlinKernels.unLinearize] for every forced backend.
      */
     data class Case(
         val name: String,
@@ -139,7 +139,7 @@ public object UnlinearizeValidationCorpus {
         /** Reference oracle (never calls native). */
         fun reference(): IntArray {
             val out = IntArray(size)
-            KotlinKernels.unlinearize(input, out, width, height, table)
+            KotlinKernels.unLinearize(input, out, width, height, table)
             return out
         }
 

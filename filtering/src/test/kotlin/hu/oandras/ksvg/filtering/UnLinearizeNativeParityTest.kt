@@ -24,7 +24,7 @@ import org.junit.runners.Parameterized
 
 /**
  * Byte-exact parity between the native `unlinearize.cpp` SIMD kernels and the
- * pure-Kotlin reference [KotlinKernels.unlinearize].
+ * pure-Kotlin reference [KotlinKernels.unLinearize].
  *
  * Runs on the host JVM against a host-arch build of `libksvgblur` (the
  * `:filtering` test task builds it via `buildHostNativeLib`). Various buffer
@@ -78,14 +78,14 @@ class UnLinearizeNativeParityTest(
         val ref = IntArray(width * height)
         val native = IntArray(width * height)
 
-        KotlinKernels.unlinearize(src, ref, width, height, table)
+        KotlinKernels.unLinearize(src, ref, width, height, table)
 
         if (inPlace) {
             // Exercise the JNI in-place (src==dst) path: copy src into native, run in-place.
             System.arraycopy(src, 0, native, 0, src.size)
-            SoftwareKernels.unlinearize(native, native, width, height, table)
+            SoftwareKernels.unLinearize(native, native, width, height, table)
         } else {
-            SoftwareKernels.unlinearize(src, native, width, height, table)
+            SoftwareKernels.unLinearize(src, native, width, height, table)
         }
 
         assertArrayEquals("unlinearize mismatch (${width}x$height, inPlace=$inPlace)", ref, native)
@@ -106,8 +106,8 @@ class UnLinearizeNativeParityTest(
         val ref = IntArray(width * height)
         val native = IntArray(width * height)
 
-        KotlinKernels.unlinearize(src, ref, width, height, KotlinKernels.UN_LINEARIZE)
-        SoftwareKernels.unlinearize(src, native, width, height, KotlinKernels.UN_LINEARIZE)
+        KotlinKernels.unLinearize(src, ref, width, height, KotlinKernels.UN_LINEARIZE)
+        SoftwareKernels.unLinearize(src, native, width, height, KotlinKernels.UN_LINEARIZE)
 
         assertArrayEquals("alpha preservation mismatch", ref, native)
         for (i in src.indices) {
