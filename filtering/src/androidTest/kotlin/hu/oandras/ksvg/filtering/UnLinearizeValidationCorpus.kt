@@ -29,7 +29,7 @@ package hu.oandras.ksvg.filtering
  * architecture"). This file is never compiled into the library (it lives under
  * src/sharedTest, wired into both test source sets only).
  */
-public object UnlinearizeValidationCorpus {
+public object UnLinearizeValidationCorpus {
 
     // ------------------------------------------------------------------ shapes
 

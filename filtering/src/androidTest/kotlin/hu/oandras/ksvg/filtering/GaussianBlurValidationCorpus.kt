@@ -109,18 +109,18 @@ public object GaussianBlurValidationCorpus {
     val cases: List<Case> = buildList {
         // Small isotropic
         add(Case("isotropic 1.5 16x16", 16, 16, 1.5f, 1.5f, 
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
         
         // Optimized path isotropic (radius 8, sigma ~2.6)
         add(Case("isotropic 2.6 32x24", 32, 24, 2.6f, 2.6f,
-            UnlinearizeValidationCorpus.fixedSeedRandom(32 * 24)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(32 * 24)))
 
         // Anisotropic
         add(Case("anisotropic 2.0 4.0 16x16", 16, 16, 2f, 4f,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
 
         // Large radius (routes to scalar)
         add(Case("large 10.0 16x16", 16, 16, 10f, 10f,
-            UnlinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
     }
 }

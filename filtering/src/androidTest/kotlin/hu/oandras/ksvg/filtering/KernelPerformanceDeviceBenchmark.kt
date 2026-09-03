@@ -19,6 +19,7 @@ package hu.oandras.ksvg.filtering
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,18 +32,12 @@ class KernelPerformanceDeviceBenchmark {
         @BeforeClass
         @JvmStatic
         fun setup() {
-            // libksvgblur is already loaded by the Native static inits usually, 
-            // but just to be sure for tests:
-            assertTrue("Native lib not available", NativeGaussianBlur.isAvailable)
+            assertNativeBackendAvailable()
             KernelBenchmarkRunner.clear()
-        }
-
-        private fun assertTrue(msg: String, condition: Boolean) {
-            if (!condition) throw AssertionError(msg)
         }
         
         fun getBackendsFor(flags: Int): List<Int> {
-            val all = listOf(
+            val all = arrayOf(
                 SIMD_SCALAR,
                 SIMD_NEON64,
                 SIMD_NEON32
@@ -58,14 +53,14 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private val sizes = listOf(512 to 512, 2048 to 2048)
+    private val sizes: Array<Pair<Int, Int>> = arrayOf(512 to 512, 2048 to 2048)
 
     @Test
     fun benchmarkAll() {
         Log.i("Benchmark", "Starting selective benchmark on device")
         val target = InstrumentationRegistry.getArguments().getString("kernel")
 
-        if (target == null || target == "Unlinearize") benchmarkUnlinearize()
+        if (target == null || target == "UnLinearize") benchmarkUnLinearize()
         if (target == null || target == "ComponentTransfer") benchmarkComponentTransfer()
         if (target == null || target == "Morphology") benchmarkMorphology()
         if (target == null || target == "ArithmeticComposite") benchmarkArithmeticComposite()
@@ -83,13 +78,20 @@ class KernelPerformanceDeviceBenchmark {
         Log.i("Benchmark", "Results written to: ${output.absolutePath}")
     }
 
-    private fun benchmarkUnlinearize() {
+    private fun benchmarkUnLinearize() {
         val table = ByteArray(256) { it.toByte() }
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
-            benchmarkSingle("Unlinearize", UnLinearizeNative.nativeBackend(), w, h) { b ->
-                UnLinearizeNative.applyForced(src, dst, w, h, table, b)
+            benchmarkSingle("UnLinearize", UnLinearizeNative.nativeBackend(), w, h) { b ->
+                UnLinearizeNative.applyForced(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    table = table,
+                    simdBackend = b
+                )
             }
         }
     }
@@ -100,7 +102,21 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
             benchmarkSingle("ComponentTransfer", ComponentTransferNative.nativeBackend(), w, h) { b ->
-                ComponentTransferNative.applyForced(src, dst, w, h, 0, 0, w, h, tables[0], tables[1], tables[2], tables[3], b)
+                ComponentTransferNative.applyForced(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    tableA = tables[0],
+                    tableR = tables[1],
+                    tableG = tables[2],
+                    tableB = tables[3],
+                    simdBackend = b
+                )
             }
         }
     }
@@ -110,7 +126,20 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
             benchmarkSingle("Morphology", MorphologyNative.nativeBackend(), w, h) { b ->
-                MorphologyNative.applyForced(src, dst, w, h, 5, 5, true, 0, 0, w, h, b)
+                MorphologyNative.applyForced(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    radiusX = 5,
+                    radiusY = 5,
+                    erode = true,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    simdBackend = b
+                )
             }
         }
     }
@@ -121,7 +150,22 @@ class KernelPerformanceDeviceBenchmark {
             val src2 = IntArray(w * h)
             val dst = IntArray(w * h)
             benchmarkSingle("ArithmeticComposite", ArithmeticCompositeNative.nativeBackend(), w, h) { b ->
-                ArithmeticCompositeNative.applyForced(src1, src2, dst, w, 0, 0, w, h, 0.5f, 0.5f, 0.5f, 0.1f, true, b)
+                ArithmeticCompositeNative.applyForced(
+                    src1 = src1,
+                    src2 = src2,
+                    dst = dst,
+                    width = w,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    k1 = 0.5f,
+                    k2 = 0.5f,
+                    k3 = 0.5f,
+                    k4 = 0.1f,
+                    useLinear = true,
+                    simdBackend = b
+                )
             }
         }
     }
@@ -132,7 +176,22 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
             benchmarkSingle("ConvolveMatrix", ConvolveNative.nativeBackend(), w, h) { b ->
-                ConvolveNative.applyForced(src, dst, w, h, kernel, 3, 3, 1, 1, 1f, 0f, true, 0, b)
+                ConvolveNative.applyForced(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    kernel = kernel,
+                    orderX = 3,
+                    orderY = 3,
+                    targetX = 1,
+                    targetY = 1,
+                    divisor = 1f,
+                    bias = 0f,
+                    preserveAlpha = true,
+                    edgeMode = 0,
+                    simdBackend = b
+                )
             }
         }
     }
@@ -143,7 +202,19 @@ class KernelPerformanceDeviceBenchmark {
             val map = IntArray(w * h)
             val dst = IntArray(w * h)
             benchmarkSingle("DisplacementMap", DisplacementMapNative.nativeBackend(), w, h, numBuffers = 3) { b ->
-                DisplacementMapNative.applyForced(src, map, dst, w, h, w, h, 20f, 0, 1, b)
+                DisplacementMapNative.applyForced(
+                    src = src,
+                    map = map,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    mapWidth = w,
+                    mapHeight = h,
+                    scale = 20f,
+                    xChannel = 0,
+                    yChannel = 1,
+                    simdBackend = b
+                )
             }
         }
     }
@@ -154,7 +225,38 @@ class KernelPerformanceDeviceBenchmark {
             val pix = IntArray(w * h)
             val out = IntArray(w * h)
             benchmarkSingle("Lighting", LightingNative.nativeBackend(), w, h) { b ->
-                LightingNative.applyForced(pix, out, w, h, 0, 0, w, h, 1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f, 0, false, 1f, 1f, 255, 255, 255, params, false, false, b)
+                LightingNative.applyForced(
+                    pix = pix,
+                    out = out,
+                    width = w,
+                    height = h,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    surfaceScaleNormalized = 1f,
+                    invCanvasScaleX = 1.0,
+                    invCanvasScaleY = 1.0,
+                    userLeft = 0.0,
+                    userTop = 0.0,
+                    originX = 0.0,
+                    originY = 0.0,
+                    unitSizeX = 1.0,
+                    unitSizeY = 1.0,
+                    canvasScaleX = 1f,
+                    canvasScaleY = 1f,
+                    lightType = 0,
+                    specular = false,
+                    k = 1f,
+                    exponent = 1f,
+                    lightR = 255,
+                    lightG = 255,
+                    lightB = 255,
+                    params = params,
+                    premultipliedOutput = false,
+                    useLinear = false,
+                    simdBackend = b
+                )
             }
         }
     }
@@ -163,7 +265,31 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes) {
             val pix = IntArray(w * h)
             benchmarkSingle("Turbulence", TurbulenceNative.nativeBackend(), w, h, numBuffers = 1) { b ->
-                TurbulenceNative.applyForced(pix, w, h, 0, 0, w, h, 0.01, 0.01, 0, 0, 1, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 123, b)
+                TurbulenceNative.applyForced(
+                    pixels = pix,
+                    width = w,
+                    height = h,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    baseFrequencyX = 0.01,
+                    baseFrequencyY = 0.01,
+                    periodX = 0,
+                    periodY = 0,
+                    octaves = 1,
+                    fractalNoise = false,
+                    invCanvasScaleX = 1.0,
+                    invCanvasScaleY = 1.0,
+                    userLeft = 0.0,
+                    userTop = 0.0,
+                    originX = 0.0,
+                    originY = 0.0,
+                    unitSizeX = 1.0,
+                    unitSizeY = 1.0,
+                    seed = 123,
+                    simdBackend = b
+                )
             }
         }
     }
@@ -174,7 +300,15 @@ class KernelPerformanceDeviceBenchmark {
             for ((w, h) in sizes) {
                 val pix = IntArray(w * h)
                 benchmarkSingle("GaussianBlur", NativeGaussianBlur.nativeBackend(5f, 5f), w, h) { b ->
-                    NativeGaussianBlur.applyForced(scratch, pix, w, h, 5f, 5f, b)
+                    NativeGaussianBlur.applyForced(
+                        scratch = scratch,
+                        pixels = pix,
+                        width = w,
+                        height = h,
+                        stdDeviationX = 5f,
+                        stdDeviationY = 5f,
+                        simdBackend = b
+                    )
                 }
             }
         } finally {

@@ -113,7 +113,7 @@ public class NativeGaussianBlurDeviceTest {
     public fun blurMatchesReference() {
         assertTrue(
             "NativeGaussianBlur not available on this device/ABI (native .so missing?)",
-            NativeGaussianBlur.isAvailable,
+            NativeBackend.isAvailable,
         )
         val cases = listOf(
             Case(1, 1, 1f, 1f),

@@ -26,7 +26,7 @@ import org.junit.runner.RunWith
 /**
  * Instrumented Android validation test for `unlinearize.cpp`.
  *
- * Runs on-device over the exhaustive [UnlinearizeValidationCorpus] and forces
+ * Runs on-device over the exhaustive [UnLinearizeValidationCorpus] and forces
  * the ARM backends (NEON64 on AArch64, NEON32 on armeabi-v7a) explicitly.
  * Reports ABI, SIMD level, and selected backend for the validation matrix.
  */
@@ -40,7 +40,7 @@ class UnLinearizeNativeDeviceTest {
         Log.i("UnlinearizeValidation", "ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
         Log.i("UnlinearizeValidation", "Dispatched backend: ${UnLinearizeNative.nativeBackend()}")
 
-        for (case in UnlinearizeValidationCorpus.cases) {
+        for (case in UnLinearizeValidationCorpus.cases) {
             val expected = case.reference()
             val actual = if (case.inPlace) {
                 val buf = case.freshInput()
@@ -98,7 +98,7 @@ class UnLinearizeNativeDeviceTest {
     @Test
     fun productionApplyMatchesKotlin() {
         assertNativeBackendAvailable()
-        for (case in UnlinearizeValidationCorpus.cases) {
+        for (case in UnLinearizeValidationCorpus.cases) {
             val expected = case.reference()
             val actual = if (case.inPlace) {
                 val buf = case.freshInput()
