@@ -1,9 +1,42 @@
-# NEON Edge Optimization Work Log
+# NEON Edge & Scalar Convolve Optimization Work Log
 
-## Objective
-Fix the generic AArch64 NEON convolve: repair `convolve_neon.S` bugs and fold in (or improve)
-the NEON edge path so on-device parity tests pass and the NEON64 backend is faster than scalar.
-Currently NEON edge was SLOWER than scalar edge (a regression vs the pre-`d15a05dc` scalar-edge state).
+## Phase 3 (current): edgeMode-specialized scalar path
+User point: `edgeMode != 0` (and small-image cases) always fall through to the full-scalar
+`applyScalar` — that IS the production path for wrap/none edge modes, worth optimizing.
+
+### Change
+In `convolve_matrix.cpp`:
+- `sampleCoordinateT<EDGE_MODE>`: compile-time edgeMode -> runtime `if (edgeMode==...)` chain
+  collapses; only the reachable branch is emitted.
+- `convolveScalarPixelT<EDGE_MODE>`: per-pixel scalar convolve using the specialized sampler.
+- `convolveInteriorPixel`: branch-free interior pixel (all coords in-bounds -> no clamp/wrap/none
+  branch, no out-of-bounds guard).
+- `applyScalarImpl<EDGE_MODE>`: splits image into thin edge bands (specialized) + interior
+  rectangle (branch-free via convolveInteriorPixel). Bit-exact for ALL edgeModes because inside
+  [yLo,yHi)x[xLo,xHi) clamp/wrap/none all agree.
+- `applyScalar` dispatches on runtime edgeMode to the 3 instantiations.
+- Shared `packPixel(...)` for the clamp/pack tail.
+
+## Phase 2 (committed f402ef44): clamp-specialized scalar edge in AArch64 convolve
+NEON edge slower than scalar edge; reverted to scalar edge with a clamp-only specialization
+(`convolveScalarPixelClamp` + `clamp255Neon`). Removed dead NEON edge helpers.
+Result (single-session bench): neon64 512=9.14ms (was 9.60 scalar-edge / 10.99 NEON-edge),
+2048=120.4ms (was 125.2/126.8). Parity 18/18.
+
+## Phase 1 (d15a05dc): repaired NEON interior ASM + folded in NEON edges (since reverted edges).
+
+## Verification (Phase 3)
+- Host `ConvolveNativeParityTest` (--rerun-tasks): PASS (scalar/SSSE3/AVX2) -> bit-exact new applyScalar.
+- On-device `ConvolveNativeParityTest`: PASS 18/18.
+- Device bench (ConvolveMatrix, quick, single-session):
+  - scalar 512 = **90.879ms** (old applyScalar ~128-129ms) -> **~30% faster**
+  - scalar 2048 = **1322.814ms** (old ~1999-2041ms) -> **~34% faster**
+  - neon64 512 = 9.17ms, 2048 = 123.2ms (unchanged, interior ASM still dominates)
+- Big win on the scalar (edgeMode!=0 / small) production path. Next: extend the bench to
+  actually exercise edgeMode=1 (wrap) so the wrap path is covered (benchmark hardcodes edgeMode 0).
+
+## Opinion: why other filters/kernels aren't accelerated
+(To be written under final summary — see chat.)
 
 ## Key context
 - The interior is already a huge win (`neon64 512x512 = 9.6ms` vs `scalar = 128.7ms`, ~13x).

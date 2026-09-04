@@ -66,17 +66,126 @@ namespace Convolve {
         dst[y * width + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
     }
 
+    // Compile-time edgeMode specialization of sampleCoordinate(): pins EDGE_MODE
+    // so the runtime `if (edgeMode == ...)` chain collapses to nothing and only
+    // the reachable branch is emitted. EDGE_MODE 0 = clamp, 1 = wrap, 2 = none.
+    template <int EDGE_MODE>
+    static inline jint sampleCoordinateT(const jint coordinate, const jint limit) {
+        if (coordinate >= 0 && coordinate < limit) return coordinate;
+        if (EDGE_MODE == 2) return -1;
+        if (EDGE_MODE == 1) {
+            const jint m = coordinate % limit;
+            return (m < 0) ? m + limit : m;
+        }
+        return (coordinate < 0) ? 0 : limit - 1;
+    }
+
+    // Final clamp/pack shared by the scalar pixel kernels below (bit-exact with
+    // convolveScalarPixel() / Kotlin reference).
+    static inline jint packPixel(const float r, const float g, const float b, const float a,
+                                 const jint srcAlpha, const bool preserve, const float divisor, const float bias) {
+        const jint outR = clamp255(r / divisor + bias * 255.f);
+        const jint outG = clamp255(g / divisor + bias * 255.f);
+        const jint outB = clamp255(b / divisor + bias * 255.f);
+        const jint outA = preserve ? srcAlpha : clamp255(a / divisor + bias * 255.f);
+        return (outA << 24) | (outR << 16) | (outG << 8) | outB;
+    }
+
+    // Specialized single-pixel scalar convolve; coordinate sampling follows the
+    // compile-time EDGE_MODE (used for the boundary bands of applyScalar).
+    template <int EDGE_MODE>
+    static inline void convolveScalarPixelT(
+        const jint *src, jint *dst, const jint width, const jint height,
+        const jfloat *kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const float divisor, const float bias, const bool preserve, const jint x, const jint y) {
+        float r = 0.f, g = 0.f, b = 0.f, a = 0.f;
+        for (jint ky = 0; ky < orderY; ky++) {
+            const jint srcY = sampleCoordinateT<EDGE_MODE>(y + ky - targetY, height);
+            for (jint kx = 0; kx < orderX; kx++) {
+                const jint srcX = sampleCoordinateT<EDGE_MODE>(x + kx - targetX, width);
+                const jint pixel = (srcX < 0 || srcY < 0) ? 0 : src[srcY * width + srcX];
+                const float w = kernel[ky * orderX + kx];
+                r += static_cast<float>((pixel >> 16) & 0xFF) * w;
+                g += static_cast<float>((pixel >> 8) & 0xFF) * w;
+                b += static_cast<float>(pixel & 0xFF) * w;
+                a += static_cast<float>((pixel >> 24) & 0xFF) * w;
+            }
+        }
+        dst[y * width + x] = packPixel(r, g, b, a, (src[y * width + x] >> 24) & 0xFF, preserve, divisor, bias);
+    }
+
+    // Interior single-pixel scalar convolve: every source coordinate is in-bounds
+    // by construction inside [yLo,yHi) x [xLo,xHi), so sampling is a plain index
+    // with no clamp/wrap/none branch and no out-of-bounds guard.
+    static inline void convolveInteriorPixel(
+        const jint *src, jint *dst, const jint width,
+        const jfloat *kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const float divisor, const float bias, const bool preserve, const jint x, const jint y) {
+        float r = 0.f, g = 0.f, b = 0.f, a = 0.f;
+        for (jint ky = 0; ky < orderY; ky++) {
+            const jint *const row = src + (y + ky - targetY) * width;
+            for (jint kx = 0; kx < orderX; kx++) {
+                const jint pixel = row[x + kx - targetX];
+                const float w = kernel[ky * orderX + kx];
+                r += static_cast<float>((pixel >> 16) & 0xFF) * w;
+                g += static_cast<float>((pixel >> 8) & 0xFF) * w;
+                b += static_cast<float>(pixel & 0xFF) * w;
+                a += static_cast<float>((pixel >> 24) & 0xFF) * w;
+            }
+        }
+        dst[y * width + x] = packPixel(r, g, b, a, (src[y * width + x] >> 24) & 0xFF, preserve, divisor, bias);
+    }
+
+    // Scalar convolve specialized for a compile-time edgeMode. The interior
+    // rectangle (the bulk of the image) runs clamp/branch-free via
+    // convolveInteriorPixel; only the thin edge bands go through the specialized
+    // sampleCoordinateT<EDGE_MODE> path.
+    template <int EDGE_MODE>
+    static void applyScalarImpl(
+        const jint *src, jint *dst, const jint width, const jint height,
+        const jfloat *kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const float divisor, const float bias, const bool preserve) {
+        const jint xLo = targetX;
+        const jint xHi = width - orderX + targetX + 1;
+        const jint yLo = targetY;
+        const jint yHi = height - orderY + targetY + 1;
+
+        // Top + bottom edge bands (full width).
+        for (jint y = 0; y < yLo; y++)
+            for (jint x = 0; x < width; x++)
+                convolveScalarPixelT<EDGE_MODE>(src, dst, width, height, kernel, orderX, orderY, targetX, targetY,
+                                                divisor, bias, preserve, x, y);
+        for (jint y = yHi; y < height; y++)
+            for (jint x = 0; x < width; x++)
+                convolveScalarPixelT<EDGE_MODE>(src, dst, width, height, kernel, orderX, orderY, targetX, targetY,
+                                                divisor, bias, preserve, x, y);
+
+        // Interior rectangle: branch-free.
+        for (jint y = yLo; y < yHi; y++) {
+            // Left + right edge portions of interior rows.
+            for (jint x = 0; x < xLo; x++)
+                convolveScalarPixelT<EDGE_MODE>(src, dst, width, height, kernel, orderX, orderY, targetX, targetY,
+                                                divisor, bias, preserve, x, y);
+            for (jint x = xHi; x < width; x++)
+                convolveScalarPixelT<EDGE_MODE>(src, dst, width, height, kernel, orderX, orderY, targetX, targetY,
+                                                divisor, bias, preserve, x, y);
+            // Interior columns: no coordinate handling.
+            for (jint x = xLo; x < xHi; x++)
+                convolveInteriorPixel(src, dst, width, kernel, orderX, orderY, targetX, targetY,
+                                      divisor, bias, preserve, x, y);
+        }
+    }
+
     void applyScalar(
         const jint *src, jint *dst, const jint width, const jint height,
         const jfloat *kernel,
         const jint orderX, const jint orderY, const jint targetX, const jint targetY,
         const jfloat divisor, const jfloat bias, const jboolean preserveAlpha, const jint edgeMode) {
         const bool preserve = preserveAlpha == JNI_TRUE;
-        for (jint y = 0; y < height; y++) {
-            for (jint x = 0; x < width; x++) {
-                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY,
-                                    targetX, targetY, divisor, bias, preserve, edgeMode, x, y);
-            }
+        switch (edgeMode) {
+            case 0: applyScalarImpl<0>(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve); break;
+            case 1: applyScalarImpl<1>(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve); break;
+            default: applyScalarImpl<2>(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve); break;
         }
     }
 
