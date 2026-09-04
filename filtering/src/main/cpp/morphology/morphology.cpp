@@ -212,17 +212,11 @@ namespace {
         const jint xLo = clipLeft;
         const jint xHi = clipRight;
 
-        const jint vyLo = yLo > radiusY ? yLo : radiusY;
-        const jint vyHi = yHi < height - radiusY ? yHi : height - radiusY;
-        const jint vxLo = xLo > radiusX ? xLo : radiusX;
-        const jint vxHi = xHi < width - radiusX ? xHi : width - radiusX;
+        const jint vyLo = std::max(yLo, radiusY);
+        const jint vyHi = std::min(yHi, height - radiusY);
+        const jint vxLo = std::max(xLo, radiusX);
+        const jint vxHi = std::min(xHi, width - radiusX);
 
-        // A window is fully interior only when the whole clip region lies at least
-        // radiusY/radiusX away from the frame edge. When the radius covers the
-        // whole clip (or the frame is smaller than the kernel), the interior range
-        // [vyLo,vyHi)x[vxLo,vxHi) collapses (or inverts) and the naive split below
-        // would overrun clipBottom/clipRight, writing pixels the Kotlin reference
-        // leaves untouched. In that case every clip pixel runs the scalar path.
         if (vyLo >= vyHi || vxLo >= vxHi) {
             for (jint y = yLo; y < yHi; y++) {
                 for (jint x = xLo; x < xHi; x++) {
@@ -361,15 +355,11 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
     const jint xHi = clipRight;
 
     // Vectorize only fully-interior windows; borders go to the scalar path.
-    const jint vyLo = yLo > radiusY ? yLo : radiusY;
-    const jint vyHi = yHi < height - radiusY ? yHi : height - radiusY;
-    const jint vxLo = xLo > radiusX ? xLo : radiusX;
-    const jint vxHi = xHi < width - radiusX ? xHi : width - radiusX;
+    const jint vyLo = std::max(yLo, radiusY);
+    const jint vyHi = std::min(yHi, height - radiusY);
+    const jint vxLo = std::max(xLo, radiusX);
+    const jint vxHi = std::min(xHi, width - radiusX);
 
-    // When the radius covers the whole clip (or the frame is smaller than the
-    // kernel), the interior range collapses/inverts; the split below would then
-    // overrun clipBottom/clipRight and write pixels outside the requested clip.
-    // Run the whole clip through the scalar path instead (matches runForced).
     if (vyLo >= vyHi || vxLo >= vxHi) {
         for (jint y = yLo; y < yHi; y++) {
             for (jint x = xLo; x < xHi; x++) {
@@ -382,13 +372,18 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
         }
+
+#if defined(__i386__) || defined(__x86_64__)
+        const SimdLevel level = detectSimdLevel();
+#endif
+
         for (jint y = vyLo; y < vyHi; y++) {
             for (jint x = xLo; x < vxLo; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
             for (jint x = vxLo; x < vxHi; x++) {
 #if defined(__i386__) || defined(__x86_64__)
-                switch (detectSimdLevel()) {
+                switch (level) {
                     case SIMD_AVX512:
                         ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
                         break;

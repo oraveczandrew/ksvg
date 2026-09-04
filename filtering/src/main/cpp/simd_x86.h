@@ -19,7 +19,7 @@
 
 #include <jni.h>
 
-// Entry points implemented in simd_x86_avx2.cpp / simd_x86_avx512.cpp.
+// Entry points implemented in wide-ISA translation units.
 // Those translation units are compiled with -mavx2 / -mavx512f,-mavx512bw so
 // the intrinsics headers expose the wide ISA; the baseline TUs stay SSE2 and
 // call these only after detectSimdLevel() reports support. All kernels are
@@ -42,18 +42,17 @@ void ksvgMorphologyApplyPixelAvx512(
 // convolve_matrix.cpp — duplicate-edge interior pass.
 void ksvgConvolveApplyInteriorAvx2(
         jint* dst, const jint* src, jint width, jint height,
-        const jfloat* kernel, jint orderX, jint orderY,
+        const float* kernel, jint orderX, jint orderY,
         jint targetX, jint targetY,
         jfloat divisor, jfloat bias, jboolean preserveAlpha);
 void ksvgConvolveApplyInteriorAvx512(
         jint* dst, const jint* src, jint width, jint height,
-        const jfloat* kernel, jint orderX, jint orderY,
+        const float* kernel, jint orderX, jint orderY,
         jint targetX, jint targetY,
         jfloat divisor, jfloat bias, jboolean preserveAlpha);
 
 // blur_x86.cpp / gaussian_blur.cpp — vertical separable blur pass over byte
-// pixels, 8 columns per iteration (horizontal pass stays SSE: the float4-
-// interleaved intermediate would need gathers/transposes that eat the gain).
+// pixels, 8 columns per iteration.
 void ksvgBlurVerticalAvx2(
         void* dst, const void* pin, int stride, const void* gptr,
         int rct, int x1, int x2);
@@ -63,6 +62,21 @@ void ksvgComponentTransferApplyAvx2(
         const jint* src, jint* dst, jint width, jint height,
         jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB);
+
+// arithmetic_composite.cpp — per-channel LUT-based arithmetic
+void ksvgArithmeticApplySse(
+        const jint* src1, const jint* src2, jint* dst,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jfloat k1, jfloat k2, jfloat k3, jfloat k4,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+
+void ksvgArithmeticApplyAvx2(
+        const jint* src1, const jint* src2, jint* dst,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jfloat k1, jfloat k2, jfloat k3, jfloat k4,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
 
 // unlinearize.cpp — flat element-wise LUT pass with alpha passthrough.
 void ksvgUnlinearizeApplyAvx2(

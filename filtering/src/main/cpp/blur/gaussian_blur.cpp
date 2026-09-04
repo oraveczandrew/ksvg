@@ -23,6 +23,7 @@
 #include <cstring>
 #include <cassert>
 #include "cpu_dispatch.h"
+#include "shared/math_utils.h"
 
 namespace {
 
@@ -83,18 +84,10 @@ int computeWeights(const float sigma, std::vector<float>& weights) {
 }
 
  uint32_t pack(const float a, const float r, const float g, const float b) {
-    int ia = static_cast<int>(a + 0.5f);
-    int ir = static_cast<int>(r + 0.5f);
-    int ig = static_cast<int>(g + 0.5f);
-    int ib = static_cast<int>(b + 0.5f);
-    if (ia < 0) ia = 0; else if (ia > 255) ia = 255;
-    if (ir < 0) ir = 0; else if (ir > 255) ir = 255;
-    if (ig < 0) ig = 0; else if (ig > 255) ig = 255;
-    if (ib < 0) ib = 0; else if (ib > 255) ib = 255;
-    return (static_cast<uint32_t>(ia) << 24) |
-           (static_cast<uint32_t>(ir) << 16) |
-           (static_cast<uint32_t>(ig) << 8) |
-           static_cast<uint32_t>(ib);
+    return (static_cast<uint32_t>(ksvg::clamp255(a)) << 24) |
+           (static_cast<uint32_t>(ksvg::clamp255(r)) << 16) |
+           (static_cast<uint32_t>(ksvg::clamp255(g)) << 8) |
+           static_cast<uint32_t>(ksvg::clamp255(b));
 }
 
 // Pure-C++ two-pass separable blur (reference + fallback). Handles arbitrary

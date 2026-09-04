@@ -146,8 +146,9 @@ ksvgConvolveGenericNeonAsm32:
     cmp     r0, r9                  @ r9 = orderY
     bge     .Lnormalize
 
-    @ Source row for this ky: block_base + ky * width.
-    mla     r3, r0, r6, r12         @ r3 = src_row byte address
+    @ Source row for this ky: block_base + ky * width * 4.
+    mul     r3, r0, r6              @ r3 = ky * width
+    add     r3, r12, r3, lsl #2     @ r3 = block_base + ky * width * 4
 
     @ Kernel row for this ky: kernel + ky * orderX.
     mul     r2, r0, r8              @ r2 = ky * orderX
@@ -218,9 +219,9 @@ ksvgConvolveGenericNeonAsm32:
     vadd.f32 q6, q6, q0
 
     @ Floor via FPSCR RMode manipulation (no frintm on ARMv7).
-    @ Set round-toward-minus-infinity (bits 24:23 = 0b11).
+    @ Set round-toward-minus-infinity (bits 23:22 = 0b10).
     fmrx    r0, fpscr
-    orr     r0, r0, #(3 << 22)
+    orr     r0, r0, #(2 << 22)
     fmxr    fpscr, r0
 
     @ Convert to signed integer (floor via RMode).

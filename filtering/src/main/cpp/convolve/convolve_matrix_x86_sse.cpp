@@ -50,12 +50,7 @@ namespace Convolve {
 
         for (jint y = yLo; y < yHi; y++) {
             const jint rowOffset = y * width;
-            jint x = 0;
-            for (; x < xLo; x++) {
-                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY,
-                                    targetX, targetY, divisor, bias, preserve, 0, x, y);
-            }
-
+            int x = xLo;
             for (; x + 4 <= xHi; x += 4) {
                 __m128 accR = _mm_setzero_ps();
                 __m128 accG = _mm_setzero_ps();
@@ -101,7 +96,7 @@ namespace Convolve {
                 _mm_storeu_si128(reinterpret_cast<__m128i *>(dst + rowOffset + x), out);
             }
 
-            for (; x < width; x++) {
+            for (; x < xHi; x++) {
                 convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY,
                                     targetX, targetY, divisor, bias, preserve, 0, x, y);
             }

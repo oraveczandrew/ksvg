@@ -47,25 +47,6 @@ public object KotlinKernels {
     private fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
         (alpha shl 24) or (red shl 16) or (green shl 8) or blue
 
-    /**
-     * Precomputed linear→sRGB (unlinearize) lookup table, matching librsvg's
-     * `build.rs` exactly: `UNLINEARIZE[i] = round(unlinearize(i / 255.0) * 255.0)`
-     * where `unlinearize(c) = if c <= 0.0031308: 12.92 * c else: 1.055 * c^(1/2.4) - 0.055`.
-     *
-     * This is the single authoritative source for the 8-bit transfer table; it is
-     * passed to the native kernels and to [unLinearizeArgb]. (It mirrors what
-     * used to live in `ColorUtils.UN_LINEARIZE` in `:ksvg`.)
-     */
-    @JvmField
-    public val UN_LINEARIZE: ByteArray = ByteArray(256) { i ->
-        val c = i.toDouble() / 255.0
-        val x = if (c <= 0.0031308) {
-            12.92 * c
-        } else {
-            1.055 * c.pow(1.0 / 2.4) - 0.055
-        }
-        (x * 255.0).roundToInt().toByte()
-    }
 
     private fun clamp(v: Float, min: Float, max: Float): Float =
         v.coerceIn(min, max)
@@ -244,7 +225,7 @@ public object KotlinKernels {
 
     /**
      * Converts a single straight (non-premultiplied) linear-RGB pixel to straight
-     * sRGB using [table] (normally [UN_LINEARIZE]): each colour channel is looked
+     * sRGB using [table] (normally [ColorLuts.UN_LINEARIZE]): each colour channel is looked
      * up and alpha is preserved unchanged. Element-wise reference for both
      * [unLinearize] and `unlinearize.cpp`'s scalar loop.
      */

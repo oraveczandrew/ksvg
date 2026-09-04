@@ -29,7 +29,7 @@ internal object ArithmeticCompositeNative {
     val isAvailable: Boolean = NativeBackend.isAvailable
 
     @JvmStatic
-    external fun apply(
+    fun apply(
         src1: IntArray,
         src2: IntArray,
         dst: IntArray,
@@ -43,6 +43,43 @@ internal object ArithmeticCompositeNative {
         k3: Float,
         k4: Float,
         useLinear: Boolean,
+    ) {
+        applyNative(
+            src1 = src1,
+            src2 = src2,
+            dst = dst,
+            width = width,
+            clipLeft = clipLeft,
+            clipTop = clipTop,
+            clipRight = clipRight,
+            clipBottom = clipBottom,
+            k1 = k1,
+            k2 = k2,
+            k3 = k3,
+            k4 = k4,
+            useLinear = useLinear,
+            srgbToLinear = ColorLuts.SRGB_TO_LINEAR,
+            linearToSrgb = ColorLuts.LINEAR_TO_SRGB
+        )
+    }
+
+    @JvmStatic
+    private external fun applyNative(
+        src1: IntArray,
+        src2: IntArray,
+        dst: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        k1: Float,
+        k2: Float,
+        k3: Float,
+        k4: Float,
+        useLinear: Boolean,
+        srgbToLinear: ByteArray,
+        linearToSrgb: ByteArray,
     )
 
     /**
@@ -50,7 +87,7 @@ internal object ArithmeticCompositeNative {
      * regardless of normal CPU dispatch.
      */
     @JvmStatic
-    external fun applyForced(
+    fun applyForced(
         src1: IntArray,
         src2: IntArray,
         dst: IntArray,
@@ -64,6 +101,45 @@ internal object ArithmeticCompositeNative {
         k3: Float,
         k4: Float,
         useLinear: Boolean,
+        simdBackend: Int,
+    ) {
+        applyForcedNative(
+            src1 = src1,
+            src2 = src2,
+            dst = dst,
+            width = width,
+            clipLeft = clipLeft,
+            clipTop = clipTop,
+            clipRight = clipRight,
+            clipBottom = clipBottom,
+            k1 = k1,
+            k2 = k2,
+            k3 = k3,
+            k4 = k4,
+            useLinear = useLinear,
+            srgbToLinear = ColorLuts.SRGB_TO_LINEAR,
+            linearToSrgb = ColorLuts.LINEAR_TO_SRGB,
+            simdBackend = simdBackend
+        )
+    }
+
+    @JvmStatic
+    private external fun applyForcedNative(
+        src1: IntArray,
+        src2: IntArray,
+        dst: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        k1: Float,
+        k2: Float,
+        k3: Float,
+        k4: Float,
+        useLinear: Boolean,
+        srgbToLinear: ByteArray,
+        linearToSrgb: ByteArray,
         simdBackend: Int,
     )
 

@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cassert>
 #include "cpu_dispatch.h"
+#include "shared/math_utils.h"
 
 // feDiffuseLighting / feSpecularLighting over unpremultiplied ARGB_8888
 // IntArrays. Bit-exact port of the Kotlin reference loop in
@@ -44,8 +45,7 @@ namespace {
 constexpr jint kMaxVecRowSpan = 4096; // stack height-buffer limit (floats)
 
  jint clamp255f(const float v) {
-    const jint i = static_cast<jint>(std::floor(v + 0.5f));
-    return i < 0 ? 0 : (i > 255 ? 255 : i);
+    return static_cast<jint>(ksvg::clamp255(v));
 }
 
  float heightAt(const jint* pix, const jint width, const jint height, const jint x, const jint y, const float ss) {

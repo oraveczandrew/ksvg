@@ -114,7 +114,7 @@ public object UnLinearizeValidationCorpus {
     // ------------------------------------------------------------------ tables
 
     /** The library's production UNLINEARIZE table (the oracle's own table). */
-    public val realTable: ByteArray get() = KotlinKernels.UN_LINEARIZE
+    public val realTable: ByteArray get() = ColorLuts.UN_LINEARIZE
 
     /** Non-identity stepping table; alpha passthrough must still hold. */
     public val steppingTable: ByteArray = ByteArray(256) { ((it * 7) and 0xFF).toByte() }
