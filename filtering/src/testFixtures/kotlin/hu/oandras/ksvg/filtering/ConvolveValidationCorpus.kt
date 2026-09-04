@@ -56,7 +56,7 @@ public object ConvolveValidationCorpus {
             -1f, 5f, -1f,
             0f, -1f, 0f
         )
-        add(Case("sharpen 16x16", 16, 16, sharpen, 3, 3, 1, 1, 1f, 0f, true, 0, 
+        add(Case("sharpen 16x16", 16, 16, sharpen, 3, 3, 1, 1, 1f, 0f, true, 0,
             UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
         
         // 5x5 blur
@@ -83,5 +83,17 @@ public object ConvolveValidationCorpus {
         val box32 = floatArrayOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
         add(Case("box 3x2 duplicate 16x16", 16, 16, box32, 3, 2, 1, 1, 1f, 0.15f, false, 0,
             UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+
+        // These two force the AArch64 NEON assembly specializations in
+        // applyNeonInterior (only reachable via the NEON64 backend on a real
+        // ARM64 device): preserveAlpha=true, anchor at centre, edgeMode=0.
+        //
+        // 3x3 -> ksvgConvolve3x3NeonAsm (interior SIMD, edges handled by the
+        //       applyNeon3x3AsmWithEdges wrapper).
+        // 5x5 -> ksvgConvolve5x5NeonAsm (interior SIMD only).
+        add(Case("asm 3x3 preserve 20x20", 20, 20, sharpen, 3, 3, 1, 1, 1f, 0f, true, 0,
+            UnLinearizeValidationCorpus.fixedSeedRandom(20 * 20)))
+        add(Case("asm 5x5 preserve 20x20", 20, 20, blur5x5, 5, 5, 2, 2, 1f, 0f, true, 0,
+            UnLinearizeValidationCorpus.fixedSeedRandom(20 * 20)))
     }
 }

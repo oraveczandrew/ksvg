@@ -22,56 +22,57 @@
 
 namespace {
 
-inline uint8_t clamp255(float v) {
-    int i = static_cast<int>(std::floor(v + 0.5f));
+inline uint8_t clamp255(const float v) {
+    const int i = static_cast<int>(std::floor(v + 0.5f));
     return static_cast<uint8_t>(std::max(0, std::min(255, i)));
 }
 
-inline uint8_t sRgbToLinear(uint8_t c) {
-    float a = c / 255.f;
+inline uint8_t sRgbToLinear(const uint8_t c) {
+    const float a = c / 255.f;
     if (a <= 0.04045f) {
         return clamp255((a / 12.92f) * 255.f);
-    } else {
-        return clamp255(std::pow((a + 0.055f) / 1.055f, 2.4f) * 255.f);
     }
+
+    return clamp255(std::pow((a + 0.055f) / 1.055f, 2.4f) * 255.f);
 }
 
-inline uint8_t linearToSRgb(uint8_t c) {
-    float a = c / 255.f;
+inline uint8_t linearToSRgb(const uint8_t c) {
+    const float a = c / 255.f;
+
     if (a <= 0.0031308f) {
         return clamp255(a * 12.92f * 255.f);
-    } else {
-        return clamp255((1.055f * std::pow(a, 1.f / 2.4f) - 0.055f) * 255.f);
     }
+
+    return clamp255((1.055f * std::pow(a, 1.f / 2.4f) - 0.055f) * 255.f);
 }
 
-inline uint8_t arithmeticChannel(uint8_t in1, uint8_t in2, float k1, float k2, float k3, float k4) {
-    float a = in1 / 255.f;
-    float b = in2 / 255.f;
+inline uint8_t arithmeticChannel(const uint8_t in1, const uint8_t in2, const float k1, const float k2, const float k3, const float k4) {
+    const float a = in1 / 255.f;
+    const float b = in2 / 255.f;
     return clamp255((k1 * a * b + k2 * a + k3 * b + k4) * 255.f);
 }
 
 void applyScalar(const jint* src1, const jint* src2, jint* dst,
-                 jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-                 float k1, float k2, float k3, float k4, bool useLinear) {
+                 const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+                 const float k1, const float k2, const float k3, const float k4, const bool useLinear) {
     for (jint y = clipTop; y < clipBottom; y++) {
-        jint rowOffset = y * width;
+        const jint rowOffset = y * width;
         for (jint x = clipLeft; x < clipRight; x++) {
-            jint i = rowOffset + x;
-            jint p = src1[i];
-            jint q = src2[i];
+            const jint i = rowOffset + x;
+            const jint p = src1[i];
+            const jint q = src2[i];
 
-            uint8_t a1 = (p >> 24) & 0xFF;
-            uint8_t r1 = (p >> 16) & 0xFF;
-            uint8_t g1 = (p >> 8) & 0xFF;
-            uint8_t b1 = p & 0xFF;
+            const uint8_t a1 = (p >> 24) & 0xFF;
+            const uint8_t r1 = (p >> 16) & 0xFF;
+            const uint8_t g1 = (p >> 8) & 0xFF;
+            const uint8_t b1 = p & 0xFF;
 
-            uint8_t a2 = (q >> 24) & 0xFF;
-            uint8_t r2 = (q >> 16) & 0xFF;
-            uint8_t g2 = (q >> 8) & 0xFF;
-            uint8_t b2 = q & 0xFF;
+            const uint8_t a2 = (q >> 24) & 0xFF;
+            const uint8_t r2 = (q >> 16) & 0xFF;
+            const uint8_t g2 = (q >> 8) & 0xFF;
+            const uint8_t b2 = q & 0xFF;
 
-            uint8_t outA = arithmeticChannel(a1, a2, k1, k2, k3, k4);
+            const uint8_t outA = arithmeticChannel(a1, a2, k1, k2, k3, k4);
             uint8_t outR, outG, outB;
 
             if (useLinear) {
@@ -108,9 +109,9 @@ jint nativeBackendForAbi() {
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyForced(
         JNIEnv* env, jclass clazz,
-        jintArray jSrc1, jintArray jSrc2, jintArray jDst,
-        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        jfloat k1, jfloat k2, jfloat k3, jfloat k4, jboolean useLinear, jint simdBackend) {
+        const jintArray jSrc1, const jintArray jSrc2, const jintArray jDst,
+        const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear, const jint simdBackend) {
     (void)simdBackend;
     assert(simdBackend == SIMD_BACKEND_SCALAR);
 
@@ -130,9 +131,9 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyForced(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_apply(
         JNIEnv* env, jclass clazz,
-        jintArray jSrc1, jintArray jSrc2, jintArray jDst,
-        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        jfloat k1, jfloat k2, jfloat k3, jfloat k4, jboolean useLinear) {
+        const jintArray jSrc1, const jintArray jSrc2, const jintArray jDst,
+        const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear) {
     jint* src1 = env->GetIntArrayElements(jSrc1, nullptr);
     jint* src2 = env->GetIntArrayElements(jSrc2, nullptr);
     jint* dst = env->GetIntArrayElements(jDst, nullptr);

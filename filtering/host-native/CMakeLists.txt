@@ -10,6 +10,7 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve_matrix.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve_matrix_x86_sse.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence_x86.cpp

@@ -61,12 +61,12 @@ class KernelPerformanceDeviceBenchmark {
         if (target == null || target == "Lighting") benchmarkLighting()
         if (target == null || target == "Turbulence") benchmarkTurbulence()
         if (target == null || target == "GaussianBlur") benchmarkGaussianBlur()
-        
+
         val suffix = if (target != null) "_$target" else ""
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val output = File(context.externalCacheDir, "benchmarks_device$suffix.csv")
         KernelBenchmarkRunner.report(output)
-        
+
         Log.i("Benchmark", "Results written to: ${output.absolutePath}")
     }
 
@@ -199,11 +199,11 @@ class KernelPerformanceDeviceBenchmark {
                     width = w,
                     height = h,
                     kernel = kernel,
-                    orderX = 3,
-                    orderY = 3,
-                    targetX = 1,
-                    targetY = 1,
-                    divisor = 1f,
+                    orderX = 5,
+                    orderY = 5,
+                    targetX = 2,
+                    targetY = 2,
+                    divisor = 16f,
                     bias = 0f,
                     preserveAlpha = true,
                     edgeMode = 0,
