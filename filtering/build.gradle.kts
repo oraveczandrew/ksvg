@@ -44,6 +44,13 @@ android {
                 // in CMakeLists.txt via ANDROID_ABI.
             }
         }
+
+        // Optional ABI filter: pass -PfilterAbis=armeabi-v7a to build a 32-bit-only
+        // test APK (useful for exercising the ARM32 NEON kernel on arm64 devices).
+        // Without the property, all ABIs are built as usual.
+        project.findProperty("filterAbis")?.toString()?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toList()?.let { abis ->
+            ndk { abiFilters.addAll(abis) }
+        }
     }
 
     externalNativeBuild {

@@ -193,8 +193,8 @@ namespace Convolve {
                    const jfloat *kernel, const jint orderX, const jint orderY,
                    const jint targetX, const jint targetY, const jfloat divisor, const jfloat bias,
                    const bool preserve, const jint edgeMode, const jint backend) {
-#if defined(__aarch64__)
-        // aarch64: the neon path partitions the image into edge bands (scalar,
+#if defined(__aarch64__) || (defined(__ARM_NEON) || defined(__ARM_NEON__))
+        // aarch64/arm32: the neon path partitions the image into edge bands (scalar,
         // edgeMode-specialized) + pure interior (ASM). The interior rectangle is
         // edgeMode-agnostic, so wrap/none edgeModes can use the SIMD interior too.
         if (height >= orderY && width >= orderX) {
@@ -202,7 +202,7 @@ namespace Convolve {
                 applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve,
                             edgeMode);
             } else {
-                assert(backend == SIMD_BACKEND_NEON64);
+                assert(backend == SIMD_BACKEND_NEON64 || backend == SIMD_BACKEND_NEON32);
                 const jint yLo = targetY;
                 const jint yHi = height - orderY + 1 + targetY;
                 for (jint y = 0; y < yLo; y++) {
@@ -354,7 +354,7 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
         return;
     }
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) || (defined(__ARM_NEON) || defined(__ARM_NEON__))
     const bool canSimdInterior = true;
 #elif defined(__SSE2__)
     const bool canSimdInterior = (edgeMode == 0);
@@ -378,7 +378,7 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
                     src, dst, width, height, kernel, orderX, orderY,
                     targetX, targetY, divisor, bias, preserve, edgeMode, x, y);
         }
-#ifdef __aarch64__
+#if defined(__aarch64__) || (defined(__ARM_NEON) || defined(__ARM_NEON__))
         Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY,
                                     targetX, targetY, divisor, bias, preserve, edgeMode);
 #elif defined(__SSE2__)

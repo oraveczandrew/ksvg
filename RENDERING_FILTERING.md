@@ -271,6 +271,64 @@ prints it as a Markdown table):
 - `class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark` restricts
   the run to the benchmark so the parity/device tests don't also execute.
 
+**32-bit (ARMv7 NEON32) test builds** — pass `-PfilterAbis=armeabi-v7a` to build a
+32-bit-only test APK. This lets you exercise the ARM32 NEON kernels
+(`convolve_neon32.S`, `Blur_advsimd.S`) on arm64 devices (which also support v7a),
+where the benchmark/parity instrumentation reports the `neon32` backend instead of
+`neon64`. Multiple ABIs are comma-separated, e.g. `-PfilterAbis=armeabi-v7a,arm64-v8a`.
+Without the property all ABIs build as usual (this is wired in
+`filtering/build.gradle.kts` via `defaultConfig.ndk.abiFilters`).
+
+```bash
+# 32-bit-only device benchmark for the ConvolveMatrix kernel:
+./gradlew :filtering:runDeviceBenchmark \
+  -PfilterAbis=armeabi-v7a \
+  -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
+  -Pandroid.testInstrumentationRunnerArguments.benchmark.kernel=ConvolveMatrix \
+  -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
+```
+
+### Host Results (i7-7820X)
+
+| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup |
+| :--- | :--- | :---: | ---: | ---: | ---: | ---: |
+| Unlinearize | scalar | 512x512 | 1.333 | 196.62 | 1.57 | 1.00x |
+| Unlinearize | ssse3 | 512x512 | 0.541 | 484.84 | 3.88 | 2.47x |
+| Unlinearize | avx2 | 512x512 | 0.312 | 839.34 | 6.71 | 4.27x |
+| ComponentTransfer | scalar | 512x512 | 0.475 | 551.70 | 4.41 | 1.00x |
+| ComponentTransfer | avx2 | 512x512 | 0.448 | 585.40 | 4.68 | 1.06x |
+| Morphology | scalar | 512x512 | 23.678 | 11.07 | 0.09 | 1.00x |
+| Morphology | avx2 | 512x512 | 9.691 | 27.05 | 0.22 | 2.44x |
+| ConvolveMatrix | scalar | 512x512 | 10.402 | 25.20 | 0.20 | 1.00x |
+| ConvolveMatrix | avx512 | 512x512 | 1.406 | 186.43 | 1.49 | 7.40x |
+| DisplacementMap | scalar | 512x512 | 2.524 | 103.87 | 1.25 | 1.00x |
+| DisplacementMap | ssse3 | 512x512 | 0.715 | 366.54 | 4.40 | 3.53x |
+| Lighting | scalar | 512x512 | 7.803 | 33.59 | 0.27 | 1.00x |
+| Lighting | ssse3 | 512x512 | 3.855 | 68.00 | 0.54 | 2.02x |
+| GaussianBlur | scalar | 512x512 | 21.140 | 12.40 | 0.10 | 1.00x |
+| GaussianBlur | avx2 | 512x512 | 10.768 | 24.34 | 0.19 | 1.96x |
+| Turbulence | scalar | 512x512 | 16.247 | 16.13 | 0.06 | 1.00x |
+| Turbulence | ssse3 | 512x512 | 7.449 | 35.19 | 0.14 | **2.18x** |
+| Turbulence | avx2 | 512x512 | 6.017 | 43.57 | 0.17 | **2.70x** |
+
+### Device Results (Snapdragon 8 Gen 2)
+
+| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup |
+| :--- | :--- | :---: | ---: | ---: | ---: | ---: |
+| Unlinearize | scalar | 512x512 | 1.282 | 204.53 | 1.64 | 1.00x |
+| Unlinearize | neon64 | 512x512 | 33.992 | 7.71 | 0.06 | **0.04x** |
+| ComponentTransfer | scalar | 512x512 | 2.848 | 92.05 | 0.74 | 1.00x |
+| ComponentTransfer | neon64 | 512x512 | 39.201 | 6.69 | 0.05 | **0.07x** |
+| Morphology | scalar | 512x512 | 286.274 | 0.92 | 0.01 | 1.00x |
+| Morphology | neon64 | 512x512 | 647.917 | 0.40 | 0.00 | **0.44x** |
+| ConvolveMatrix | scalar | 512x512 | 90.549 | 2.90 | 0.02 | 1.00x |
+| ConvolveMatrix | neon64 | 512x512 | 9.580 | 27.36 | 0.22 | **9.45x** |
+| DisplacementMap | scalar | 512x512 | 8.261 | 31.73 | 0.38 | 1.00x |
+| DisplacementMap | neon64 | 512x512 | 13.300 | 19.71 | 0.24 | **0.62x** |
+| GaussianBlur | scalar | 512x512 | 357.167 | 0.73 | 0.01 | 1.00x |
+| GaussianBlur | neon64 | 512x512 | 6.398 | 40.97 | 0.33 | **55.83x** |
+| Turbulence | scalar | 512x512 | 131.544 | 1.99 | 0.01 | 1.00x |
+
 ---
 
 ## 7. Change log (append)
@@ -293,3 +351,11 @@ prints it as a Markdown table):
   to `connectedDebugAndroidTest`, then pulls `benchmarks_device*.csv` from the
   device cache dir into `tmp/` and prints it as a Markdown table. The pull relies
   on `android.injected.androidTest.leaveApksInstalledAfterRun=true`.
+- 2026-09-04 — Implemented the ARMv7-A NEON32 ConvolveMatrix interior kernel
+  (`convolve_neon32.S`), shared the edge-mode-parameterized scalar helpers in
+  `convolve_matrix_neon.cpp` across aarch64/arm32, and routed NEON32 through
+  `runForced`/`apply` in `convolve_matrix.cpp` (all `edgeMode`s supported, like
+  aarch64). Validation: all-ABI native build clean; host parity pass; on-device
+  parity 18/18. Added `-PfilterAbis` (32-bit-only test APK) to §6.1. On-device
+  quick benchmark: neon32 ConvolveMatrix **7.41x** @512x512 (16.1ms), **7.27x**
+  @2048x2048 (241.2ms) vs scalar.

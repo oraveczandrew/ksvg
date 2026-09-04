@@ -29,6 +29,10 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
     set(CONVOLVE_SOURCES convolve_neon.S convolve.h)
 endif()
 
+if(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(CONVOLVE_SOURCES convolve_neon32.S convolve.h)
+endif()
+
 add_library(ksvgblur SHARED gaussian_blur.cpp component_transfer.cpp unlinearize.cpp arithmetic_composite.cpp displacement_map.cpp convolve_matrix.cpp convolve_matrix_neon.cpp convolve_matrix_x86_sse.cpp morphology.cpp turbulence.cpp turbulence_x86.cpp turbulence_arm.cpp lighting.cpp blur_x86.cpp ${BLUR_SOURCES} ${CONVOLVE_SOURCES})
 
 # Bit-exact float parity with the Kotlin reference loops: forbid FMA contraction.

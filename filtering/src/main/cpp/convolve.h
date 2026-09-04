@@ -66,6 +66,30 @@ namespace Convolve {
         jint *dst, const jint *src, const jint width, const jint height,
         const jfloat *kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
         const jfloat divisor, const jfloat bias, const bool preserve, const jint edgeMode);
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+    // Parameter block consumed by ksvgConvolveGenericNeonAsm32 in
+    // convolve_neon32.S. All pointers and jints are 4 bytes on ARM32.
+    //
+    // Layout: width@0, height@4, kernel@8, orderX@12, orderY@16,
+    // targetX@20, targetY@24, divisor@28, bias@32, preserve@36.
+    // Size 40, align 4.
+    struct NeonConvolveParams32 {
+        const jint width;                  // +0
+        const jint height;                 // +4
+        const jfloat *const kernel;        // +8  (4-byte pointer)
+        const jint orderX;                 // +12
+        const jint orderY;                 // +16
+        const jint targetX;                // +20
+        const jint targetY;                // +24
+        const jfloat divisor;              // +28
+        const jfloat bias;                 // +32
+        const jboolean preserve;           // +36
+    };
+
+    void applyNeonInterior(
+        jint *dst, const jint *src, const jint width, const jint height,
+        const jfloat *kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const jfloat divisor, const jfloat bias, const bool preserve, const jint edgeMode);
 #endif
 
 }

@@ -14,17 +14,24 @@
  *    limitations under the License.
  */
 
-#ifdef __aarch64__
+#if defined(__aarch64__) || (defined(__ARM_NEON) || defined(__ARM_NEON__))
 
 #include <jni.h>
 #include <cmath>
 #include "convolve.h"
-#include <arm_neon.h>
 
+#if defined(__aarch64__)
+#include <arm_neon.h>
 extern "C" jint ksvgConvolveGenericNeonAsm(
     const Convolve::NeonConvolveParams *p,
     jint *dst,
     const jint *src);
+#else
+extern "C" jint ksvgConvolveGenericNeonAsm32(
+    const Convolve::NeonConvolveParams32 *p,
+    jint *dst,
+    const jint *src);
+#endif
 
 namespace Convolve {
 
@@ -121,11 +128,19 @@ namespace Convolve {
         // Interior.
         if (xLo < xHi && yLo < yHi) {
             if (preserve) {
+#if defined(__aarch64__)
                 const NeonConvolveParams params {
                     width, height, kernel, orderX, orderY,
                     targetX, targetY, divisor, bias, preserve,
                 };
                 const jint tailX = ksvgConvolveGenericNeonAsm(&params, dst, src);
+#else
+                const NeonConvolveParams32 params {
+                    width, height, kernel, orderX, orderY,
+                    targetX, targetY, divisor, bias, preserve,
+                };
+                const jint tailX = ksvgConvolveGenericNeonAsm32(&params, dst, src);
+#endif
                 for (jint y = yLo; y < yHi; y++) {
                     for (jint x = tailX; x < xHi; x++) {
                         convolveScalarPixelEdged<EDGE_MODE>(
