@@ -123,7 +123,7 @@ jint nativeBackendForAbi() {
         backends |= SIMD_BACKEND_AVX2;
     }
 #elif defined(__aarch64__)
-    //backends |= SIMD_BACKEND_NEON64;
+    backends |= SIMD_BACKEND_NEON64;
 #endif
     return backends;
 }
@@ -229,11 +229,11 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
                     invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                     unitSizeX, unitSizeY, seed);
     }
-/*#elif defined(__aarch64__)
+#elif defined(__aarch64__)
     applyNeon64(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
                 invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
-                unitSizeX, unitSizeY, seed);*/
+                unitSizeX, unitSizeY, seed);
 #else
     applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
