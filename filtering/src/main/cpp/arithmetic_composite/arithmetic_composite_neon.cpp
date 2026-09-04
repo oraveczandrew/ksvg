@@ -23,24 +23,18 @@
 namespace {
 
 #ifdef __aarch64__
-inline float32x4_t computeChannelNeon64(uint8x16_t c1, uint8x16_t c2,
-                                       float32x4_t k1, float32x4_t k2, float32x4_t k3, float32x4_t k4_255,
-                                       int lane) {
-    // Extract 4 bytes from lane (0, 1, 2, 3) to float32x4
-    // We only process 4 pixels at a time for simplicity in FMA loop
-    uint32x4_t p1 = vmovl_u16(vget_low_u16(vmovl_u8(vget_low_u8(c1))));
-    // Actually vld4q_u8 already gives us planes.
-    // If we use vld4q_u8, c1 is already a plane of 16 bytes.
-    // We take the first 4 bytes for one iteration.
-    // But it's better to process all 16 bytes if possible.
-    // However, k values are scalar floats.
-    // Let's process 4 pixels at a time (16 bytes total for 4 channels, but we have planes).
-    // If we have 16 pixels per vld4q_u8, we have 4 iterations of 4 pixels.
-
-    (void)c1; (void)c2; (void)k1; (void)k2; (void)k3; (void)k4_255; (void)lane;
-    return vdupq_n_f32(0); // placeholder
-}
+extern "C" void applyArithmetic64Asm(
+        const uint8_t* src1, const uint8_t* src2, uint8_t* dst,
+        size_t pixels, float k1_div_255, float k2, float k3, float k4_255);
+#else
+    extern "C" void applyArithmetic32Asm(
+        const uint8_t* src1,
+        const uint8_t* src2,
+        uint8_t* dst,
+        size_t pixels,
+        const float* coeffs);
 #endif
+
 
 // More efficient: process all 16 pixels from vld4q_u8.
 // Since we have 4 float32x4 in 16 pixels, we can loop 4 times.
@@ -143,51 +137,87 @@ void applyArithmeticNeon(
 
     for (jint y = clipTop; y < clipBottom; y++) {
         const jint rowOffset = y * width;
+
+        if (!useLinear) {
+            const jint rowPixels = clipRight - clipLeft;
+            const jint simdPixels = rowPixels & ~7;
+            if (simdPixels > 0) {
+                applyArithmetic64Asm(
+                        reinterpret_cast<const uint8_t*>(src1 + rowOffset + clipLeft),
+                        reinterpret_cast<const uint8_t*>(src2 + rowOffset + clipLeft),
+                        reinterpret_cast<uint8_t*>(dst + rowOffset + clipLeft),
+                        static_cast<size_t>(simdPixels),
+                        k1 / 255.0f, k2, k3, k4_255);
+            }
+
+            const jint scalarLeft = clipLeft + simdPixels;
+            if (scalarLeft < clipRight) {
+                applyArithmeticScalar(src1, src2, dst, width, scalarLeft, y, clipRight, y + 1,
+                        k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+            }
+            continue;
+        }
+
         jint x = clipLeft;
         for (; x + 16 <= clipRight; x += 16) {
             uint8x16x4_t p1 = vld4q_u8(reinterpret_cast<const uint8_t*>(src1 + rowOffset + x));
             uint8x16x4_t p2 = vld4q_u8(reinterpret_cast<const uint8_t*>(src2 + rowOffset + x));
             uint8x16x4_t out;
 
-            // Alpha always non-linear
+            // Alpha remains non-linear in linear-light mode.
             out.val[3] = applyArithmeticFormulaNeon64(p1.val[3], p2.val[3], k1, k2, k3, k4_255);
-
-            if (useLinear) {
-                for (int c = 0; c < 3; c++) {
-                    uint8x16_t l1 = lookup256Neon(p1.val[c], tS2L);
-                    uint8x16_t l2 = lookup256Neon(p2.val[c], tS2L);
-                    uint8x16_t res = applyArithmeticFormulaNeon64(l1, l2, k1, k2, k3, k4_255);
-                    out.val[c] = lookup256Neon(res, tL2S);
-                }
-            } else {
-                out.val[0] = applyArithmeticFormulaNeon64(p1.val[0], p2.val[0], k1, k2, k3, k4_255);
-                out.val[1] = applyArithmeticFormulaNeon64(p1.val[1], p2.val[1], k1, k2, k3, k4_255);
-                out.val[2] = applyArithmeticFormulaNeon64(p1.val[2], p2.val[2], k1, k2, k3, k4_255);
+            for (int c = 0; c < 3; c++) {
+                uint8x16_t l1 = lookup256Neon64(p1.val[c], tS2L);
+                uint8x16_t l2 = lookup256Neon64(p2.val[c], tS2L);
+                uint8x16_t res = applyArithmeticFormulaNeon64(l1, l2, k1, k2, k3, k4_255);
+                out.val[c] = lookup256Neon64(res, tL2S);
             }
 
             vst4q_u8(reinterpret_cast<uint8_t*>(dst + rowOffset + x), out);
         }
-        // Fallback to scalar for remainder
+
         if (x < clipRight) {
-            applyArithmeticScalar(src1, src2, dst, width, x, y, clipRight, y + 1, k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
-        }
-    }
-#else
-    // NEON32
-    uint8x8x2_t tS2L[16], tL2S[16];
-    if (useLinear) {
-        for (int i = 0; i < 16; i++) {
-            tS2L[i].val[0] = vld1_u8(reinterpret_cast<const uint8_t*>(srgbToLinear) + i * 16);
-            tS2L[i].val[1] = vld1_u8(reinterpret_cast<const uint8_t*>(srgbToLinear) + i * 16 + 8);
-            tL2S[i].val[0] = vld1_u8(reinterpret_cast<const uint8_t*>(linearToSrgb) + i * 16);
-            tL2S[i].val[1] = vld1_u8(reinterpret_cast<const uint8_t*>(linearToSrgb) + i * 16 + 8);
+            applyArithmeticScalar(src1, src2, dst, width, x, y, clipRight, y + 1,
+                    k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
         }
     }
 
+#else
+    // NEON32
     const float k4_255 = k4 * 255.0f;
+    const float coeffs[4] = {
+            k1 / 255.0f,
+            k2,
+            k3,
+            k4_255 + 0.5f
+    };
+
+    const uint8_t* uS2L = reinterpret_cast<const uint8_t*>(srgbToLinear);
+    const uint8_t* uL2S = reinterpret_cast<const uint8_t*>(linearToSrgb);
 
     for (jint y = clipTop; y < clipBottom; y++) {
         const jint rowOffset = y * width;
+
+        if (!useLinear) {
+            const jint rowPixels = clipRight - clipLeft;
+            const jint simdPixels = rowPixels & ~7;
+            if (simdPixels > 0) {
+                applyArithmetic32Asm(
+                        reinterpret_cast<const uint8_t*>(src1 + rowOffset + clipLeft),
+                        reinterpret_cast<const uint8_t*>(src2 + rowOffset + clipLeft),
+                        reinterpret_cast<uint8_t*>(dst + rowOffset + clipLeft),
+                        static_cast<size_t>(simdPixels),
+                        coeffs);
+            }
+
+            const jint scalarLeft = clipLeft + simdPixels;
+            if (scalarLeft < clipRight) {
+                applyArithmeticScalar(src1, src2, dst, width, scalarLeft, y, clipRight, y + 1,
+                        k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+            }
+            continue;
+        }
+
         jint x = clipLeft;
         for (; x + 8 <= clipRight; x += 8) {
             uint8x8x4_t p1 = vld4_u8(reinterpret_cast<const uint8_t*>(src1 + rowOffset + x));
@@ -196,17 +226,11 @@ void applyArithmeticNeon(
 
             out.val[3] = applyArithmeticFormulaNeon32(p1.val[3], p2.val[3], k1, k2, k3, k4_255);
 
-            if (useLinear) {
-                for (int c = 0; c < 3; c++) {
-                    uint8x8_t l1 = lookup256Neon32(p1.val[c], tS2L);
-                    uint8x8_t l2 = lookup256Neon32(p2.val[c], tS2L);
-                    uint8x8_t res = applyArithmeticFormulaNeon32(l1, l2, k1, k2, k3, k4_255);
-                    out.val[c] = lookup256Neon32(res, tL2S);
-                }
-            } else {
-                out.val[0] = applyArithmeticFormulaNeon32(p1.val[0], p2.val[0], k1, k2, k3, k4_255);
-                out.val[1] = applyArithmeticFormulaNeon32(p1.val[1], p2.val[1], k1, k2, k3, k4_255);
-                out.val[2] = applyArithmeticFormulaNeon32(p1.val[2], p2.val[2], k1, k2, k3, k4_255);
+            for (int c = 0; c < 3; c++) {
+                uint8x8_t l1 = lookup256Neon32(p1.val[c], uS2L);
+                uint8x8_t l2 = lookup256Neon32(p2.val[c], uS2L);
+                uint8x8_t res = applyArithmeticFormulaNeon32(l1, l2, k1, k2, k3, k4_255);
+                out.val[c] = lookup256Neon32(res, uL2S);
             }
 
             vst4_u8(reinterpret_cast<uint8_t*>(dst + rowOffset + x), out);

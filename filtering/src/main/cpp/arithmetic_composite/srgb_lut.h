@@ -22,29 +22,83 @@
 #include <arm_neon.h>
 
 #ifdef __aarch64__
-inline uint8x16_t lookup256Neon(uint8x16_t indices, const uint8x16_t table[16]) {
-    const uint8x16_t lo = vandq_u8(indices, vdupq_n_u8(0x0F));
-    const uint8x16_t hi = vshrq_n_u8(indices, 4);
-    uint8x16_t result = vdupq_n_u8(0);
-    for (int row = 0; row < 16; ++row) {
-        const uint8x16_t value = vqtbl1q_u8(table[row], lo);
-        const uint8x16_t mask = vceqq_u8(hi, vdupq_n_u8(static_cast<uint8_t>(row)));
-        result = vbslq_u8(mask, value, result);
-    }
+
+inline uint8x16_t lookup256Neon64(
+        uint8x16_t indices,
+        const uint8x16_t table[16]) {
+
+    const uint8x16_t zero = vdupq_n_u8(0);
+
+    const uint8x16x4_t t0 = {
+        table[0], table[1], table[2], table[3]
+    };
+    const uint8x16x4_t t1 = {
+        table[4], table[5], table[6], table[7]
+    };
+    const uint8x16x4_t t2 = {
+        table[8], table[9], table[10], table[11]
+    };
+    const uint8x16x4_t t3 = {
+        table[12], table[13], table[14], table[15]
+    };
+
+    uint8x16_t result = vqtbx4q_u8(
+        zero,
+        t0,
+        indices
+    );
+
+    result = vqtbx4q_u8(
+        result,
+        t1,
+        vsubq_u8(indices, vdupq_n_u8(64))
+    );
+
+    result = vqtbx4q_u8(
+        result,
+        t2,
+        vsubq_u8(indices, vdupq_n_u8(128))
+    );
+
+    result = vqtbx4q_u8(
+        result,
+        t3,
+        vsubq_u8(indices, vdupq_n_u8(192))
+    );
+
     return result;
 }
 #endif
 
 #ifndef __aarch64__
-inline uint8x8_t lookup256Neon32(uint8x8_t indices, const uint8x8x2_t table[16]) {
-    const uint8x8_t lo = vand_u8(indices, vdup_n_u8(0x0F));
-    const uint8x8_t hi = vand_u8(vshr_n_u8(indices, 4), vdup_n_u8(0x0F));
+inline uint8x8_t lookup256Neon32(uint8x8_t indices, const uint8_t* table) {
     uint8x8_t result = vdup_n_u8(0);
-    for (int i = 0; i < 16; i++) {
-        const uint8x8_t candidate = vtbl2_u8(table[i], lo);
-        const uint8x8_t sel = vceq_u8(hi, vdup_n_u8(static_cast<uint8_t>(i)));
-        result = vorr_u8(result, vand_u8(candidate, sel));
-    }
+    uint8x8x4_t t;
+
+    t = vld1_u8_x4(table + 0);
+    result = vtbx4_u8(result, t, indices);
+
+    t = vld1_u8_x4(table + 32);
+    result = vtbx4_u8(result, t, vsub_u8(indices, vdup_n_u8(32)));
+
+    t = vld1_u8_x4(table + 64);
+    result = vtbx4_u8(result, t, vsub_u8(indices, vdup_n_u8(64)));
+
+    t = vld1_u8_x4(table + 96);
+    result = vtbx4_u8(result, t, vsub_u8(indices, vdup_n_u8(96)));
+
+    t = vld1_u8_x4(table + 128);
+    result = vtbx4_u8(result, t, vsub_u8(indices, vdup_n_u8(128)));
+
+    t = vld1_u8_x4(table + 160);
+    result = vtbx4_u8(result, t, vsub_u8(indices, vdup_n_u8(160)));
+
+    t = vld1_u8_x4(table + 192);
+    result = vtbx4_u8(result, t, vsub_u8(indices, vdup_n_u8(192)));
+
+    t = vld1_u8_x4(table + 224);
+    result = vtbx4_u8(result, t, vsub_u8(indices, vdup_n_u8(224)));
+
     return result;
 }
 #endif

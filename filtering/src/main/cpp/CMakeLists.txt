@@ -29,8 +29,17 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
     set(CONVOLVE_SOURCES convolve/convolve_neon.S)
 endif()
 
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_neon64.S)
+endif()
+
+
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
     set(CONVOLVE_SOURCES convolve/convolve_neon32.S)
+endif()
+
+if(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_neon32.S)
 endif()
 
 set(AVX2_SOURCES
@@ -61,7 +70,7 @@ add_library(ksvgblur SHARED
     arithmetic_composite/arithmetic_composite.cpp arithmetic_composite/arithmetic_composite_neon.cpp
         arithmetic_composite/arithmetic_composite_x86_sse.cpp
     ${AVX2_SOURCES} ${AVX512_SOURCES}
-    ${BLUR_SOURCES} ${CONVOLVE_SOURCES})
+    ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES})
 
 # Include path so per-filter headers resolve (convolve.h, turbulence_tables.h, etc.)
 target_include_directories(ksvgblur PRIVATE

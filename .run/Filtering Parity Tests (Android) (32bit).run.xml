@@ -1,0 +1,71 @@
+<!--
+  ~    Copyright 2026 András Oravecz <info@oandras.hu>
+  ~
+  ~    Licensed under the Apache License, Version 2.0 (the "License");
+  ~    you may not use this file except in compliance with the License.
+  ~    You may obtain a copy of the License at
+  ~
+  ~        http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~    Unless required by applicable law or agreed to in writing, software
+  ~    distributed under the License is distributed on an "AS IS" BASIS,
+  ~    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~    See the License for the specific language governing permissions and
+  ~    limitations under the License.
+  -->
+
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Filtering Parity Tests (Android) (32bit)" type="AndroidTestRunConfigurationType" factoryName="Android Instrumented Tests">
+    <module name="ksvg.filtering" />
+    <option name="ANDROID_TEST_RUN_CONFIGURATION_SCHEMA_VERSION" value="0" />
+    <option name="TESTING_TYPE" value="0" />
+    <option name="METHOD_NAME" value="" />
+    <option name="CLASS_NAME" value="" />
+    <option name="PACKAGE_NAME" value="" />
+    <option name="TEST_NAME_REGEX" value="hu.oandras.ksvg.filtering.*NativeParityTest" />
+    <option name="INSTRUMENTATION_RUNNER_CLASS" value="" />
+    <option name="EXTRA_OPTIONS" value="" />
+    <option name="CLEAR_LOGCAT" value="false" />
+    <option name="SHOW_LOGCAT_AUTOMATICALLY" value="false" />
+    <option name="TARGET_SELECTION_MODE" value="DEVICE_AND_SNAPSHOT_COMBO_BOX" />
+    <option name="DEBUGGER_TYPE" value="Java" />
+    <Auto>
+      <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
+      <option name="SHOW_STATIC_VARS" value="true" />
+      <option name="WORKING_DIR" value="" />
+      <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
+      <option name="SHOW_OPTIMIZED_WARNING" value="true" />
+      <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+    </Auto>
+    <Hybrid>
+      <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
+      <option name="SHOW_STATIC_VARS" value="true" />
+      <option name="WORKING_DIR" value="" />
+      <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
+      <option name="SHOW_OPTIMIZED_WARNING" value="true" />
+      <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+    </Hybrid>
+    <Java>
+      <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+    </Java>
+    <Native>
+      <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
+      <option name="SHOW_STATIC_VARS" value="true" />
+      <option name="WORKING_DIR" value="" />
+      <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
+      <option name="SHOW_OPTIMIZED_WARNING" value="true" />
+      <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+    </Native>
+    <Profilers>
+      <option name="ADVANCED_PROFILING_ENABLED" value="false" />
+      <option name="STARTUP_PROFILING_ENABLED" value="false" />
+      <option name="STARTUP_CPU_PROFILING_ENABLED" value="false" />
+      <option name="STARTUP_CPU_PROFILING_CONFIGURATION_NAME" value="LeakCanary" />
+      <option name="STARTUP_NATIVE_MEMORY_PROFILING_ENABLED" value="false" />
+      <option name="NATIVE_MEMORY_SAMPLE_RATE_BYTES" value="2048" />
+    </Profilers>
+    <method v="2">
+      <option name="Android.Gradle.BeforeRunTask" enabled="true" />
+    </method>
+  </configuration>
+</component>

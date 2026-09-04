@@ -1,0 +1,47 @@
+<!--
+  ~    Copyright 2026 András Oravecz <info@oandras.hu>
+  ~
+  ~    Licensed under the Apache License, Version 2.0 (the "License");
+  ~    you may not use this file except in compliance with the License.
+  ~    You may obtain a copy of the License at
+  ~
+  ~        http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~    Unless required by applicable law or agreed to in writing, software
+  ~    distributed under the License is distributed on an "AS IS" BASIS,
+  ~    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~    See the License for the specific language governing permissions and
+  ~    limitations under the License.
+  -->
+
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Filtering Parity Tests (Android) (32bit) Gradle" type="GradleRunConfiguration" factoryName="Gradle">
+    <ExternalSystemSettings>
+      <option name="executionName" />
+      <option name="externalProjectPath" value="$PROJECT_DIR$" />
+      <option name="externalSystemIdString" value="GRADLE" />
+      <option name="scriptParameters" value="-PfilterAbis=armeabi-v7a -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.ArithmeticCompositeNativeParityTest,hu.oandras.ksvg.filtering.ComponentTransferNativeParityTest,hu.oandras.ksvg.filtering.ConvolveNativeParityTest,hu.oandras.ksvg.filtering.DisplacementMapNativeParityTest,hu.oandras.ksvg.filtering.GaussianBlurNativeParityTest,hu.oandras.ksvg.filtering.LightingNativeParityTest,hu.oandras.ksvg.filtering.MorphologyNativeParityTest,hu.oandras.ksvg.filtering.TurbulenceNativeParityTest,hu.oandras.ksvg.filtering.UnLinearizeNativeParityTest" />
+      <option name="taskDescriptions">
+        <list />
+      </option>
+      <option name="taskNames">
+        <list>
+          <option value=":filtering:connectedDebugAndroidTest" />
+        </list>
+      </option>
+      <option name="vmOptions" />
+    </ExternalSystemSettings>
+    <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+    <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+    <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+    <EXTENSION ID="com.android.tools.idea.testartifacts.testsuite.GradleRunConfigurationExtension">
+      <com.android.tools.idea.testartifacts.testsuite.SHOW_TEST_RESULT_IN_ANDROID_TEST_SUITE_VIEW>false</com.android.tools.idea.testartifacts.testsuite.SHOW_TEST_RESULT_IN_ANDROID_TEST_SUITE_VIEW>
+      <android.execution.deploysToLocalDevice>false</android.execution.deploysToLocalDevice>
+    </EXTENSION>
+    <DebugAllEnabled>false</DebugAllEnabled>
+    <RunAsTest>false</RunAsTest>
+    <GradleProfilingDisabled>false</GradleProfilingDisabled>
+    <GradleCoverageDisabled>false</GradleCoverageDisabled>
+    <method v="2" />
+  </configuration>
+</component>

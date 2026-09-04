@@ -55,7 +55,10 @@ class KernelPerformanceDeviceBenchmark {
         if (target == null || target == "UnLinearize") benchmarkUnLinearize()
         if (target == null || target == "ComponentTransfer") benchmarkComponentTransfer()
         if (target == null || target == "Morphology") benchmarkMorphology()
-        if (target == null || target == "ArithmeticComposite") benchmarkArithmeticComposite()
+        if (target == null || target == "ArithmeticComposite") {
+            benchmarkArithmeticCompositeNonLinear()
+            benchmarkArithmeticCompositeLinear()
+        }
         if (target == null || target == "ConvolveMatrix") benchmarkConvolveMatrix()
         if (target == null || target == "DisplacementMap") benchmarkDisplacementMap()
         if (target == null || target == "Lighting") benchmarkLighting()
@@ -151,13 +154,13 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkArithmeticComposite() {
+    private fun benchmarkArithmeticCompositeNonLinear() {
         for ((w, h) in sizes) {
             val src1 = IntArray(w * h)
             val src2 = IntArray(w * h)
             val dst = IntArray(w * h)
             benchmarkSingle(
-                name = "ArithmeticComposite",
+                name = "ArithmeticComposite (non-linear)",
                 backendFlags = ArithmeticCompositeNative.nativeBackend(),
                 w = w,
                 h = h
@@ -175,7 +178,38 @@ class KernelPerformanceDeviceBenchmark {
                     k2 = 0.5f,
                     k3 = 0.5f,
                     k4 = 0.1f,
-                    useLinear = true,
+                    useLinear = false,
+                    simdBackend = b
+                )
+            }
+        }
+    }
+
+    private fun benchmarkArithmeticCompositeLinear() {
+        for ((w, h) in sizes) {
+            val src1 = IntArray(w * h)
+            val src2 = IntArray(w * h)
+            val dst = IntArray(w * h)
+            benchmarkSingle(
+                name = "ArithmeticComposite (linear)",
+                backendFlags = ArithmeticCompositeNative.nativeBackend(),
+                w = w,
+                h = h
+            ) { b ->
+                ArithmeticCompositeNative.applyForced(
+                    src1 = src1,
+                    src2 = src2,
+                    dst = dst,
+                    width = w,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    k1 = 0.5f,
+                    k2 = 0.5f,
+                    k3 = 0.5f,
+                    k4 = 0.1f,
+                    useLinear = false,
                     simdBackend = b
                 )
             }
