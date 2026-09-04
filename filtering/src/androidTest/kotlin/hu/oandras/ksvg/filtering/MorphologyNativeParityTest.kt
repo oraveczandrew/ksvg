@@ -27,6 +27,7 @@ import org.junit.runners.Parameterized
  * [MorphologyValidationCorpus], every SIMD backend this host advertises is
  * forced via [MorphologyNative.applyForced] and compared byte-for-byte.
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class MorphologyNativeParityTest(
     private val name: String,

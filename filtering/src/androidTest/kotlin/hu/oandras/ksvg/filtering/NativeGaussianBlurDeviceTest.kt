@@ -39,6 +39,7 @@ import kotlin.random.Random
  * Cases cover the optimized RIR kernel path (isotropic, radius <= 25), the
  * scalar fallback (radius > 25), and the anisotropic scalar path.
  */
+@NativeParityTest
 @RunWith(AndroidJUnit4::class)
 public class NativeGaussianBlurDeviceTest {
 

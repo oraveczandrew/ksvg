@@ -28,6 +28,7 @@ import org.junit.runners.Parameterized
  * [DisplacementMapValidationCorpus], every SIMD backend this host advertises is
  * forced and compared byte-for-byte.
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class DisplacementMapNativeParityTest(
     private val name: String,

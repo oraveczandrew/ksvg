@@ -35,6 +35,7 @@ import kotlin.math.abs
  * For every configuration in the shared corpus, every SIMD backend this host
  * advertises for that radius is forced via [NativeGaussianBlur.applyForced].
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class GaussianBlurNativeParityTest(
     private val name: String,

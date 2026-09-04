@@ -29,6 +29,7 @@ import org.junit.runners.Parameterized
  * and compared byte-for-byte, covering kernel orders, anchors, divisors,
  * preserveAlpha, and the duplicate/wrap/none edge modes.
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class ConvolveNativeParityTest(
     private val name: String,

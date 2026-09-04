@@ -29,6 +29,7 @@ import org.junit.runners.Parameterized
  * and compared byte-for-byte, covering distant/point/spot lights, diffuse and
  * specular, and linear/sRGB premultiplied output.
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class LightingNativeParityTest(
     private val name: String,

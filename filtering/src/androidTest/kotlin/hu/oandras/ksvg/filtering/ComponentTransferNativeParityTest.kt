@@ -29,6 +29,7 @@ import org.junit.runners.Parameterized
  * is forced and compared byte-for-byte, covering clip/table edge cases and the
  * outer-pixel transparent-black fill.
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class ComponentTransferNativeParityTest(
     private val name: String,

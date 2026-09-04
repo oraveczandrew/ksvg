@@ -37,6 +37,7 @@ import org.junit.runners.Parameterized
  * [TurbulenceNative.isAvailable] stays false and the test fails loudly rather
  * than silently comparing Kotlin against Kotlin.
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class TurbulenceNativeParityTest(
     private val name: String,

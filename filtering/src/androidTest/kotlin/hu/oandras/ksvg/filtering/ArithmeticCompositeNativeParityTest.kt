@@ -28,6 +28,7 @@ import org.junit.runners.Parameterized
  * [ArithmeticCompositeValidationCorpus], every SIMD backend this host advertises
  * is forced and compared byte-for-byte.
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class ArithmeticCompositeNativeParityTest(
     private val name: String,

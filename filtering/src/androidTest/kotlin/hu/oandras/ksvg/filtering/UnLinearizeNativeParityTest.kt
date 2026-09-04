@@ -31,6 +31,7 @@ import org.junit.runners.Parameterized
  * separate src/dst, and the in-place (src == dst) path used by the
  * filter-output transfer.
  */
+@NativeParityTest
 @RunWith(Parameterized::class)
 class UnLinearizeNativeParityTest(
     private val name: String,
