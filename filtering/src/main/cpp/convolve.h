@@ -65,7 +65,7 @@ namespace Convolve {
     void applyNeonInterior(
         jint *dst, const jint *src, const jint width, const jint height,
         const jfloat *kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
-        const jfloat divisor, const jfloat bias, const bool preserve);
+        const jfloat divisor, const jfloat bias, const bool preserve, const jint edgeMode);
 #endif
 
 }

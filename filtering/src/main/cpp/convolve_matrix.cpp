@@ -33,9 +33,9 @@ namespace Convolve {
         if (edgeMode == 2) return -1;
         if (edgeMode == 1) {
             const jint m = coordinate % limit;
-            return (m < 0) ? m + limit : m;
+            return m < 0 ? m + limit : m;
         }
-        return (coordinate < 0) ? 0 : limit - 1;
+        return coordinate < 0 ? 0 : limit - 1;
     }
 
     void convolveScalarPixel(
@@ -193,8 +193,11 @@ namespace Convolve {
                    const jfloat *kernel, const jint orderX, const jint orderY,
                    const jint targetX, const jint targetY, const jfloat divisor, const jfloat bias,
                    const bool preserve, const jint edgeMode, const jint backend) {
-        if (edgeMode == 0 && height >= orderY && width >= orderX) {
 #if defined(__aarch64__)
+        // aarch64: the neon path partitions the image into edge bands (scalar,
+        // edgeMode-specialized) + pure interior (ASM). The interior rectangle is
+        // edgeMode-agnostic, so wrap/none edgeModes can use the SIMD interior too.
+        if (height >= orderY && width >= orderX) {
             if (backend == SIMD_BACKEND_SCALAR) {
                 applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve,
                             edgeMode);
@@ -204,18 +207,25 @@ namespace Convolve {
                 const jint yHi = height - orderY + 1 + targetY;
                 for (jint y = 0; y < yLo; y++) {
                     for (jint x = 0; x < width; x++) convolveScalarPixel(
-                        src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, 0,
+                        src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, edgeMode,
                         x, y);
                 }
                 for (jint y = yHi; y < height; y++) {
                     for (jint x = 0; x < width; x++) convolveScalarPixel(
-                        src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, 0,
+                        src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, edgeMode,
                         x, y);
                 }
                 applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias,
-                                  preserve);
+                                  preserve, edgeMode);
             }
+            return;
+        }
+        applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve,
+                    edgeMode);
 #elif defined(__i386__) || defined(__x86_64__)
+        // x86 SIMD interior functions embed the edgeMode-0 (clamp) handling for
+        // the interior edge columns, so they are only valid for edgeMode == 0.
+        if (edgeMode == 0 && height >= orderY && width >= orderX) {
             const jint yLo = targetY;
             const jint yHi = height - orderY + 1 + targetY;
             auto runInterior = [&]() {
@@ -254,16 +264,15 @@ namespace Convolve {
                 default:
                     assert(false && "unsupported forced convolve backend on x86");
             }
-#else
-            (void) backend;
-            applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve,
-                        edgeMode);
-#endif
             return;
         }
+        applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve,
+                    edgeMode);
+#else
         (void) backend;
         applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve,
                     edgeMode);
+#endif
     }
 
     static jint nativeBackendForAbi() {
@@ -345,8 +354,14 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
         return;
     }
 
-#if defined(__aarch64__) || (!defined(__aarch64__) && defined(__SSE2__))
-    if (edgeMode == 0 && height >= orderY && width >= orderX) {
+#if defined(__aarch64__)
+    const bool canSimdInterior = true;
+#elif defined(__SSE2__)
+    const bool canSimdInterior = (edgeMode == 0);
+#else
+    const bool canSimdInterior = false;
+#endif
+    if (canSimdInterior && height >= orderY && width >= orderX) {
         const bool preserve = preserveAlpha == JNI_TRUE;
         const jint yLo = targetY;
         const jint yHi = height - orderY + 1 + targetY;
@@ -355,18 +370,18 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
             for (jint x = 0; x < width; x++)
                 Convolve::convolveScalarPixel(
                     src, dst, width, height, kernel, orderX, orderY,
-                    targetX, targetY, divisor, bias, preserve, 0, x, y);
+                    targetX, targetY, divisor, bias, preserve, edgeMode, x, y);
         }
         for (jint y = yHi; y < height; y++) {
             for (jint x = 0; x < width; x++)
                 Convolve::convolveScalarPixel(
                     src, dst, width, height, kernel, orderX, orderY,
-                    targetX, targetY, divisor, bias, preserve, 0, x, y);
+                    targetX, targetY, divisor, bias, preserve, edgeMode, x, y);
         }
 #ifdef __aarch64__
         Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY,
-                                    targetX, targetY, divisor, bias, preserve);
-#else
+                                    targetX, targetY, divisor, bias, preserve, edgeMode);
+#elif defined(__SSE2__)
         switch (detectSimdLevel()) {
             case SIMD_AVX512:
                 ksvgConvolveApplyInteriorAvx512(dst, src, width, height, kernel,
@@ -386,7 +401,6 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
         env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
         return;
     }
-#endif
 
     Convolve::applyScalar(src, dst, width, height, kernel,
                           orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
