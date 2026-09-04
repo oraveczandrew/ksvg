@@ -26,4 +26,8 @@ class ShowcaseGlideModule : AppGlideModule() {
     override fun applyOptions(context: Context, builder: GlideBuilder) {
         super.applyOptions(context, builder)
     }
+
+    override fun isManifestParsingEnabled(): Boolean {
+        return false
+    }
 }
