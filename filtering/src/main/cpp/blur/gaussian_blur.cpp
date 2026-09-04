@@ -286,6 +286,9 @@ void runForced(GaussianScratch* s, jint* pix, int w, int h, float stdDeviationX,
 #if defined(__aarch64__)
     assert(backend == SIMD_BACKEND_NEON64);
     blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s);
+#elif defined(__arm__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
+    assert(backend == SIMD_BACKEND_NEON32);
+    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s);
 #elif defined(__i386__) || defined(__x86_64__)
     // Gaussian Blur has hybrid SSE/AVX2 logic inside blurIsotropicKernel.
     // We'll just run it.
@@ -305,6 +308,8 @@ jint nativeBackendForAbi(float stdDeviationX, float stdDeviationY) {
     if (isotropic && rx >= 1 && rx <= kMaxKernelRadius) {
 #if defined(__aarch64__)
         backends |= SIMD_BACKEND_NEON64;
+#elif defined(__arm__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
+        backends |= SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
         backends |= SIMD_BACKEND_SSSE3;
         if (detectSimdLevel() >= SIMD_AVX2) {
