@@ -38,22 +38,24 @@
 .equ A_UNIT_Y, 128
 
 // ── Stack frame ─────────────────────────────────────────────────────────────
-// Only callee-saved d8-d13 need saving; everything else lives in scratch regs
-// or in the frame for persistent per-row/per-pair state.
+// Callee-saved d8-d13 are saved (read geometry); d14/d15 also live across the
+// whole octave loop as the P1 sum accumulators (v14/v15), so they must be
+// saved/restored too (AAPCS64: d14/d15 are callee-saved).
 .equ S_SAVE_D8,   0
 .equ S_SAVE_D10, 16
 .equ S_SAVE_D12, 32
-.equ S_PIXELS,   40   // x: base pixel pointer (row-start recomputation)
-.equ S_FX_BASE,  48   // double: P0 fx start for this row
-.equ S_FX_STEP,  56   // double: fx advance per pixel (= invScaleX/unitX*freqX)
-.equ S_CTLX_BASE,64   // double: P0 curtlx start (= 0 for clipLeft)
-.equ S_PY0,      72   // double: py0 for this row
-.equ S_CTLY,     80   // double: curtly for this row
-.equ S_FX1,      88   // double: P1 fx (= fxBase + fxStep, updated per pixel pair)
-.equ S_CTLX1,    96   // double: P1 curtlx (= freqX, updated per pixel pair)
-.equ S_BY0,     104   // w: saved by0 (needed by P1 after P0's permutation)
-.equ S_BY1,     108   // w: saved by1 (needed by P1 after P0's permutation)
-.equ S_SIZE,    128   // must be 16-byte aligned
+.equ S_SAVE_D14, 48
+.equ S_PIXELS,   64   // x: base pixel pointer (row-start recomputation)
+.equ S_FX_BASE,  72   // double: P0 fx start for this row
+.equ S_FX_STEP,  80   // double: fx advance per pixel (= invScaleX/unitX*freqX)
+.equ S_CTLX_BASE,88   // double: P0 curtlx start (= 0 for clipLeft)
+.equ S_PY0,      96   // double: py0 for this row
+.equ S_CTLY,    104   // double: curtly for this row
+.equ S_FX1,     112   // double: P1 fx (= fxBase + fxStep, updated per pixel pair)
+.equ S_CTLX1,   120   // double: P1 curtlx (= freqX, updated per pixel pair)
+.equ S_BY0,     128   // w: saved by0 (needed by P1 after P0's permutation)
+.equ S_BY1,     132   // w: saved by1 (needed by P1 after P0's permutation)
+.equ S_SIZE,    144   // must be 16-byte aligned
 
 // ── Register map (stable across the function unless noted) ──────────────────
 // x0 = args pointer (preserved)
@@ -77,7 +79,9 @@
 // v7  = fabs sign mask: 0x8000000000000000 in BOTH 64-bit lanes for turbulence,
 //       0 for fractal. BIC with v7 clears the sign bit (fabs) or is a no-op.
 //       Set once at entry; never modified elsewhere.
-// v30 = [255,255,255,255] (0x000000ff per lane) — pack clamp ceiling.
+// v30 = pack clamp ceiling [255,255,255,255]. NOT a set-once register: d30
+// (its low 64 bits) is a geometry scratch double, so v30 is re-established
+// (movi v30.4s,#255) at the top of every pack_pixel_pair.
 //
 // d8  = rx0       d9  = rx1       d10 = ry0
 // d11 = ry1       d12 = sx        d13 = sy
@@ -85,7 +89,8 @@
 //
 // d24 = fx0       d25 = fy (shared)   d26 = curtlx0   d27 = curtly (shared)
 // d28 = ratio (invRatio, shared)
-// d29 = scratch   d30 = scratch   d31 = scratch
+// d29 = scratch   d30 = scratch (NOTE: d30 ALIASES v30.d[0], the pack clamp
+//      ceiling — see the pack_pixel_pair movi)   d31 = scratch
 //
 // v16-v23 = gradient loads (reused for P0 then P1)
 
@@ -97,6 +102,7 @@ turbulence64Asm:
     stp     d8, d9,  [sp, #S_SAVE_D8]
     stp     d10, d11,[sp, #S_SAVE_D10]
     stp     d12, d13,[sp, #S_SAVE_D12]
+    stp     d14, d15,[sp, #S_SAVE_D14]
 
     ldr     x3, [x0, #A_GRADX]
     ldr     x4, [x0, #A_GRADY]
@@ -579,6 +585,12 @@ no_double_stitch_2:
 // Pack into ARGB32: (A<<24)|(R<<16)|(G<<8)|B   (ch0=R, ch1=G, ch2=B, ch3=A)
 // ══════════════════════════════════════════════════════════════════════════════
 pack_pixel_pair:
+    // v30 is clobbered every octave: d30 (its low 64 bits) is used as a
+    // geometry scratch double (scvtf/fmul). The umin clamp below is only safe
+    // with a live 255 ceiling, so re-establish it here. Nothing in pack needs
+    // the scratch values, so this is safe and cheap.
+    movi    v30.4s, #255
+
     // ── Select scale/offset based on fractal flag ────────────────────────────
     cbz     w1, ppair_non_fractal
 
@@ -954,6 +966,7 @@ next_row:
     b       row_loop
 
 finish:
+    ldp     d14, d15, [sp, #S_SAVE_D14]
     ldp     d12, d13, [sp, #S_SAVE_D12]
     ldp     d10, d11, [sp, #S_SAVE_D10]
     ldp     d8, d9,  [sp, #S_SAVE_D8]
