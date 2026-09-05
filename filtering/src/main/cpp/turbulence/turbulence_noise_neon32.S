@@ -32,9 +32,9 @@
  *   d3-d7   geometry/noise arithmetic scratch
  *   d8-d15  current channel gradients (gx00 gy00 gx10 gy10 gx01 gy01 gx11 gy11)
  *   d16-d19 channel accumulators R G B A
- *   d20-d24 octave state fx fy curtlx curtly ratio
- *   d25     time-shared: 2.0 during the geometry phase, then 1/ratio (built
- *           once per octave) for the channel accumulates
+ *   d20-d24 octave state fx fy ctlx ctly weight
+ *   d25     time-shared: 2.0 during the geometry phase, then 2.0>>10 (one
+ *           exponent unit) to halve the weight bitwise at the octave end
  *   d26-d31 geometry rx0 rx1 ry0 ry1 sx sy
  *
  * GPRs:
@@ -45,11 +45,15 @@
  *
  * void turbulence32Asm(const Turbulence32AsmArgs* args);
  *
- * Per-channel sum is accumulated in double precision (ratio is a power of two,
- * so n/ratio == n*(1/ratio) exactly). floor(t) for the lattice index and
- * fractional part is computed as trunc-then-correct (ARMv7 VFP has no directed
- * floor convert; vcvt.s32.f64 rounds toward zero). For t >= 0 the correction
- * never triggers, which matches the Kotlin reference's tx.toInt() semantics.
+ * Per-channel sum is accumulated in double precision, scaled by the octave
+ * weight d24 (the reciprocal of the lattice ratio 2^octave). The weight is a
+ * power of two, so it is stepped bitwise (decrement the biased exponent by one)
+ * instead of computing n/2^octave in VFP — multiply by the exact reciprocal and
+ * divide by the exact ratio are the same value bit for bit. floor(t) for the
+ * lattice index and fractional part is computed as trunc-then-correct (ARMv7
+ * VFP has no directed floor convert; vcvt.s32.f64 rounds toward zero). For
+ * t >= 0 the correction never triggers, which matches the Kotlin reference's
+ * tx.toInt() semantics.
  */
 
 .syntax unified
@@ -109,8 +113,7 @@
 .endm
 
 /* sx = t*t*(3.0 - 2.0*t) — same fp op order as the C++ reference. Uses the
- * permanent constants d2 = 3.0 and d25 = 2.0 (built at octave top; d25 becomes
- * 1/ratio once the geometry phase is done). */
+ * permanent constants d2 = 3.0 and d25 = 2.0 (re-armed at octave top). */
 .macro SMOOTHSTEP out, t
     vmul.f64 \out, \t, \t
     vmul.f64 d5, \t, d25           /* 2*t */
@@ -121,7 +124,8 @@
 /* One channel of one octave: reload the channel's gradients (byte offset \chb)
  * into d8-d15 using the shared lattice indices, compute noise into d4 with the
  * shared geometry (d26-d31), and accumulate into \acc (one of d16-d19) with the
- * octave ratio (d24). Clobbers r1/r2 as address scratch only.
+ * octave weight (d24, the reciprocal of the lattice ratio). Clobbers r1/r2 as
+ * address scratch only.
  *
  * Lattice indices: b00=r14, b01=r10, b10=r12, b11=r11. */
 .macro NOISE_CHANNEL chb, acc
@@ -172,10 +176,10 @@
     vmul.f64 d3, d31, d6
     vadd.f64 d4, d4, d3            /* n = a + sy*(b-a) */
 
-    /* Accumulate: acc += (r8 ? n : |n|) * (1/ratio) ───────────────────────── */
+    /* Accumulate: acc += (r8 ? n : |n|) * weight ───────────────────────────── */
     cmp r8, #0
     vabseq.f64 d4, d4
-    vmul.f64 d4, d4, d25
+    vmul.f64 d4, d4, d24
     vadd.f64 \acc, \acc, d4
 .endm
 
@@ -250,12 +254,9 @@ pixel_loop:
     cmp r7, r9
     bge next_row
 
-    /* accumulators = 0 */
-    mov r12, #0
-    vmov d16, r12, r12
-    vmov d17, r12, r12
-    vmov d18, r12, r12
-    vmov d19, r12, r12
+    /* accumulators = 0 (q8 = d16/d17, q9 = d18/d19) */
+    veor q8, q8, q8
+    veor q9, q9, q9
 
     /* fx = px0 = (userLeft + x*invScaleX) / unitX * freqX */
     vmov s6, r7
@@ -281,7 +282,8 @@ pixel_loop:
     vldr d21, [sp, #S_PY0]
     vldr d23, [sp, #S_CTLY0]
 
-    /* ratio = 1.0, octave index = 0, park the output cursor */
+    /* weight = 1.0 (reciprocal, halves bitwise each octave), octave index = 0,
+     * park the output cursor */
     vmov.f64 d24, d0
     mov r5, #0
     str r2, [sp, #S_DST]
@@ -298,7 +300,7 @@ pixel_loop:
     cmp r5, r1
     bge .Loct_done
 
-    vadd.f64 d25, d0, d0          /* 2.0 (SMOOTHSTEP; becomes 1/ratio below) */
+    vadd.f64 d25, d0, d0          /* 2.0 for SMOOTHSTEP (geometry only) */
 
     /* ── X geometry (stich wrap folded in) ──────────────────────────────── */
     ldr r12, [r0, #A_PERIOD_X]
@@ -363,10 +365,6 @@ pixel_loop:
     add r12, r1, r12              /* j + by0 */
     ldr r12, [r2, r12, lsl #2]    /* b10 */
 
-    /* 1/ratio: ratio is a power of two, so n/ratio == n*(1/ratio) exactly;
-     * one division per octave instead of four per channel. */
-    vdiv.f64 d25, d0, d24
-
     /* ── Four channels (R, G, B, A) ────────────────────────────────────── */
     NOISE_CHANNEL  0, d16
     NOISE_CHANNEL  8, d17
@@ -378,7 +376,12 @@ pixel_loop:
     vadd.f64 d21, d21, d21
     vadd.f64 d22, d22, d22
     vadd.f64 d23, d23, d23
-    vadd.f64 d24, d24, d24
+    /* weight -> weight/2 without a VFP divide: 2.0 >> 10 is one exponent
+     * unit (bit 52), so subtracting it from weight's bit pattern exactly
+     * decrements the biased exponent (2^-n stays an exact power of two for
+     * any octave count within the normal range). */
+    vshr.u64 d25, d25, #10
+    vsub.i64 d24, d24, d25
 
     add r5, r5, #1
     b .Loct
@@ -415,10 +418,7 @@ pack_pixel:
     vadd.f64 d4, d4, d7
     vcvt.s32.f64 s4, d4
     vmov r12, s4
-    cmp r12, #0
-    movlt r12, #0
-    cmp r12, #255
-    movgt r12, #255
+    usat r12, #8, r12
 
     /* ch1 (G) d17 -> r1 */
     vadd.f64 d4, d17, d6
@@ -426,10 +426,7 @@ pack_pixel:
     vadd.f64 d4, d4, d7
     vcvt.s32.f64 s4, d4
     vmov r1, s4
-    cmp r1, #0
-    movlt r1, #0
-    cmp r1, #255
-    movgt r1, #255
+    usat r1, #8, r1
 
     /* ch2 (B) d18 -> r14 */
     vadd.f64 d4, d18, d6
@@ -437,10 +434,7 @@ pack_pixel:
     vadd.f64 d4, d4, d7
     vcvt.s32.f64 s4, d4
     vmov r14, s4
-    cmp r14, #0
-    movlt r14, #0
-    cmp r14, #255
-    movgt r14, #255
+    usat r14, #8, r14
 
     orr r1, r14, r1, lsl #8         /* B | G<<8 */
     orr r1, r1, r12, lsl #16        /* | R<<16 */
@@ -451,10 +445,7 @@ pack_pixel:
     vadd.f64 d4, d4, d7
     vcvt.s32.f64 s4, d4
     vmov r12, s4
-    cmp r12, #0
-    movlt r12, #0
-    cmp r12, #255
-    movgt r12, #255
+    usat r12, #8, r12
 
     orr r12, r1, r12, lsl #24       /* | A<<24 */
     str r12, [r2], #4

@@ -269,3 +269,23 @@ Final cumulative (vs 0df7b09e baseline 24.967 / 397.618):
   512:   20.531 ms  (~17.8% faster)    6.56x
   2048:  327.018 ms (~17.8% faster)    6.59x
 All 6 steps: parity OK (22 tests each).
+
+## Round 3 — usat clamp, veor accumulator clear, bitwise weight (all parity-green)
+
+1. Pack clamp -> `usat r12, #8, r12` (saturates signed word to [0,255],
+   identical to the cmp/movlt/cmp/movgt clamp for any int32 incl. the 0x80000000
+   NaN-box from vcvt). 4 instr x 4 channels = 16/pixel saved.
+   512: 20.531 -> 20.513; 2048: 327.018 -> 325.350 ms.
+
+2. Accumulator clear: veor q8,q8,q8 / veor q9,q9,q9 (q8=d16/d17, q9=d18/d19)
+   replaces mov+4x vmov. 5 -> 2 instr/pixel.
+   (measured together with #1: 6.87x/6.64x)
+
+3. Kill the per-octave vdiv entirely. d24 now holds the WEIGHT = 1/2^octave
+   (starts as 1.0 = d0). Each octave end: vshr.u64 d25,d25,#10 turns 2.0
+   (0x4000...0) into one exponent unit (bit 52 = 0x0010...0), and
+   vsub.i64 d24,d24,d25 decrements the biased exponent -> weight halves
+   bit-exactly. Valid for any octave count within the normal double range
+   (octave < 1022); parity confirms. vdiv.f64 d25,d0,d24 (the last remaining
+   per-octave division) is gone; accumulate multiplies by d24.
+   512: 20.513 -> 20.123; 2048: 325.350 -> 320.663 ms (6.65x/6.65x).
