@@ -97,5 +97,10 @@ public object TurbulenceValidationCorpus {
 
         // Downscaled canvas (canvas scale 2.0 -> frequency doubles in user space).
         add(Case("scaled", 32, 32, 0, 0, 32, 32, 0.05, 0.05, 0, 0, 3, false, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 55))
+
+        // Near-zero frequency: lattice coordinates just above +4096 (origin is
+        // exactly an integer cell corner). Lattice coords stay >= 0, so the
+        // native floor() and the Kotlin tx.toInt() lattice index agree.
+        add(Case("nearzero 32x32", 32, 32, 0, 0, 32, 32, 0.001, 0.001, 0, 0, 1, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 321))
     }
 }

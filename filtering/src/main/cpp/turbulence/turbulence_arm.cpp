@@ -23,6 +23,10 @@
 #include "turbulence_arm.h"
 #include "turbulence_asm64.h"
 
+#if defined(__arm__)
+#include "turbulence_asm32.h"
+#endif
+
 #if defined(__aarch64__)
 
 void applyNeon64(
@@ -71,6 +75,58 @@ void applyNeon64(
     };
 
     turbulence64Asm(&args);
+}
+
+#endif
+
+#if defined(__arm__)
+
+void applyNeon32(
+        jint* pixels, const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jdouble baseFrequencyX, const jdouble baseFrequencyY,
+        const jint periodX, const jint periodY, const jint octaves, const jboolean fractalNoise,
+        const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+        const jdouble userLeft, const jdouble userTop,
+        const jdouble originX, const jdouble originY,
+        const jdouble unitSizeX, const jdouble unitSizeY,
+        const jint seed) {
+    (void) originX;
+    (void) originY;
+
+    Arm32LatticeTables tables;
+    initArm32Tables(tables, seed);
+
+    std::memset(
+            pixels,
+            0,
+            static_cast<size_t>(width) * static_cast<size_t>(height) * sizeof(jint));
+
+    Turbulence32AsmArgs args {
+            tables.selector32,
+            &tables.gradPackedX[0][0],
+            &tables.gradPackedY[0][0],
+            pixels,
+            width,
+            clipLeft,
+            clipTop,
+            clipRight,
+            clipBottom,
+            periodX,
+            periodY,
+            octaves,
+            fractalNoise == JNI_TRUE ? 1 : 0,
+            baseFrequencyX,
+            baseFrequencyY,
+            invCanvasScaleX,
+            invCanvasScaleY,
+            userLeft,
+            userTop,
+            unitSizeX,
+            unitSizeY
+    };
+
+    turbulence32Asm(&args);
 }
 
 #endif

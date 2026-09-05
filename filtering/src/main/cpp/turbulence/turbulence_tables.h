@@ -218,6 +218,32 @@ static inline void initArm64Tables(Arm64LatticeTables& t, const int32_t seed) {
 
 #endif
 
+#if defined(__arm__)
+
+// Same layout as Arm64LatticeTables: 32-bit selector + channel-interleaved
+// gradients (row stride 4 doubles) for the ARMv7 assembly kernel
+// (turbulence_noise_neon32.S / turbulence32Asm).
+struct Arm32LatticeTables {
+    uint8_t selector[S_TABLE_SIZE];
+    uint32_t selector32[S_TABLE_SIZE];
+    double gradPackedX[S_TABLE_SIZE][4];
+    double gradPackedY[S_TABLE_SIZE][4];
+};
+
+static inline void initArm32Tables(Arm32LatticeTables& t, const int32_t seed) {
+    double gradX[4][S_TABLE_SIZE][2];
+    initBaseTables(t.selector, gradX, seed);
+    for (int32_t i = 0; i < S_TABLE_SIZE; i++) {
+        t.selector32[i] = t.selector[i];
+        for (int32_t k = 0; k < 4; k++) {
+            t.gradPackedX[i][k] = gradX[k][i][0];
+            t.gradPackedY[i][k] = gradX[k][i][1];
+        }
+    }
+}
+
+#endif
+
 static inline PixelGeometry geometry(
         const uint8_t selector[S_TABLE_SIZE],
         const double pxd,

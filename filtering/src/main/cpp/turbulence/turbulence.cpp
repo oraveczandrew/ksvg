@@ -124,6 +124,8 @@ jint nativeBackendForAbi() {
     }
 #elif defined(__aarch64__)
     backends |= SIMD_BACKEND_NEON64;
+#elif defined(__arm__)
+    backends |= SIMD_BACKEND_NEON32;
 #endif
     return backends;
 }
@@ -182,6 +184,15 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
         } else {
             assert(false && "unsupported forced turbulence backend on arm64");
         }
+#elif defined(__arm__)
+        if (simdBackend == SIMD_BACKEND_NEON32) {
+            applyNeon32(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                        baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                        invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                        unitSizeX, unitSizeY, seed);
+        } else {
+            assert(false && "unsupported forced turbulence backend on arm32");
+        }
 #else
         (void)simdBackend;
         applyScalar(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
@@ -231,6 +242,11 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
     }
 #elif defined(__aarch64__)
     applyNeon64(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                unitSizeX, unitSizeY, seed);
+#elif defined(__arm__)
+    applyNeon32(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
                 invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                 unitSizeX, unitSizeY, seed);

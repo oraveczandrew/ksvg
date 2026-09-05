@@ -38,6 +38,10 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
 endif()
 
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(TURBULENCE_SOURCES turbulence/turbulence_noise_neon32.S)
+endif()
+
+if(ANDROID_ABI STREQUAL "armeabi-v7a")
     set(CONVOLVE_SOURCES convolve/convolve_neon32.S)
 endif()
 

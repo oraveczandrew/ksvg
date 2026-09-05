@@ -31,6 +31,17 @@ void applyNeon64(
         jdouble originX, jdouble originY,
         jdouble unitSizeX, jdouble unitSizeY,
         jint seed);
+
+void applyNeon32(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed);
 }
 
 #endif // KSVG_TURBULENCE_ARM_H
