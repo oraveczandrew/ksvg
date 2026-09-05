@@ -21,6 +21,17 @@
 #include "cpu_dispatch.h"
 #include "simd_x86.h"
 
+#if defined(__aarch64__)
+// Hand-written AArch64/AdvSIMD interior morphology pixel (morphology_neon64.S).
+// Same precondition as applyVectorPixel below: the complete
+// (2*radiusX+1)x(2*radiusY+1) window must lie inside the image. The init value
+// (delta: 0 / erode: 255) is derived from `erode` internally.
+extern "C" void ksvgMorphologyApplyPixelNeon64(
+    const jint *src, jint *dst, jint width,
+    jint radiusX, jint radiusY, jboolean erode,
+    jint x, jint y);
+#endif
+
 // feMorphology (erode/dilate) over unpremultiplied ARGB_8888 IntArrays.
 //
 // Bit-exact port of the Kotlin reference loop in FilterGeometry.kt:
@@ -241,7 +252,7 @@ namespace {
                     applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
                 } else {
                     assert(backend == SIMD_BACKEND_NEON64);
-                    applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
+                    ksvgMorphologyApplyPixelNeon64(src, dst, width, radiusX, radiusY, erode, x, y);
                 }
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
                 if (backend == SIMD_BACKEND_SCALAR) {
@@ -393,6 +404,8 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
                     default:
                         applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
                 }
+#elif defined(__aarch64__)
+                ksvgMorphologyApplyPixelNeon64(src, dst, width, radiusX, radiusY, erode, x, y);
 #else
                 applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
 #endif
