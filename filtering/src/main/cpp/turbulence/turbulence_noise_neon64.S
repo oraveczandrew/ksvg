@@ -322,22 +322,20 @@ no_stitch_x_p0:
     ldr     w15, [x5, x15, lsl #2]
 
     // ── Gradients P0 channels 0/1 ────────────────────────────────────────────
-    add     x16, x3, x12, lsl #5
-    ldr     q16, [x16]
-    add     x16, x4, x12, lsl #5
-    ldr     q17, [x16]
-    add     x16, x3, x13, lsl #5
-    ldr     q18, [x16]
-    add     x16, x4, x13, lsl #5
-    ldr     q19, [x16]
-    add     x16, x3, x14, lsl #5
-    ldr     q20, [x16]
-    add     x16, x4, x14, lsl #5
-    ldr     q21, [x16]
-    add     x16, x3, x15, lsl #5
-    ldr     q22, [x16]
-    add     x16, x4, x15, lsl #5
-    ldr     q23, [x16]
+    // Lattice row stride is 32 bytes; q-register indexing only scales <<4, so
+    // pre-double the indices (x<<1 yields stride 32 via lsl #4).
+    lsl     x12, x12, #1
+    lsl     x13, x13, #1
+    lsl     x14, x14, #1
+    lsl     x15, x15, #1
+    ldr     q16, [x3, x12, lsl #4]
+    ldr     q17, [x4, x12, lsl #4]
+    ldr     q18, [x3, x13, lsl #4]
+    ldr     q19, [x4, x13, lsl #4]
+    ldr     q20, [x3, x14, lsl #4]
+    ldr     q21, [x4, x14, lsl #4]
+    ldr     q22, [x3, x15, lsl #4]
+    ldr     q23, [x4, x15, lsl #4]
 
     fmul    v2.2d, v16.2d, v8.d[0]
     fmla    v2.2d, v17.2d, v10.d[0]
@@ -360,30 +358,16 @@ no_stitch_x_p0:
     fmla    v0.2d, v2.2d, v28.d[0]
 
     // ── Gradients P0 channels 2/3 ────────────────────────────────────────────
-    add     x16, x3, x12, lsl #5
-    add     x16, x16, #16
-    ldr     q16, [x16]
-    add     x16, x4, x12, lsl #5
-    add     x16, x16, #16
-    ldr     q17, [x16]
-    add     x16, x3, x13, lsl #5
-    add     x16, x16, #16
-    ldr     q18, [x16]
-    add     x16, x4, x13, lsl #5
-    add     x16, x16, #16
-    ldr     q19, [x16]
-    add     x16, x3, x14, lsl #5
-    add     x16, x16, #16
-    ldr     q20, [x16]
-    add     x16, x4, x14, lsl #5
-    add     x16, x16, #16
-    ldr     q21, [x16]
-    add     x16, x3, x15, lsl #5
-    add     x16, x16, #16
-    ldr     q22, [x16]
-    add     x16, x4, x15, lsl #5
-    add     x16, x16, #16
-    ldr     q23, [x16]
+    add     x16, x3, #16
+    add     x17, x4, #16
+    ldr     q16, [x16, x12, lsl #4]
+    ldr     q17, [x17, x12, lsl #4]
+    ldr     q18, [x16, x13, lsl #4]
+    ldr     q19, [x17, x13, lsl #4]
+    ldr     q20, [x16, x14, lsl #4]
+    ldr     q21, [x17, x14, lsl #4]
+    ldr     q22, [x16, x15, lsl #4]
+    ldr     q23, [x17, x15, lsl #4]
 
     fmul    v2.2d, v16.2d, v8.d[0]
     fmla    v2.2d, v17.2d, v10.d[0]
@@ -463,22 +447,18 @@ no_stitch_x_p1:
     ldr     w15, [x5, x15, lsl #2]
 
     // ── Gradients P1 channels 0/1 ────────────────────────────────────────────
-    add     x16, x3, x12, lsl #5
-    ldr     q16, [x16]
-    add     x16, x4, x12, lsl #5
-    ldr     q17, [x16]
-    add     x16, x3, x13, lsl #5
-    ldr     q18, [x16]
-    add     x16, x4, x13, lsl #5
-    ldr     q19, [x16]
-    add     x16, x3, x14, lsl #5
-    ldr     q20, [x16]
-    add     x16, x4, x14, lsl #5
-    ldr     q21, [x16]
-    add     x16, x3, x15, lsl #5
-    ldr     q22, [x16]
-    add     x16, x4, x15, lsl #5
-    ldr     q23, [x16]
+    lsl     x12, x12, #1
+    lsl     x13, x13, #1
+    lsl     x14, x14, #1
+    lsl     x15, x15, #1
+    ldr     q16, [x3, x12, lsl #4]
+    ldr     q17, [x4, x12, lsl #4]
+    ldr     q18, [x3, x13, lsl #4]
+    ldr     q19, [x4, x13, lsl #4]
+    ldr     q20, [x3, x14, lsl #4]
+    ldr     q21, [x4, x14, lsl #4]
+    ldr     q22, [x3, x15, lsl #4]
+    ldr     q23, [x4, x15, lsl #4]
 
     fmul    v2.2d, v16.2d, v8.d[0]
     fmla    v2.2d, v17.2d, v10.d[0]
@@ -501,30 +481,16 @@ no_stitch_x_p1:
     fmla    v14.2d, v2.2d, v28.d[0]
 
     // ── Gradients P1 channels 2/3 ────────────────────────────────────────────
-    add     x16, x3, x12, lsl #5
-    add     x16, x16, #16
-    ldr     q16, [x16]
-    add     x16, x4, x12, lsl #5
-    add     x16, x16, #16
-    ldr     q17, [x16]
-    add     x16, x3, x13, lsl #5
-    add     x16, x16, #16
-    ldr     q18, [x16]
-    add     x16, x4, x13, lsl #5
-    add     x16, x16, #16
-    ldr     q19, [x16]
-    add     x16, x3, x14, lsl #5
-    add     x16, x16, #16
-    ldr     q20, [x16]
-    add     x16, x4, x14, lsl #5
-    add     x16, x16, #16
-    ldr     q21, [x16]
-    add     x16, x3, x15, lsl #5
-    add     x16, x16, #16
-    ldr     q22, [x16]
-    add     x16, x4, x15, lsl #5
-    add     x16, x16, #16
-    ldr     q23, [x16]
+    add     x16, x3, #16
+    add     x17, x4, #16
+    ldr     q16, [x16, x12, lsl #4]
+    ldr     q17, [x17, x12, lsl #4]
+    ldr     q18, [x16, x13, lsl #4]
+    ldr     q19, [x17, x13, lsl #4]
+    ldr     q20, [x16, x14, lsl #4]
+    ldr     q21, [x17, x14, lsl #4]
+    ldr     q22, [x16, x15, lsl #4]
+    ldr     q23, [x17, x15, lsl #4]
 
     fmul    v2.2d, v16.2d, v8.d[0]
     fmla    v2.2d, v17.2d, v10.d[0]
@@ -791,22 +757,18 @@ no_stitch_x_tail:
     ldr     w15, [x5, x15, lsl #2]
 
     // Channels 0/1
-    add     x16, x3, x12, lsl #5
-    ldr     q16, [x16]
-    add     x16, x4, x12, lsl #5
-    ldr     q17, [x16]
-    add     x16, x3, x13, lsl #5
-    ldr     q18, [x16]
-    add     x16, x4, x13, lsl #5
-    ldr     q19, [x16]
-    add     x16, x3, x14, lsl #5
-    ldr     q20, [x16]
-    add     x16, x4, x14, lsl #5
-    ldr     q21, [x16]
-    add     x16, x3, x15, lsl #5
-    ldr     q22, [x16]
-    add     x16, x4, x15, lsl #5
-    ldr     q23, [x16]
+    lsl     x12, x12, #1
+    lsl     x13, x13, #1
+    lsl     x14, x14, #1
+    lsl     x15, x15, #1
+    ldr     q16, [x3, x12, lsl #4]
+    ldr     q17, [x4, x12, lsl #4]
+    ldr     q18, [x3, x13, lsl #4]
+    ldr     q19, [x4, x13, lsl #4]
+    ldr     q20, [x3, x14, lsl #4]
+    ldr     q21, [x4, x14, lsl #4]
+    ldr     q22, [x3, x15, lsl #4]
+    ldr     q23, [x4, x15, lsl #4]
 
     fmul    v2.2d, v16.2d, v8.d[0]
     fmla    v2.2d, v17.2d, v10.d[0]
@@ -828,30 +790,16 @@ no_stitch_x_tail:
     fmla    v0.2d, v2.2d, v28.d[0]
 
     // Channels 2/3
-    add     x16, x3, x12, lsl #5
-    add     x16, x16, #16
-    ldr     q16, [x16]
-    add     x16, x4, x12, lsl #5
-    add     x16, x16, #16
-    ldr     q17, [x16]
-    add     x16, x3, x13, lsl #5
-    add     x16, x16, #16
-    ldr     q18, [x16]
-    add     x16, x4, x13, lsl #5
-    add     x16, x16, #16
-    ldr     q19, [x16]
-    add     x16, x3, x14, lsl #5
-    add     x16, x16, #16
-    ldr     q20, [x16]
-    add     x16, x4, x14, lsl #5
-    add     x16, x16, #16
-    ldr     q21, [x16]
-    add     x16, x3, x15, lsl #5
-    add     x16, x16, #16
-    ldr     q22, [x16]
-    add     x16, x4, x15, lsl #5
-    add     x16, x16, #16
-    ldr     q23, [x16]
+    add     x16, x3, #16
+    add     x17, x4, #16
+    ldr     q16, [x16, x12, lsl #4]
+    ldr     q17, [x17, x12, lsl #4]
+    ldr     q18, [x16, x13, lsl #4]
+    ldr     q19, [x17, x13, lsl #4]
+    ldr     q20, [x16, x14, lsl #4]
+    ldr     q21, [x17, x14, lsl #4]
+    ldr     q22, [x16, x15, lsl #4]
+    ldr     q23, [x17, x15, lsl #4]
 
     fmul    v2.2d, v16.2d, v8.d[0]
     fmla    v2.2d, v17.2d, v10.d[0]
