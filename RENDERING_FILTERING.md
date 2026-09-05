@@ -319,14 +319,16 @@ Without the property all ABIs build as usual (this is wired in
 
 ### Device Results (Snapdragon 8 Gen 2)
 
-| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup |
+| Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: |
 | Unlinearize | scalar | 512x512 | 1.282 | 204.53 | 1.64 | 1.00x |
 | Unlinearize | neon64 | 512x512 | 33.992 | 7.71 | 0.06 | **0.04x** |
 | ComponentTransfer | scalar | 512x512 | 2.848 | 92.05 | 0.74 | 1.00x |
 | ComponentTransfer | neon64 | 512x512 | 39.201 | 6.69 | 0.05 | **0.07x** |
-| Morphology | scalar | 512x512 | 286.274 | 0.92 | 0.01 | 1.00x |
-| Morphology | neon64 | 512x512 | 647.917 | 0.40 | 0.00 | **0.44x** |
+| Morphology | scalar | 512x512 | 199.105 | 1.32 | 0.01 | 1.00x |
+| Morphology | neon64 | 512x512 | 15.790 | 16.60 | 0.13 | **12.6x** |
+| Morphology | scalar | 2048x2048 | 3275.911 | 1.28 | 0.01 | 1.00x |
+| Morphology | neon64 | 2048x2048 | 238.894 | 17.56 | 0.14 | **13.7x** |
 | ConvolveMatrix | scalar | 512x512 | 90.549 | 2.90 | 0.02 | 1.00x |
 | ConvolveMatrix | neon64 | 512x512 | 9.580 | 27.36 | 0.22 | **9.45x** |
 | DisplacementMap | scalar | 512x512 | 8.261 | 31.73 | 0.38 | 1.00x |
@@ -334,6 +336,16 @@ Without the property all ABIs build as usual (this is wired in
 | GaussianBlur | scalar | 512x512 | 357.167 | 0.73 | 0.01 | 1.00x |
 | GaussianBlur | neon64 | 512x512 | 6.398 | 40.97 | 0.33 | **55.83x** |
 | Turbulence | scalar | 512x512 | 131.544 | 1.99 | 0.01 | 1.00x |
+
+Methodology note: for everything except Morphology, `ms` is the raw-runner
+**average** (2026-09-02); the Morphology rows come from the stable `nativeBenchmark { }`
+harness (spec §6.2, median of 5 batches with warmup + thermal gating + batch-CV
+classifier, measured 2026-09-05 on the same OnePlus 12 / SM8550). Scalar-vs-SIMD
+speedups are only directly comparable within the same run (CPU-frequency/thermal
+drift makes cross-session absolute times differ — e.g. Morphology scalar 512² was
+286.3 ms avg in the 2026-09-02 run vs 199.1 ms harness median here). The Morphology
+`neon64` rows exercise the hand-written AArch64 kernel (`morphology_neon64.S`); the
+previous inline NEON path measured **0.44x** vs scalar.
 
 ---
 
@@ -480,3 +492,15 @@ trusting long bench runs on this device:
   the ArithmeticComposite `(linear)` variant now actually sets `useLinear=true`.
   Removed the superseded Turbulence-only `TurbulenceNativeHarnessBenchmark`;
   `KernelBenchmarkRunner` is host-JVM-only again.
+- 2026-09-05 — Replaced the AArch64 morphology interior loop (erode/dilate) with a
+  hand-written kernel (`morphology_neon64.S`): wired into CMake for arm64-v8a and into
+  both `applyForced`/`apply` via an `extern "C"` declaration under `__aarch64__`. Fixed
+  a critical register-aliasing bug in its tail loop (`w14`/`x14` — the per-row cursor
+  `mov x14, x15` trashed the tail counter held in `w14`, causing out-of-bounds reads /
+  effectively unbounded loops for every odd kernel width) and normalized the byte
+  stride to `sxtw(w2)`. Device parity (scalar + neon64 forced backends vs the Kotlin
+  reference across the `MorphologyValidationCorpus`): **OK (108 tests)**; host parity
+  and `buildHostNativeLib` green. Updated the §6.1 Device Results table with a harness
+  run: neon64 Morphology is now **12.6x** @512² (15.8 ms) and **13.7x** @2048²
+  (238.9 ms) vs scalar in the same run, where the previous inline NEON path measured
+  **0.44x**. CSVs: `tmp/benchmarks_device_harness_Morphology_*.csv`.
