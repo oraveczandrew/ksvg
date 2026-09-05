@@ -23,6 +23,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import android.view.WindowManager
 import androidx.test.platform.app.InstrumentationRegistry
@@ -155,11 +156,42 @@ internal class BenchmarkActivity : Activity() {
         var resumeObserved: Boolean = false
             private set
 
+        /** Whether the benchmark window currently holds focus (a late-settling indicator). */
+        val isWindowFocused: Boolean
+            get() = singleton.get()?.hasWindowFocus() ?: false
+
         /** true = setSustainedPerformanceMode(true) returned without throwing. */
         var sustainedSetResult: Boolean? = null
             private set
 
         private var sustainedSetAttempted: Boolean = false
+
+        /**
+         * Brings the foreground window up (spec §17) if no live instance exists. Reuses the
+         * already-foreground Activity across the whole instrumentation process so benchmarks
+         * never create/destroy a Window in the middle of a suite.
+         */
+        fun ensureAlive() {
+            val current = singleton.get()
+            if (current == null || current.isFinishing) {
+                launchSingleton()
+            }
+        }
+
+        /**
+         * Ensures the window is alive AND holds focus, waiting up to [timeoutMs]. Focus
+         * settles ~100 ms after launch (see worklog Step 0); measurements must not start
+         * while unfocused.
+         */
+        fun waitForFocusedWindow(timeoutMs: Long = 5_000): Boolean {
+            ensureAlive()
+            val deadline = SystemClock.uptimeMillis() + timeoutMs
+            while (SystemClock.uptimeMillis() < deadline) {
+                if (isWindowFocused) return true
+                Thread.sleep(50)
+            }
+            return isWindowFocused
+        }
 
         fun launchSingleton(): Activity {
             val intent =
