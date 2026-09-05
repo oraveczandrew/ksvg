@@ -331,6 +331,92 @@ Without the property all ABIs build as usual (this is wired in
 
 ---
 
+### 6.2 Stable native benchmark harness (androidTest, Steps 0-8 done)
+
+A stable, long-running **harness** for comparing native/NEON kernel work (e.g. `old
+assembly vs new assembly`) lives in `filtering/src/androidTest/.../benchmark/`
+(`NativeBenchmarkHarness.kt`, DSL `nativeBenchmark { }`; spec = `tmp/TEST_HARNESS.md`,
+plan = `TEST_HARNESS_PLAN.md`, findings = `tmp/TEST_HARNESS_WORKLOG.md`). It is the
+preferred device path for Turbulence going forward.
+
+It provides, per benchmark block (measured region = **only the JNI call**, spec §20):
+
+- foreground `BenchmarkActivity` + focus wait (the window is held by the same process
+  that loads `libksvgblur`),
+- benchmark-thread priority key: bump `setThreadPriority(myTid(), -20)`, restored at end,
+- `warmup` → repeated `measurementBatches` × `iterationsPerBatch`, per-iteration
+  `System.nanoTime()` sampling,
+- one `CacheNormalizer.normalize()` (deterministic 1 MB×2 copy/touch) before each batch,
+  outside the measurement,
+- thermal gating (`ThermalStateMonitor`): API 29+ `PowerManager.currentThermalStatus`;
+  API<29 deterministic compute-probe fallback (baseline once per run, >10% degradation =
+  throttled). A batch measured while throttled is **invalidated** → configurable cooldown
+  (`cooldownMillis`, default 5 s) → fresh batch; `invalidatedBatches` / `cooldownTimeMs`
+  are tracked,
+- per-sample statistics (`BenchmarkStats`: min/median/mean/max/p90/p95/p99/stddev;
+  compare by median → p90 → min),
+- classification (spec §15): `VALID / THERMAL_THROTTLED / THERMAL_RECOVERY /
+  UNSTABLE / INSUFFICIENT_SAMPLES`, `isValid` flag (batch-average CV > 5% → `UNSTABLE`),
+- environment report (spec §16): device/model/abi/coreCount, SoC (`CpuInfo`:
+  QTI SM8550 on the test device), sustained-mode result, `thermalStatusBefore/After`,
+  `invalidatedBatches`/`cooldownTimeMs`, best-effort sysfs CPU frequency
+  `cpuFreqBeforeKhz`/`cpuFreqAfterKhz`, `cpuAffinityControlAvailable` (always `false`,
+  no root).
+
+CSV (pull-compatible with `runDeviceBenchmark`'s `benchmarks_device*.csv` glob):
+
+```text
+# summary — benchmarks_device_harness_<kernel>_<backend>_<size>.csv
+Kernel,Backend,Size,MinMs,MedianMs,MeanMs,MaxMs,P90,P95,P99,StdDevMs,MPix/s,InvalidatedBatches,CooldownMs,Classification,VALID
+
+# detail — benchmarks_harness_detail_<kernel>_<backend>_<size>.csv
+env,<key>=<value> ...        # environment block
+batch,iteration,ms           # per-sample rows
+```
+
+Commands (device serial = e.g. `adbca122`):
+
+```bash
+./gradlew :filtering:assembleDebugAndroidTest -PfilterAbis=arm64-v8a -Dorg.gradle.warning.mode=none
+adb -s adbca122 install -r -t filtering/build/outputs/apk/androidTest/debug/filtering-debug-androidTest.apk
+adb -s adbca122 logcat -c
+adb -s adbca122 shell am instrument -w \
+  -e class hu.oandras.ksvg.filtering.benchmark.TurbulenceNativeHarnessBenchmark \
+  -e benchmark.quick true \
+  hu.oandras.filtering.test/androidx.test.runner.AndroidJUnitRunner
+adb -s adbca122 logcat -d -s System.out
+```
+
+The migrated `TurbulenceNativeHarnessBenchmark` covers every native backend (scalar,
+neon64, …) × both sizes (512² / 2048²; quick = 512² only) and honours the
+`benchmark.kernel` / `benchmark.quick` args. The old raw path
+`KernelPerformanceDeviceBenchmark` is kept for the raw-vs-harness comparison
+(`HarnessValidationRawTest`, spec §22). Console output example:
+
+```text
+=== Benchmark: Turbulence (neon64) 512x512 ===
+thermalSource=powerManager        thermalStatusBefore=0  thermalStatusAfter=0 ...
+stats(count=50) min=4.4414 p90=4.4981 median=4.4679 mean=4.4699 p95=4.5042 max=4.5168
+classification=VALID valid=true invalidatedBatches=0 cooldownTimeMs=0
+```
+
+**Device findings (OnePlus 12 / CPH2449, SDK 36, SM8550, non-root)** — relevant to
+trusting long bench runs on this device:
+
+- Sustained performance mode is **unsupported** (`sustainedPerformanceMode=false`);
+  reported, never asserted.
+- `PowerManager.currentThermalStatus` stays `NONE` even while performance drifts
+  ~15-20% (observed across sessions); the **sysfs `scaling_cur_freq` read is the
+  load-bearing signal** — e.g. 1.555 → 1.459 GHz across one run with status 0 the whole
+  time. Every CSV carries `cpuFreqBeforeKhz`/`cpuFreqAfterKhz`.
+- The batch-average-CV classifier flags exactly that drift: an early-fast / later-slow
+  scalar run scored `UNSTABLE` `valid=false` while the neon64 cell in the same run scored
+  `VALID`.
+- Not active on this device (reported as false/unavailable): sustained mode, CPU-affinity
+  pinning.
+
+---
+
 ## 7. Change log (append)
 
 - 2026-08-30 — Document created. Recorded: two-phase render model, software/HW
@@ -359,3 +445,16 @@ Without the property all ABIs build as usual (this is wired in
   parity 18/18. Added `-PfilterAbis` (32-bit-only test APK) to §6.1. On-device
   quick benchmark: neon32 ConvolveMatrix **7.41x** @512x512 (16.1ms), **7.27x**
   @2048x2048 (241.2ms) vs scalar.
+- 2026-09-05 — Completed the stable native benchmark harness (Steps 0-8,
+  spec `tmp/TEST_HARNESS.md`) and documented it in §6.2: `nativeBenchmark { }` DSL,
+  foreground window + focus wait, thread-priority keying, warmup/batch model,
+  per-batch cache normalization, thermal gating with cooldown/retry
+  (`ThermalStateMonitor` API 29+ status + API<29 probe fallback), stats + five-way
+  classification, environment/SoC/CPU-frequency report, summary+detail CSV
+  pull-compatible with `runDeviceBenchmark`. Migrated the device Turbulence driver
+  onto the harness (all backends × 512²/2048², `benchmark.kernel`/`benchmark.quick`
+  compat) and added the raw-vs-harness validation test (`HarnessValidationRawTest`,
+  spec §22). Key device finding: on the OnePlus 12 (SM8550) sustained mode is
+  unsupported and `currentThermalStatus` stays `NONE` while CPU frequency drifts
+  (sysfs `scaling_cur_freq` is the reliable signal); the batch-CV classifier flags
+  such drift as `UNSTABLE`.
