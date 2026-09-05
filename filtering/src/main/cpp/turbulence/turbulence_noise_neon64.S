@@ -55,7 +55,10 @@
 .equ S_CTLX1,   120   // double: P1 curtlx (= freqX, updated per pixel pair)
 .equ S_BY0,     128   // w: saved by0 (needed by P1 after P0's permutation)
 .equ S_BY1,     132   // w: saved by1 (needed by P1 after P0's permutation)
-.equ S_SIZE,    144   // must be 16-byte aligned
+.equ S_PACK_SCALE, 144 // q: [scale, scale]   pack vector (built once at entry)
+.equ S_PACK_OFFSET,160 // q: [offset, offset] pack vector (built once at entry)
+.equ S_PACK_HALF,  176 // q: [0.5, 0.5]       pack vector (built once at entry)
+.equ S_SIZE,    192   // must be 16-byte aligned
 
 // ── Register map (stable across the function unless noted) ──────────────────
 // x0 = args pointer (preserved)
@@ -89,6 +92,8 @@
 //
 // d24 = fx0       d25 = fy (shared)   d26 = curtlx0   d27 = curtly (shared)
 // d28 = ratio (invRatio, shared)
+// (In the pack paths v24/v25/v26 are instead loaded from the frame slots
+// S_PACK_SCALE/S_PACK_OFFSET/S_PACK_HALF — see entry.)
 // d29 = scratch   d30 = scratch (NOTE: d30 ALIASES v30.d[0], the pack clamp
 //      ceiling — see the pack_pixel_pair movi)   d31 = scratch
 //
@@ -120,6 +125,27 @@ turbulence64Asm:
     fmov    d7, x16
     ins     v7.d[1], x16               // both 64-bit lanes identical
     // v7 is now our permanent fabs mask; it is NOT modified elsewhere.
+
+    // ── Pre-build the pack constant vectors (once per call) ───────────────────
+    // The pack_clamp path needs [scale,scale], [offset,offset], [0.5,0.5].
+    // fractal (w1 != 0):  scale = 127.5, offset = 1.0 (base-1 trick)
+    // turbulence (w1 == 0): scale = 255.0, offset = 0.0
+    // The octave loops clobber every vector (v0-v31), so these are cached in
+    // the frame; each pack then reloads them with straight qword loads.
+    cmp     w1, #0
+    ldr     d20, const_127_5
+    ldr     d21, const_255
+    fcsel   d20, d20, d21, ne       // d20 = fractal ? 127.5 : 255.0
+    ldr     d21, const_1
+    fmov    d22, xzr
+    fcsel   d21, d21, d22, ne       // d21 = fractal ? 1.0 : 0.0
+    ldr     d22, const_half
+    dup     v24.2d, v20.d[0]
+    dup     v25.2d, v21.d[0]
+    dup     v26.2d, v22.d[0]
+    str     q24, [sp, #S_PACK_SCALE]
+    str     q25, [sp, #S_PACK_OFFSET]
+    str     q26, [sp, #S_PACK_HALF]
 
     movi    v30.4s, #255               // pack clamp ceiling (0x000000ff per lane)
 
@@ -557,22 +583,10 @@ pack_pixel_pair:
     // the scratch values, so this is safe and cheap.
     movi    v30.4s, #255
 
-    // ── Select scale/offset based on fractal flag ────────────────────────────
-    cbz     w1, ppair_non_fractal
-
-    ldr     d20, const_127_5          // scale
-    ldr     d21, const_1              // offset
-    b       ppair_common
-ppair_non_fractal:
-    ldr     d20, const_255
-    fmov    d21, xzr                  // offset = 0
-ppair_common:
-    ldr     d22, const_half
-
-    // Broadcast scale, offset, +0.5 to 2-lane vectors
-    dup     v24.2d, v20.d[0]         // v24 = [scale, scale]
-    dup     v25.2d, v21.d[0]         // v25 = [offset, offset]
-    dup     v26.2d, v22.d[0]         // v26 = [0.5, 0.5]
+    // ── Load pre-built scale/offset/+0.5 vectors (see entry) ─────────────────
+    ldr     q24, [sp, #S_PACK_SCALE]
+    ldr     q25, [sp, #S_PACK_OFFSET]
+    ldr     q26, [sp, #S_PACK_HALF]
 
     // ── Interleave channels across pixels ────────────────────────────────────
     // v0=[R0,G0], v14=[R1,G1] → zip → v2=[R0,R1], v3=[G0,G1]
@@ -842,16 +856,10 @@ no_double_stitch_tail:
 
 // ── Pack single pixel (scalar — one pixel, not worth SIMD) ──────────────────
 pack_single:
-    cbz     w1, pack_single_non_fractal
-
-    ldr     d20, const_127_5
-    ldr     d21, const_1
-    b       pack_single_common
-pack_single_non_fractal:
-    ldr     d20, const_255
-    fmov    d21, xzr
-pack_single_common:
-    ldr     d22, const_half
+    // Load pre-built pack scalars (lane 0 of the cached vectors, see entry).
+    ldr     d20, [sp, #S_PACK_SCALE]   // scale
+    ldr     d21, [sp, #S_PACK_OFFSET]  // offset
+    ldr     d22, [sp, #S_PACK_HALF]    // +0.5
 
     fadd    d23, d0, d21
     fmul    d23, d23, d20

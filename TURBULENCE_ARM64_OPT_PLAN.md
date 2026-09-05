@@ -41,14 +41,18 @@ Replace the per-pixel-pair `cbz w1`+literal loads+`dup` chain with:
 - at entry (after the fractal test that sets the v7 sign mask): build
   `v24=[scale,scale], v25=[offset,scale], v26=[0.5,0.5]` once into permanent
   registers using the same const loads that already exist.
-- pack path: straight `fadd/fmul/fadd/fcvtzs` chain, no branch, no loads, no dups.
 
-The scalar tail path (`pack_single`) has the same redundant per-pixel constant
-build and branch. Remove it by using the already-built vectors or a single set
-of scalar constants cached in the frame.
+**Implementation note:** the octave loops clobber every SIMD register
+(v24–v26 hold fx0/fy/curtlx0 there, v0–v23 are use), so the constants cannot
+live in registers across octaves. Instead the three vectors are built once at
+entry and stored to new 16-byte frame slots (S_PACK_SCALE/OFFSET/HALF,
+S_SIZE 144→192); each pack path reloads them with straight qword loads.
+Also removes the branch in `pack_single` the same way.
 
-Expected: parity OK, measurably faster on 2048² where the ratio of pack to
-octave work is higher (wider rows).
+**Result (verified 2026-09-05):** parity 22/22 OK. Median across 3 bench
+runs (`adbca122`): 512² 4.47ms (vs 4.64 Step 1), 2048² 71.8ms (vs 73.9 Step 1).
+Small consistent gain, no regression; device noise today is ±10% so the
+absolute numbers carry wide error bars.
 
 ## Step 3 — dead freqY/freqX reload removal (G2)
 
