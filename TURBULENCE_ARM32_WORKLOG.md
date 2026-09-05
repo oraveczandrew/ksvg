@@ -151,3 +151,24 @@ Reverted ALL throwaway debug: `.S` debug stores + `A_DEBUG`, `debugFinalOut` fie
 + skip-assert, C++ thread_local + JNI setter + args wiring (struct back to exact
 original layout/size 120), Kotlin `setNeon32DebugOut`, and deleted the throwaway
 `TurbulenceArm32DiagnosticTest`. Parity re-ran green AFTER the revert.
+
+## 2026-09-05 — Post-commit on-device benchmark (lazy kernel)
+
+Ran the device turbulence bench (armeabi-v7a build) after the parity fix+commit.
+
+| Kernel | Backend | Size | AvgMs | MPix/s | GB/s | Speedup |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Turbulence | scalar | 512x512 | 136.992 | 1.91 | 0.01 | 1.00 |
+| Turbulence | neon32 | 512x512 | 40.719 | 6.44 | 0.03 | 3.36 |
+| Turbulence | scalar | 2048x2048 | 2165.834 | 1.94 | 0.01 | 1.00 |
+| Turbulence | neon32 | 2048x2048 | 660.526 | 6.35 | 0.03 | 3.28 |
+
+### Implication
+Phase 2's exit gate (neon32 >= 1.3x scalar in the same bench run) is ALREADY
+MET by the lazy 1-px kernel (3.36x / 3.28x). The lazy kernel's per-row geometry
+hoisting + tight unrolled VFP channel chain beats the C++ scalar reference
+(which recomputes geometry per pixel through call layers) by ~3.3x.
+
+Phase 2 (2-px interleave + register rebalance) is now an OPTIONAL extra perf
+step, not a gate. Defer register-allocation discussion; revisit only if more
+headroom is needed. Phase 3 (channel-pair blocking) likewise optional.
