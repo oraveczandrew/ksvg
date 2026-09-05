@@ -52,18 +52,18 @@ class KernelPerformanceDeviceBenchmark {
         Log.i("Benchmark", "Starting selective benchmark on device")
         val target = InstrumentationRegistry.getArguments().getString("benchmark.kernel")
 
-        if (target == null || target == "UnLinearize") benchmarkUnLinearize()
-        if (target == null || target == "ComponentTransfer") benchmarkComponentTransfer()
-        if (target == null || target == "Morphology") benchmarkMorphology()
-        if (target == null || target == "ArithmeticComposite") {
+        if (target.isNullOrEmpty() || target == "UnLinearize") benchmarkUnLinearize()
+        if (target.isNullOrEmpty() || target == "ComponentTransfer") benchmarkComponentTransfer()
+        if (target.isNullOrEmpty() || target == "Morphology") benchmarkMorphology()
+        if (target.isNullOrEmpty() || target == "ArithmeticComposite") {
             benchmarkArithmeticCompositeNonLinear()
             benchmarkArithmeticCompositeLinear()
         }
-        if (target == null || target == "ConvolveMatrix") benchmarkConvolveMatrix()
-        if (target == null || target == "DisplacementMap") benchmarkDisplacementMap()
-        if (target == null || target == "Lighting") benchmarkLighting()
-        if (target == null || target == "Turbulence") benchmarkTurbulence()
-        if (target == null || target == "GaussianBlur") benchmarkGaussianBlur()
+        if (target.isNullOrEmpty() || target == "ConvolveMatrix") benchmarkConvolveMatrix()
+        if (target.isNullOrEmpty() || target == "DisplacementMap") benchmarkDisplacementMap()
+        if (target.isNullOrEmpty() || target == "Lighting") benchmarkLighting()
+        if (target.isNullOrEmpty() || target == "Turbulence") benchmarkTurbulence()
+        if (target.isNullOrEmpty() || target == "GaussianBlur") benchmarkGaussianBlur()
 
         val suffix = if (target != null) "_$target" else ""
         val context = InstrumentationRegistry.getInstrumentation().targetContext
