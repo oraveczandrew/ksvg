@@ -28,11 +28,13 @@
  *
  * Register map (VFP d0..d31 fully allocated):
  *   d0   = 1.0            d1   = 4096.0
- *   d2-d7   geometry/noise arithmetic scratch
+ *   d2   = 3.0 (permanent SMOOTHSTEP constant)
+ *   d3-d7   geometry/noise arithmetic scratch
  *   d8-d15  current channel gradients (gx00 gy00 gx10 gy10 gx01 gy01 gx11 gy11)
  *   d16-d19 channel accumulators R G B A
  *   d20-d24 octave state fx fy curtlx curtly ratio
- *   d25     scratch (spare)
+ *   d25     time-shared: 2.0 during the geometry phase, then 1/ratio (built
+ *           once per octave) for the channel accumulates
  *   d26-d31 geometry rx0 rx1 ry0 ry1 sx sy
  *
  * GPRs:
@@ -84,19 +86,19 @@
 /* ── Stack frame (final sp is 8-aligned) ──────────────────────────────────── */
 /* Doubles */
 .equ S_PY0,    0
-.equ S_TILEY,  8
+.equ S_CTLY0,  8
 /* Words */
 .equ S_DST,   16
 .equ S_SIZE,  24
 
 /* floor(t): trunc toward zero, then correct when the truncated value is above
  * the true floor (doesn't happen for t >= 0).  out: \breg (int), \frac (double).
- * Clobbers s4 (low word of d2) and d3. \t must NOT be d2 (s4 aliases d2's low
- * half). */
+ * Clobbers s14 (low word of d7) and d3. \t must NOT be d7 (s14 aliases d7's low
+ * half). d2 is a live constant (3.0), so the integer convert lands in s14. */
 .macro FLOOR breg, frac, t
-    vcvt.s32.f64 s4, \t
-    vmov \breg, s4
-    vcvt.f64.s32 d3, s4
+    vcvt.s32.f64 s14, \t
+    vmov \breg, s14
+    vcvt.f64.s32 d3, s14
     vsub.f64 \frac, \t, d3
     vcmp.f64 \frac, #0.0
     vmrs APSR_nzcv, FPSCR
@@ -106,13 +108,13 @@
 .Lfloor_ok\@:
 .endm
 
-/* sx = t*t*(3.0 - 2.0*t) — same fp op order as the C++ reference. */
+/* sx = t*t*(3.0 - 2.0*t) — same fp op order as the C++ reference. Uses the
+ * permanent constants d2 = 3.0 and d25 = 2.0 (built at octave top; d25 becomes
+ * 1/ratio once the geometry phase is done). */
 .macro SMOOTHSTEP out, t
     vmul.f64 \out, \t, \t
-    vadd.f64 d4, d0, d0            /* 2.0 */
-    vmul.f64 d5, \t, d4            /* 2*t */
-    vadd.f64 d6, d4, d0            /* 3.0 */
-    vsub.f64 d6, d6, d5            /* 3 - 2*t */
+    vmul.f64 d5, \t, d25           /* 2*t */
+    vsub.f64 d6, d2, d5            /* 3 - 2*t */
     vmul.f64 \out, \out, d6
 .endm
 
@@ -125,32 +127,24 @@
 .macro NOISE_CHANNEL chb, acc
     /* b00 -> d8 (gx) / d9 (gy) */
     add r2, r3, r14, lsl #5
-    add r2, r2, #\chb
-    vldr d8, [r2]
+    vldr d8, [r2, #\chb]
     add r1, r4, r14, lsl #5
-    add r1, r1, #\chb
-    vldr d9, [r1]
+    vldr d9, [r1, #\chb]
     /* b10 -> d10 (gx) / d11 (gy) */
     add r2, r3, r12, lsl #5
-    add r2, r2, #\chb
-    vldr d10, [r2]
+    vldr d10, [r2, #\chb]
     add r1, r4, r12, lsl #5
-    add r1, r1, #\chb
-    vldr d11, [r1]
+    vldr d11, [r1, #\chb]
     /* b01 -> d12 (gx) / d13 (gy) */
     add r2, r3, r10, lsl #5
-    add r2, r2, #\chb
-    vldr d12, [r2]
+    vldr d12, [r2, #\chb]
     add r1, r4, r10, lsl #5
-    add r1, r1, #\chb
-    vldr d13, [r1]
+    vldr d13, [r1, #\chb]
     /* b11 -> d14 (gx) / d15 (gy) */
     add r2, r3, r11, lsl #5
-    add r2, r2, #\chb
-    vldr d14, [r2]
+    vldr d14, [r2, #\chb]
     add r1, r4, r11, lsl #5
-    add r1, r1, #\chb
-    vldr d15, [r1]
+    vldr d15, [r1, #\chb]
 
     /* Noise2 (u/v/a/u2/v2/b then n), same fp order as the reference ───────
      * vmla.f64 is fused on this VFPv4 core; the C++ reference builds with
@@ -178,17 +172,11 @@
     vmul.f64 d3, d31, d6
     vadd.f64 d4, d4, d3            /* n = a + sy*(b-a) */
 
-    /* Accumulate: acc += fractal ? n/ratio : |n|/ratio ───────────────────── */
+    /* Accumulate: acc += (r8 ? n : |n|) * (1/ratio) ───────────────────────── */
     cmp r8, #0
-    beq .Lturb_n\@
-    vdiv.f64 d4, d4, d24
+    vabseq.f64 d4, d4
+    vmul.f64 d4, d4, d25
     vadd.f64 \acc, \acc, d4
-    b .Lacc_n\@
-.Lturb_n\@:
-    vabs.f64 d4, d4
-    vdiv.f64 d4, d4, d24
-    vadd.f64 \acc, \acc, d4
-.Lacc_n\@:
 .endm
 
 turbulence32Asm:
@@ -197,7 +185,7 @@ turbulence32Asm:
     vpush {d8-d15}
     sub sp, sp, #S_SIZE
 
-    /* constants: d0 = 1.0, d1 = 4096.0 */
+    /* constants: d0 = 1.0, d1 = 4096.0, d2 = 3.0 */
     mov r12, #0
     movw r1, #0
     movt r1, #0x3FF0
@@ -205,6 +193,7 @@ turbulence32Asm:
     movw r1, #0
     movt r1, #0x40B0
     vmov d1, r12, r1
+    vmov.f64 d2, #3.0
 
     ldr r3, [r0, #A_GRADX]
     ldr r4, [r0, #A_GRADY]
@@ -223,8 +212,8 @@ row_loop:
     bge finish
 
     /* py0 = (userTop + y*invScaleY) / unitY * freqY */
-    vmov s4, r6
-    vcvt.f64.s32 d3, s4
+    vmov s6, r6
+    vcvt.f64.s32 d3, s6
     vldr d5, [r0, #A_INV_SCALE_Y]
     vmul.f64 d3, d3, d5
     vldr d5, [r0, #A_USER_TOP]
@@ -235,12 +224,14 @@ row_loop:
     vmul.f64 d3, d3, d5
     vstr d3, [sp, #S_PY0]
 
-    /* tileY = (y - clipTop) */
+    /* ctly0 = (y - clipTop) * freqY */
     ldr r14, [r0, #A_CLIP_TOP]
     sub r1, r6, r14
-    vmov s4, r1
-    vcvt.f64.s32 d3, s4
-    vstr d3, [sp, #S_TILEY]
+    vmov s6, r1
+    vcvt.f64.s32 d3, s6
+    vldr d5, [r0, #A_FREQ_Y]
+    vmul.f64 d3, d3, d5
+    vstr d3, [sp, #S_CTLY0]
 
     /* row destination = pixels + (y*width + clipLeft)*4 */
     ldr r1, [r0, #A_PIXELS]
@@ -267,8 +258,8 @@ pixel_loop:
     vmov d19, r12, r12
 
     /* fx = px0 = (userLeft + x*invScaleX) / unitX * freqX */
-    vmov s4, r7
-    vcvt.f64.s32 d3, s4
+    vmov s6, r7
+    vcvt.f64.s32 d3, s6
     vldr d5, [r0, #A_INV_SCALE_X]
     vmul.f64 d3, d3, d5
     vldr d5, [r0, #A_USER_LEFT]
@@ -281,16 +272,14 @@ pixel_loop:
     /* ctlx = tileX * freqX */
     ldr r14, [r0, #A_CLIP_LEFT]
     sub r1, r7, r14
-    vmov s4, r1
-    vcvt.f64.s32 d3, s4           /* tileX */
+    vmov s6, r1
+    vcvt.f64.s32 d3, s6           /* tileX */
     vldr d5, [r0, #A_FREQ_X]
     vmul.f64 d22, d3, d5          /* ctlx */
 
     /* fy, ctly */
     vldr d21, [sp, #S_PY0]
-    vldr d3, [sp, #S_TILEY]
-    vldr d5, [r0, #A_FREQ_Y]
-    vmul.f64 d23, d3, d5          /* ctly = tileY * freqY */
+    vldr d23, [sp, #S_CTLY0]
 
     /* ratio = 1.0, octave index = 0, park the output cursor */
     vmov.f64 d24, d0
@@ -308,6 +297,8 @@ pixel_loop:
     ldr r1, [r0, #A_OCTAVES]
     cmp r5, r1
     bge .Loct_done
+
+    vadd.f64 d25, d0, d0          /* 2.0 (SMOOTHSTEP; becomes 1/ratio below) */
 
     /* ── X geometry (stich wrap folded in) ──────────────────────────────── */
     ldr r12, [r0, #A_PERIOD_X]
@@ -372,6 +363,10 @@ pixel_loop:
     add r12, r1, r12              /* j + by0 */
     ldr r12, [r2, r12, lsl #2]    /* b10 */
 
+    /* 1/ratio: ratio is a power of two, so n/ratio == n*(1/ratio) exactly;
+     * one division per octave instead of four per channel. */
+    vdiv.f64 d25, d0, d24
+
     /* ── Four channels (R, G, B, A) ────────────────────────────────────── */
     NOISE_CHANNEL  0, d16
     NOISE_CHANNEL  8, d17
@@ -412,10 +407,7 @@ pack_pixel:
     mov r12, #0
     vmov d6, r12, r12               /* offset = 0.0 */
 .Lfp_common:
-    mov r12, #0
-    movw r1, #0x0000
-    movt r1, #0x3FE0
-    vmov d7, r12, r1                /* 0.5 */
+    vmov.f64 d7, #0.5
 
     /* ch0 (R) d16 -> r12 */
     vadd.f64 d4, d16, d6

@@ -225,3 +225,47 @@ pack: accs straight from d16-d19
   vs lazy baseline neon32: 40.719 -> 24.967 ms (1.63x) and 660.526 -> 397.618 ms
   (1.66x). Speedup vs scalar went 3.36/3.28 -> 6.19/6.22. Phase 2 gate (>=1.3x)
   is now satisfied by ~5x margin; the 2-px interleave remains optional.
+
+## Step A — vldr [r2,#chb] offset merge (incremental pass 1)
+
+Restructured the NOISE_CHANNEL gradient loads: fold the per-channel byte offset
+into the `vldr` addressing ([r2, #\chb]) instead of a separate `add r2,r2,#\chb`.
+Removes 8 integer adds per channel, 32 per octave. Alignment is preserved
+(gradX/gradY base 4-aligned, index stride 32, offsets 0/8/16/24 -> 8-aligned).
+
+Parity: OK (22 tests).
+Bench (scalar/neon32 same-run, vs 0df7b09e baseline):
+  512:   154.473 / 24.741 ms   (was 24.967)  6.24x  (+0.9%)
+  2048:  2159.946 / 344.828 ms (was 397.618)  6.26x  (+13.3%)
+
+## Steps B-F — incremental micro-optimization pass (all parity-green)
+
+Step B — hoist the accumulate branch into one `cmp r8,#0` + conditional
+`vabseq.f64 d4,d4`, sharing the div+add for both fractal/turbulence paths.
+Removes 2 branches + 1 duplicate vdiv per channel. abs still precedes div,
+so the FP op order is unchanged.  512: 24.741 -> 21.417 ms; 2048: 344.828 -> 344.653 ms.
+
+Step C — single reciprocal per octave: `vdiv.f64 d25, d0, d24` once after the
+permutation, then `vmul` instead of `vdiv` in each channel accumulate. ratio is
+a power of two, so n/ratio == n*(1/ratio) bit-exactly; confirmed by parity.
+d25 now time-shared (2.0 during geometry, 1/ratio after permutation).
+512: 21.417 -> 20.660 ms; 2048: 344.653 -> 327.216 ms.
+
+Step D — hoist `ctly0 = (y - clipTop)*freqY` into the row loop (stack slot
+S_TILEY -> S_CTLY0); pixel loop just vldr's it. Same mul order -> bit-exact.
+512: 20.660 -> 20.579 ms; 2048: 327.216 -> 326.841 ms.
+
+Step E — permanent constants for SMOOTHSTEP: d2 = 3.0 (vmov.f64 #3.0 at entry),
+d25 = 2.0 (vadd d0,d0 at octave top). FLOOR int-convert moved s4 -> s14 (d7 low
+half; d2 is now live) and the int->double vmov traffic moved s4 -> s6 (d3 low
+half). Pack still uses s4 (d2 is dead there). Saves 2 vadd per smoothstep.
+512: 20.579 -> 20.693 ms; 2048: 326.841 -> 328.667 ms (flat, within noise).
+
+Step F — pack's +0.5 constant via `vmov.f64 d7, #0.5` (VFP immediate), dropping
+the 4-instruction movw/movt/... build (3 fewer instructions per pixel).
+512: 20.693 -> 20.531 ms; 2048: 328.667 -> 327.018 ms (flat, within noise).
+
+Final cumulative (vs 0df7b09e baseline 24.967 / 397.618):
+  512:   20.531 ms  (~17.8% faster)    6.56x
+  2048:  327.018 ms (~17.8% faster)    6.59x
+All 6 steps: parity OK (22 tests each).
