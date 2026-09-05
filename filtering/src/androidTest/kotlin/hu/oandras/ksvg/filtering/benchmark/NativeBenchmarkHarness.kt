@@ -18,7 +18,6 @@ package hu.oandras.ksvg.filtering.benchmark
 
 import android.content.Context
 import android.os.Build
-import android.os.PowerManager
 import android.os.Process
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
@@ -43,16 +42,17 @@ import java.util.Locale
  * }
  * ```
  *
- * The harness provides: foreground Activity + sustained-performance opt-in
- * ([BenchmarkActivity]), benchmark-thread priority raise/restore, warmup, a batch
- * measurement loop with per-iteration `System.nanoTime()` sampling, per-sample
- * statistics ([BenchmarkStats], spec §14), and an environment report. The measured
- * region is exactly the [run] block (spec §20: no logging, I/O, thermal reads or GC
- * inside it).
- *
- * Later steps add thermal/cooldown gating, cache normalization, classification and
- * the validation-vs-raw comparison.
- */
+* The harness provides: foreground Activity + sustained-performance opt-in
+     * ([BenchmarkActivity]), benchmark-thread priority raise/restore, warmup, a batch
+     * measurement loop with per-iteration `System.nanoTime()` sampling, thermal gating
+     * ([ThermalStateMonitor], spec §6/§7: batches measured while throttled are dropped),
+     * per-sample statistics ([BenchmarkStats], spec §14), and an environment report. The
+     * measured region is exactly the [run] block (spec §20: no logging, I/O, thermal reads
+     * or GC inside it).
+     *
+     * Later steps add the thermal cooldown/retry, cache normalization, classification and
+     * the validation-vs-raw comparison.
+     */
 fun nativeBenchmark(configure: NativeBenchmarkBuilder.() -> Unit): NativeBenchmarkReport {
     val builder = NativeBenchmarkBuilder()
     builder.configure()
@@ -90,26 +90,50 @@ class NativeBenchmarkBuilder {
 
         BenchmarkActivity.waitForFocusedWindow()
 
+        val thermal = ThermalStateMonitor.create(context())
+        thermal.computeBaselineIfNeeded()
+        val thermalStatusBefore = thermal.currentThermalStatus()
+
         val tid = Process.myTid()
         val previousPriority = capturePriority(tid)
 
-        val samples = Array(measurementBatches) { DoubleArray(iterationsPerBatch) }
+        val validBatches = ArrayList<DoubleArray>(measurementBatches)
         var threadPriorityApplied = false
+        var thermalThrottled = false
         try {
             // Warmup never touches the measured region either.
             repeat(warmupIterations) { kernel.invoke() }
 
-            for (b in 0 until measurementBatches) {
+            // Batches are gated on thermal state (spec §6/§9): a batch measured while
+            // throttled is dropped and not counted. Retry asks for a fresh batch; the
+            // cooldown sleep + invalidatedBatches counters arrive in Step 4.
+            var attempted = 0
+            val maxAttempts = maxOf(measurementBatches * 3, measurementBatches + 8)
+            while (validBatches.size < measurementBatches && attempted < maxAttempts) {
+                attempted++
+                if (thermal.isThrottled()) {
+                    thermalThrottled = true
+                    continue
+                }
+                val batch = DoubleArray(iterationsPerBatch)
                 for (i in 0 until iterationsPerBatch) {
                     val t0 = System.nanoTime()
                     kernel.invoke()
                     val t1 = System.nanoTime()
-                    samples[b][i] = (t1 - t0) / 1_000_000.0
+                    batch[i] = (t1 - t0) / 1_000_000.0
                 }
+                if (thermal.isThrottled()) {
+                    // Status rose while the batch was being measured -> invalid (spec §6).
+                    thermalThrottled = true
+                    continue
+                }
+                validBatches.add(batch)
             }
         } finally {
             threadPriorityApplied = restorePriority(tid, previousPriority)
         }
+
+        val thermalStatusAfter = thermal.currentThermalStatus()
 
         val report =
             NativeBenchmarkReport(
@@ -117,11 +141,15 @@ class NativeBenchmarkBuilder {
                 backend = backend,
                 width = width,
                 height = height,
-                samples = samples,
+                samples = validBatches.toTypedArray(),
                 environment =
                     buildEnvironment(
                         frontend = this,
                         threadPriorityApplied = threadPriorityApplied,
+                        thermalStatusBefore = thermalStatusBefore,
+                        thermalStatusAfter = thermalStatusAfter,
+                        thermalThrottled = thermalThrottled,
+                        thermalSource = thermal.source,
                     ),
             )
         report.print()
@@ -255,6 +283,10 @@ class NativeBenchmarkReport(
 private fun buildEnvironment(
     frontend: NativeBenchmarkBuilder,
     threadPriorityApplied: Boolean,
+    thermalStatusBefore: Int,
+    thermalStatusAfter: Int,
+    thermalThrottled: Boolean,
+    thermalSource: String,
 ): String =
     buildString {
         appendLine("device=${Build.DEVICE}")
@@ -267,7 +299,10 @@ private fun buildEnvironment(
                 (BenchmarkActivity.sustainedPerformanceModeInUse && BenchmarkActivity.sustainedSetResult != false)
         )
         appendLine("sustainedSetResult=${BenchmarkActivity.sustainedSetResult}")
-        appendLine("thermalStatus=${thermalStatus()}")
+        appendLine("thermalSource=$thermalSource")
+        appendLine("thermalStatusBefore=$thermalStatusBefore")
+        appendLine("thermalStatusAfter=$thermalStatusAfter")
+        appendLine("thermalThrottled=$thermalThrottled")
         appendLine("windowFocused=${BenchmarkActivity.isWindowFocused}")
         appendLine("warmupIterations=${frontend.warmupIterations}")
         appendLine("measurementBatches=${frontend.measurementBatches}")
@@ -278,12 +313,6 @@ private fun buildEnvironment(
     }
 
 private fun context(): Context = InstrumentationRegistry.getInstrumentation().targetContext
-
-private fun thermalStatus(): Int? {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
-    val pm = context().getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return null
-    return pm.currentThermalStatus
-}
 
 /** Highest Linux nice priority (best-effort like the platform docs; needs no root). */
 private const val HIGH_PRIORITY = -20
