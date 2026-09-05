@@ -122,6 +122,9 @@ class NativeBenchmarkBuilder {
                     cooldownTimeMs += cooldown()
                     continue
                 }
+                // Flush CPU-cache state left by the previous batch (spec §8; outside
+                // the measured region — no kernel call, no timing here).
+                CacheNormalizer.normalize()
                 val batch = DoubleArray(iterationsPerBatch)
                 for (i in 0 until iterationsPerBatch) {
                     val t0 = System.nanoTime()
