@@ -325,10 +325,10 @@ Without the property all ABIs build as usual (this is wired in
 | Unlinearize | neon64 | 512x512 | 33.992 | 7.71 | 0.06 | **0.04x** |
 | ComponentTransfer | scalar | 512x512 | 2.848 | 92.05 | 0.74 | 1.00x |
 | ComponentTransfer | neon64 | 512x512 | 39.201 | 6.69 | 0.05 | **0.07x** |
-| Morphology | scalar | 512x512 | 199.105 | 1.32 | 0.01 | 1.00x |
-| Morphology | neon64 | 512x512 | 15.790 | 16.60 | 0.13 | **12.6x** |
-| Morphology | scalar | 2048x2048 | 3275.911 | 1.28 | 0.01 | 1.00x |
-| Morphology | neon64 | 2048x2048 | 238.894 | 17.56 | 0.14 | **13.7x** |
+| Morphology | scalar | 512x512 | 200.232 | 1.31 | 0.01 | 1.00x |
+| Morphology | neon64 | 512x512 | 15.979 | 16.41 | 0.13 | **12.5x** |
+| Morphology | scalar | 2048x2048 | 3295.601 | 1.27 | 0.01 | 1.00x |
+| Morphology | neon64 | 2048x2048 | 224.114 | 18.72 | 0.15 | **14.7x** |
 | ConvolveMatrix | scalar | 512x512 | 90.549 | 2.90 | 0.02 | 1.00x |
 | ConvolveMatrix | neon64 | 512x512 | 9.580 | 27.36 | 0.22 | **9.45x** |
 | DisplacementMap | scalar | 512x512 | 8.261 | 31.73 | 0.38 | 1.00x |
@@ -343,9 +343,12 @@ harness (spec §6.2, median of 5 batches with warmup + thermal gating + batch-CV
 classifier, measured 2026-09-05 on the same OnePlus 12 / SM8550). Scalar-vs-SIMD
 speedups are only directly comparable within the same run (CPU-frequency/thermal
 drift makes cross-session absolute times differ — e.g. Morphology scalar 512² was
-286.3 ms avg in the 2026-09-02 run vs 199.1 ms harness median here). The Morphology
-`neon64` rows exercise the hand-written AArch64 kernel (`morphology_neon64.S`); the
-previous inline NEON path measured **0.44x** vs scalar.
+286.3 ms avg in the 2026-09-02 run vs ~200 ms harness median here). The Morphology
+`neon64` row median (15.979 ms @512², 224.114 ms @2048²) is the post-2026-09-05
+optimization revision of the hand-written AArch64 kernel (`morphology_neon64.S`):
+the tail loop was replaced by a straight-line 1-or-3-pixel tail (`tbz w12, #1`) and
+the per-iteration `cbz` was hoisted out of the vector loop; the previous inline NEON
+path measured **0.44x** vs scalar.
 
 ---
 
@@ -504,3 +507,13 @@ trusting long bench runs on this device:
   run: neon64 Morphology is now **12.6x** @512² (15.8 ms) and **13.7x** @2048²
   (238.9 ms) vs scalar in the same run, where the previous inline NEON path measured
   **0.44x**. CSVs: `tmp/benchmarks_device_harness_Morphology_*.csv`.
+- 2026-09-05 — Optimized `morphology_neon64.S` (points 1+2+7 of the code review):
+  the loopy 1..3-pixel tail became a **straight-line** tail (`tbz w12, #1` selects the
+  always-odd 1-or-3-pixel case, no counter), the `cbz w8` guard was hoisted out of the
+  vector-loop body so each iteration is just `ld1`+`umax`/`umin`+`subs`+branch, and the
+  per-row tail-count recompute (`and w11, w12, #3`) is gone — structurally eliminating
+  the `w14`/`x14` counter/cursor aliasing bug class. Device parity re-run:
+  **OK (108 tests)**; harness medians re-measured in the same run: scalar 200.2 /
+  neon64 15.98 ms @512² (**12.5x**) and scalar 3295.6 / neon64 224.1 ms @2048²
+  (**14.7x**). The 2048² cell improved ~6% over the pre-optimization revision
+  (238.9 -> 224.1 ms); 512² is within noise. §6.1 table refreshed.

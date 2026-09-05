@@ -92,45 +92,52 @@ ksvgMorphologyApplyPixelNeon64:
     sxtw    x17, w2
     lsl     x17, x17, #2               // row stride in bytes
 
-    /* tailCount lives in w11, never in w14/x14: x14 is the per-row pixel
-     * cursor below, and re-using the same register as the tail counter would
-     * trash it on every row. */
-    and     w11, w12, #3               // tailCount = pixelCount % 4
+    /* No tail counter at all: pixelCount is always odd (2*radiusX + 1), so
+     * the tail after the 4-pixel vector loop is either 1 or 3 pixels. The
+     * straight-line tail below tests bit 1 of w12 and unrolls accordingly,
+     * which also removes the possibility of a counter/cursor register clash
+     * (x14 is the per-row pixel cursor and stays out of the tail math). */
 
     /* Branch once: do not maintain both min and max accumulators. */
     cbnz    w5, .L_erode
 
 /* ---------------------------------------------------------------------
  * Dilation: byte-wise maximum over the complete kernel.
+ *
+ * The vector loop consumes pixelCount & ~3 pixels; the tail is always
+ * 1 or 3 pixels because pixelCount = 2*radiusX + 1 is odd.
  * --------------------------------------------------------------------- */
 .L_dilate:
     movi    v0.16b, #0
 
 .L_dilate_row:
     mov     x14, x15
-    mov     w8, w13                   // vector loop counter
+    cbz     w13, .L_dilate_tail        // pixelCount < 4: no vector work
+    mov     w8, w13                    // vector loop counter
 
 .L_dilate_vec:
-    cbz     w8, .L_dilate_tail
     ld1     {v2.16b}, [x14], #16
     umax    v0.16b, v0.16b, v2.16b
     subs    w8, w8, #1
     b.ne    .L_dilate_vec
 
 .L_dilate_tail:
-    cbz     w11, .L_dilate_next_row
-
-.L_dilate_tail_loop:
+    /* First tail pixel always exists (tail is 1 or 3). */
     ldr     w8, [x14], #4
     dup     v2.4s, w8
     umax    v0.16b, v0.16b, v2.16b
-    subs    w11, w11, #1
-    b.ne    .L_dilate_tail_loop
+    /* The remaining two tail pixels exist only when pixelCount % 4 == 3,
+     * i.e. when bit 1 of the odd pixelCount is set. */
+    tbz     w12, #1, .L_dilate_next_row
+    ldr     w8, [x14], #4
+    dup     v2.4s, w8
+    umax    v0.16b, v0.16b, v2.16b
+    ldr     w8, [x14], #4
+    dup     v2.4s, w8
+    umax    v0.16b, v0.16b, v2.16b
 
 .L_dilate_next_row:
     add     x15, x15, x17
-    /* Recompute tail for every row: w11 was consumed above. */
-    and     w11, w12, #3
     subs    w10, w10, #1
     b.ne    .L_dilate_row
 
@@ -144,29 +151,32 @@ ksvgMorphologyApplyPixelNeon64:
 
 .L_erode_row:
     mov     x14, x15
-    mov     w8, w13                   // vector loop counter
+    cbz     w13, .L_erode_tail         // pixelCount < 4: no vector work
+    mov     w8, w13                    // vector loop counter
 
 .L_erode_vec:
-    cbz     w8, .L_erode_tail
     ld1     {v2.16b}, [x14], #16
     umin    v0.16b, v0.16b, v2.16b
     subs    w8, w8, #1
     b.ne    .L_erode_vec
 
 .L_erode_tail:
-    cbz     w11, .L_erode_next_row
-
-.L_erode_tail_loop:
+    /* First tail pixel always exists (tail is 1 or 3). */
     ldr     w8, [x14], #4
     dup     v2.4s, w8
     umin    v0.16b, v0.16b, v2.16b
-    subs    w11, w11, #1
-    b.ne    .L_erode_tail_loop
+    /* The remaining two tail pixels exist only when pixelCount % 4 == 3,
+     * i.e. when bit 1 of the odd pixelCount is set. */
+    tbz     w12, #1, .L_erode_next_row
+    ldr     w8, [x14], #4
+    dup     v2.4s, w8
+    umin    v0.16b, v0.16b, v2.16b
+    ldr     w8, [x14], #4
+    dup     v2.4s, w8
+    umin    v0.16b, v0.16b, v2.16b
 
 .L_erode_next_row:
     add     x15, x15, x17
-    /* Recompute tail for every row: w11 was consumed above. */
-    and     w11, w12, #3
     subs    w10, w10, #1
     b.ne    .L_erode_row
 
