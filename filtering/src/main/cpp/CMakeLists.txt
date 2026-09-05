@@ -42,6 +42,10 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
 endif()
 
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(MORPHOLOGY_SOURCES morphology/morphology_neon32.S)
+endif()
+
+if(ANDROID_ABI STREQUAL "armeabi-v7a")
     set(TURBULENCE_SOURCES turbulence/turbulence_noise_neon32.S)
 endif()
 

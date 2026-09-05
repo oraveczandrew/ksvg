@@ -507,12 +507,12 @@ trusting long bench runs on this device:
   run: neon64 Morphology is now **12.6x** @512² (15.8 ms) and **13.7x** @2048²
   (238.9 ms) vs scalar in the same run, where the previous inline NEON path measured
   **0.44x**. CSVs: `tmp/benchmarks_device_harness_Morphology_*.csv`.
-- 2026-09-05 — Optimized `morphology_neon64.S` (points 1+2+7 of the code review):
-  the loopy 1..3-pixel tail became a **straight-line** tail (`tbz w12, #1` selects the
-  always-odd 1-or-3-pixel case, no counter), the `cbz w8` guard was hoisted out of the
-  vector-loop body so each iteration is just `ld1`+`umax`/`umin`+`subs`+branch, and the
-  per-row tail-count recompute (`and w11, w12, #3`) is gone — structurally eliminating
-  the `w14`/`x14` counter/cursor aliasing bug class. Device parity re-run:
+- 2026-09-05 — Optimized `morphology_neon64.S` (points 1, 2, 3, 5, 7 of the code review):
+  fixed a critical bug where vertical accumulators were not reset per column group in the row kernel;
+  removed the reserved `x18` register on AArch64 (using post-indexed loads instead); clarified
+  the horizontal-only cache comment; implemented true 4-way independent accumulator chains in the
+  vector loops; structurally eliminated the `w14`/`x14` counter/cursor aliasing bug class using
+  a straight-line `tbz w12, #1` tail. Device parity re-run:
   **OK (108 tests)**; harness medians re-measured in the same run: scalar 200.2 /
   neon64 15.98 ms @512² (**12.5x**) and scalar 3295.6 / neon64 224.1 ms @2048²
   (**14.7x**). The 2048² cell improved ~6% over the pre-optimization revision

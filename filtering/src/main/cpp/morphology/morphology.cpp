@@ -30,6 +30,27 @@ extern "C" void ksvgMorphologyApplyPixelNeon64(
     const jint *src, jint *dst, jint width,
     jint radiusX, jint radiusY, jboolean erode,
     jint x, jint y);
+
+// Row kernel: computes xStart..xEnd-1 output pixels of row y in one call so
+// overlapping horizontal windows reuse the shared source reads. Requires that
+// the whole spanned window lies inside the image. scratch must hold at least
+// (xEnd - xStart) + 2*radiusX jints and is written over.
+extern "C" void ksvgMorphologyApplyRowNeon64(
+    const jint *src, jint *dst, jint width,
+    jint radiusX, jint radiusY, jboolean erode,
+    jint y, jint xStart, jint xEnd, jint *scratch);
+#elif defined(__arm__)
+// Hand-written ARM32/AdvSIMD interior morphology pixel (morphology_neon32.S).
+extern "C" void ksvgMorphologyApplyPixelNeon32(
+    const jint *src, jint *dst, jint width,
+    jint radiusX, jint radiusY, jboolean erode,
+    jint x, jint y);
+
+// Row kernel for ARM32.
+extern "C" void ksvgMorphologyApplyRowNeon32(
+    const jint *src, jint *dst, jint width,
+    jint radiusX, jint radiusY, jboolean erode,
+    jint y, jint xStart, jint xEnd, jint *scratch);
 #endif
 
 // feMorphology (erode/dilate) over unpremultiplied ARGB_8888 IntArrays.
@@ -254,12 +275,12 @@ namespace {
                     assert(backend == SIMD_BACKEND_NEON64);
                     ksvgMorphologyApplyPixelNeon64(src, dst, width, radiusX, radiusY, erode, x, y);
                 }
-#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+#elif defined(__arm__)
                 if (backend == SIMD_BACKEND_SCALAR) {
                     applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
                 } else {
                     assert(backend == SIMD_BACKEND_NEON32);
-                    applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
+                    ksvgMorphologyApplyPixelNeon32(src, dst, width, radiusX, radiusY, erode, x, y);
                 }
 #elif defined(__i386__) || defined(__x86_64__)
                 switch (backend) {
@@ -342,6 +363,97 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForced(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
+    JNIEnv *env, jclass clazz,
+    const jintArray jSrc, const jintArray jDst,
+    const jint width, const jint height,
+    const jint radiusX, const jint radiusY, const jboolean erode,
+    const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
+    auto *src = env->GetIntArrayElements(jSrc, nullptr);
+    if (src == nullptr) return;
+    auto *dst = env->GetIntArrayElements(jDst, nullptr);
+    if (dst == nullptr) {
+        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+        return;
+    }
+
+    std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
+
+#if defined(__aarch64__)
+    // Row-kernel forced variant: scalar borders + row kernel on the interior.
+    const jint yLo = clipTop;
+    const jint yHi = clipBottom;
+    const jint xLo = clipLeft;
+    const jint xHi = clipRight;
+
+    const jint vyLo = std::max(yLo, radiusY);
+    const jint vyHi = std::min(yHi, height - radiusY);
+    const jint vxLo = std::max(xLo, radiusX);
+    const jint vxHi = std::min(xHi, width - radiusX);
+
+    const bool isErode = erode == JNI_TRUE;
+    const jint init = isErode ? 255 : 0;
+    const jint span = vxHi - vxLo + 2 * radiusX;
+    jint *spanBuf = span > 0 ? new jint[span] : nullptr;
+
+    for (jint y = yLo; y < yHi; y++) {
+        if (y >= vyLo && y < vyHi) {
+            for (jint x = xLo; x < vxLo; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+            ksvgMorphologyApplyRowNeon64(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            for (jint x = vxHi; x < xHi; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+        } else {
+            for (jint x = xLo; x < xHi; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+        }
+    }
+    delete[] spanBuf;
+#elif defined(__arm__)
+    const jint yLo = clipTop;
+    const jint yHi = clipBottom;
+    const jint xLo = clipLeft;
+    const jint xHi = clipRight;
+
+    const jint vyLo = std::max(yLo, radiusY);
+    const jint vyHi = std::min(yHi, height - radiusY);
+    const jint vxLo = std::max(xLo, radiusX);
+    const jint vxHi = std::min(xHi, width - radiusX);
+
+    const bool isErode = erode == JNI_TRUE;
+    const jint init = isErode ? 255 : 0;
+    const jint span = vxHi - vxLo + 2 * radiusX;
+    jint *spanBuf = span > 0 ? new jint[span] : nullptr;
+
+    for (jint y = yLo; y < yHi; y++) {
+        if (y >= vyLo && y < vyHi) {
+            for (jint x = xLo; x < vxLo; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+            ksvgMorphologyApplyRowNeon32(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            for (jint x = vxHi; x < xHi; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+        } else {
+            for (jint x = xLo; x < xHi; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+        }
+    }
+    delete[] spanBuf;
+#else
+    runForced(src, dst, width, height, radiusX, radiusY, erode == JNI_TRUE,
+              clipLeft, clipTop, clipRight, clipBottom, SIMD_BACKEND_SCALAR);
+#endif
+
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
     JNIEnv *env, jclass clazz,
     const jintArray jSrc, const jintArray jDst,
@@ -392,8 +504,23 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             for (jint x = xLo; x < vxLo; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
+#if defined(__aarch64__)
+            // Row kernel for the whole interior run: header math (incl. the
+            // byte-row-stride sign-extension) is hoisted out of the per-pixel
+            // calls, and overlapping horizontal windows re-use a shared L1
+            // scratch row instead of re-reading the same source bytes.
+            const jint span = vxHi - vxLo + 2 * radiusX;
+            jint *spanBuf = new jint[span];
+            ksvgMorphologyApplyRowNeon64(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            delete[] spanBuf;
+#elif defined(__arm__)
+            const jint span = vxHi - vxLo + 2 * radiusX;
+            jint *spanBuf = new jint[span];
+            ksvgMorphologyApplyRowNeon32(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            delete[] spanBuf;
+#elif defined(__i386__) || defined(__x86_64__)
+            const SimdLevel level = detectSimdLevel();
             for (jint x = vxLo; x < vxHi; x++) {
-#if defined(__i386__) || defined(__x86_64__)
                 switch (level) {
                     case SIMD_AVX512:
                         ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
@@ -404,12 +531,12 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
                     default:
                         applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
                 }
-#elif defined(__aarch64__)
-                ksvgMorphologyApplyPixelNeon64(src, dst, width, radiusX, radiusY, erode, x, y);
-#else
-                applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
-#endif
             }
+#else
+            for (jint x = vxLo; x < vxHi; x++) {
+                applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
+            }
+#endif
             for (jint x = vxHi; x < xHi; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
