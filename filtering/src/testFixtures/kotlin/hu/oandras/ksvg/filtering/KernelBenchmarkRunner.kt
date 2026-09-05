@@ -20,11 +20,11 @@ import java.io.File
 import java.util.*
 
 /**
- * Shared performance benchmark harness for filter kernels, used by both the
- * host JVM benchmark (`KernelPerformanceBenchmark`, src/test) and the Android
- * instrumented benchmark (`KernelPerformanceDeviceBenchmark`, src/androidTest).
- * On Android `println` is routed into logcat, so no explicit `Log` calls are
- * needed here.
+ * Legacy raw performance benchmark runner for filter kernels. Used only by the
+ * host JVM benchmark (`KernelPerformanceBenchmark`, src/test). The Android
+ * device benchmark (`KernelPerformanceDeviceBenchmark`, src/androidTest) no
+ * longer uses this: it runs through the stable `nativeBenchmark { }` harness
+ * (`benchmark` package, spec `tmp/TEST_HARNESS.md`).
  */
 public object KernelBenchmarkRunner {
 

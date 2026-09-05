@@ -253,8 +253,10 @@ the host CPU); the `benchmark.*` JVM system props are forwarded to the test fork
 by `testOptions.unitTests` in `filtering/build.gradle.kts`.
 
 **Device (ARM64)** — `runDeviceBenchmark` wrapper (runs `connectedDebugAndroidTest`,
-auto-`adb pull`s the CSV from the device's `externalCacheDir` into `tmp/`, then
-prints it as a Markdown table):
+auto-`adb pull`s the CSVs from the device's `externalCacheDir` into `tmp/`, then
+prints them as a Markdown table). The device benchmark
+(`KernelPerformanceDeviceBenchmark`, src/androidTest) runs every kernel through the
+stable `nativeBenchmark { }` harness — see §6.2:
 
 ```bash
 ./gradlew :filtering:runDeviceBenchmark \
@@ -263,7 +265,11 @@ prints it as a Markdown table):
 ```
 
 - The instrumentation args the benchmark reads are `benchmark.kernel` (name filter; omit
-  for the full suite) and `benchmark.quick` (`true` = 1 iteration).
+  for the full suite) and `benchmark.quick` (`true` = 512x512 only). Each
+  (kernel, backend, size) cell is its own harness block → one summary + one detail CSV
+  per cell (`benchmarks_device_harness_<kernel>_<backend>_<size>.csv` /
+  `benchmarks_harness_detail_<kernel>_<backend>_<size>.csv`), all matched by the
+  `benchmarks_device*.csv` pull glob.
 - Requires a connected device. The pull works because the project enables
   `android.injected.androidTest.leaveApksInstalledAfterRun=true` (the test APK —
   and its cache dir) is left installed after the run, and the pull reads the
@@ -336,8 +342,12 @@ Without the property all ABIs build as usual (this is wired in
 A stable, long-running **harness** for comparing native/NEON kernel work (e.g. `old
 assembly vs new assembly`) lives in `filtering/src/androidTest/.../benchmark/`
 (`NativeBenchmarkHarness.kt`, DSL `nativeBenchmark { }`; spec = `tmp/TEST_HARNESS.md`,
-plan = `TEST_HARNESS_PLAN.md`, findings = `tmp/TEST_HARNESS_WORKLOG.md`). It is the
-preferred device path for Turbulence going forward.
+plan = `TEST_HARNESS_PLAN.md`, findings = `tmp/TEST_HARNESS_WORKLOG.md`). The device
+kernel benchmark (`KernelPerformanceDeviceBenchmark`, §6.1) runs every filter kernel
+(UnLinearize, ComponentTransfer, Morphology, ArithmeticComposite non-linear + linear,
+ConvolveMatrix, DisplacementMap, Lighting, Turbulence, GaussianBlur) through it — the
+Morphology-only `TurbulenceNativeHarnessBenchmark` was the step-7 precursor and was
+removed once the general driver landed.
 
 It provides, per benchmark block (measured region = **only the JNI call**, spec §20):
 
@@ -381,17 +391,17 @@ Commands (device serial = e.g. `adbca122`):
 adb -s adbca122 install -r -t filtering/build/outputs/apk/androidTest/debug/filtering-debug-androidTest.apk
 adb -s adbca122 logcat -c
 adb -s adbca122 shell am instrument -w \
-  -e class hu.oandras.ksvg.filtering.benchmark.TurbulenceNativeHarnessBenchmark \
-  -e benchmark.quick true \
+  -e class hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
+  -e benchmark.kernel Turbulence -e benchmark.quick true \
   hu.oandras.filtering.test/androidx.test.runner.AndroidJUnitRunner
 adb -s adbca122 logcat -d -s System.out
 ```
 
-The migrated `TurbulenceNativeHarnessBenchmark` covers every native backend (scalar,
-neon64, …) × both sizes (512² / 2048²; quick = 512² only) and honours the
-`benchmark.kernel` / `benchmark.quick` args. The old raw path
-`KernelPerformanceDeviceBenchmark` is kept for the raw-vs-harness comparison
-(`HarnessValidationRawTest`, spec §22). Console output example:
+`KernelPerformanceDeviceBenchmark` covers every native backend (scalar, neon64, …) ×
+both sizes (512² / 2048²; quick = 512² only) per kernel and honours the
+`benchmark.kernel` / `benchmark.quick` args. Buffer reuse means the measured region is
+exactly the JNI call (spec §20). The raw-vs-harness comparison lives in
+`HarnessValidationRawTest` (spec §22). Console output example:
 
 ```text
 === Benchmark: Turbulence (neon64) 512x512 ===
@@ -458,3 +468,15 @@ trusting long bench runs on this device:
   unsupported and `currentThermalStatus` stays `NONE` while CPU frequency drifts
   (sysfs `scaling_cur_freq` is the reliable signal); the batch-CV classifier flags
   such drift as `UNSTABLE`.
+- 2026-09-05 — Generalised the harness to the whole device kernel suite:
+  `KernelPerformanceDeviceBenchmark` (src/androidTest) now runs **all** kernels
+  (UnLinearize, ComponentTransfer, Morphology, ArithmeticComposite non-linear +
+  linear, ConvolveMatrix, DisplacementMap, Lighting, Turbulence, GaussianBlur)
+  through `nativeBenchmark { }`, one harness block per (kernel, backend, size) cell,
+  replacing the old raw `KernelBenchmarkRunner` driver. `quick` = 512² only; 2048²
+  cells use 3 iterations/batch (vs 10 at 512²) to keep the larger kernels bounded.
+  Fixed two latent driver bugs while migrating: ConvolveMatrix now passes a proper
+  25-element 5x5 weight array (the old 9-float array + order-5 was an OOB read), and
+  the ArithmeticComposite `(linear)` variant now actually sets `useLinear=true`.
+  Removed the superseded Turbulence-only `TurbulenceNativeHarnessBenchmark`;
+  `KernelBenchmarkRunner` is host-JVM-only again.
