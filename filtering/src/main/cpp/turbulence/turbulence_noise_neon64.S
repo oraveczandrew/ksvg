@@ -171,10 +171,10 @@ row_loop:
     str     d20, [sp, #S_PY0]
 
     // ── curtly = (y - clipTop) * baseFrequencyY ─────────────────────────────
+    // d21 still holds freqY (fmul above), so no reload here.
     ldr     w17, [x0, #A_CLIP_TOP]
     sub     w17, w6, w17
     scvtf   d20, w17
-    ldr     d21, [x0, #A_FREQ_Y]
     fmul    d20, d20, d21
     str     d20, [sp, #S_CTLY]
 
@@ -192,10 +192,12 @@ row_loop:
     str     d20, [sp, #S_FX_BASE]
 
     // ── fxStep = invScaleX / unitX * freqX ───────────────────────────────────
+    // d21 still holds freqX from the fxBase computation; hold unitX in d22
+    // (free here — it is a gradient-load temp) so freqX survives without a
+    // reload. Same fp operands → bit-identical result.
     ldr     d20, [x0, #A_INV_SCALE_X]
-    ldr     d21, [x0, #A_UNIT_X]
-    fdiv    d20, d20, d21
-    ldr     d21, [x0, #A_FREQ_X]
+    ldr     d22, [x0, #A_UNIT_X]
+    fdiv    d20, d20, d22
     fmul    d20, d20, d21
     str     d20, [sp, #S_FX_STEP]
 

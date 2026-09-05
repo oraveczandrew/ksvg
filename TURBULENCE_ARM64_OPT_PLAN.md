@@ -56,15 +56,17 @@ absolute numbers carry wide error bars.
 
 ## Step 3 — dead freqY/freqX reload removal (G2)
 
-`row_loop` loads `A_FREQ_Y` twice for `py0` (line 143) and `curtly` (line 151)
-with no clobber between — the second is dead. Cache the scalar values (freqX,
-freqY, invScaleX, invScaleY) once before the row loop into callee-saved d-regs
-or into the stack frame, removing ~6 redundant ldr/row.
+`row_loop` loads `A_FREQ_Y` twice for `py0` and `curtly` with no clobber
+between — the second is dead (d21 keeps freqY from the `py0` fmul).
+Same for `A_FREQ_X` between `fxBase` and `fxStep`: d21 still holds freqX,
+so `fxStep` keeps it alive by holding unitX in d22 (a free gradient temp
+in row_loop) instead of reloading freqX.
 
-Apply also to the `fxStep` and `curtlx` computation which has similar patterns
-where `d21` holds a value across an `fdiv`+`fmul` block.
-
-Expected: parity OK, very small bench improvement (few instr/row).
+**Done (verified 2026-09-05):** parity 22/22 OK. 2 loads/row removed,
+fp-identical. Bench within noise (2048² 66.4–73.2 vs median ~71.8 pre-step);
+no regression. The broader "cache freqX/freqY/… across row_loop" idea from
+the report does not fit the register map — every d-reg is claimed across the
+loop, and stack-caching would not remove load instructions.
 
 ## Step 4 — bitwise weight step (1 instr/octave saved)
 
