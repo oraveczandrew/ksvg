@@ -215,10 +215,9 @@ row_loop:
 
     // ── row destination pointer = pixels + (y*width + clipLeft)*4 ─────────────
     ldr     x16, [sp, #S_PIXELS]
-    ldr     w17, [x0, #A_WIDTH]
-    mul     w17, w6, w17
     ldr     w18, [x0, #A_CLIP_LEFT]
-    add     w17, w17, w18
+    ldr     w17, [x0, #A_WIDTH]
+    madd    w17, w6, w17, w18
     add     x2, x16, x17, lsl #2
 
     ldr     w8, [x0, #A_CLIP_LEFT]

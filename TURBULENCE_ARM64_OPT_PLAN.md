@@ -68,21 +68,27 @@ no regression. The broader "cache freqX/freqY/… across row_loop" idea from
 the report does not fit the register map — every d-reg is claimed across the
 loop, and stack-caching would not remove load instructions.
 
-## Step 4 — bitwise weight step (1 instr/octave saved)
+## Step 4 — bitwise weight step — **NOT PORTABLE** (evaluated 2026-09-05)
 
 Replace the per-octave `ldr d29,const_half; fmul d28,d28,d29` with an integer
 subtract from a permanent `2^52` double held in a spare dN. The weight is always
 a normal power of two, so decrementing the biased exponent by one halves it
 bit-exactly (proven in 32-bit parity, applicable identically).
 
-One register live across the octave loop. On AArch64 the register file is wide
-enough to spare one more. Verify register pressure.
-
-Expected: parity OK, ~1% improvement at 2048².
+**Negative result.** The 32-bit kernel does `vsub.i64 d24,d24,d25` with a
+dedicated spare `d25`. AArch64's octave loop has **every D-lane's low 64 bits
+live** (accumulators v0/v1/v14/v15, temps v2-v6, mask v7, geometry d8-d13,
+gradients v16-v23, state d24-d28, scratch d29-d31), and AArch64 scalar `sub`
+has **no element-indexed operand** (verified: `sub d28,d28,v28.d[1]` fails to
+assemble; only whole-D sources, which would need a permanently-free register).
+Alternatives are ≥2 instr/octave (`movi`+`sub` = ldr+fmul tie; fmov/sub/fmov =
+3) so there is no win. The upper 64-bit lanes are free but unusable for the
+integer sub. Do not attempt a register-pressure fight here.
 
 ## Step 5 — madd row address (1 instr/row saved)
 
 Replace `mul w17,w6,w17; add w17,w17,w18` with `madd w17,w6,w17,w18`.
 Trivial 1-instruction-per-row savings. Parity trivially identical.
 
-Expected: no measurable bench impact but code completeness.
+**Done (verified 2026-09-05):** parity 22/22 OK. Bench within noise
+(4.60/73.5 ms, the normal device band); no measurable impact as predicted.
