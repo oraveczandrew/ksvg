@@ -289,3 +289,38 @@ All 6 steps: parity OK (22 tests each).
    (octave < 1022); parity confirms. vdiv.f64 d25,d0,d24 (the last remaining
    per-octave division) is gone; accumulate multiplies by d24.
    512: 20.513 -> 20.123; 2048: 325.350 -> 320.663 ms (6.65x/6.65x).
+
+## Round 4 — hoisted cmp, dead vldr removal, permanent 2^52 weight step, mla,
+## stack-cached pack constants (all parity-green)
+
+G1  One `cmp r8,#0` feeds all four channel accumulate vabseqs (VFP arithmetic
+    and the `add` address math never write APSR; the hoisted cmp sits after the
+    permutation so the geometry's cmp/subge can't interfere). 3 cmp/octave gone.
+G2  d5 keeps freqY / freqX alive between the two adjacent vmuls, so the second
+    vldr d5,[r0,#A_FREQ_Y/_X] was dead: 1 load/row + 1 load/pixel removed.
+G3  d25 is now a PERMANENT 2^52 constant (0x0010 0000 0000 0000 = one exponent
+    unit), built once at entry. SMOOTHSTEP doubles t with `vadd d5,t,t` (exact,
+    == t*2.0), and the octave-end weight halve is just `vsub.i64 d24,d24,d25`.
+    Removes the per-octave vadd (2.0 re-arm) + vshr: 2 instr/octave, and d25 is
+    never a clobbered state anymore.
+G4  row address: mul+add -> mla (1 instr/row).
+G5  Pack constants (scale/offset/0.5) cached in the frame ONCE per call
+    (S_SCALE/S_OFFSET/S_HALF); pack_pixel restores them with a single
+    `vldm sp,{d5,d6,d7}` and the per-pixel cmp/beq + movw/movt builds are gone.
+    Frame grew 24 -> 48 bytes (still 8-aligned).
+
+NOTE: idea "FLOOR branch removal" was REVIEWED and REJECTED for now: fx can be
+negative when userLeft < 0 (the +4096 shift only guarantees t >= 0 for
+fx > -4096), so trunc-then-correct is still required for bit-exactness.
+
+Bench (two runs: first was within-noise, second real):
+  run1 512: 20.523  2048: 324.375
+  run2 512: 20.067  2048: 322.425  (6.76x / 6.73x)
+
+Per-pixel instruction budget (4-octave corpus):
+  pixel prologue ~26, per octave ~248, pack ~32; total ~1050 @4 octaves.
+  octave split: noise arith 84 (34%), gradient loads 64 (26%), geometry 66
+  (27%), accumulate 13 (5%), permutation 11 (4.4%), entry/advance 10 (4%).
+  Biggest remaining structural win: Idea 6 (incremental fx/ctlx) - killed for
+  bit-exact reasons; FLOOR branch removal would save 12 instr/octave (4.8%) but
+  needs a coordinate-domain contract.

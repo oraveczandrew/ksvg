@@ -33,8 +33,7 @@
  *   d8-d15  current channel gradients (gx00 gy00 gx10 gy10 gx01 gy01 gx11 gy11)
  *   d16-d19 channel accumulators R G B A
  *   d20-d24 octave state fx fy ctlx ctly weight
- *   d25     time-shared: 2.0 during the geometry phase, then 2.0>>10 (one
- *           exponent unit) to halve the weight bitwise at the octave end
+ *   d25     2^52 (exponent-step constant, permanent: halves the weight bitwise)
  *   d26-d31 geometry rx0 rx1 ry0 ry1 sx sy
  *
  * GPRs:
@@ -88,12 +87,15 @@
 .equ A_UNIT_Y,   112
 
 /* ── Stack frame (final sp is 8-aligned) ──────────────────────────────────── */
-/* Doubles */
-.equ S_PY0,    0
-.equ S_CTLY0,  8
+/* Doubles: scale/offset/0.5 cached once per call (pack constant triple) */
+.equ S_SCALE,    0
+.equ S_OFFSET,   8
+.equ S_HALF,    16
+.equ S_PY0,     24
+.equ S_CTLY0,   32
 /* Words */
-.equ S_DST,   16
-.equ S_SIZE,  24
+.equ S_DST,     40
+.equ S_SIZE,    48
 
 /* floor(t): trunc toward zero, then correct when the truncated value is above
  * the true floor (doesn't happen for t >= 0).  out: \breg (int), \frac (double).
@@ -112,11 +114,12 @@
 .Lfloor_ok\@:
 .endm
 
-/* sx = t*t*(3.0 - 2.0*t) — same fp op order as the C++ reference. Uses the
- * permanent constants d2 = 3.0 and d25 = 2.0 (re-armed at octave top). */
+/* sx = t*t*(3.0 - 2.0*t) — same fp op order as the C++ reference. 2*t via
+ * t+t (exact doubling, bit-identical to t*2.0) so d25 can stay the permanent
+ * exponent-step constant; d2 = 3.0 is a live constant. */
 .macro SMOOTHSTEP out, t
     vmul.f64 \out, \t, \t
-    vmul.f64 d5, \t, d25           /* 2*t */
+    vadd.f64 d5, \t, \t            /* 2*t */
     vsub.f64 d6, d2, d5            /* 3 - 2*t */
     vmul.f64 \out, \out, d6
 .endm
@@ -176,8 +179,10 @@
     vmul.f64 d3, d31, d6
     vadd.f64 d4, d4, d3            /* n = a + sy*(b-a) */
 
-    /* Accumulate: acc += (r8 ? n : |n|) * weight ───────────────────────────── */
-    cmp r8, #0
+    /* Accumulate: acc += (r8 ? n : |n|) * weight. The APSR flags (Z) come from a
+ * `cmp r8, #0` hoisted before the channel group: the gradient `add` address
+ * math and the VFP ops below never write APSR, so one compare feeds all four
+ * channels' vabseq. */
     vabseq.f64 d4, d4
     vmul.f64 d4, d4, d24
     vadd.f64 \acc, \acc, d4
@@ -198,12 +203,40 @@ turbulence32Asm:
     movt r1, #0x40B0
     vmov d1, r12, r1
     vmov.f64 d2, #3.0
+    /* d25 = 2^52 (0x0010000000000000): one exponent unit. Subtracting it from
+     * the weight's bit pattern halves the weight bit-exactly. */
+    mov r12, #0
+    movw r1, #0x0000
+    movt r1, #0x0010
+    vmov d25, r12, r1
 
     ldr r3, [r0, #A_GRADX]
     ldr r4, [r0, #A_GRADY]
     ldr r8, [r0, #A_FRACTAL]
     ldr r6, [r0, #A_CLIP_TOP]
     ldr r9, [r0, #A_CLIP_RIGHT]
+
+    /* pack constants, built ONCE per call (the mode is fixed by r8): scale,
+     * offset and 0.5 cached in the frame so pack_pixel needs one vldm. */
+    cmp r8, #0
+    beq .Lcfg_turb
+    mov r12, #0
+    movw r1, #0xE000
+    movt r1, #0x405F
+    vmov d5, r12, r1                /* scale = 127.5 */
+    vmov.f64 d6, d0                 /* offset = 1.0 */
+    b .Lcfg_store
+.Lcfg_turb:
+    mov r12, #0
+    movw r1, #0xE000
+    movt r1, #0x406F
+    vmov d5, r12, r1                /* scale = 255.0 */
+    veor d6, d6, d6                 /* offset = 0.0 */
+.Lcfg_store:
+    vmov.f64 d7, #0.5
+    vstr d5, [sp, #S_SCALE]
+    vstr d6, [sp, #S_OFFSET]
+    vstr d7, [sp, #S_HALF]
 
     b row_loop
 
@@ -228,21 +261,19 @@ row_loop:
     vmul.f64 d3, d3, d5
     vstr d3, [sp, #S_PY0]
 
-    /* ctly0 = (y - clipTop) * freqY */
+    /* ctly0 = (y - clipTop) * freqY  (d5 still holds freqY from py0) */
     ldr r14, [r0, #A_CLIP_TOP]
     sub r1, r6, r14
     vmov s6, r1
     vcvt.f64.s32 d3, s6
-    vldr d5, [r0, #A_FREQ_Y]
     vmul.f64 d3, d3, d5
     vstr d3, [sp, #S_CTLY0]
 
     /* row destination = pixels + (y*width + clipLeft)*4 */
     ldr r1, [r0, #A_PIXELS]
     ldr r14, [r0, #A_WIDTH]
-    mul r14, r6, r14
     ldr r12, [r0, #A_CLIP_LEFT]
-    add r14, r14, r12
+    mla r14, r6, r14, r12          /* y*width + clipLeft */
     add r2, r1, r14, lsl #2
 
     ldr r7, [r0, #A_CLIP_LEFT]
@@ -270,12 +301,11 @@ pixel_loop:
     vldr d5, [r0, #A_FREQ_X]
     vmul.f64 d20, d3, d5          /* fx */
 
-    /* ctlx = tileX * freqX */
+    /* ctlx = tileX * freqX  (d5 still holds freqX from fx) */
     ldr r14, [r0, #A_CLIP_LEFT]
     sub r1, r7, r14
     vmov s6, r1
     vcvt.f64.s32 d3, s6           /* tileX */
-    vldr d5, [r0, #A_FREQ_X]
     vmul.f64 d22, d3, d5          /* ctlx */
 
     /* fy, ctly */
@@ -299,8 +329,6 @@ pixel_loop:
     ldr r1, [r0, #A_OCTAVES]
     cmp r5, r1
     bge .Loct_done
-
-    vadd.f64 d25, d0, d0          /* 2.0 for SMOOTHSTEP (geometry only) */
 
     /* ── X geometry (stich wrap folded in) ──────────────────────────────── */
     ldr r12, [r0, #A_PERIOD_X]
@@ -365,7 +393,10 @@ pixel_loop:
     add r12, r1, r12              /* j + by0 */
     ldr r12, [r2, r12, lsl #2]    /* b10 */
 
-    /* ── Four channels (R, G, B, A) ────────────────────────────────────── */
+    /* ── Four channels (R, G, B, A) ──────────────────────────────────────
+     * One cmp feeds all four accumulate vabseqs: the VFP arithmetic and the
+     * `add` address math in a channel never write APSR. */
+    cmp r8, #0
     NOISE_CHANNEL  0, d16
     NOISE_CHANNEL  8, d17
     NOISE_CHANNEL 16, d18
@@ -376,11 +407,10 @@ pixel_loop:
     vadd.f64 d21, d21, d21
     vadd.f64 d22, d22, d22
     vadd.f64 d23, d23, d23
-    /* weight -> weight/2 without a VFP divide: 2.0 >> 10 is one exponent
-     * unit (bit 52), so subtracting it from weight's bit pattern exactly
-     * decrements the biased exponent (2^-n stays an exact power of two for
-     * any octave count within the normal range). */
-    vshr.u64 d25, d25, #10
+    /* weight -> weight/2 bitwise, no VFP divide: d25 (2^52) is one exponent
+     * unit, so subtracting it from the weight's bit pattern exactly decrements
+     * the biased exponent (2^-n stays exact for any count in the normal range).
+     * d25 itself is never modified. */
     vsub.i64 d24, d24, d25
 
     add r5, r5, #1
@@ -389,28 +419,13 @@ pixel_loop:
 /* ════════════════════════════════════════════════════════════════════════════
  * Pack: given sums[4], finalVal = (sum + offset)*scale, +0.5, truncate, clamp.
  * fractal: offset=1.0, scale=127.5    turbulence: offset=0.0, scale=255.0
+ * scale/offset/0.5 were cached in the frame once per call; d5-d7 are dead here
+ * (the octave loop owns them), so a single vldm restores the triple.
  * Accs are live in d16-d19 (R G B A); output cursor comes back from S_DST.
  * ════════════════════════════════════════════════════════════════════════════ */
 pack_pixel:
     ldr r2, [sp, #S_DST]
-    cmp r8, #0
-    beq .Lfp_turb
-
-    mov r12, #0
-    movw r1, #0xE000
-    movt r1, #0x405F
-    vmov d5, r12, r1                /* scale = 127.5 */
-    vmov.f64 d6, d0                 /* offset = 1.0 */
-    b .Lfp_common
-.Lfp_turb:
-    mov r12, #0
-    movw r1, #0xE000
-    movt r1, #0x406F
-    vmov d5, r12, r1                /* scale = 255.0 */
-    mov r12, #0
-    vmov d6, r12, r12               /* offset = 0.0 */
-.Lfp_common:
-    vmov.f64 d7, #0.5
+    vldm sp, {d5, d6, d7}           /* scale, offset, 0.5 */
 
     /* ch0 (R) d16 -> r12 */
     vadd.f64 d4, d16, d6
