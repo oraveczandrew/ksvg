@@ -26,13 +26,16 @@ import java.util.Locale
 
 /**
  * Public DSL + orchestration for the stable native benchmark harness
- * (TEST_HARNESS_PLAN.md Step 1; spec §12, §13, §17, §19).
+ * (TEST_HARNESS_PLAN.md Step 1-2; spec §12, §13, §14, §17, §19).
  *
  * The benchmark test only describes the workload:
  *
  * ```
  * nativeBenchmark {
  *     name = "Turbulence"
+ *     backend = "neon64"
+ *     width = 512
+ *     height = 512
  *     warmupIterations = 20
  *     measurementBatches = 5
  *     iterationsPerBatch = 10
@@ -42,12 +45,13 @@ import java.util.Locale
  *
  * The harness provides: foreground Activity + sustained-performance opt-in
  * ([BenchmarkActivity]), benchmark-thread priority raise/restore, warmup, a batch
- * measurement loop with per-iteration `System.nanoTime()` sampling, and an
- * environment report. The measured region is exactly the [run] block (spec §20:
- * no logging, I/O, thermal reads or GC inside it).
+ * measurement loop with per-iteration `System.nanoTime()` sampling, per-sample
+ * statistics ([BenchmarkStats], spec §14), and an environment report. The measured
+ * region is exactly the [run] block (spec §20: no logging, I/O, thermal reads or GC
+ * inside it).
  *
- * Later steps add thermal/cooldown gating, cache normalization, full statistics
- * and classification; the report shape here is deliberately a stepping stone.
+ * Later steps add thermal/cooldown gating, cache normalization, classification and
+ * the validation-vs-raw comparison.
  */
 fun nativeBenchmark(configure: NativeBenchmarkBuilder.() -> Unit): NativeBenchmarkReport {
     val builder = NativeBenchmarkBuilder()
@@ -58,6 +62,12 @@ fun nativeBenchmark(configure: NativeBenchmarkBuilder.() -> Unit): NativeBenchma
 class NativeBenchmarkBuilder {
 
     var name: String = "benchmark"
+
+    var backend: String = ""
+
+    var width: Int = 0
+
+    var height: Int = 0
 
     var warmupIterations: Int = 20
 
@@ -104,13 +114,13 @@ class NativeBenchmarkBuilder {
         val report =
             NativeBenchmarkReport(
                 name = name,
+                backend = backend,
+                width = width,
+                height = height,
                 samples = samples,
                 environment =
                     buildEnvironment(
-                        warmupIterations = warmupIterations,
-                        measurementBatches = measurementBatches,
-                        iterationsPerBatch = iterationsPerBatch,
-                        cooldownSeconds = cooldownSeconds,
+                        frontend = this,
                         threadPriorityApplied = threadPriorityApplied,
                     ),
             )
@@ -122,70 +132,128 @@ class NativeBenchmarkBuilder {
 
 class NativeBenchmarkReport(
     val name: String,
+    val backend: String,
+    val width: Int,
+    val height: Int,
     val samples: Array<DoubleArray>,
     val environment: String,
 ) {
 
     val batchAveragesMs: List<Double> = samples.map { batch -> batch.average() }
 
-    val allSamplesMs: List<Double> = samples.flatMap { it.toList() }
+    val stats: BenchmarkStats = BenchmarkStats(sortedSamples(flatten(samples)))
 
-    /** Overall min/median/mean/max across all batches (full stats land in a later step). */
-    val minMs: Double = allSamplesMs.min()
-    val medianMs: Double = median(allSamplesMs)
-    val meanMs: Double = allSamplesMs.average()
-    val maxMs: Double = allSamplesMs.max()
+    /** Pixels/s at the median, for parity with the old runner's MPix/s column. */
+    val medianMPixSec: Double =
+        if (width > 0 && height > 0) {
+            (width.toDouble() * height / (stats.medianMs / 1_000.0)) / 1_000_000.0
+        } else {
+            0.0
+        }
 
     fun print() {
         println(
             buildString {
-                appendLine("=== Benchmark: $name ===")
+                appendLine("=== Benchmark: $name ($backend) ${sizeLabel()} ===")
                 append(environment)
                 appendLine("batchAverageMs=${batchAveragesMs.joinToString(",") { formatMs(it) }}")
                 append(
-                    "overall=" +
-                        "min=${formatMs(minMs)} " +
-                        "median=${formatMs(medianMs)} " +
-                        "mean=${formatMs(meanMs)} " +
-                        "max=${formatMs(maxMs)}" +
+                    "stats(count=${stats.count}) " +
+                        "min=${formatMs(stats.minMs)} " +
+                        "p90=${formatMs(stats.p90Ms)} " +
+                        "median=${formatMs(stats.medianMs)} " +
+                        "mean=${formatMs(stats.meanMs)} " +
+                        "p95=${formatMs(stats.p95Ms)} " +
+                        "max=${formatMs(stats.maxMs)} " +
                         "\n"
                 )
             }
         )
     }
 
+    /**
+     * Writes two CSVs:
+     *  - `benchmarks_device_harness_<name>.csv` — one summary row, glob-compatible with the
+     *    existing `runDeviceBenchmark` pull task (spec §24 deliverable 4);
+     *  - `benchmarks_harness_detail_<name>.csv` — environment block + per-sample rows.
+     */
     fun writeCsv(context: Context) {
-        val out = File(context.externalCacheDir, "benchmarks_harness_${name}.csv")
-        val sb = StringBuilder()
-        environment.lineSequence()
-            .filter { it.isNotBlank() }
-            .forEach { sb.append("env,").append(it).append('\n') }
-        sb.append("batch,iteration,ms\n")
-        for ((b, batch) in samples.withIndex()) {
-            for ((i, ms) in batch.withIndex()) {
-                sb.append(b).append(',').append(i).append(',')
-                    .append(String.format(Locale.US, "%.4f", ms)).append('\n')
+        val dir = context.externalCacheDir
+        // Backend + size in the name: a kernel run makes one file per backend.
+        val fileBase =
+            cleanName(name) + "_" + cleanName(backend.ifBlank { "all" }) + "_" + sizeLabel()
+
+        val summary = File(dir, "benchmarks_device_harness_$fileBase.csv")
+        summary.writeText(
+            buildString {
+                append("Kernel,Backend,Size,MinMs,MedianMs,MeanMs,MaxMs,P90,P95,P99,StdDevMs,MPix/s\n")
+                appendFormatLn(
+                    Locale.US,
+                    "%s,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.2f",
+                    name,
+                    backend.ifBlank { "-" },
+                    sizeLabel(),
+                    stats.minMs,
+                    stats.medianMs,
+                    stats.meanMs,
+                    stats.maxMs,
+                    stats.p90Ms,
+                    stats.p95Ms,
+                    stats.p99Ms,
+                    stats.stdDevMs,
+                    medianMPixSec,
+                )
             }
+        )
+
+        val detail = File(dir, "benchmarks_harness_detail_$fileBase.csv")
+        detail.writeText(
+            buildString {
+                environment.lineSequence()
+                    .filter { it.isNotBlank() }
+                    .forEach { append("env,").append(it).append('\n') }
+                append("batch,iteration,ms\n")
+                for ((b, batch) in samples.withIndex()) {
+                    for ((i, ms) in batch.withIndex()) {
+                        append(b).append(',').append(i).append(',')
+                            .append(String.format(Locale.US, "%.4f", ms)).append('\n')
+                    }
+                }
+            }
+        )
+        println("Harness summary: ${summary.absolutePath}")
+        println("Harness detail: ${detail.absolutePath}")
+    }
+
+    private fun sizeLabel(): String =
+        if (width > 0 && height > 0) "${width}x${height}" else "-"
+
+    private fun StringBuilder.appendFormatLn(
+        locale: Locale,
+        format: String,
+        vararg args: Any?
+    ) {
+        append(String.format(locale, format, *args)).append('\n')
+    }
+
+    private fun cleanName(raw: String): String = raw.replace(Regex("[^A-Za-z0-9_.-]"), "_")
+
+    private fun flatten(batches: Array<DoubleArray>): DoubleArray {
+        val total = batches.sumOf { it.size }
+        val out = DoubleArray(total)
+        var i = 0
+        for (batch in batches) {
+            for (value in batch) out[i++] = value
         }
-        out.writeText(sb.toString())
-        println("Harness results saved to ${out.absolutePath}")
+        return out
     }
 
     private fun formatMs(value: Double): String = String.format(Locale.US, "%.4f", value)
-
-    private fun median(sortedList: List<Double>): Double {
-        val sorted = sortedList.sorted()
-        val mid = sorted.size / 2
-        return if (sorted.size % 2 == 0) (sorted[mid - 1] + sorted[mid]) / 2 else sorted[mid]
-    }
 }
 
 /** Builds the spec §16 environment block (key=value lines). */
 private fun buildEnvironment(
-    warmupIterations: Int,
-    measurementBatches: Int,
-    iterationsPerBatch: Int,
-    cooldownSeconds: Long,
+    frontend: NativeBenchmarkBuilder,
     threadPriorityApplied: Boolean,
 ): String =
     buildString {
@@ -201,10 +269,10 @@ private fun buildEnvironment(
         appendLine("sustainedSetResult=${BenchmarkActivity.sustainedSetResult}")
         appendLine("thermalStatus=${thermalStatus()}")
         appendLine("windowFocused=${BenchmarkActivity.isWindowFocused}")
-        appendLine("warmupIterations=$warmupIterations")
-        appendLine("measurementBatches=$measurementBatches")
-        appendLine("iterationsPerBatch=$iterationsPerBatch")
-        appendLine("cooldownSeconds=$cooldownSeconds")
+        appendLine("warmupIterations=${frontend.warmupIterations}")
+        appendLine("measurementBatches=${frontend.measurementBatches}")
+        appendLine("iterationsPerBatch=${frontend.iterationsPerBatch}")
+        appendLine("cooldownSeconds=${frontend.cooldownSeconds}")
         appendLine("benchThreadPriority=$HIGH_PRIORITY")
         appendLine("threadPriorityApplied=$threadPriorityApplied")
     }

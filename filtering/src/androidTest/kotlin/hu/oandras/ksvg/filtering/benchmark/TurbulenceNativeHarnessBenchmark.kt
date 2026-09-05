@@ -40,9 +40,12 @@ class TurbulenceNativeHarnessBenchmark {
 
         val backends = getBackendsFor(TurbulenceNative.nativeBackend())
 
-        for (backend in backends) {
+        for (simdBackend in backends) {
             nativeBenchmark {
-                name = "Turbulence@${backendName(backend)}"
+                name = "Turbulence"
+                backend = backendName(simdBackend)
+                width = w
+                height = h
                 warmupIterations = 10
                 measurementBatches = 5
                 iterationsPerBatch = 10
@@ -70,7 +73,7 @@ class TurbulenceNativeHarnessBenchmark {
                         unitSizeX = 1.0,
                         unitSizeY = 1.0,
                         seed = 123,
-                        simdBackend = backend,
+                        simdBackend = simdBackend,
                     )
                 }
             }
