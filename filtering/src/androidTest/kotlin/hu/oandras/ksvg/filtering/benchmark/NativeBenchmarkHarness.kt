@@ -19,6 +19,7 @@ package hu.oandras.ksvg.filtering.benchmark
 import android.content.Context
 import android.os.Build
 import android.os.Process
+import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.util.Locale
@@ -50,8 +51,8 @@ import java.util.Locale
      * measured region is exactly the [run] block (spec §20: no logging, I/O, thermal reads
      * or GC inside it).
      *
-     * Later steps add the thermal cooldown/retry, cache normalization, classification and
-     * the validation-vs-raw comparison.
+     * Later steps add cache normalization, CPU-frequency info and the validation-vs-raw
+     * comparison.
      */
 fun nativeBenchmark(configure: NativeBenchmarkBuilder.() -> Unit): NativeBenchmarkReport {
     val builder = NativeBenchmarkBuilder()
@@ -75,8 +76,11 @@ class NativeBenchmarkBuilder {
 
     var iterationsPerBatch: Int = 10
 
-    /** Reserved for thermal-recovery cooldown (spec §9); wired up in a later step. */
-    var cooldownSeconds: Long = 10
+    /**
+     * Sleep before retrying a batch invalidated by thermal throttling (spec §9). Actual
+     * sleep duration accumulates into the report's `cooldownTimeMs`.
+     */
+    var cooldownMillis: Long = 5_000
 
     private var body: (() -> Unit)? = null
 
@@ -100,19 +104,22 @@ class NativeBenchmarkBuilder {
         val validBatches = ArrayList<DoubleArray>(measurementBatches)
         var threadPriorityApplied = false
         var thermalThrottled = false
+        var invalidatedBatches = 0
+        var cooldownTimeMs = 0L
         try {
             // Warmup never touches the measured region either.
             repeat(warmupIterations) { kernel.invoke() }
 
             // Batches are gated on thermal state (spec §6/§9): a batch measured while
-            // throttled is dropped and not counted. Retry asks for a fresh batch; the
-            // cooldown sleep + invalidatedBatches counters arrive in Step 4.
+            // throttled is invalidated (not counted) -> cooldown sleep -> fresh batch.
             var attempted = 0
             val maxAttempts = maxOf(measurementBatches * 3, measurementBatches + 8)
             while (validBatches.size < measurementBatches && attempted < maxAttempts) {
                 attempted++
                 if (thermal.isThrottled()) {
                     thermalThrottled = true
+                    invalidatedBatches++
+                    cooldownTimeMs += cooldown()
                     continue
                 }
                 val batch = DoubleArray(iterationsPerBatch)
@@ -125,6 +132,8 @@ class NativeBenchmarkBuilder {
                 if (thermal.isThrottled()) {
                     // Status rose while the batch was being measured -> invalid (spec §6).
                     thermalThrottled = true
+                    invalidatedBatches++
+                    cooldownTimeMs += cooldown()
                     continue
                 }
                 validBatches.add(batch)
@@ -142,6 +151,10 @@ class NativeBenchmarkBuilder {
                 width = width,
                 height = height,
                 samples = validBatches.toTypedArray(),
+                requestedBatches = measurementBatches,
+                thermalThrottled = thermalThrottled,
+                invalidatedBatches = invalidatedBatches,
+                cooldownTimeMs = cooldownTimeMs,
                 environment =
                     buildEnvironment(
                         frontend = this,
@@ -150,11 +163,24 @@ class NativeBenchmarkBuilder {
                         thermalStatusAfter = thermalStatusAfter,
                         thermalThrottled = thermalThrottled,
                         thermalSource = thermal.source,
+                        invalidatedBatches = invalidatedBatches,
+                        cooldownTimeMs = cooldownTimeMs,
                     ),
             )
         report.print()
         report.writeCsv(context())
         return report
+    }
+
+    /**
+     * Blocks for the configured cooldown (spec §9) and returns the actual elapsed time.
+     * Uses `SystemClock.sleep` so an interrupt never truncates the recovery; the measured
+     * region is untouched — no kernel call happens here.
+     */
+    private fun cooldown(): Long {
+        val start = SystemClock.elapsedRealtime()
+        SystemClock.sleep(cooldownMillis)
+        return SystemClock.elapsedRealtime() - start
     }
 }
 
@@ -164,6 +190,10 @@ class NativeBenchmarkReport(
     val width: Int,
     val height: Int,
     val samples: Array<DoubleArray>,
+    val requestedBatches: Int,
+    val thermalThrottled: Boolean,
+    val invalidatedBatches: Int,
+    val cooldownTimeMs: Long,
     val environment: String,
 ) {
 
@@ -177,6 +207,44 @@ class NativeBenchmarkReport(
             (width.toDouble() * height / (stats.medianMs / 1_000.0)) / 1_000_000.0
         } else {
             0.0
+        }
+
+    /**
+     * Result classification (spec §15): `VALID / THERMAL_THROTTLED / THERMAL_RECOVERY /
+     * UNSTABLE / INSUFFICIENT_SAMPLES`.
+     *
+     *  - `INSUFFICIENT_SAMPLES` — no batch collected, or fewer than requested without any
+     *    thermal event (attempt cap exhausted).
+     *  - `THERMAL_THROTTLED` — throttling occurred and the run ended with fewer batches than
+     *    requested.
+     *  - `THERMAL_RECOVERY` — throttling occurred but all requested batches were still
+     *    collected afterwards.
+     *  - `UNSTABLE` — all batches collected, no throttling, but batch averages spread too
+     *    widely (CV above [UNSTABLE_CV]).
+     *  - `VALID` — otherwise.
+     */
+    val classification: String =
+        when {
+            samples.isEmpty() -> INSUFFICIENT_SAMPLES
+            thermalThrottled && samples.size < requestedBatches -> THERMAL_THROTTLED
+            thermalThrottled -> THERMAL_RECOVERY
+            samples.size < requestedBatches -> INSUFFICIENT_SAMPLES
+            batchCv > UNSTABLE_CV -> UNSTABLE
+            else -> VALID
+        }
+
+    val isValid: Boolean
+        get() = classification == VALID
+
+    /** Coefficient of variation of the batch averages (population). */
+    private val batchCv: Double
+        get() {
+            if (batchAveragesMs.size < 2) return 0.0
+            val mean = batchAveragesMs.average()
+            if (mean <= 0.0) return 0.0
+            val variance =
+                batchAveragesMs.sumOf { avg -> (avg - mean) * (avg - mean) } / batchAveragesMs.size
+            return kotlin.math.sqrt(variance) / mean
         }
 
     fun print() {
@@ -194,6 +262,10 @@ class NativeBenchmarkReport(
                         "p95=${formatMs(stats.p95Ms)} " +
                         "max=${formatMs(stats.maxMs)} " +
                         "\n"
+                )
+                appendLine(
+                    "classification=$classification valid=$isValid " +
+                        "invalidatedBatches=$invalidatedBatches cooldownTimeMs=$cooldownTimeMs"
                 )
             }
         )
@@ -214,10 +286,13 @@ class NativeBenchmarkReport(
         val summary = File(dir, "benchmarks_device_harness_$fileBase.csv")
         summary.writeText(
             buildString {
-                append("Kernel,Backend,Size,MinMs,MedianMs,MeanMs,MaxMs,P90,P95,P99,StdDevMs,MPix/s\n")
+                append(
+                    "Kernel,Backend,Size,MinMs,MedianMs,MeanMs,MaxMs,P90,P95,P99,StdDevMs," +
+                        "MPix/s,InvalidatedBatches,CooldownMs,Classification,VALID\n"
+                )
                 appendFormatLn(
                     Locale.US,
-                    "%s,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.2f",
+                    "%s,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.2f,%d,%d,%s,%b",
                     name,
                     backend.ifBlank { "-" },
                     sizeLabel(),
@@ -230,6 +305,10 @@ class NativeBenchmarkReport(
                     stats.p99Ms,
                     stats.stdDevMs,
                     medianMPixSec,
+                    invalidatedBatches,
+                    cooldownTimeMs,
+                    classification,
+                    isValid,
                 )
             }
         )
@@ -287,6 +366,8 @@ private fun buildEnvironment(
     thermalStatusAfter: Int,
     thermalThrottled: Boolean,
     thermalSource: String,
+    invalidatedBatches: Int,
+    cooldownTimeMs: Long,
 ): String =
     buildString {
         appendLine("device=${Build.DEVICE}")
@@ -303,16 +384,28 @@ private fun buildEnvironment(
         appendLine("thermalStatusBefore=$thermalStatusBefore")
         appendLine("thermalStatusAfter=$thermalStatusAfter")
         appendLine("thermalThrottled=$thermalThrottled")
+        appendLine("invalidatedBatches=$invalidatedBatches")
+        appendLine("cooldownTimeMs=$cooldownTimeMs")
         appendLine("windowFocused=${BenchmarkActivity.isWindowFocused}")
         appendLine("warmupIterations=${frontend.warmupIterations}")
         appendLine("measurementBatches=${frontend.measurementBatches}")
         appendLine("iterationsPerBatch=${frontend.iterationsPerBatch}")
-        appendLine("cooldownSeconds=${frontend.cooldownSeconds}")
+        appendLine("cooldownMillis=${frontend.cooldownMillis}")
         appendLine("benchThreadPriority=$HIGH_PRIORITY")
         appendLine("threadPriorityApplied=$threadPriorityApplied")
     }
 
 private fun context(): Context = InstrumentationRegistry.getInstrumentation().targetContext
+
+/** Result classifications (spec §15). */
+private const val VALID = "VALID"
+private const val THERMAL_THROTTLED = "THERMAL_THROTTLED"
+private const val THERMAL_RECOVERY = "THERMAL_RECOVERY"
+private const val UNSTABLE = "UNSTABLE"
+private const val INSUFFICIENT_SAMPLES = "INSUFFICIENT_SAMPLES"
+
+/** Batch-average CV above which an otherwise clean run is classified UNSTABLE (spec §15). */
+private const val UNSTABLE_CV = 0.05
 
 /** Highest Linux nice priority (best-effort like the platform docs; needs no root). */
 private const val HIGH_PRIORITY = -20
