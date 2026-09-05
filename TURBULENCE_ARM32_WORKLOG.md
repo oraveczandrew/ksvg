@@ -172,3 +172,56 @@ hoisting + tight unrolled VFP channel chain beats the C++ scalar reference
 Phase 2 (2-px interleave + register rebalance) is now an OPTIONAL extra perf
 step, not a gate. Defer register-allocation discussion; revisit only if more
 headroom is needed. Phase 3 (channel-pair blocking) likewise optional.
+
+## 2026-09-05 — Session 3: octave-outer register-resident restructure
+
+### Motive (user-directed)
+The lazy kernel recomputed ALL channel-independent work per channel:
+fx/fy/ctlx/ctly/ratio/value round-tripped to stack 4x per octave; geometry,
+wrap and permutation ran inside each channel. The user's register-allocation
+plan (seconded by another AI) was to flop the loop nest: octave-outer /
+channel-inner, with geometry computed once per octave.
+
+Re-verified liveness: the 4-accumulator map DOES fit exactly in d0..d31. The
+noise block writes ONLY d3-d7 and reads d8-d15 (gradients, reloaded per
+channel), d26-d31 (geometry) and d24 (ratio); d16-d19 accumulate R/G/B/A;
+d20-d24 are fx/fy/curtlx/curtly/ratio. No two live sets overlap, so all four
+accumulators are register-resident and the octave loop performs ZERO stack
+traffic for state (vs ~120 bytes/octave before).
+
+### New structure (turbulence_noise_neon32.S)
+```
+pixel setup: accs d16-d19=0; fx=d20; ctlx=d22; fy=d21; ctly=d23; ratio=d24; r5=0
+octave loop (r5 = octave index):
+  wrap folded into each geometry (no S_WRAP* slots)
+  X geometry once   -> bx0/bx1, rx0/rx1, sx
+  Y geometry once   -> by0/by1, ry0/ry1, sy
+  permutation once  -> b00/r14 b01/r10 b10/r12 b11/r11 (kept in GPRs across channels)
+  NOISE_CHANNEL 0, d16  (grad reload + noise + acc)
+  NOISE_CHANNEL 8, d17
+  NOISE_CHANNEL 16, d18
+  NOISE_CHANNEL 24, d19
+  state advance once   (vadd d20-d24 self; r5 += 1)
+pack: accs straight from d16-d19
+```
+- GPRs: r5 = octave index (selector base reloaded per octave from args);
+  r2 = dst spilled to S_DST per pixel; b-indices live in r1/r10/r11/r12/r14.
+- periodX/Y now computed per octave as `args.period << r5` (identical integer
+  value to the old per-channel doubling, same 32-bit wrap semantics).
+- Math and FP op order per (octave,channel) UNCHANGED -> bit-exact by
+  construction; stack shrank 272 -> 24 bytes.
+
+### Result
+- `TurbulenceNativeParityTest` on-device: **OK (22 tests)** — unchanged parity.
+- Device bench (same run as baseline, adbca122):
+
+  | Kernel | Backend | Size | AvgMs | MPix/s | Speedup |
+  | :--- | :--- | :--- | :--- | :--- | :--- |
+  | Turbulence | scalar | 512x512 | 154.482 | 1.70 | 1.00 |
+  | Turbulence | neon32 | 512x512 | 24.967 | 10.50 | **6.19** |
+  | Turbulence | scalar | 2048x2048 | 2474.369 | 1.70 | 1.00 |
+  | Turbulence | neon32 | 2048x2048 | 397.618 | 10.55 | **6.22** |
+
+  vs lazy baseline neon32: 40.719 -> 24.967 ms (1.63x) and 660.526 -> 397.618 ms
+  (1.66x). Speedup vs scalar went 3.36/3.28 -> 6.19/6.22. Phase 2 gate (>=1.3x)
+  is now satisfied by ~5x margin; the 2-px interleave remains optional.
