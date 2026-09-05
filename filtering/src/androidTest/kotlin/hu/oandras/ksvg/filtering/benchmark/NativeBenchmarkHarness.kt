@@ -100,6 +100,7 @@ class NativeBenchmarkBuilder {
 
         val tid = Process.myTid()
         val previousPriority = capturePriority(tid)
+        val cpuFreqBeforeKhz = CpuInfo.cpuFreqKhz()
 
         val validBatches = ArrayList<DoubleArray>(measurementBatches)
         var threadPriorityApplied = false
@@ -146,6 +147,7 @@ class NativeBenchmarkBuilder {
         }
 
         val thermalStatusAfter = thermal.currentThermalStatus()
+        val cpuFreqAfterKhz = CpuInfo.cpuFreqKhz()
 
         val report =
             NativeBenchmarkReport(
@@ -168,6 +170,8 @@ class NativeBenchmarkBuilder {
                         thermalSource = thermal.source,
                         invalidatedBatches = invalidatedBatches,
                         cooldownTimeMs = cooldownTimeMs,
+                        cpuFreqBeforeKhz = cpuFreqBeforeKhz,
+                        cpuFreqAfterKhz = cpuFreqAfterKhz,
                     ),
             )
         report.print()
@@ -371,6 +375,8 @@ private fun buildEnvironment(
     thermalSource: String,
     invalidatedBatches: Int,
     cooldownTimeMs: Long,
+    cpuFreqBeforeKhz: Int?,
+    cpuFreqAfterKhz: Int?,
 ): String =
     buildString {
         appendLine("device=${Build.DEVICE}")
@@ -378,6 +384,12 @@ private fun buildEnvironment(
         appendLine("androidVersion=${Build.VERSION.SDK_INT}")
         appendLine("abi=${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"}")
         appendLine("cpuCoreCount=${Runtime.getRuntime().availableProcessors()}")
+        appendLine("socManufacturer=${CpuInfo.socManufacturer}")
+        appendLine("socModel=${CpuInfo.socModel}")
+        appendLine("hardware=${CpuInfo.hardware}")
+        appendLine("cpuAffinityControlAvailable=${CpuInfo.cpuAffinityControlAvailable}")
+        appendLine("cpuFreqBeforeKhz=${cpuFreqBeforeKhz ?: "unavailable"}")
+        appendLine("cpuFreqAfterKhz=${cpuFreqAfterKhz ?: "unavailable"}")
         appendLine(
             "sustainedPerformanceMode=" +
                 (BenchmarkActivity.sustainedPerformanceModeInUse && BenchmarkActivity.sustainedSetResult != false)
