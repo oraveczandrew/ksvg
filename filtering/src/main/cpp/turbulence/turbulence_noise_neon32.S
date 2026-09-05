@@ -20,11 +20,13 @@
  *
  * Structure: octave-outer / channel-inner. For each pixel the octave loop runs
  * N times; within one octave the channel-independent geometry (wrap, x/y
- * lattice indices, smoothstep, permutation) is computed ONCE, then the four
- * channels (R, G, B, A) each reload their own gradient set and accumulate into
- * a dedicated register. Per-pixel state stays in the VFP register file: the
- * octave loop touches no stack for state, so the previous ~120 bytes of
- * vldr/vstr per octave collapse to a handful of GPR loads/stores.
+ * lattice indices, smoothstep, permutation) is computed ONCE; the permutation's
+ * lattice indices are turned into a shared 8-pointer gradient cache, and the
+ * four channels (R, G, B, A) each reload their own gradient set (pure vldr)
+ * and accumulate into a dedicated register. Per-pixel state stays in the VFP
+ * register file: the octave loop touches no stack for state, so the previous
+ * ~120 bytes of vldr/vstr per octave collapse to a handful of GPR
+ * loads/stores.
  *
  * Register map (VFP d0..d31 fully allocated):
  *   d0   = 1.0            d1   = 4096.0
@@ -38,9 +40,11 @@
  *
  * GPRs:
  *   r0 args   r3 gradX    r4 gradY    r6 y    r7 x
- *   r8 fractal flag       r9 clipRight
- *   r5 octave index       r2 output cursor (spilled to S_DST inside the loop)
- *   r1 r10-r12 r14 scratch / lattice indices (b00 b01 b10 b11)
+ *   r8 octave index       r9 clipRight (GY10 during the channel group)
+ *   r2 output cursor (spilled to S_DST inside the loop)
+ *   within a channel group r1 r5 r10-r12 r14 hold the 8 gradient pointers
+ *     (GX00 GY00 GX10 GY10 GX11 GY11 GX01 GY01), rebuilt every octave;
+ *   before the cache build they carry lattice indices / address scratch.
  *
  * void turbulence32Asm(const Turbulence32AsmArgs* args);
  *
@@ -125,33 +129,20 @@
 .endm
 
 /* One channel of one octave: reload the channel's gradients (byte offset \chb)
- * into d8-d15 using the shared lattice indices, compute noise into d4 with the
- * shared geometry (d26-d31), and accumulate into \acc (one of d16-d19) with the
- * octave weight (d24, the reciprocal of the lattice ratio). Clobbers r1/r2 as
- * address scratch only.
- *
- * Lattice indices: b00=r14, b01=r10, b10=r12, b11=r11. */
+ * from the pointer cache (GX00=r1 GY00=r2 GX10=r5 GY10=r9 GX01=r12 GY01=r14
+ * GX11=r10 GY11=r11, built once before the four-channel group) into d8-d15,
+ * compute noise into d4 with the shared geometry (d26-d31), and accumulate into
+ * \acc (one of d16-d19) with the octave weight (d24, the reciprocal of the
+ * lattice ratio). Clobbers nothing. */
 .macro NOISE_CHANNEL chb, acc
-    /* b00 -> d8 (gx) / d9 (gy) */
-    add r2, r3, r14, lsl #5
-    vldr d8, [r2, #\chb]
-    add r1, r4, r14, lsl #5
-    vldr d9, [r1, #\chb]
-    /* b10 -> d10 (gx) / d11 (gy) */
-    add r2, r3, r12, lsl #5
-    vldr d10, [r2, #\chb]
-    add r1, r4, r12, lsl #5
-    vldr d11, [r1, #\chb]
-    /* b01 -> d12 (gx) / d13 (gy) */
-    add r2, r3, r10, lsl #5
-    vldr d12, [r2, #\chb]
-    add r1, r4, r10, lsl #5
-    vldr d13, [r1, #\chb]
-    /* b11 -> d14 (gx) / d15 (gy) */
-    add r2, r3, r11, lsl #5
-    vldr d14, [r2, #\chb]
-    add r1, r4, r11, lsl #5
-    vldr d15, [r1, #\chb]
+    vldr d8,  [r1, #\chb]
+    vldr d9,  [r2, #\chb]
+    vldr d10, [r5, #\chb]
+    vldr d11, [r9, #\chb]
+    vldr d12, [r12, #\chb]
+    vldr d13, [r14, #\chb]
+    vldr d14, [r10, #\chb]
+    vldr d15, [r11, #\chb]
 
     /* Noise2 (u/v/a/u2/v2/b then n), same fp order as the reference ───────
      * vmla.f64 is fused on this VFPv4 core; the C++ reference builds with
@@ -179,10 +170,10 @@
     vmul.f64 d3, d31, d6
     vadd.f64 d4, d4, d3            /* n = a + sy*(b-a) */
 
-    /* Accumulate: acc += (r8 ? n : |n|) * weight. The APSR flags (Z) come from a
- * `cmp r8, #0` hoisted before the channel group: the gradient `add` address
- * math and the VFP ops below never write APSR, so one compare feeds all four
- * channels' vabseq. */
+    /* Accumulate: acc += (fractal ? n : |n|) * weight. The APSR flags (Z) come
+     * from the `cmp r1, #0` (fractal flag) before the pointer cache: the plain
+     * `add`s and the VFP ops below never write APSR, so one compare feeds all
+     * four channels' vabseq. */
     vabseq.f64 d4, d4
     vmul.f64 d4, d4, d24
     vadd.f64 \acc, \acc, d4
@@ -212,13 +203,14 @@ turbulence32Asm:
 
     ldr r3, [r0, #A_GRADX]
     ldr r4, [r0, #A_GRADY]
-    ldr r8, [r0, #A_FRACTAL]
     ldr r6, [r0, #A_CLIP_TOP]
     ldr r9, [r0, #A_CLIP_RIGHT]
 
-    /* pack constants, built ONCE per call (the mode is fixed by r8): scale,
-     * offset and 0.5 cached in the frame so pack_pixel needs one vldm. */
-    cmp r8, #0
+    /* pack constants, built ONCE per call (the mode is fixed by the fractal
+     * flag): scale, offset and 0.5 cached in the frame so pack_pixel needs one
+     * vldm. */
+    ldr r1, [r0, #A_FRACTAL]
+    cmp r1, #0
     beq .Lcfg_turb
     mov r12, #0
     movw r1, #0xE000
@@ -315,7 +307,7 @@ pixel_loop:
     /* weight = 1.0 (reciprocal, halves bitwise each octave), octave index = 0,
      * park the output cursor */
     vmov.f64 d24, d0
-    mov r5, #0
+    mov r8, #0
     str r2, [sp, #S_DST]
 
     b .Loct
@@ -323,18 +315,18 @@ pixel_loop:
     b pack_pixel
 
 /* ════════════════════════════════════════════════════════════════════════════
- * Octave loop. r5 = octave index. Shared geometry once, then 4 channels.
+ * Octave loop. r8 = octave index. Shared geometry once, then 4 channels.
  * ════════════════════════════════════════════════════════════════════════════ */
 .Loct:
     ldr r1, [r0, #A_OCTAVES]
-    cmp r5, r1
+    cmp r8, r1
     bge .Loct_done
 
     /* ── X geometry (stich wrap folded in) ──────────────────────────────── */
     ldr r12, [r0, #A_PERIOD_X]
     cmp r12, #0
     ble .LxNowrap
-    lsl r12, r12, r5              /* periodX << octave */
+    lsl r12, r12, r8              /* periodX << octave */
     vadd.f64 d4, d22, d1          /* curtlx + 4096 */
     FLOOR r11, d5, d4
     add r11, r11, r12             /* wrapX */
@@ -359,7 +351,7 @@ pixel_loop:
     ldr r2, [r0, #A_PERIOD_Y]
     cmp r2, #0
     ble .LyNowrap
-    lsl r2, r2, r5                /* periodY << octave */
+    lsl r2, r2, r8                /* periodY << octave */
     vadd.f64 d4, d23, d1          /* curtly + 4096 */
     FLOOR r14, d5, d4
     add r14, r14, r2              /* wrapY */
@@ -394,9 +386,21 @@ pixel_loop:
     ldr r12, [r2, r12, lsl #2]    /* b10 */
 
     /* ── Four channels (R, G, B, A) ──────────────────────────────────────
-     * One cmp feeds all four accumulate vabseqs: the VFP arithmetic and the
-     * `add` address math in a channel never write APSR. */
-    cmp r8, #0
+     * Build the shared gradient-pointer cache once, then each channel is pure
+     * vldr + noise. One cmp (fractal flag) placed BEFORE the cache feeds all
+     * four accumulate vabseqs: plain `add` never writes APSR, so the flags
+     * survive the 8 adds and the VFP body of each channel. */
+    ldr r1, [r0, #A_FRACTAL]
+    cmp r1, #0
+    /* cache: GX00=r1 GY00=r2 GX10=r5 GY10=r9 GX01=r12 GY01=r14 GX11=r10 GY11=r11 */
+    add r1, r3, r14, lsl #5
+    add r2, r4, r14, lsl #5
+    add r5, r3, r12, lsl #5
+    add r9, r4, r12, lsl #5
+    add r12, r3, r10, lsl #5
+    add r14, r4, r10, lsl #5
+    add r10, r3, r11, lsl #5
+    add r11, r4, r11, lsl #5
     NOISE_CHANNEL  0, d16
     NOISE_CHANNEL  8, d17
     NOISE_CHANNEL 16, d18
@@ -413,7 +417,7 @@ pixel_loop:
      * d25 itself is never modified. */
     vsub.i64 d24, d24, d25
 
-    add r5, r5, #1
+    add r8, r8, #1
     b .Loct
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -454,7 +458,7 @@ pack_pixel:
     orr r1, r14, r1, lsl #8         /* B | G<<8 */
     orr r1, r1, r12, lsl #16        /* | R<<16 */
 
-    /* ch3 (A) d19 -> r12  (r8 stays the fractal flag) */
+    /* ch3 (A) d19 -> r12 */
     vadd.f64 d4, d19, d6
     vmul.f64 d4, d4, d5
     vadd.f64 d4, d4, d7
@@ -466,6 +470,9 @@ pack_pixel:
     str r12, [r2], #4
 
     add r7, r7, #1
+    /* r9 was GY10 during the channel group; bring clipRight back for the next
+     * pixel loop's `cmp r7, r9`. */
+    ldr r9, [r0, #A_CLIP_RIGHT]
     b pixel_loop
 
 next_row:

@@ -324,3 +324,38 @@ Per-pixel instruction budget (4-octave corpus):
   Biggest remaining structural win: Idea 6 (incremental fx/ctlx) - killed for
   bit-exact reasons; FLOOR branch removal would save 12 instr/octave (4.8%) but
   needs a coordinate-domain contract.
+
+## Round 5 — register-map redraw: shared 8-pointer gradient cache (parity-green)
+
+Per-channel gradient addressing was 4x4 adds (32/octave, each channel rebuilt
+b00/b10/b01/b11 on the fly). Redraw allocates all 8 gradient pointers to GPRs
+for the length of the channel group, built ONCE per octave from the
+permutation's lattice indices:
+
+    add r1, r3, r14, lsl #5   ; GX00 (b00=r14)
+    add r2, r4, r14, lsl #5   ; GY00
+    add r5, r3, r12, lsl #5   ; GX10 (b10=r12)
+    add r9, r4, r12, lsl #5   ; GY10
+    add r12, r3, r10, lsl #5  ; GX01 (b01=r10)
+    add r14, r4, r10, lsl #5  ; GY01
+    add r10, r3, r11, lsl #5  ; GX11 (b11=r11)
+    add r11, r4, r11, lsl #5  ; GY11
+
+Then NOISE_CHANNEL is eight pure vldrs ([rX,#chb]) + noise + vabseq, with the
+partials describing no order-of-evaluation dependencies. 32 -> 8 adds/octave
+(24 saved). r9 (clipRight) is repurposed as GY10 during the channel group, so
+pack_pixel's tail reloads `ldr r9,[r0,#A_CLIP_RIGHT]` (+1 instr/pixel); the
+fractal flag, previously r8, is re-read per octave (`ldr r1,[r0,#A_FRACTAL];
+cmp r1,#0`) because r8 became the octave index and the geometry's cmp/subge
+clobber APSR anyway (+1 ldr/octave). Order of cache adds is load-conservative
+(no lattice index is read after its register is overwritten).
+
+Rejected as a bad trade: splitting the channel section per fractal/turbulence
+mode to avoid the re-read (~240 duplicated instructions to save 1 cmp+1 ldr
+per octave).
+
+Bench (third run; run1 throttled - device asleep, scalar 2477ms; run2 within
+noise, scalar 2176ms; run3 warm, scalar 2151ms == prior baseline):
+  512: 20.067 -> 19.984 ms  2048: 322.425 -> 318.241 ms  (6.73x / 6.76x)
+Modest (approx -1.3% on 2048) — the win is limited by the two extra loads
+per octave (fractal) + per pixel (clipRight).
