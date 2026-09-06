@@ -204,6 +204,7 @@ class KernelPerformanceDeviceBenchmark {
                         clipTop = 0,
                         clipRight = w,
                         clipBottom = h,
+                        simdBackend = SIMD_NEON64,
                     )
                 }
             }

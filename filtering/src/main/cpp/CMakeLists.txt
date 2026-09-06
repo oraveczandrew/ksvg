@@ -84,10 +84,10 @@ if(ANDROID_ABI STREQUAL "x86")
         morphology/morphology_i386_avx2.S
         morphology/morphology_i386_avx512.S
     )
+    # i386 AVX2/AVX-512 lighting rows are unfinished (WIP); x86-32 uses the
+    # SSE2 row only (dispatch is guarded to __x86_64__ in lighting.cpp).
     set(LIGHTING_SOURCES
         lighting/lighting_distant_diffuse_i386_sse2.S
-        lighting/lighting_distant_diffuse_i386_avx2.S
-        lighting/lighting_distant_diffuse_i386_avx512.S
     )
 endif()
 

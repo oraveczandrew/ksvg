@@ -15,7 +15,8 @@
  */
 
 .syntax unified
-.fpu neon-vfpv4
+.arm
+.fpu neon
 .text
 .align 2
 .global ksvgLightingDistantDiffuseRowNeon32
@@ -24,151 +25,188 @@
 // void ksvgLightingDistantDiffuseRowNeon32(
 //   const jint* srcT, const jint* srcM, const jint* srcB,
 //   jint* dst, jint count, const LightingParams* params)
+//
+// AAPCS32:
+//   r0 = srcT, r1 = srcM, r2 = srcB, r3 = dst
+//   [sp, #0] = count, [sp, #4] = params
+//
+// LightingParams layout (lighting.cpp, hard contract):
+//   +0 invDx  +4 invDy  +8 k  +12 lx  +16 ly  +20 lz
+//   +24 lr    +28 lg    +32 lb +36 ss
+//
+// Processes 4 ARGB8888 pixels per iteration. For output pixel (x) the taps
+// are read from columns (x-1 .. x+1) of rows y-1/y/y+1 via three overlapping
+// q-register loads at [src+0], [src+4], [src+8] (l/m/r of each row).
+//
+// math (matches the Kotlin/scalar reference op order):
+//   h = (alpha >> 24) * ss
+//   dxRel = (rT-lT) + 2*(rM-lM) + (rB-lB)
+//   dyRel = (lB+2*mB+rB) - (lT+2*mT+rT)
+//   nx = -dxRel*scaleX, ny = -dyRel*scaleY, nz = 1
+//   rec = rsqrt(nx^2+ny^2+1) with 2 Newton-Raphson refinements
+//   dot = nx*rec*lx + ny*rec*ly + rec*lz
+//   intensity = clamp(clamp(dot,0)*k, 0, 1)
+//   out = (round(lr*intensity)<<16) | (round(lg*intensity)<<8)
+//         | round(lb*intensity) | 0xFF000000
+//
+// Register map (loop-invariant):
+//   q4 = ss        q5 = scaleX = 1/invDx   q6 = scaleY = 1/invDy
+//   q7 = k         q8 = lx      q9 = ly
+//   q10 = lz       q11 = lr     q12 = lg
+//   q13 = lb       q14 = 1.0f
+//   q0-q3, q15     = scratch (q15 is transient only)
 
 ksvgLightingDistantDiffuseRowNeon32:
-    push    {r4-r11, lr}
-    vpush   {d8-d15}
+    push    {r4-r11, r12, lr}      @ 10 words -> sp stays 8-byte aligned for vpush
+    vpush   {d8-d15}               @ preserve callee-saved d8-d15 (q4-q7)
 
-    ldr     r4, [sp, #100]    @ count
-    ldr     r5, [sp, #104]    @ params
+    ldr     r4, [sp, #104]         @ count
+    ldr     r5, [sp, #108]         @ params
+    cmp     r4, #0
+    beq     .Ldone
 
-    cbz     r4, .Ldone
+    // Load Params:
+    //   q0 = [invDx, invDy, k, lx]; q1 = [ly, lz, lr, lg]; d4 = [lb, ss]
+    vld1.32 {d0, d1}, [r5]!
+    vld1.32 {d2, d3}, [r5]!
+    vld1.32 {d4}, [r5]
 
-    // Load Params
-    vld1.32 {d0, d1}, [r5]!  @ q0 = [invDx, invDy, k, lx]
-    vld1.32 {d2, d3}, [r5]!  @ q1 = [ly, lz, lr, lg]
-    vld1.32 {d4}, [r5]       @ d4 = [lb, ss]
-
+    // scaleX = 1/invDx, scaleY = 1/invDy (single-precision VFP, VFPv3 ok)
     vmov.f32 s16, #1.0
     vdiv.f32 s0, s16, s0
     vdiv.f32 s1, s16, s1
 
-    vdup.32 q8, s0           @ scaleX
-    vdup.32 q9, s1           @ scaleY
-    vdup.32 q10, s2          @ k
-    vdup.32 q11, s3          @ lx
-    vdup.32 q12, s4          @ ly
-    vdup.32 q13, s5          @ lz
-
-    vdup.32 q14, s6          @ lr
-    vdup.32 q15, s7          @ lg
-    vdup.32 q4, s8           @ lb
-    vdup.32 q5, s9           @ ss
-
-    vmov.f32 q6, #1.0        @ one
-    vmov.f32 q7, #2.0        @ two
-    veor    q16, q16, q16    @ zero
-
-    mov     r6, #0xFF000000
-    vdup.32 q17, r6
+    vdup.32 q4, d4[1]     @ ss
+    vdup.32 q5, d0[0]     @ scaleX
+    vdup.32 q6, d0[1]     @ scaleY
+    vdup.32 q7, d1[0]     @ k
+    vdup.32 q8, d1[1]     @ lx
+    vdup.32 q9, d2[0]     @ ly
+    vdup.32 q10, d2[1]    @ lz
+    vdup.32 q11, d3[0]    @ lr
+    vdup.32 q12, d3[1]    @ lg
+    vdup.32 q13, d4[0]    @ lb
+    vmov.f32 q14, #1.0    @ one
 
 .Lloop:
-    // Row T
-    vld1.32 {q0}, [r0]!
+    // ---- Row T ----
+    vld1.32 {q0}, [r0]
     vshr.u32 q0, q0, #24
-    vcvt.f32.u32 q0, q0      @ h_lT
+    vcvt.f32.u32 q0, q0
+    vmul.f32 q0, q0, q4          @ q0 = h_lT = alpha*ss
 
-    sub     r0, r0, #16
     add     r10, r0, #4
     vld1.32 {q1}, [r10]
     vshr.u32 q1, q1, #24
-    vcvt.f32.u32 q1, q1      @ h_mT
+    vcvt.f32.u32 q1, q1
+    vmul.f32 q1, q1, q4          @ q1 = h_mT
 
     add     r10, r0, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
-    vcvt.f32.u32 q2, q2      @ h_rT
+    vcvt.f32.u32 q2, q2
+    vmul.f32 q2, q2, q4          @ q2 = h_rT
 
-    vmul.f32 q18, q1, q7
-    vadd.f32 q18, q18, q0
-    vadd.f32 q18, q18, q2    @ q18 = sumT_rel
+    vadd.f32 q3, q1, q1          @ 2*mT
+    vadd.f32 q3, q3, q0          @ + lT
+    vadd.f32 q3, q3, q2          @ q3 = sumT
+    vsub.f32 q1, q2, q0          @ q1 = dx_rel (rT - lT)
 
-    vsub.f32 q19, q2, q0     @ dx_rel_partial
-
-    // Row M
-    vld1.32 {q0}, [r1]!
+    // ---- Row M (middle column cancels out of dx) ----
+    vld1.32 {q0}, [r1]
     vshr.u32 q0, q0, #24
-    vcvt.f32.u32 q0, q0      @ h_lM
+    vcvt.f32.u32 q0, q0
+    vmul.f32 q0, q0, q4          @ q0 = h_lM
 
-    sub     r1, r1, #16
     add     r10, r1, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
-    vcvt.f32.u32 q2, q2      @ h_rM
+    vcvt.f32.u32 q2, q2
+    vmul.f32 q2, q2, q4          @ q2 = h_rM
 
-    vsub.f32 q20, q2, q0
-    vmul.f32 q20, q20, q7
-    vadd.f32 q19, q19, q20
+    vsub.f32 q2, q2, q0          @ rM - lM
+    vadd.f32 q2, q2, q2          @ 2*(rM - lM)
+    vadd.f32 q1, q1, q2          @ dx_rel += 2*(rM - lM)
 
-    // Row B
-    vld1.32 {q0}, [r2]!
+    // ---- Row B ----
+    vld1.32 {q0}, [r2]
     vshr.u32 q0, q0, #24
-    vcvt.f32.u32 q0, q0      @ h_lB
+    vcvt.f32.u32 q0, q0
+    vmul.f32 q0, q0, q4          @ q0 = h_lB
 
-    sub     r2, r2, #16
     add     r10, r2, #4
-    vld1.32 {q1}, [r10]
-    vshr.u32 q1, q1, #24
-    vcvt.f32.u32 q1, q1      @ h_mB
-
-    add     r10, r2, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
-    vcvt.f32.u32 q2, q2      @ h_rB
+    vcvt.f32.u32 q2, q2
+    vmul.f32 q2, q2, q4          @ q2 = h_mB
 
-    vmul.f32 q20, q1, q7
-    vadd.f32 q20, q20, q0
-    vadd.f32 q20, q20, q2    @ sumB_rel
+    add     r10, r2, #8
+    vld1.32 {q15}, [r10]
+    vshr.u32 q15, q15, #24
+    vcvt.f32.u32 q15, q15
+    vmul.f32 q15, q15, q4        @ q15 = h_rB
 
-    vsub.f32 q2, q2, q0
-    vadd.f32 q19, q19, q2    @ final dx_rel
+    vadd.f32 q2, q2, q2          @ 2*mB
+    vadd.f32 q2, q2, q0          @ + lB
+    vadd.f32 q2, q2, q15         @ sumB
+    vsub.f32 q2, q2, q3          @ q2 = dy_rel = sumB - sumT
+    vsub.f32 q0, q15, q0         @ rB - lB
+    vadd.f32 q1, q1, q0          @ q1 = final dx_rel
 
-    vsub.f32 q20, q20, q18   @ final dy_rel
+    // ---- Apply per-axis scale ----
+    vmul.f32 q0, q1, q5          @ q0 = dx
+    vmul.f32 q1, q2, q6          @ q1 = dy
 
-    vmul.f32 q0, q5, q8
-    vmul.f32 q19, q19, q0    @ dx
-    vmul.f32 q0, q5, q9
-    vmul.f32 q20, q20, q0    @ dy
+    // ---- Surface normal: n = (-dx, -dy, 1) ----
+    vneg.f32 q0, q0              @ nx
+    vneg.f32 q1, q1              @ ny
 
-    vneg.f32 q21, q19
-    vneg.f32 q22, q20
-    vmul.f32 q23, q21, q21
-    vmul.f32 q25, q22, q22
-    vadd.f32 q23, q23, q25
-    vadd.f32 q23, q23, q6
+    vmul.f32 q2, q0, q0          @ nx^2
+    vmul.f32 q3, q1, q1          @ ny^2
+    vadd.f32 q2, q2, q3
+    vadd.f32 q2, q2, q14         @ nLen^2 = nx^2 + ny^2 + 1
 
-    vrsqrte.f32 q0, q23
-    vrsqrts.f32 q1, q23, q0
-    vmul.f32 q0, q0, q1      @ 1/nLen
+    // 1/nLen via vrsqrte + two Newton-Raphson refinements (matches the
+    // previous ARMv7 C++ NEON reference's two-step refinement).
+    vrsqrte.f32 q3, q2           @ estimate
+    vrsqrts.f32 q15, q2, q3      @ (3 - nLen^2*est^2) / 2
+    vmul.f32 q3, q3, q15         @ refinement 1
+    vrsqrts.f32 q15, q2, q3      @ refinement 2
+    vmul.f32 q3, q3, q15         @ q3 = 1/nLen
 
-    vmul.f32 q21, q21, q0
-    vmul.f32 q22, q22, q0
+    vmul.f32 q0, q0, q3          @ nx' = nx / nLen
+    vmul.f32 q1, q1, q3          @ ny' = ny / nLen
+                                 @ nz' = q3 = 1/nLen
 
-    vmul.f32 q24, q21, q11
-    vmul.f32 q25, q22, q12
-    vadd.f32 q24, q24, q25
-    vmul.f32 q25, q0, q13
-    vadd.f32 q24, q24, q25
+    // ---- dot = nx'*lx + ny'*ly + nz'*lz ----
+    vmul.f32 q2, q0, q8
+    vmla.f32 q2, q1, q9
+    vmla.f32 q2, q3, q10
 
-    vmax.f32 q24, q24, q16
-    vmul.f32 q24, q24, q10
-    vmin.f32 q24, q24, q6    @ intensity
+    // ---- intensity = min(max(dot, 0)*k, 1) ----
+    veor    q15, q15, q15         @ zero (transient scratch)
+    vmax.f32 q2, q2, q15
+    vmul.f32 q2, q2, q7
+    vmin.f32 q2, q2, q14          @ q2 = intensity
 
-    vmul.f32 q0, q24, q14
-    vmul.f32 q1, q24, q15
-    vmul.f32 q2, q24, q4
-
-    vcvt.u32.f32 q0, q0
+    // ---- Pack ARGB ----
+    vmul.f32 q0, q2, q11          @ outR
+    vmul.f32 q1, q2, q12          @ outG
+    vmul.f32 q3, q2, q13          @ outB
+    vcvt.u32.f32 q0, q0           @ round-to-nearest-even == Kotlin roundToInt()
     vcvt.u32.f32 q1, q1
-    vcvt.u32.f32 q2, q2
+    vcvt.u32.f32 q3, q3
 
     vshl.u32 q0, q0, #16
     vshl.u32 q1, q1, #8
-    vorr     q2, q2, q0
-    vorr     q2, q2, q1
-    vorr     q2, q2, q17
+    vorr    q3, q3, q0
+    vorr    q3, q3, q1
 
-    vst1.32 {q2}, [r3]!
+    mov     r6, #0xFF000000
+    vdup.32 q0, r6                @ alpha = 0xFF
+    vorr    q3, q3, q0
+
+    vst1.32 {q3}, [r3]!
 
     add     r0, r0, #16
     add     r1, r1, #16
@@ -178,5 +216,5 @@ ksvgLightingDistantDiffuseRowNeon32:
 
 .Ldone:
     vpop    {d8-d15}
-    pop     {r4-r11, pc}
+    pop     {r4-r11, r12, pc}
 .size ksvgLightingDistantDiffuseRowNeon32, .-ksvgLightingDistantDiffuseRowNeon32

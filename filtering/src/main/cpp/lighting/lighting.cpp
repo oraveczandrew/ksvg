@@ -270,28 +270,32 @@ void applyVector(
 #elif defined(__arm__)
                 ksvgLightingDistantDiffuseRowNeon32(srcT, srcM, srcB, rowOut, count, &lp);
 #elif defined(__i386__) || defined(__x86_64__)
-                const SimdLevel level = detectSimdLevel();
-                if (level >= SIMD_AVX512) {
-                    const jint c16 = (ixHi - x) & ~15;
-                    if (c16 > 0) {
-                        ksvgLightingDistantDiffuseRowAvx512(srcT, srcM, srcB, rowOut, c16, &lp);
-                        x += c16; srcT += c16; srcM += c16; srcB += c16; rowOut += c16;
-                    }
-                }
-                if (x < ixHi) {
-                    if (level >= SIMD_AVX2) {
-                        const jint c8 = (ixHi - x) & ~7;
-                        if (c8 > 0) {
-                            ksvgLightingDistantDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp);
-                            x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
-                        }
-                    }
-                    const jint c4 = (ixHi - x) & ~3;
-                    if (c4 > 0) {
-                        ksvgLightingDistantDiffuseRowSse2(srcT, srcM, srcB, rowOut, c4, &lp);
-                        x += c4;
-                    }
-                }
+#if defined(__x86_64__)
+    const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_AVX512) {
+        const jint c16 = (ixHi - x) & ~15;
+        if (c16 > 0) {
+            ksvgLightingDistantDiffuseRowAvx512(srcT, srcM, srcB, rowOut, c16, &lp);
+            x += c16; srcT += c16; srcM += c16; srcB += c16; rowOut += c16;
+        }
+    }
+    if (x < ixHi) {
+        if (level >= SIMD_AVX2) {
+            const jint c8 = (ixHi - x) & ~7;
+            if (c8 > 0) {
+                ksvgLightingDistantDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp);
+                x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
+            }
+        }
+#endif
+        const jint c4 = (ixHi - x) & ~3;
+        if (c4 > 0) {
+            ksvgLightingDistantDiffuseRowSse2(srcT, srcM, srcB, rowOut, c4, &lp);
+            x += c4;
+        }
+#if defined(__x86_64__)
+    }
+#endif
 #endif
             }
         }
@@ -354,8 +358,10 @@ jint nativeBackendForAbi() {
     backends |= SIMD_BACKEND_SSE2;
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_SSSE3) backends |= SIMD_BACKEND_SSSE3;
+#if defined(__x86_64__)
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
     if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
+#endif
 #endif
     return backends;
 }
@@ -459,9 +465,11 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
     backend = SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
     backend = SIMD_BACKEND_SSE2;
+#if defined(__x86_64__)
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
     if (level >= SIMD_AVX512) backend = SIMD_BACKEND_AVX512;
+#endif
 #endif
 
     applyVector(pix, out, width, height,

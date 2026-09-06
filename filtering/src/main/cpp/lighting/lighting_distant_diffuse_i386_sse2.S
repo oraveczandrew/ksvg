@@ -36,6 +36,7 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     push    %esi
     push    %edi
     push    %ebx
+    and     $-16, %esp      # 16-byte align: i386 entry esp is 12 mod 16
     sub     $128, %esp
 
     mov     8(%ebp), %esi
@@ -60,14 +61,10 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     shufps  $0, %xmm0, %xmm0
     movaps  %xmm0, 48(%esp)
 
-    mov     $0x437f0000, %edx  # 255.0
-    movd    %edx, %xmm0
-    shufps  $0, %xmm0, %xmm0
-    movaps  %xmm0, 112(%esp)
-
     mov     $0x40000000, %edx  # 2.0
     movd    %edx, %xmm6
     shufps  $0, %xmm6, %xmm6
+    movaps  %xmm6, 96(%esp)    # 96(esp) = 2.0 (frees xmm6 as scratch for i386)
 
     // Precalculate Scales
     movaps  64(%esp), %xmm0    # 1.0
@@ -76,15 +73,13 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     movss   36(%eax), %xmm1    # ss
     shufps  $0, %xmm1, %xmm1
     mulps   %xmm1, %xmm0
-    divps   112(%esp), %xmm0   # / 255.0
-    movaps  %xmm0, 0(%esp)     # scaleX_ss_final
+    movaps  %xmm0, 0(%esp)     # scaleX = (1/invDx)*ss (raw alpha heights, no /255)
 
     movaps  64(%esp), %xmm0    # 1.0
     divss   4(%eax), %xmm0
     shufps  $0, %xmm0, %xmm0
     mulps   %xmm1, %xmm0
-    divps   112(%esp), %xmm0
-    movaps  %xmm0, 16(%esp)    # scaleY_ss_final
+    movaps  %xmm0, 16(%esp)    # scaleY = (1/invDy)*ss
 
     movss   8(%eax), %xmm0     # k
     shufps  $0, %xmm0, %xmm0
@@ -118,7 +113,7 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     movups  4(%esi), %xmm1
     psrld   $24, %xmm1
     cvtdq2ps %xmm1, %xmm1      # h_mT
-    mulps   %xmm6, %xmm1
+    mulps   96(%esp), %xmm1
     addps   %xmm0, %xmm1
     addps   %xmm2, %xmm1       # sumT_rel in xmm1
 
@@ -130,7 +125,7 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     psrld   $24, %xmm2
     cvtdq2ps %xmm2, %xmm2
     subps   %xmm0, %xmm2
-    mulps   %xmm6, %xmm2
+    mulps   96(%esp), %xmm2
     addps   %xmm2, %xmm7       # dx_rel
 
     // Row B
@@ -140,27 +135,27 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     movups  8(%ebx), %xmm2
     psrld   $24, %xmm2
     cvtdq2ps %xmm2, %xmm2
-    movaps  %xmm2, %xmm15
-    subps   %xmm0, %xmm15
-    addps   %xmm15, %xmm7      # final dx_rel
+    movaps  %xmm2, %xmm6
+    subps   %xmm0, %xmm6
+    addps   %xmm6, %xmm7      # final dx_rel
 
-    movups  4(%ebx), %xmm15
-    psrld   $24, %xmm15
-    cvtdq2ps %xmm15, %xmm15
-    mulps   %xmm6, %xmm15
-    addps   %xmm0, %xmm15
-    addps   %xmm2, %xmm15      # sumB_rel
+    movups  4(%ebx), %xmm6
+    psrld   $24, %xmm6
+    cvtdq2ps %xmm6, %xmm6
+    mulps   96(%esp), %xmm6
+    addps   %xmm0, %xmm6
+    addps   %xmm2, %xmm6      # sumB_rel
 
-    subps   %xmm1, %xmm15      # dy_rel
+    subps   %xmm1, %xmm6      # dy_rel
 
     mulps   0(%esp), %xmm7     # dx
-    mulps   16(%esp), %xmm15    # dy
+    mulps   16(%esp), %xmm6    # dy
 
     // n = (-dx, -dy, 1)
     xorps   %xmm0, %xmm0
     subps   %xmm7, %xmm0       # nx
     xorps   %xmm1, %xmm1
-    subps   %xmm15, %xmm1      # ny
+    subps   %xmm6, %xmm1      # ny
 
     movaps  %xmm0, %xmm2
     mulps   %xmm0, %xmm2
@@ -170,12 +165,12 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     addps   64(%esp), %xmm2    # nLen^2
 
     rsqrtps %xmm2, %xmm7       # estimate
-    movaps  %xmm7, %xmm15
-    mulps   %xmm7, %xmm15
-    mulps   %xmm2, %xmm15
-    mulps   80(%esp), %xmm15   # 0.5 * x * r^2
+    movaps  %xmm7, %xmm6
+    mulps   %xmm7, %xmm6
+    mulps   %xmm2, %xmm6
+    mulps   80(%esp), %xmm6   # 0.5 * x * r^2
     movaps  48(%esp), %xmm2    # 1.5
-    subps   %xmm15, %xmm2
+    subps   %xmm6, %xmm2
     mulps   %xmm7, %xmm2       # 1/nLen in xmm2
 
     mulps   %xmm2, %xmm0       # nx
@@ -207,22 +202,22 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     addps   80(%esp), %xmm2    # +0.5
     cvttps2dq %xmm2, %xmm2
 
-    movss   32(%eax), %xmm15   # lb
-    shufps  $0, %xmm15, %xmm15
-    mulps   %xmm0, %xmm15
-    addps   80(%esp), %xmm15   # +0.5
-    cvttps2dq %xmm15, %xmm15
+    movss   32(%eax), %xmm6   # lb
+    shufps  $0, %xmm6, %xmm6
+    mulps   %xmm0, %xmm6
+    addps   80(%esp), %xmm6   # +0.5
+    cvttps2dq %xmm6, %xmm6
 
     pslld   $16, %xmm1
     pslld   $8, %xmm2
-    por     %xmm1, %xmm15
-    por     %xmm2, %xmm15
+    por     %xmm1, %xmm6
+    por     %xmm2, %xmm6
     mov     $0xFF000000, %eax
     movd    %eax, %xmm0
     shufps  $0, %xmm0, %xmm0
-    por     %xmm0, %xmm15
+    por     %xmm0, %xmm6
 
-    movups  %xmm15, (%edx)
+    movups  %xmm6, (%edx)
 
     add     $16, %esi
     add     $16, %edi
@@ -232,7 +227,7 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     jnz     .Lloop
 
 .Ldone:
-    add     $128, %esp
+    lea     -12(%ebp), %esp # saved regs sit at ebp-12..ebp (the `and -16` dropped stack)
     pop     %ebx
     pop     %edi
     pop     %esi
