@@ -25,6 +25,23 @@ import java.io.File
 import java.util.Locale
 
 /**
+ * Clears every benchmark CSV from the device's external cache directory (spec §24).
+ */
+fun clearPreviousResults() {
+    val dir = context().externalCacheDir ?: return
+    if (!dir.exists()) return
+    val summaryFiles = dir.listFiles { _, name -> name.startsWith("benchmarks_device") && name.endsWith(".csv") }
+    val detailFiles = dir.listFiles { _, name -> name.startsWith("benchmarks_harness_detail") && name.endsWith(".csv") }
+    
+    val totalDeleted = (summaryFiles?.size ?: 0) + (detailFiles?.size ?: 0)
+    if (totalDeleted > 0) {
+        summaryFiles?.forEach { it.delete() }
+        detailFiles?.forEach { it.delete() }
+        println("Benchmark harness: cleared $totalDeleted previous result files from ${dir.absolutePath}")
+    }
+}
+
+/**
  * Public DSL + orchestration for the stable native benchmark harness
  * (TEST_HARNESS_PLAN.md Step 1-2; spec §12, §13, §14, §17, §19).
  *

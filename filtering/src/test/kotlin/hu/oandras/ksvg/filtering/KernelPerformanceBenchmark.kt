@@ -33,6 +33,13 @@ class KernelPerformanceBenchmark {
         fun setup() {
             assertNativeBackendAvailable()
             KernelBenchmarkRunner.clear()
+            
+            // Clear previous host results from tmp/
+            val tmpDir = resolveTmpDir()
+            if (tmpDir.exists()) {
+                tmpDir.listFiles { _, name -> name.startsWith("benchmarks_host") && name.endsWith(".csv") }
+                    ?.forEach { it.delete() }
+            }
         }
     }
 

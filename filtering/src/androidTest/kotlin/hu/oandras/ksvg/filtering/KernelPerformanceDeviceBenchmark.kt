@@ -18,6 +18,7 @@ package hu.oandras.ksvg.filtering
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import hu.oandras.ksvg.filtering.benchmark.clearPreviousResults
 import hu.oandras.ksvg.filtering.benchmark.nativeBenchmark
 import org.junit.BeforeClass
 import org.junit.Test
@@ -53,6 +54,7 @@ class KernelPerformanceDeviceBenchmark {
         @JvmStatic
         fun setup() {
             assertNativeBackendAvailable()
+            clearPreviousResults()
         }
 
         const val WARMUP_ITERATIONS = 10

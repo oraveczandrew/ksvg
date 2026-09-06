@@ -185,6 +185,14 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
     dependsOn(connectedTest)
 
     doLast {
+        // Clear previous results from the host's tmp directory so the Markdown
+        // report only reflects the current run.
+        if (tmpDir.exists()) {
+            tmpDir.listFiles { _, name ->
+                (name.startsWith("benchmarks_device") || name.startsWith("benchmarks_harness_detail")) &&
+                    name.endsWith(".csv")
+            }?.forEach { it.delete() }
+        }
         tmpDir.mkdirs()
 
         fun adbRun(vararg args: String): String {

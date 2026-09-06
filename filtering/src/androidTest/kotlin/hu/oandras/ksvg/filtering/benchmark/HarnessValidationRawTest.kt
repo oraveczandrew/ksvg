@@ -20,6 +20,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import hu.oandras.ksvg.filtering.TurbulenceNative
 import hu.oandras.ksvg.filtering.backendName
 import hu.oandras.ksvg.filtering.getBackendsFor
+import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.math.sqrt
@@ -148,6 +149,12 @@ class HarnessValidationRawTest {
     )
 
     private companion object {
+        @BeforeClass
+        @JvmStatic
+        fun setup() {
+            clearPreviousResults()
+        }
+        
         const val RAW_RUNS = 50
     }
 }
