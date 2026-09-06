@@ -279,10 +279,10 @@ void applyVector(
         float canvasScaleX, float canvasScaleY,
         jint lightType, bool isSpecular, float k, float exponent,
         float fr, float fg, float fb, const jdouble* params,
-        bool premultiplied, bool useLinear) {
+        bool premultiplied, bool useLinear, jint backend) {
     const jint span = clipRight - clipLeft + 3; // columns x-1 .. x+1 of last px
     float rowT[kMaxVecRowSpan], rowM[kMaxVecRowSpan], rowB[kMaxVecRowSpan];
-    float intensities[4];
+    float intensities[kMaxVecRowSpan];
 
     const float lr = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fr))) : fr;
     const float lg = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fg))) : fg;
@@ -320,6 +320,50 @@ void applyVector(
 
         jint x = clipLeft;
         const jint vecEnd = clipLeft + ((clipRight - clipLeft) & ~3);
+
+        if (lightType == 0 && !isSpecular && (clipRight - clipLeft) >= 4) {
+            // Distant-diffuse assembly path.
+            const jint count = (clipRight - clipLeft) & ~3;
+#if defined(__aarch64__)
+            ksvgLightingDistantDiffuseNeon64(rowT, rowM, rowB, count, invDx, invDy, k, lx, ly, lz, intensities);
+#elif defined(__arm__)
+            ksvgLightingDistantDiffuseNeon32(rowT, rowM, rowB, count, invDx, invDy, k, lx, ly, lz, intensities);
+#elif defined(__i386__) || defined(__x86_64__)
+            const SimdLevel level = detectSimdLevel();
+            if (level >= SIMD_AVX512) {
+                const jint c = (clipRight - clipLeft) & ~15;
+                if (c > 0) {
+                    ksvgLightingDistantDiffuseAvx512(rowT, rowM, rowB, c, invDx, invDy, k, lx, ly, lz, intensities);
+                    x += c;
+                }
+            } else if (level >= SIMD_AVX2) {
+                const jint c = (clipRight - clipLeft) & ~7;
+                if (c > 0) {
+                    ksvgLightingDistantDiffuseAvx2(rowT, rowM, rowB, c, invDx, invDy, k, lx, ly, lz, intensities);
+                    x += c;
+                }
+            } else {
+                ksvgLightingDistantDiffuseSse2(rowT, rowM, rowB, count, invDx, invDy, k, lx, ly, lz, intensities);
+                x += count;
+            }
+#endif
+            // The assembly kernel only wrote the intensities. We still need to pack the pixels.
+            // (Reusing the loop below for the packed parts).
+            jint packX = clipLeft;
+            for (; packX < x; packX++) {
+                const float inten = intensities[packX - clipLeft];
+                jint outR = clamp255f(lr * inten);
+                jint outG = clamp255f(lg * inten);
+                jint outB = clamp255f(lb * inten);
+                if (useLinear) {
+                    outR = linearToLightSRgb(outR);
+                    outG = linearToLightSRgb(outG);
+                    outB = linearToLightSRgb(outB);
+                }
+                out[rowOffset + packX] = packPixel(255, outR, outG, outB);
+            }
+        }
+
         for (; x < vecEnd; x += 4) {
             const jint base = x - clipLeft; // index of column x-1 in the rows
             F32x4 nx, ny, nz;
@@ -546,13 +590,17 @@ void runForced(jint* pix, jint* out, jint width, jint height,
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     assert(backend == SIMD_BACKEND_NEON32);
 #elif defined(__i386__) || defined(__x86_64__)
-    assert(backend == SIMD_BACKEND_SSSE3); // lighting vector path uses SSE2 minimum
+    if (backend == SIMD_BACKEND_SSE2 || backend == SIMD_BACKEND_AVX2 || backend == SIMD_BACKEND_AVX512) {
+        // Handled via the assembly path in applyVector
+    } else {
+        assert(backend == SIMD_BACKEND_SSSE3);
+    }
 #endif
     applyVector(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 ss, invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                 unitSizeX, unitSizeY, canvasScaleX, canvasScaleY,
                 lightType, isSpecular, k, exponent, fr, fg, fb, params,
-                premultiplied, useLinear);
+                premultiplied, useLinear, backend);
 #else
     (void)backend;
     applyScalar(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
@@ -571,7 +619,11 @@ jint nativeBackendForAbi() {
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     backends |= SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
+    backends |= SIMD_BACKEND_SSE2;
     backends |= SIMD_BACKEND_SSSE3;
+    const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
+    if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
 #endif
 #endif
     return backends;
@@ -672,6 +724,14 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
 
 #ifdef LIGHT_SIMD
     if (span <= kMaxVecRowSpan) {
+        jint backend = SIMD_BACKEND_SCALAR;
+#if defined(__aarch64__)
+        backend = SIMD_BACKEND_NEON64;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+        backend = SIMD_BACKEND_NEON32;
+#elif defined(__i386__) || defined(__x86_64__)
+        backend = SIMD_BACKEND_SSSE3;
+#endif
         applyVector(pix, out, width, height,
                     clipLeft, clipTop, clipRight, clipBottom,
                     surfaceScaleNormalized,
@@ -682,7 +742,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
                     lightType, isSpecular, k, exponent,
                     static_cast<float>(lightR), static_cast<float>(lightG),
                     static_cast<float>(lightB), params,
-                    premultiplied, useLinear);
+                    premultiplied, useLinear, backend);
     } else
 #endif
     {

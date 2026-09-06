@@ -41,8 +41,16 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
     set(TURBULENCE_SOURCES turbulence/turbulence_noise_aarch64_neon.S)
 endif()
 
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(LIGHTING_SOURCES lighting/lighting_distant_diffuse_aarch64_neon.S)
+endif()
+
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
     set(MORPHOLOGY_SOURCES morphology/morphology_armv7a_neon.S)
+endif()
+
+if(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(LIGHTING_SOURCES lighting/lighting_distant_diffuse_armv7a_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
@@ -63,6 +71,11 @@ if(ANDROID_ABI STREQUAL "x86_64")
         morphology/morphology_x86_64_avx2.S
         morphology/morphology_x86_64_avx512.S
     )
+    set(LIGHTING_SOURCES
+        lighting/lighting_distant_diffuse_x86_64_sse2.S
+        lighting/lighting_distant_diffuse_x86_64_avx2.S
+        lighting/lighting_distant_diffuse_x86_64_avx512.S
+    )
 endif()
 
 if(ANDROID_ABI STREQUAL "x86")
@@ -70,6 +83,11 @@ if(ANDROID_ABI STREQUAL "x86")
         morphology/morphology_i386_sse2.S
         morphology/morphology_i386_avx2.S
         morphology/morphology_i386_avx512.S
+    )
+    set(LIGHTING_SOURCES
+        lighting/lighting_distant_diffuse_i386_sse2.S
+        lighting/lighting_distant_diffuse_i386_avx2.S
+        lighting/lighting_distant_diffuse_i386_avx512.S
     )
 endif()
 
@@ -99,7 +117,7 @@ add_library(ksvgblur SHARED
     arithmetic_composite/arithmetic_composite.cpp arithmetic_composite/arithmetic_composite_neon.cpp
         arithmetic_composite/arithmetic_composite_x86_sse.cpp
     ${AVX2_SOURCES} ${AVX512_SOURCES}
-    ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES})
+    ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES})
 
 # Include path so per-filter headers resolve (convolve.h, turbulence_tables.h, etc.)
 target_include_directories(ksvgblur PRIVATE

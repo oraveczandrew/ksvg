@@ -517,3 +517,8 @@ trusting long bench runs on this device:
   neon64 15.98 ms @512² (**12.5x**) and scalar 3295.6 / neon64 224.1 ms @2048²
   (**14.7x**). The 2048² cell improved ~6% over the pre-optimization revision
   (238.9 -> 224.1 ms); 512² is within noise. §6.1 table refreshed.
+- 2026-09-06 — Standardized assembly naming convention to `<feature>_<arch>_<isa>.S`
+  across the whole project (Morphology, Blur, Convolve, Turbulence, ArithmeticComposite, Lighting).
+  Integrated hand-written distant-light diffuse lighting assembly kernels for all
+  architectures (aarch64, armv7a, x86_64, i386) including SSE2, AVX2 and AVX512
+  variants for x86.

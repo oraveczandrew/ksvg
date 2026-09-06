@@ -45,6 +45,22 @@ void ksvgMorphologyApplyRowAvx512(
         jint radiusX, jint radiusY, jboolean erode,
         jint y, jint xStart, jint xEnd, jint* scratch);
 
+// lighting.cpp — distant diffuse pass over float height rows.
+void ksvgLightingDistantDiffuseSse2(
+        const float* ht, const float* hm, const float* hb,
+        int count, float invDx, float invDy, float k,
+        float lx, float ly, float lz, float* out);
+
+void ksvgLightingDistantDiffuseAvx2(
+        const float* ht, const float* hm, const float* hb,
+        int count, float invDx, float invDy, float k,
+        float lx, float ly, float lz, float* out);
+
+void ksvgLightingDistantDiffuseAvx512(
+        const float* ht, const float* hm, const float* hb,
+        int count, float invDx, float invDy, float k,
+        float lx, float ly, float lz, float* out);
+
 // convolve_matrix.cpp — duplicate-edge interior pass.
 void ksvgConvolveApplyInteriorAvx2(
         jint* dst, const jint* src, jint width, jint height,
