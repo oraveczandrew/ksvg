@@ -32,6 +32,7 @@ public fun getBackendsFor(@SimdBackend flags: Int): IntArray {
         SIMD_AVX512,
         SIMD_NEON64,
         SIMD_NEON32,
+        SIMD_SSE2,
     )
     return all.filter { (flags and it) != 0 }.toIntArray()
 }

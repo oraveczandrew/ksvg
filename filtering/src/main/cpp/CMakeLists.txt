@@ -57,6 +57,10 @@ if(ANDROID_ABI STREQUAL "armeabi-v7a")
     set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_neon32.S)
 endif()
 
+if(ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
+    set(MORPHOLOGY_SOURCES morphology/morphology_x86_sse2.S)
+endif()
+
 set(AVX2_SOURCES
     blur/blur_x86_avx2.cpp
     convolve/convolve_matrix_x86_avx2.cpp

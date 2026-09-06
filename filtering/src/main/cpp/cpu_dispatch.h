@@ -61,6 +61,7 @@ enum SimdBackend {
     SIMD_BACKEND_AVX512 = 1 << 3,
     SIMD_BACKEND_NEON64 = 1 << 4,
     SIMD_BACKEND_NEON32 = 1 << 5,
+    SIMD_BACKEND_SSE2   = 1 << 6,
 };
 
 #endif // KSVG_CPU_DISPATCH_H

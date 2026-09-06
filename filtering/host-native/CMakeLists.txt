@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project("ksvgblur_host" LANGUAGES C CXX)
+project("ksvgblur_host" LANGUAGES C CXX ASM)
 
 set(JAVA_HOME "$ENV{JAVA_HOME}")
 
@@ -31,6 +31,7 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix_x86_sse.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology_x86_sse2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_x86.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting.cpp

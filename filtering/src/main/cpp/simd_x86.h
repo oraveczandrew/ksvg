@@ -30,6 +30,15 @@ extern "C" {
 #endif
 
 // morphology.cpp — one fully-interior output pixel (erode/dilate min/max).
+void ksvgMorphologyApplyPixelSse2(
+        const jint* src, jint* dst, jint width,
+        jint radiusX, jint radiusY, jboolean erode,
+        jint x, jint y);
+void ksvgMorphologyApplyRowSse2(
+        const jint* src, jint* dst, jint width,
+        jint radiusX, jint radiusY, jboolean erode,
+        jint y, jint xStart, jint xEnd, jint* scratch);
+
 void ksvgMorphologyApplyPixelAvx2(
         const jint* src, jint* dst, jint width,
         jint radiusX, jint radiusY, jboolean erode,

@@ -287,6 +287,9 @@ namespace {
                     case SIMD_BACKEND_SCALAR:
                         applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
                         break;
+                    case SIMD_BACKEND_SSE2:
+                        ksvgMorphologyApplyPixelSse2(src, dst, width, radiusX, radiusY, erode, x, y);
+                        break;
                     case SIMD_BACKEND_SSSE3:
                         applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
                         break;
@@ -323,6 +326,7 @@ namespace {
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
         backends |= SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
+        backends |= SIMD_BACKEND_SSE2;
         backends |= SIMD_BACKEND_SSSE3;
         const SimdLevel level = detectSimdLevel();
         if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
@@ -444,6 +448,38 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
         }
     }
     delete[] spanBuf;
+#elif defined(__i386__) || defined(__x86_64__)
+    const jint yLo = clipTop;
+    const jint yHi = clipBottom;
+    const jint xLo = clipLeft;
+    const jint xHi = clipRight;
+
+    const jint vyLo = std::max(yLo, radiusY);
+    const jint vyHi = std::min(yHi, height - radiusY);
+    const jint vxLo = std::max(xLo, radiusX);
+    const jint vxHi = std::min(xHi, width - radiusX);
+
+    const bool isErode = erode == JNI_TRUE;
+    const jint init = isErode ? 255 : 0;
+    const jint span = vxHi - vxLo + 2 * radiusX;
+    jint *spanBuf = span > 0 ? new jint[span] : nullptr;
+
+    for (jint y = yLo; y < yHi; y++) {
+        if (y >= vyLo && y < vyHi) {
+            for (jint x = xLo; x < vxLo; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+            ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            for (jint x = vxHi; x < xHi; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+        } else {
+            for (jint x = xLo; x < xHi; x++) {
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+            }
+        }
+    }
+    delete[] spanBuf;
 #else
     runForced(src, dst, width, height, radiusX, radiusY, erode == JNI_TRUE,
               clipLeft, clipTop, clipRight, clipBottom, SIMD_BACKEND_SCALAR);
@@ -520,16 +556,23 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             delete[] spanBuf;
 #elif defined(__i386__) || defined(__x86_64__)
             const SimdLevel level = detectSimdLevel();
-            for (jint x = vxLo; x < vxHi; x++) {
-                switch (level) {
-                    case SIMD_AVX512:
-                        ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
-                        break;
-                    case SIMD_AVX2:
-                        ksvgMorphologyApplyPixelAvx2(src, dst, width, radiusX, radiusY, erode, x, y);
-                        break;
-                    default:
-                        applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
+            if (level < SIMD_AVX2) {
+                const jint span = vxHi - vxLo + 2 * radiusX;
+                jint *spanBuf = new jint[span];
+                ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                delete[] spanBuf;
+            } else {
+                for (jint x = vxLo; x < vxHi; x++) {
+                    switch (level) {
+                        case SIMD_AVX512:
+                            ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
+                            break;
+                        case SIMD_AVX2:
+                            ksvgMorphologyApplyPixelAvx2(src, dst, width, radiusX, radiusY, erode, x, y);
+                            break;
+                        default:
+                            applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
+                    }
                 }
             }
 #else

@@ -32,6 +32,7 @@ import androidx.annotation.IntDef
         SIMD_AVX512,
         SIMD_NEON64,
         SIMD_NEON32,
+        SIMD_SSE2,
     ]
 )
 public annotation class SimdBackend
@@ -42,6 +43,7 @@ public const val SIMD_AVX2: Int = 1 shl 2
 public const val SIMD_AVX512: Int = 1 shl 3
 public const val SIMD_NEON64: Int = 1 shl 4
 public const val SIMD_NEON32: Int = 1 shl 5
+public const val SIMD_SSE2: Int = 1 shl 6
 
 internal fun backendName(backend: Int): String = when (backend) {
     SIMD_SCALAR -> "scalar"
@@ -50,5 +52,6 @@ internal fun backendName(backend: Int): String = when (backend) {
     SIMD_AVX512 -> "avx512"
     SIMD_NEON64 -> "neon64"
     SIMD_NEON32 -> "neon32"
+    SIMD_SSE2 -> "sse2"
     else -> backend.toString()
 }
