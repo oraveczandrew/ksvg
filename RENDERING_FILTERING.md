@@ -232,7 +232,9 @@ helpers are used (see AGENTS.md).
 
 Full suite: `./gradlew :ksvg:testDebugUnitTest -Dorg.gradle.warning.mode=none`
 
-### 6.1 Kernel performance benchmarks (`:filtering`)
+### 6.1 Kernel performance benchmarks (:filtering)
+
+Detailed performance metrics for both Host (x86_64) and Device (ARM64) are maintained in the separate **[BENCHMARKS.md](BENCHMARKS.md)** file.
 
 The 9 native kernels (`:filtering`, §4) have a shared throughput harness
 (`KernelBenchmarkRunner`) driven from two places — a host JVM benchmark for the
@@ -279,7 +281,7 @@ stable `nativeBenchmark { }` harness — see §6.2:
 
 **32-bit (ARMv7 NEON32) test builds** — pass `-PfilterAbis=armeabi-v7a` to build a
 32-bit-only test APK. This lets you exercise the ARM32 NEON kernels
-(`convolve_neon32.S`, `Blur_advsimd.S`) on arm64 devices (which also support v7a),
+(`convolve_armv7a_neon.S`, `blur_armv7a_neon.S`) on arm64 devices (which also support v7a),
 where the benchmark/parity instrumentation reports the `neon32` backend instead of
 `neon64`. Multiple ABIs are comma-separated, e.g. `-PfilterAbis=armeabi-v7a,arm64-v8a`.
 Without the property all ABIs build as usual (this is wired in
@@ -293,49 +295,6 @@ Without the property all ABIs build as usual (this is wired in
   -Pandroid.testInstrumentationRunnerArguments.benchmark.kernel=ConvolveMatrix \
   -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
 ```
-
-### Host Results (i7-7820X)
-
-| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup |
-| :--- | :--- | :---: | ---: | ---: | ---: | ---: |
-| Unlinearize | scalar | 512x512 | 1.333 | 196.62 | 1.57 | 1.00x |
-| Unlinearize | ssse3 | 512x512 | 0.541 | 484.84 | 3.88 | 2.47x |
-| Unlinearize | avx2 | 512x512 | 0.312 | 839.34 | 6.71 | 4.27x |
-| ComponentTransfer | scalar | 512x512 | 0.475 | 551.70 | 4.41 | 1.00x |
-| ComponentTransfer | avx2 | 512x512 | 0.448 | 585.40 | 4.68 | 1.06x |
-| Morphology | scalar | 512x512 | 23.678 | 11.07 | 0.09 | 1.00x |
-| Morphology | avx2 | 512x512 | 9.691 | 27.05 | 0.22 | 2.44x |
-| ConvolveMatrix | scalar | 512x512 | 10.402 | 25.20 | 0.20 | 1.00x |
-| ConvolveMatrix | avx512 | 512x512 | 1.406 | 186.43 | 1.49 | 7.40x |
-| DisplacementMap | scalar | 512x512 | 2.524 | 103.87 | 1.25 | 1.00x |
-| DisplacementMap | ssse3 | 512x512 | 0.715 | 366.54 | 4.40 | 3.53x |
-| Lighting | scalar | 512x512 | 7.803 | 33.59 | 0.27 | 1.00x |
-| Lighting | ssse3 | 512x512 | 3.855 | 68.00 | 0.54 | 2.02x |
-| GaussianBlur | scalar | 512x512 | 21.140 | 12.40 | 0.10 | 1.00x |
-| GaussianBlur | avx2 | 512x512 | 10.768 | 24.34 | 0.19 | 1.96x |
-| Turbulence | scalar | 512x512 | 16.247 | 16.13 | 0.06 | 1.00x |
-| Turbulence | ssse3 | 512x512 | 7.449 | 35.19 | 0.14 | **2.18x** |
-| Turbulence | avx2 | 512x512 | 6.017 | 43.57 | 0.17 | **2.70x** |
-
-### Device Results (Snapdragon 8 Gen 2)
-
-| Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup |
-| :--- | :--- | :---: | ---: | ---: | ---: | ---: |
-| Unlinearize | scalar | 512x512 | 1.282 | 204.53 | 1.64 | 1.00x |
-| Unlinearize | neon64 | 512x512 | 33.992 | 7.71 | 0.06 | **0.04x** |
-| ComponentTransfer | scalar | 512x512 | 2.848 | 92.05 | 0.74 | 1.00x |
-| ComponentTransfer | neon64 | 512x512 | 39.201 | 6.69 | 0.05 | **0.07x** |
-| Morphology | scalar | 512x512 | 200.232 | 1.31 | 0.01 | 1.00x |
-| Morphology | neon64 | 512x512 | 15.979 | 16.41 | 0.13 | **12.5x** |
-| Morphology | scalar | 2048x2048 | 3295.601 | 1.27 | 0.01 | 1.00x |
-| Morphology | neon64 | 2048x2048 | 224.114 | 18.72 | 0.15 | **14.7x** |
-| ConvolveMatrix | scalar | 512x512 | 90.549 | 2.90 | 0.02 | 1.00x |
-| ConvolveMatrix | neon64 | 512x512 | 9.580 | 27.36 | 0.22 | **9.45x** |
-| DisplacementMap | scalar | 512x512 | 8.261 | 31.73 | 0.38 | 1.00x |
-| DisplacementMap | neon64 | 512x512 | 13.300 | 19.71 | 0.24 | **0.62x** |
-| GaussianBlur | scalar | 512x512 | 357.167 | 0.73 | 0.01 | 1.00x |
-| GaussianBlur | neon64 | 512x512 | 6.398 | 40.97 | 0.33 | **55.83x** |
-| Turbulence | scalar | 512x512 | 131.544 | 1.99 | 0.01 | 1.00x |
 
 Methodology note: for everything except Morphology, `ms` is the raw-runner
 **average** (2026-09-02); the Morphology rows come from the stable `nativeBenchmark { }`
