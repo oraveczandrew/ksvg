@@ -76,6 +76,10 @@ if(ANDROID_ABI STREQUAL "x86_64")
         lighting/lighting_distant_diffuse_x86_64_avx2.S
         lighting/lighting_distant_diffuse_x86_64_avx512.S
     )
+    set(UNLINEARIZE_SOURCES
+        component_transfer/unlinearize_ssse3_x86_64.S
+        component_transfer/unlinearize_avx2_x86_64.S
+    )
 endif()
 
 if(ANDROID_ABI STREQUAL "x86")
@@ -89,13 +93,13 @@ if(ANDROID_ABI STREQUAL "x86")
     set(LIGHTING_SOURCES
         lighting/lighting_distant_diffuse_i386_sse2.S
     )
+    # x86 (32-bit) uses C++ SSSE3 implementation for unlinearize.
 endif()
 
 set(AVX2_SOURCES
     blur/blur_x86_avx2.cpp
     convolve/convolve_matrix_x86_avx2.cpp
     component_transfer/component_transfer_x86_avx2.cpp
-    component_transfer/unlinearize_x86_avx2.cpp
     displacement_map/displacement_map_x86_avx2.cpp
     turbulence/turbulence_x86_avx2.cpp
     arithmetic_composite/arithmetic_composite_x86_avx2.cpp
@@ -117,7 +121,7 @@ add_library(ksvgblur SHARED
     arithmetic_composite/arithmetic_composite.cpp arithmetic_composite/arithmetic_composite_neon.cpp
         arithmetic_composite/arithmetic_composite_x86_sse.cpp
     ${AVX2_SOURCES} ${AVX512_SOURCES}
-    ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES})
+    ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES})
 
 # Include path so per-filter headers resolve (convolve.h, turbulence_tables.h, etc.)
 target_include_directories(ksvgblur PRIVATE

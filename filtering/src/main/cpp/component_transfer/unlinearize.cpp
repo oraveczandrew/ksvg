@@ -115,6 +115,10 @@ void applyNeon64(const jint* src, jint* dst, const jint width, const jint height
 #if defined(__SSSE3__)
 #include <tmmintrin.h>
 
+// External SSSE3 assembly implementation (x86 and x86_64).
+extern "C" void ksvgUnlinearizeApplySsse3(
+        jint* src, jint* dst, jint width, jint height, const jbyte* table);
+
 static inline __m128i lutRow128(const jbyte* table, int row) {
     return _mm_loadu_si128(reinterpret_cast<const __m128i*>(table + row * 16));
 }
@@ -256,8 +260,21 @@ void runForced(jint* src, jint* dst, jint width, jint height,
 #elif defined(__SSSE3__)
     switch (backend) {
         case SIMD_BACKEND_SCALAR: applyScalar(src, dst, width, height, table); break;
-        case SIMD_BACKEND_SSSE3:  applySsse3(src, dst, width, height, table); break;
-        case SIMD_BACKEND_AVX2:   ksvgUnlinearizeApplyAvx2(src, dst, width, height, table); break;
+        case SIMD_BACKEND_SSSE3:
+#if defined(__x86_64__)
+            ksvgUnlinearizeApplySsse3(src, dst, width, height, table);
+#else
+            applySsse3(src, dst, width, height, table);
+#endif
+            break;
+        case SIMD_BACKEND_AVX2:
+#if defined(__x86_64__)
+            ksvgUnlinearizeApplyAvx2(src, dst, width, height, table);
+#else
+            // AVX2 not available on 32-bit x86; fall back to SSSE3
+            applySsse3(src, dst, width, height, table);
+#endif
+            break;
         default:                  assert(false && "unsupported forced unlinearize backend on x86");
     }
 #else
@@ -274,9 +291,11 @@ jint nativeBackendForAbi() {
     backends |= SIMD_BACKEND_NEON32;
 #elif defined(__SSSE3__)
     backends |= SIMD_BACKEND_SSSE3;
+#if defined(__x86_64__)
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }
+#endif
 #endif
     return backends;
 }
@@ -354,9 +373,17 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
         applyNeon64(buf, buf, width, height, table);
 #elif defined(__SSSE3__)
         if (detectSimdLevel() >= SIMD_AVX2) {
+#if defined(__x86_64__)
             ksvgUnlinearizeApplyAvx2(buf, buf, width, height, table);
-        } else {
+#else
             applySsse3(buf, buf, width, height, table);
+#endif
+        } else {
+#if defined(__x86_64__)
+            ksvgUnlinearizeApplySsse3(buf, buf, width, height, table);
+#else
+            applySsse3(buf, buf, width, height, table);
+#endif
         }
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
         applyNeon32(buf, buf, width, height, table);
@@ -384,9 +411,17 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
     applyNeon64(src, dst, width, height, table);
 #elif defined(__SSSE3__)
     if (detectSimdLevel() >= SIMD_AVX2) {
+#if defined(__x86_64__)
         ksvgUnlinearizeApplyAvx2(src, dst, width, height, table);
-    } else {
+#else
         applySsse3(src, dst, width, height, table);
+#endif
+    } else {
+#if defined(__x86_64__)
+        ksvgUnlinearizeApplySsse3(src, dst, width, height, table);
+#else
+        applySsse3(src, dst, width, height, table);
+#endif
     }
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     applyNeon32(src, dst, width, height, table);
