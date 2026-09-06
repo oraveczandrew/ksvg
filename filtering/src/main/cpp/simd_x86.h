@@ -29,24 +29,21 @@
 extern "C" {
 #endif
 
-// morphology.cpp — one fully-interior output pixel (erode/dilate min/max).
-void ksvgMorphologyApplyPixelSse2(
-        const jint* src, jint* dst, jint width,
-        jint radiusX, jint radiusY, jboolean erode,
-        jint x, jint y);
+// morphology.cpp — one fully-interior output range (erode/dilate min/max).
 void ksvgMorphologyApplyRowSse2(
         const jint* src, jint* dst, jint width,
         jint radiusX, jint radiusY, jboolean erode,
         jint y, jint xStart, jint xEnd, jint* scratch);
 
-void ksvgMorphologyApplyPixelAvx2(
+void ksvgMorphologyApplyRowAvx2(
         const jint* src, jint* dst, jint width,
         jint radiusX, jint radiusY, jboolean erode,
-        jint x, jint y);
-void ksvgMorphologyApplyPixelAvx512(
+        jint y, jint xStart, jint xEnd, jint* scratch);
+
+void ksvgMorphologyApplyRowAvx512(
         const jint* src, jint* dst, jint width,
         jint radiusX, jint radiusY, jboolean erode,
-        jint x, jint y);
+        jint y, jint xStart, jint xEnd, jint* scratch);
 
 // convolve_matrix.cpp — duplicate-edge interior pass.
 void ksvgConvolveApplyInteriorAvx2(

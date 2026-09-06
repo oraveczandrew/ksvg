@@ -65,9 +65,8 @@ internal object MorphologyNative {
     )
 
     /**
-     * Validation/benchmark-only twin of [apply] that forces the aarch64 **row**
+     * Validation/benchmark-only twin of [apply] that forces a specific **row**
      * kernel (one call per output row, scratch-precomputed column reductions).
-     * Not advertised by [nativeBackend]; only callable on aarch64 builds.
      */
     @JvmStatic
     external fun applyForcedRow(
@@ -82,6 +81,7 @@ internal object MorphologyNative {
         clipTop: Int,
         clipRight: Int,
         clipBottom: Int,
+        simdBackend: Int,
     )
 
     /** Reports the backend the production dispatcher actually selects on this ABI. */

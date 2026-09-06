@@ -15,56 +15,67 @@ project("ksvgblur" LANGUAGES C CXX ASM)
 
 # ARM32 NEON kernels (32-bit ARM assembly).
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
-    set(BLUR_SOURCES blur/Blur_advsimd.S)
+    set(BLUR_SOURCES blur/blur_armv7a_neon.S)
     set(BLUR_NEEDS_NEON TRUE)
 endif()
 
 # AArch64 NEON kernels (64-bit ARM assembly). Same symbol/ABI contract as the
 # 32-bit kernel above (single combined vertical+horizontal separable pass).
 if(ANDROID_ABI STREQUAL "arm64-v8a")
-    set(BLUR_SOURCES blur/Blur_advsimd64.S)
+    set(BLUR_SOURCES blur/blur_aarch64_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
-    set(CONVOLVE_SOURCES convolve/convolve_neon.S)
+    set(CONVOLVE_SOURCES convolve/convolve_aarch64_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
-    set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_neon64.S)
+    set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_aarch64_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
-    set(MORPHOLOGY_SOURCES morphology/morphology_neon64.S)
+    set(MORPHOLOGY_SOURCES morphology/morphology_aarch64_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
-    set(TURBULENCE_SOURCES turbulence/turbulence_noise_neon64.S)
+    set(TURBULENCE_SOURCES turbulence/turbulence_noise_aarch64_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
-    set(MORPHOLOGY_SOURCES morphology/morphology_neon32.S)
+    set(MORPHOLOGY_SOURCES morphology/morphology_armv7a_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
-    set(TURBULENCE_SOURCES turbulence/turbulence_noise_neon32.S)
+    set(TURBULENCE_SOURCES turbulence/turbulence_noise_armv7a_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
-    set(CONVOLVE_SOURCES convolve/convolve_neon32.S)
+    set(CONVOLVE_SOURCES convolve/convolve_armv7a_neon.S)
 endif()
 
 if(ANDROID_ABI STREQUAL "armeabi-v7a")
-    set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_neon32.S)
+    set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_armv7a_neon.S)
 endif()
 
-if(ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
-    set(MORPHOLOGY_SOURCES morphology/morphology_x86_sse2.S)
+if(ANDROID_ABI STREQUAL "x86_64")
+    set(MORPHOLOGY_SOURCES
+        morphology/morphology_x86_64_sse2.S
+        morphology/morphology_x86_64_avx2.S
+        morphology/morphology_x86_64_avx512.S
+    )
+endif()
+
+if(ANDROID_ABI STREQUAL "x86")
+    set(MORPHOLOGY_SOURCES
+        morphology/morphology_i386_sse2.S
+        morphology/morphology_i386_avx2.S
+        morphology/morphology_i386_avx512.S
+    )
 endif()
 
 set(AVX2_SOURCES
     blur/blur_x86_avx2.cpp
     convolve/convolve_matrix_x86_avx2.cpp
-    morphology/morphology_x86_avx2.cpp
     component_transfer/component_transfer_x86_avx2.cpp
     component_transfer/unlinearize_x86_avx2.cpp
     displacement_map/displacement_map_x86_avx2.cpp
@@ -74,7 +85,6 @@ set(AVX2_SOURCES
 
 set(AVX512_SOURCES
     convolve/convolve_matrix_x86_avx512.cpp
-    morphology/morphology_x86_avx512.cpp
     displacement_map/displacement_map_x86_avx512.cpp
 )
 

@@ -37,12 +37,14 @@ import org.junit.runners.Parameterized
 class MorphologyNativeRowParityTest(
     private val name: String,
     private val case: MorphologyValidationCorpus.Case,
+    private val backend: Int,
 ) {
     companion object {
 
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun data(): List<Array<Any?>> {
+            val backends = getBackendsFor(MorphologyNative.nativeBackend())
             val wide = buildList {
                 for (erode in listOf(true, false)) {
                     val op = if (erode) "erode" else "dilate"
@@ -54,7 +56,13 @@ class MorphologyNativeRowParityTest(
                     add(case(op + " row 3x3 narrow 9x9", 9, 9, 3, 3, erode))
                 }
             }
-            return (MorphologyValidationCorpus.cases + wide).map { arrayOf(it.name, it) }
+            return buildList {
+                for (case in (MorphologyValidationCorpus.cases + wide)) {
+                    for (b in backends) {
+                        add(arrayOf("${case.name} [${backendName(b)}]", case, b))
+                    }
+                }
+            }
         }
 
         private fun case(
@@ -86,7 +94,7 @@ class MorphologyNativeRowParityTest(
         MorphologyNative.applyForcedRow(
             case.freshInput(), native, case.width, case.height,
             case.radiusX, case.radiusY, case.erode,
-            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom,
+            case.clipLeft, case.clipTop, case.clipRight, case.clipBottom, backend
         )
 
         assertArrayEquals("morphology row mismatch on [$name]", ref, native)

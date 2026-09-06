@@ -22,32 +22,32 @@
 #include "simd_x86.h"
 
 #if defined(__aarch64__)
-// Hand-written AArch64/AdvSIMD interior morphology pixel (morphology_neon64.S).
-// Same precondition as applyVectorPixel below: the complete
-// (2*radiusX+1)x(2*radiusY+1) window must lie inside the image. The init value
-// (delta: 0 / erode: 255) is derived from `erode` internally.
-extern "C" void ksvgMorphologyApplyPixelNeon64(
-    const jint *src, jint *dst, jint width,
-    jint radiusX, jint radiusY, jboolean erode,
-    jint x, jint y);
-
-// Row kernel: computes xStart..xEnd-1 output pixels of row y in one call so
-// overlapping horizontal windows reuse the shared source reads. Requires that
-// the whole spanned window lies inside the image. scratch must hold at least
-// (xEnd - xStart) + 2*radiusX jints and is written over.
+// Hand-written AArch64/AdvSIMD interior morphology row kernel (morphology_aarch64_neon.S).
 extern "C" void ksvgMorphologyApplyRowNeon64(
     const jint *src, jint *dst, jint width,
     jint radiusX, jint radiusY, jboolean erode,
     jint y, jint xStart, jint xEnd, jint *scratch);
 #elif defined(__arm__)
-// Hand-written ARM32/AdvSIMD interior morphology pixel (morphology_neon32.S).
-extern "C" void ksvgMorphologyApplyPixelNeon32(
+// Hand-written ARM32/AdvSIMD interior morphology row kernel (morphology_armv7a_neon.S).
+extern "C" void ksvgMorphologyApplyRowNeon32(
     const jint *src, jint *dst, jint width,
     jint radiusX, jint radiusY, jboolean erode,
-    jint x, jint y);
+    jint y, jint xStart, jint xEnd, jint *scratch);
+#elif defined(__i386__) || defined(__x86_64__)
+// Hand-written x86 / SSE2 interior morphology row kernel (morphology_i386_sse2.S / morphology_x86_64_sse2.S).
+extern "C" void ksvgMorphologyApplyRowSse2(
+    const jint *src, jint *dst, jint width,
+    jint radiusX, jint radiusY, jboolean erode,
+    jint y, jint xStart, jint xEnd, jint *scratch);
 
-// Row kernel for ARM32.
-extern "C" void ksvgMorphologyApplyRowNeon32(
+// AVX2 kernels.
+extern "C" void ksvgMorphologyApplyRowAvx2(
+    const jint *src, jint *dst, jint width,
+    jint radiusX, jint radiusY, jboolean erode,
+    jint y, jint xStart, jint xEnd, jint *scratch);
+
+// AVX-512 kernels.
+extern "C" void ksvgMorphologyApplyRowAvx512(
     const jint *src, jint *dst, jint width,
     jint radiusX, jint radiusY, jboolean erode,
     jint y, jint xStart, jint xEnd, jint *scratch);
@@ -263,54 +263,59 @@ namespace {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
             }
         }
+
+        const jint span = vxHi - vxLo + 2 * radiusX;
+        jint *spanBuf = (backend != SIMD_BACKEND_SCALAR && span > 0) ? new jint[span] : nullptr;
+
         for (jint y = vyLo; y < vyHi; y++) {
             for (jint x = xLo; x < vxLo; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
             }
-            for (jint x = vxLo; x < vxHi; x++) {
+
+            if (backend == SIMD_BACKEND_SCALAR) {
+                for (jint x = vxLo; x < vxHi; x++) {
+                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                }
+            } else {
 #if defined(__aarch64__)
-                if (backend == SIMD_BACKEND_SCALAR) {
-                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
-                } else {
-                    assert(backend == SIMD_BACKEND_NEON64);
-                    ksvgMorphologyApplyPixelNeon64(src, dst, width, radiusX, radiusY, erode, x, y);
-                }
+                assert(backend == SIMD_BACKEND_NEON64);
+                ksvgMorphologyApplyRowNeon64(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
 #elif defined(__arm__)
-                if (backend == SIMD_BACKEND_SCALAR) {
-                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
-                } else {
-                    assert(backend == SIMD_BACKEND_NEON32);
-                    ksvgMorphologyApplyPixelNeon32(src, dst, width, radiusX, radiusY, erode, x, y);
-                }
+                assert(backend == SIMD_BACKEND_NEON32);
+                ksvgMorphologyApplyRowNeon32(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
 #elif defined(__i386__) || defined(__x86_64__)
                 switch (backend) {
-                    case SIMD_BACKEND_SCALAR:
-                        applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
-                        break;
                     case SIMD_BACKEND_SSE2:
-                        ksvgMorphologyApplyPixelSse2(src, dst, width, radiusX, radiusY, erode, x, y);
-                        break;
-                    case SIMD_BACKEND_SSSE3:
-                        applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
+                        ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
                         break;
                     case SIMD_BACKEND_AVX2:
-                        ksvgMorphologyApplyPixelAvx2(src, dst, width, radiusX, radiusY, erode, x, y);
+                        ksvgMorphologyApplyRowAvx2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
                         break;
                     case SIMD_BACKEND_AVX512:
-                        ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
+                        ksvgMorphologyApplyRowAvx512(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                        break;
+                    case SIMD_BACKEND_SSSE3:
+                        for (jint x = vxLo; x < vxHi; x++) {
+                            applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
+                        }
                         break;
                     default:
                         assert(false && "unsupported forced morphology backend on x86");
                 }
 #else
-                (void) backend;
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                for (jint x = vxLo; x < vxHi; x++) {
+                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                }
 #endif
             }
+
             for (jint x = vxHi; x < xHi; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
             }
         }
+
+        delete[] spanBuf;
+
         for (jint y = vyHi; y < yHi; y++) {
             for (jint x = xLo; x < xHi; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
@@ -372,7 +377,8 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
     const jintArray jSrc, const jintArray jDst,
     const jint width, const jint height,
     const jint radiusX, const jint radiusY, const jboolean erode,
-    const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
+    const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+    const jint simdBackend) {
     auto *src = env->GetIntArrayElements(jSrc, nullptr);
     if (src == nullptr) return;
     auto *dst = env->GetIntArrayElements(jDst, nullptr);
@@ -405,7 +411,13 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
             for (jint x = xLo; x < vxLo; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
-            ksvgMorphologyApplyRowNeon64(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            if (simdBackend == SIMD_BACKEND_SCALAR) {
+                for (jint x = vxLo; x < vxHi; x++) {
+                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                }
+            } else {
+                ksvgMorphologyApplyRowNeon64(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            }
             for (jint x = vxHi; x < xHi; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
@@ -437,7 +449,13 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
             for (jint x = xLo; x < vxLo; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
-            ksvgMorphologyApplyRowNeon32(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            if (simdBackend == SIMD_BACKEND_SCALAR) {
+                for (jint x = vxLo; x < vxHi; x++) {
+                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                }
+            } else {
+                ksvgMorphologyApplyRowNeon32(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            }
             for (jint x = vxHi; x < xHi; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
@@ -469,7 +487,26 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
             for (jint x = xLo; x < vxLo; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
-            ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            switch (simdBackend) {
+                case SIMD_BACKEND_SCALAR:
+                    for (jint x = vxLo; x < vxHi; x++) {
+                        applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                    }
+                    break;
+                case SIMD_BACKEND_SSE2:
+                    ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                    break;
+                case SIMD_BACKEND_AVX2:
+                    ksvgMorphologyApplyRowAvx2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                    break;
+                case SIMD_BACKEND_AVX512:
+                    ksvgMorphologyApplyRowAvx512(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                    break;
+                default:
+                    for (jint x = vxLo; x < vxHi; x++) {
+                        applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                    }
+            }
             for (jint x = vxHi; x < xHi; x++) {
                 applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
@@ -556,25 +593,19 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             delete[] spanBuf;
 #elif defined(__i386__) || defined(__x86_64__)
             const SimdLevel level = detectSimdLevel();
-            if (level < SIMD_AVX2) {
-                const jint span = vxHi - vxLo + 2 * radiusX;
-                jint *spanBuf = new jint[span];
-                ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
-                delete[] spanBuf;
-            } else {
-                for (jint x = vxLo; x < vxHi; x++) {
-                    switch (level) {
-                        case SIMD_AVX512:
-                            ksvgMorphologyApplyPixelAvx512(src, dst, width, radiusX, radiusY, erode, x, y);
-                            break;
-                        case SIMD_AVX2:
-                            ksvgMorphologyApplyPixelAvx2(src, dst, width, radiusX, radiusY, erode, x, y);
-                            break;
-                        default:
-                            applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
-                    }
-                }
+            const jint span = vxHi - vxLo + 2 * radiusX;
+            jint *spanBuf = new jint[span];
+            switch (level) {
+                case SIMD_AVX512:
+                    ksvgMorphologyApplyRowAvx512(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                    break;
+                case SIMD_AVX2:
+                    ksvgMorphologyApplyRowAvx2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                    break;
+                default:
+                    ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
             }
+            delete[] spanBuf;
 #else
             for (jint x = vxLo; x < vxHi; x++) {
                 applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
