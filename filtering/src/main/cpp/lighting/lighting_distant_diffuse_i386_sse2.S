@@ -157,7 +157,11 @@ SYM(ksvgLightingDistantDiffuseSse2):
     pop     %ebp
     ret
 
+#ifdef __APPLE__
+.section __TEXT,__const
+#else
 .section .rodata
+#endif
 .p2align 4
 .Lzero: .float 0.0, 0.0, 0.0, 0.0
 .Lone:  .float 1.0, 1.0, 1.0, 1.0

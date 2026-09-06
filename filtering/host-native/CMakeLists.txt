@@ -35,6 +35,9 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_x86.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_sse2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_avx2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_avx512.S
   ${AVX2_SOURCES}
   ${AVX512_SOURCES}
 )

@@ -20,6 +20,22 @@
 #include "cpu_dispatch.h"
 #include "shared/math_utils.h"
 
+#if defined(__aarch64__)
+// Hand-written AArch64/AdvSIMD distant-light diffuse kernel (lighting_distant_diffuse_aarch64_neon.S).
+extern "C" void ksvgLightingDistantDiffuseNeon64(
+    const float* ht, const float* hm, const float* hb,
+    jint count, float invDx, float invDy, float k,
+    float lx, float ly, float lz, float* outIntensity);
+#elif defined(__arm__)
+// Hand-written ARM32/AdvSIMD distant-light diffuse kernel (lighting_distant_diffuse_armv7a_neon.S).
+extern "C" void ksvgLightingDistantDiffuseNeon32(
+    const float* ht, const float* hm, const float* hb,
+    jint count, float invDx, float invDy, float k,
+    float lx, float ly, float lz, float* outIntensity);
+#elif defined(__i386__) || defined(__x86_64__)
+#include "simd_x86.h"
+#endif
+
 // feDiffuseLighting / feSpecularLighting over unpremultiplied ARGB_8888
 // IntArrays. Bit-exact port of the Kotlin reference loop in
 // FilterLighting.kt: 3x3 Sobel surface gradients from the alpha heightmap,

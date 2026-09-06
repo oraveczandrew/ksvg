@@ -3,11 +3,21 @@
  *   int count,float invDx,float invDy,float k,float lx,float ly,float lz,float* out);
  * count must be a positive multiple of 4; rows point at x-1.
  */
+#ifdef __APPLE__
+#define SYM(x) _##x
+#define TYPE(x,y)
+#define SIZE(x)
+#else
+#define SYM(x) x
+#define TYPE(x,y) .type x,y
+#define SIZE(x) .size x,.-x
+#endif
+
 .text
 .p2align 4
-.globl ksvgLightingDistantDiffuseSse2
-.type ksvgLightingDistantDiffuseSse2,@function
-ksvgLightingDistantDiffuseSse2:
+.globl SYM(ksvgLightingDistantDiffuseSse2)
+TYPE(SYM(ksvgLightingDistantDiffuseSse2),@function)
+SYM(ksvgLightingDistantDiffuseSse2):
     pshufd  $0, %xmm0, %xmm6        # invDx
     pshufd  $0, %xmm1, %xmm7        # invDy
     pshufd  $0, %xmm2, %xmm8        # k
@@ -94,8 +104,12 @@ ksvgLightingDistantDiffuseSse2:
     jne     .Lloop
 .Ldone:
     ret
-.size ksvgLightingDistantDiffuseSse2,.-ksvgLightingDistantDiffuseSse2
+SIZE(SYM(ksvgLightingDistantDiffuseSse2))
+#ifdef __APPLE__
+.section __TEXT,__const
+#else
 .section .rodata
+#endif
 .p2align 4
 .Lzero: .float 0.0,0.0,0.0,0.0
 .Lone:  .float 1.0,1.0,1.0,1.0

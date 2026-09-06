@@ -1,11 +1,21 @@
 /* x86-64 AVX-512F distant-light diffuse kernel. SysV/Android ABI.
  * Same signature as SSE2, count must be a positive multiple of 16.
  */
+#ifdef __APPLE__
+#define SYM(x) _##x
+#define TYPE(x,y)
+#define SIZE(x)
+#else
+#define SYM(x) x
+#define TYPE(x,y) .type x,y
+#define SIZE(x) .size x,.-x
+#endif
+
 .text
 .p2align 6
-.globl ksvgLightingDistantDiffuseAvx512
-.type ksvgLightingDistantDiffuseAvx512,@function
-ksvgLightingDistantDiffuseAvx512:
+.globl SYM(ksvgLightingDistantDiffuseAvx512)
+TYPE(SYM(ksvgLightingDistantDiffuseAvx512),@function)
+SYM(ksvgLightingDistantDiffuseAvx512):
     vbroadcastss %xmm0,%zmm6
     vbroadcastss %xmm1,%zmm7
     vbroadcastss %xmm2,%zmm8
@@ -74,8 +84,12 @@ ksvgLightingDistantDiffuseAvx512:
     jne .Lloop
 .Ldone:
     ret
-.size ksvgLightingDistantDiffuseAvx512,.-ksvgLightingDistantDiffuseAvx512
+SIZE(SYM(ksvgLightingDistantDiffuseAvx512))
+#ifdef __APPLE__
+.section __TEXT,__const
+#else
 .section .rodata
+#endif
 .p2align 6
 .Lone: .float 1.0
 .Ltwo: .float 2.0
