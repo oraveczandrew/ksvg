@@ -18,6 +18,7 @@
 #define KSVG_SIMD_X86_H
 
 #include <jni.h>
+#include "cpu_dispatch.h"
 
 // Entry points implemented in wide-ISA translation units.
 // Those translation units are compiled with -mavx2 / -mavx512f,-mavx512bw so
@@ -45,21 +46,19 @@ void ksvgMorphologyApplyRowAvx512(
         jint radiusX, jint radiusY, jboolean erode,
         jint y, jint xStart, jint xEnd, jint* scratch);
 
-// lighting.cpp — distant diffuse pass over float height rows.
-void ksvgLightingDistantDiffuseSse2(
-        const float* ht, const float* hm, const float* hb,
-        int count, float invDx, float invDy, float k,
-        float lx, float ly, float lz, float* out);
+// lighting.cpp — distant diffuse pass over ARGB rows.
+// count is number of output pixels. rows point at x-1 (start of 3x3 window).
+void ksvgLightingDistantDiffuseRowSse2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params);
 
-void ksvgLightingDistantDiffuseAvx2(
-        const float* ht, const float* hm, const float* hb,
-        int count, float invDx, float invDy, float k,
-        float lx, float ly, float lz, float* out);
+void ksvgLightingDistantDiffuseRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params);
 
-void ksvgLightingDistantDiffuseAvx512(
-        const float* ht, const float* hm, const float* hb,
-        int count, float invDx, float invDy, float k,
-        float lx, float ly, float lz, float* out);
+void ksvgLightingDistantDiffuseRowAvx512(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params);
 
 // convolve_matrix.cpp — duplicate-edge interior pass.
 void ksvgConvolveApplyInteriorAvx2(

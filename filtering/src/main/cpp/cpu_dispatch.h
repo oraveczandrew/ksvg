@@ -64,4 +64,8 @@ enum SimdBackend {
     SIMD_BACKEND_SSE2   = 1 << 6,
 };
 
+struct LightingParams {
+    float invDx, invDy, k, lx, ly, lz, lr, lg, lb, ss;
+};
+
 #endif // KSVG_CPU_DISPATCH_H

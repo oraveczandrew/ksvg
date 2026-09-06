@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-/* x86-32 SSE2 distant-light diffuse kernel. cdecl ABI.
- * void ksvgLightingDistantDiffuseSse2(const float* ht, const float* hm, const float* hb,
- *   int count, float invDx, float invDy, float k, float lx, float ly, float lz, float* out);
- */
+/* x86-32 SSE2 distant-light diffuse kernel. cdecl ABI. */
 #ifdef __APPLE__
 #define SYM(x) _##x
 #define TYPE(x,y)
@@ -31,117 +28,201 @@
 .text
 .code32
 .p2align 4
-.globl SYM(ksvgLightingDistantDiffuseSse2)
-TYPE(SYM(ksvgLightingDistantDiffuseSse2), @function)
-SYM(ksvgLightingDistantDiffuseSse2):
+.globl SYM(ksvgLightingDistantDiffuseRowSse2)
+TYPE(SYM(ksvgLightingDistantDiffuseRowSse2), @function)
+SYM(ksvgLightingDistantDiffuseRowSse2):
     push    %ebp
     mov     %esp, %ebp
     push    %esi
     push    %edi
     push    %ebx
+    sub     $128, %esp
 
-    mov     8(%ebp), %esi      # ht
-    mov     12(%ebp), %edi     # hm
-    mov     16(%ebp), %ebx     # hb
-    mov     20(%ebp), %ecx     # count
+    mov     8(%ebp), %esi
+    mov     12(%ebp), %edi
+    mov     16(%ebp), %ebx
+    mov     24(%ebp), %ecx
+    mov     28(%ebp), %eax
 
-    movss   24(%ebp), %xmm6    # invDx
+    // --- Constants ---
+    mov     $0x3f800000, %edx  # 1.0
+    movd    %edx, %xmm0
+    shufps  $0, %xmm0, %xmm0
+    movaps  %xmm0, 64(%esp)
+
+    mov     $0x3f000000, %edx  # 0.5
+    movd    %edx, %xmm0
+    shufps  $0, %xmm0, %xmm0
+    movaps  %xmm0, 80(%esp)
+
+    mov     $0x3fc00000, %edx  # 1.5
+    movd    %edx, %xmm0
+    shufps  $0, %xmm0, %xmm0
+    movaps  %xmm0, 48(%esp)
+
+    mov     $0x437f0000, %edx  # 255.0
+    movd    %edx, %xmm0
+    shufps  $0, %xmm0, %xmm0
+    movaps  %xmm0, 112(%esp)
+
+    mov     $0x40000000, %edx  # 2.0
+    movd    %edx, %xmm6
     shufps  $0, %xmm6, %xmm6
-    movss   28(%ebp), %xmm7    # invDy
-    shufps  $0, %xmm7, %xmm7
-    movss   32(%ebp), %xmm8    # k
-    shufps  $0, %xmm8, %xmm8
-    movss   36(%ebp), %xmm9    # lx
-    shufps  $0, %xmm9, %xmm9
-    movss   40(%ebp), %xmm10   # ly
-    shufps  $0, %xmm10, %xmm10
-    movss   44(%ebp), %xmm11   # lz
-    shufps  $0, %xmm11, %xmm11
 
-    mov     48(%ebp), %edx     # out
+    // Precalculate Scales
+    movaps  64(%esp), %xmm0    # 1.0
+    divss   0(%eax), %xmm0
+    shufps  $0, %xmm0, %xmm0
+    movss   36(%eax), %xmm1    # ss
+    shufps  $0, %xmm1, %xmm1
+    mulps   %xmm1, %xmm0
+    divps   112(%esp), %xmm0   # / 255.0
+    movaps  %xmm0, 0(%esp)     # scaleX_ss_final
 
-    movaps  .Ltwo, %xmm4
-    movaps  .Lzero, %xmm5
-    movaps  .Lone, %xmm12
+    movaps  64(%esp), %xmm0    # 1.0
+    divss   4(%eax), %xmm0
+    shufps  $0, %xmm0, %xmm0
+    mulps   %xmm1, %xmm0
+    divps   112(%esp), %xmm0
+    movaps  %xmm0, 16(%esp)    # scaleY_ss_final
+
+    movss   8(%eax), %xmm0     # k
+    shufps  $0, %xmm0, %xmm0
+    movaps  %xmm0, 32(%esp)
+
+    movss   12(%eax), %xmm3    # lx
+    shufps  $0, %xmm3, %xmm3
+    movss   16(%eax), %xmm4    # ly
+    shufps  $0, %xmm4, %xmm4
+    movss   20(%eax), %xmm5    # lz
+    shufps  $0, %xmm5, %xmm5
+
+    mov     20(%ebp), %edx     # dst pointer
 
 .Lloop:
     test    %ecx, %ecx
     jz      .Ldone
 
-    movups  0(%esi), %xmm0     # lT
-    movups  4(%esi), %xmm1     # mT
-    movups  8(%esi), %xmm2     # rT
-    movups  0(%edi), %xmm3     # lM
-    movups  4(%edi), %xmm13    # mM
-    movups  8(%edi), %xmm14    # rM
+    // --- Sobel Gradient ---
+    movups  0(%esi), %xmm0
+    psrld   $24, %xmm0
+    cvtdq2ps %xmm0, %xmm0      # h_lT
 
-    # sumL = lT + 2*lM + lB
-    movaps  %xmm3, %xmm15
-    mulps   %xmm4, %xmm15
-    addps   %xmm0, %xmm15
-    movups  0(%ebx), %xmm3
-    addps   %xmm3, %xmm15      # sumL
+    movups  8(%esi), %xmm2
+    psrld   $24, %xmm2
+    cvtdq2ps %xmm2, %xmm2      # h_rT
 
-    # sumR = rT + 2*rM + rB
-    movaps  %xmm14, %xmm3
-    mulps   %xmm4, %xmm3
-    addps   %xmm2, %xmm3
-    movups  8(%ebx), %xmm14
-    addps   %xmm14, %xmm3      # sumR
+    movaps  %xmm2, %xmm7
+    subps   %xmm0, %xmm7       # dx_rel
 
-    # sumB = lB + 2*mB + rB
-    movups  4(%ebx), %xmm14
-    mulps   %xmm4, %xmm14
-    movups  0(%ebx), %xmm2
-    addps   %xmm2, %xmm14
-    movups  8(%ebx), %xmm2
-    addps   %xmm2, %xmm14      # sumB
-
-    # sumT = lT + 2*mT + rT
-    mulps   %xmm4, %xmm1
+    movups  4(%esi), %xmm1
+    psrld   $24, %xmm1
+    cvtdq2ps %xmm1, %xmm1      # h_mT
+    mulps   %xmm6, %xmm1
     addps   %xmm0, %xmm1
-    movups  8(%esi), %xmm0
-    addps   %xmm0, %xmm1      # sumT
+    addps   %xmm2, %xmm1       # sumT_rel in xmm1
 
-    # dzdx = (sumR - sumL) / invDx
-    subps   %xmm15, %xmm3
-    divps   %xmm6, %xmm3       # dx
+    // Row M
+    movups  0(%edi), %xmm0
+    psrld   $24, %xmm0
+    cvtdq2ps %xmm0, %xmm0
+    movups  8(%edi), %xmm2
+    psrld   $24, %xmm2
+    cvtdq2ps %xmm2, %xmm2
+    subps   %xmm0, %xmm2
+    mulps   %xmm6, %xmm2
+    addps   %xmm2, %xmm7       # dx_rel
 
-    # dzdy = (sumB - sumT) / invDy
-    subps   %xmm1, %xmm14
-    divps   %xmm7, %xmm14      # dy
+    // Row B
+    movups  0(%ebx), %xmm0
+    psrld   $24, %xmm0
+    cvtdq2ps %xmm0, %xmm0
+    movups  8(%ebx), %xmm2
+    psrld   $24, %xmm2
+    cvtdq2ps %xmm2, %xmm2
+    movaps  %xmm2, %xmm15
+    subps   %xmm0, %xmm15
+    addps   %xmm15, %xmm7      # final dx_rel
 
-    # n = (-dx, -dy, 1), nLen = sqrt(dx²+dy²+1)
-    movaps  %xmm5, %xmm0
-    subps   %xmm3, %xmm0       # nx
-    movaps  %xmm5, %xmm1
-    subps   %xmm14, %xmm1      # ny
+    movups  4(%ebx), %xmm15
+    psrld   $24, %xmm15
+    cvtdq2ps %xmm15, %xmm15
+    mulps   %xmm6, %xmm15
+    addps   %xmm0, %xmm15
+    addps   %xmm2, %xmm15      # sumB_rel
+
+    subps   %xmm1, %xmm15      # dy_rel
+
+    mulps   0(%esp), %xmm7     # dx
+    mulps   16(%esp), %xmm15    # dy
+
+    // n = (-dx, -dy, 1)
+    xorps   %xmm0, %xmm0
+    subps   %xmm7, %xmm0       # nx
+    xorps   %xmm1, %xmm1
+    subps   %xmm15, %xmm1      # ny
 
     movaps  %xmm0, %xmm2
     mulps   %xmm0, %xmm2
-    mulps   %xmm1, %xmm1
-    addps   %xmm1, %xmm2
-    addps   %xmm12, %xmm2      # nLen^2
-    sqrtps  %xmm2, %xmm2       # nLen
+    movaps  %xmm1, %xmm7
+    mulps   %xmm1, %xmm7
+    addps   %xmm7, %xmm2
+    addps   64(%esp), %xmm2    # nLen^2
 
-    # nx/nLen, ny/nLen, nz/nLen
-    divps   %xmm2, %xmm0
-    divps   %xmm2, %xmm1
-    movaps  %xmm12, %xmm3
-    divps   %xmm2, %xmm3       # nz
+    rsqrtps %xmm2, %xmm7       # estimate
+    movaps  %xmm7, %xmm15
+    mulps   %xmm7, %xmm15
+    mulps   %xmm2, %xmm15
+    mulps   80(%esp), %xmm15   # 0.5 * x * r^2
+    movaps  48(%esp), %xmm2    # 1.5
+    subps   %xmm15, %xmm2
+    mulps   %xmm7, %xmm2       # 1/nLen in xmm2
 
-    # dot = nx*lx + ny*ly + nz*lz
-    mulps   %xmm9, %xmm0
-    mulps   %xmm10, %xmm1
-    mulps   %xmm11, %xmm3
+    mulps   %xmm2, %xmm0       # nx
+    mulps   %xmm2, %xmm1       # ny
+    # nz = xmm2
+
+    mulps   %xmm3, %xmm0
+    mulps   %xmm4, %xmm1
     addps   %xmm1, %xmm0
-    addps   %xmm3, %xmm0
+    mulps   %xmm5, %xmm2
+    addps   %xmm2, %xmm0       # dot
 
-    maxps   %xmm5, %xmm0
-    mulps   %xmm8, %xmm0
-    minps   %xmm12, %xmm0
+    xorps   %xmm1, %xmm1
+    maxps   %xmm1, %xmm0
+    mulps   32(%esp), %xmm0    # intensity
+    minps   64(%esp), %xmm0
 
-    movups  %xmm0, (%edx)
+    // Pack to ARGB
+    mov     28(%ebp), %eax     # reload params
+    movss   24(%eax), %xmm1    # lr
+    shufps  $0, %xmm1, %xmm1
+    mulps   %xmm0, %xmm1
+    addps   80(%esp), %xmm1    # +0.5
+    cvttps2dq %xmm1, %xmm1
+
+    movss   28(%eax), %xmm2    # lg
+    shufps  $0, %xmm2, %xmm2
+    mulps   %xmm0, %xmm2
+    addps   80(%esp), %xmm2    # +0.5
+    cvttps2dq %xmm2, %xmm2
+
+    movss   32(%eax), %xmm15   # lb
+    shufps  $0, %xmm15, %xmm15
+    mulps   %xmm0, %xmm15
+    addps   80(%esp), %xmm15   # +0.5
+    cvttps2dq %xmm15, %xmm15
+
+    pslld   $16, %xmm1
+    pslld   $8, %xmm2
+    por     %xmm1, %xmm15
+    por     %xmm2, %xmm15
+    mov     $0xFF000000, %eax
+    movd    %eax, %xmm0
+    shufps  $0, %xmm0, %xmm0
+    por     %xmm0, %xmm15
+
+    movups  %xmm15, (%edx)
 
     add     $16, %esi
     add     $16, %edi
@@ -151,20 +232,11 @@ SYM(ksvgLightingDistantDiffuseSse2):
     jnz     .Lloop
 
 .Ldone:
+    add     $128, %esp
     pop     %ebx
     pop     %edi
     pop     %esi
     pop     %ebp
     ret
 
-#ifdef __APPLE__
-.section __TEXT,__const
-#else
-.section .rodata
-#endif
-.p2align 4
-.Lzero: .float 0.0, 0.0, 0.0, 0.0
-.Lone:  .float 1.0, 1.0, 1.0, 1.0
-.Ltwo:  .float 2.0, 2.0, 2.0, 2.0
-
-SIZE(SYM(ksvgLightingDistantDiffuseSse2))
+SIZE(SYM(ksvgLightingDistantDiffuseRowSse2))

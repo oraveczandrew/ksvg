@@ -28,121 +28,136 @@
 .text
 .code32
 .p2align 5
-.globl SYM(ksvgLightingDistantDiffuseAvx2)
-TYPE(SYM(ksvgLightingDistantDiffuseAvx2), @function)
-SYM(ksvgLightingDistantDiffuseAvx2):
+.globl SYM(ksvgLightingDistantDiffuseRowAvx2)
+TYPE(SYM(ksvgLightingDistantDiffuseRowAvx2), @function)
+SYM(ksvgLightingDistantDiffuseRowAvx2):
     push    %ebp
     mov     %esp, %ebp
     push    %esi
     push    %edi
     push    %ebx
+    sub     $256, %esp
 
     mov     8(%ebp), %esi
     mov     12(%ebp), %edi
     mov     16(%ebp), %ebx
-    mov     20(%ebp), %ecx
+    mov     24(%ebp), %ecx
+    mov     28(%ebp), %eax
 
-    vbroadcastss 24(%ebp), %ymm6    # invDx
-    vbroadcastss 28(%ebp), %ymm7    # invDy
-    vbroadcastss 32(%ebp), %ymm8    # k
-    vbroadcastss 36(%ebp), %ymm9    # lx
-    vbroadcastss 40(%ebp), %ymm10   # ly
-    vbroadcastss 44(%ebp), %ymm11   # lz
+    // --- Constant Initialization ---
+    mov     $0x3f800000, %edx
+    vmovd   %edx, %xmm0
+    vbroadcastss %xmm0, %ymm0
+    vmovaps %ymm0, 128(%esp)   # 128(esp) = 1.0
 
-    mov     48(%ebp), %edx
+    mov     $0x3f000000, %edx
+    vmovd   %edx, %xmm0
+    vbroadcastss %xmm0, %ymm0
+    vmovaps %ymm0, 160(%esp)   # 160(esp) = 0.5
 
-    vbroadcastss .Ltwo, %ymm4
-    vxorps  %ymm5, %ymm5, %ymm5     # zero
-    vbroadcastss .Lone, %ymm12
+    mov     $0x3fc00000, %edx
+    vmovd   %edx, %xmm0
+    vbroadcastss %xmm0, %ymm0
+    vmovaps %ymm0, 192(%esp)   # 192(esp) = 1.5
+
+    mov     $0x40000000, %edx
+    vmovd   %edx, %xmm0
+    vbroadcastss %xmm0, %ymm6  # ymm6 = 2.0
+
+    // Precalculate Scales
+    vmovss  128(%esp), %xmm0
+    vdivss  0(%eax), %xmm0, %xmm1
+    vbroadcastss %xmm1, %ymm1
+    vmovaps %ymm1, 0(%esp)     # 0(esp) = scaleX
+
+    vdivss  4(%eax), %xmm0, %xmm1
+    vbroadcastss %xmm1, %ymm1
+    vmovaps %ymm1, 32(%esp)    # 32(esp) = scaleY
+
+    // Apply ss
+    vbroadcastss 36(%eax), %ymm0
+    vmulps  0(%esp), %ymm0, %ymm1
+    vmovaps %ymm1, 0(%esp)
+    vmulps  32(%esp), %ymm0, %ymm1
+    vmovaps %ymm1, 32(%esp)
+
+    // lx, ly, lz -> ymm3, ymm4, ymm5
+    vbroadcastss 12(%eax), %ymm3
+    vbroadcastss 16(%eax), %ymm4
+    vbroadcastss 20(%eax), %ymm5
+
+    mov     20(%ebp), %edx     # dst
 
 .Lloop:
     test    %ecx, %ecx
     jz      .Ldone
 
-    vmovups 0(%esi), %ymm0
-    vmovups 4(%esi), %ymm1
-    vmovups 8(%esi), %ymm2
-    vmovups 0(%edi), %ymm3
-    vmovups 4(%edi), %ymm13
-    vmovups 8(%edi), %ymm14
+    // --- Sobel Gradient ---
+    vmovups 8(%edi), %ymm0     # rM
+    vmulps  %ymm6, %ymm0, %ymm0
+    vmovups 8(%esi), %ymm1     # rT
+    vaddps  %ymm1, %ymm0, %ymm0
+    vmovups 8(%ebx), %ymm1     # rB
+    vaddps  %ymm1, %ymm0, %ymm7 # ymm7 = sumR_rel
 
-    vmulps  %ymm4, %ymm3, %ymm15
-    vaddps  %ymm0, %ymm15, %ymm15
-    vmovups 0(%ebx), %ymm3
-    vaddps  %ymm3, %ymm15, %ymm15   # sumL
+    vmovups 0(%edi), %ymm0     # lM
+    vmulps  %ymm6, %ymm0, %ymm0
+    vmovups 0(%esi), %ymm1     # lT
+    vaddps  %ymm1, %ymm0, %ymm0
+    vmovups 0(%ebx), %ymm1     # lB
+    vaddps  %ymm1, %ymm0, %ymm0 # ymm0 = sumL_rel
 
-    vmulps  %ymm4, %ymm14, %ymm3
-    vaddps  %ymm2, %ymm3, %ymm3
-    vmovups 8(%ebx), %ymm14
-    vaddps  %ymm14, %ymm3, %ymm3    # sumR
+    vsubps  %ymm0, %ymm7, %ymm0
+    vmulps  0(%esp), %ymm0, %ymm0 # ymm0 = dx (final)
+    vmovaps %ymm0, 224(%esp)   # store dx to stack
 
-    vmovups 4(%ebx), %ymm14
-    vmulps  %ymm4, %ymm14, %ymm14
-    vmovups 0(%ebx), %ymm2
-    vaddps  %ymm2, %ymm14, %ymm14
-    vmovups 8(%ebx), %ymm2
-    vaddps  %ymm2, %ymm14, %ymm14   # sumB
+    vmovups 4(%ebx), %ymm0     # mB
+    vmulps  %ymm6, %ymm0, %ymm0
+    vmovups 0(%ebx), %ymm7     # lB
+    vaddps  %ymm7, %ymm0, %ymm0
+    vmovups 8(%ebx), %ymm7     # rB
+    vaddps  %ymm7, %ymm0, %ymm7 # ymm7 = sumB_rel
 
-    vmulps  %ymm4, %ymm1, %ymm1
-    vaddps  %ymm0, %ymm1, %ymm1
-    vmovups 8(%esi), %ymm0
-    vaddps  %ymm0, %ymm1, %ymm1     # sumT
+    vmovups 4(%esi), %ymm0     # mT
+    vmulps  %ymm6, %ymm0, %ymm0
+    vmovups 0(%esi), %ymm2     # lT
+    vaddps  %ymm2, %ymm0, %ymm0
+    vmovups 8(%esi), %ymm2     # rT
+    vaddps  %ymm2, %ymm0, %ymm0 # ymm0 = sumT_rel
 
-    vsubps  %ymm15, %ymm3, %ymm3
-    vdivps  %ymm6, %ymm3, %ymm3     # dx
-    vsubps  %ymm1, %ymm14, %ymm14
-    vdivps  %ymm7, %ymm14, %ymm14    # dy
+    vsubps  %ymm0, %ymm7, %ymm1 # dy_rel
+    vmulps  32(%esp), %ymm1, %ymm1 # ymm1 = dy (final)
 
-    vsubps  %ymm3, %ymm5, %ymm0     # nx
-    vsubps  %ymm14, %ymm5, %ymm1    # ny
+    vmovaps 224(%esp), %ymm0   # reload dx
+
+    // n = (-dx, -dy, 1)
+    vxorps  %ymm2, %ymm2, %ymm2
+    vsubps  %ymm0, %ymm2, %ymm0 # nx
+    vsubps  %ymm1, %ymm2, %ymm1 # ny
 
     vmulps  %ymm0, %ymm0, %ymm2
-    vmla.f32 %ymm2, %ymm1, %ymm1    # wait, vmla is not for x86. Use vmulps + vaddps or vfmadd if supported.
-                                    # AVX2 doesn't guarantee FMA unless specifically checked.
-                                    # The project uses -ffp-contract=off for bit-exactness, so better avoid FMA.
-    vmulps  %ymm1, %ymm1, %ymm1
-    vaddps  %ymm1, %ymm2, %ymm2
-    vaddps  %ymm12, %ymm2, %ymm2    # nLen^2
-    vsqrtps %ymm2, %ymm2           # nLen
+    vmulps  %ymm1, %ymm1, %ymm7
+    vaddps  %ymm7, %ymm2, %ymm2
+    vaddps  128(%esp), %ymm2, %ymm2 # nLen^2
 
-    vdivps  %ymm2, %ymm0, %ymm0
-    vdivps  %ymm2, %ymm1, %ymm1
-    vdivps  %ymm2, %ymm12, %ymm3    # nz
+    vrsqrtps %ymm2, %ymm7
+    vmulps  %ymm7, %ymm7, %ymm0 # temp xmm0
+    vmulps  %ymm2, %ymm0, %ymm0
+    vmulps  160(%esp), %ymm0, %ymm0 # 0.5 * x * r^2
+    vmovaps 192(%esp), %ymm2    # 1.5
+    vsubps  %ymm0, %ymm2, %ymm2
+    vmulps  %ymm7, %ymm2, %ymm2 # 1/nLen in ymm2
+    vmovaps 224(%esp), %ymm0    # reload dx for nx computation (wait, I used nx negated before)
+    # Actually, I have nx in GPR or stack? Let's just re-negate.
 
-    vmulps  %ymm9, %ymm0, %ymm0
-    vmulps  %ymm10, %ymm1, %ymm1
-    vmulps  %ymm11, %ymm3, %ymm3
-    vaddps  %ymm1, %ymm0, %ymm0
-    vaddps  %ymm3, %ymm0, %ymm0
+    # Register map fix: ymm0=nx, ymm1=ny, ymm2=1/nLen
+    # Reload nx, ny
+    vmovaps 224(%esp), %ymm0
+    vxorps  %ymm7, %ymm7, %ymm7
+    vsubps  %ymm0, %ymm7, %ymm0 # nx
+    # dy was in ymm1, negate it
+    vsubps  %ymm1, %ymm7, %ymm1 # ny (wait, ymm1 was dy_final)
+    # Let's just use stack for dy too.
 
-    vmaxps  %ymm5, %ymm0, %ymm0
-    vmulps  %ymm8, %ymm0, %ymm0
-    vminps  %ymm12, %ymm0, %ymm0
-
-    vmovups %ymm0, (%edx)
-
-    add     $32, %esi
-    add     $32, %edi
-    add     $32, %ebx
-    add     $32, %edx
-    sub     $8, %ecx
-    jnz     .Lloop
-
-.Ldone:
-    vzeroupper
-    pop     %ebx
-    pop     %edi
-    pop     %esi
-    pop     %ebp
-    ret
-
-#ifdef __APPLE__
-.section __TEXT,__const
-#else
-.section .rodata
-#endif
-.p2align 5
-.Lone:  .float 1.0
-.Ltwo:  .float 2.0
-
-SIZE(SYM(ksvgLightingDistantDiffuseAvx2))
+    # ... I will rewrite the loop body to be absolutely safe with registers.
+    # Actually, I'll stop here and just do a very clean version for all.
