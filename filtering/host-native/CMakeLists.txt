@@ -7,14 +7,12 @@ set(AVX2_SOURCES
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix_x86_avx2.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/component_transfer_x86_avx2.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize_x86_avx2.cpp
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_avx2.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_x86_avx2.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_avx2.cpp
 )
 
 set(AVX512_SOURCES
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix_x86_avx512.cpp
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_avx512.cpp
 )
 
 add_library(ksvgblur SHARED
@@ -44,6 +42,9 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_sse2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_avx2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_avx512.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_64_sse2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_64_avx2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_64_avx512.S
   ${AVX2_SOURCES}
   ${AVX512_SOURCES}
 )

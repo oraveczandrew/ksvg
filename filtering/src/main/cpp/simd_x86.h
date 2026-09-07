@@ -98,12 +98,24 @@ void ksvgUnlinearizeApplyAvx2(
         const jint* src, jint* dst, jint width, jint height, const jbyte* table);
 
 // displacement_map.cpp — full frame displacement.
+#if defined(__x86_64__)
+void ksvgDisplacementMapApplySse2(
+        const jint* src, const jint* map, jint* dst, jint width, jint height,
+        jfloat scale, jint xChannel, jint yChannel);
 void ksvgDisplacementMapApplyAvx2(
         const jint* src, const jint* map, jint* dst, jint width, jint height,
         jfloat scale, jint xChannel, jint yChannel);
 void ksvgDisplacementMapApplyAvx512(
         const jint* src, const jint* map, jint* dst, jint width, jint height,
         jfloat scale, jint xChannel, jint yChannel);
+#elif defined(__i386__)
+void ksvgDisplacementMapApplySsse3_i386(
+        const jint* src, const jint* map, jint* dst, jint width, jint height,
+        jfloat scale, jint xChannel, jint yChannel);
+void ksvgDisplacementMapApplyAvx2_i386(
+        const jint* src, const jint* map, jint* dst, jint width, jint height,
+        jfloat scale, jint xChannel, jint yChannel);
+#endif
 
 #ifdef __cplusplus
 }

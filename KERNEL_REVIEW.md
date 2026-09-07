@@ -49,8 +49,7 @@ Every row below is a **real vector kernel** (verified in the C++ dispatch: the
 **WP3 resolution (2026-09-07):** the three table-LUT kernels (UnLinearize,
 ComponentTransfer, ArithmeticComposite-linear) are **fixed by gate/disable** —
 see `REGRESSION_FIX_WORKLOG.md` for the measurements. Their rows are marked ✅
-below. Remaining open regressions: DisplacementMap neon64 (§2.1) and Lighting
-arm64/arm32 (§2.1/§2.2) — the WP1/WP2 work packages.
+below. Remaining open regressions: Lighting arm64/arm32 (§2.1/§2.2) — the WP2 work package.
 
 ### 2.1 Device (OnePlus 11, arm64 `neon64`) — 5 real regressing kernels
 
@@ -59,7 +58,7 @@ arm64/arm32 (§2.1/§2.2) — the WP1/WP2 work packages.
 | ✅ UnLinearize | 0.05x | 0.05x | `component_transfer/unlinearize.cpp` `lutLookupNeon64`/`applyNeon64` — **gated ✅** (scalar, WP3) |
 | ✅ ComponentTransfer | 0.08x | 0.08x | `component_transfer/component_transfer.cpp` `applyNeon64` — **gated ✅** (scalar, WP3) |
 | ✅ ArithmeticComposite (linear) | 0.34x | 0.34x | `arithmetic_composite/arithmetic_composite_neon.cpp` — **gated ✅** (linear → scalar, WP3) |
-| DisplacementMap | 0.61x | 0.61x | `displacement_map/displacement_map.cpp` `applyNeon64` (WP1 target) |
+| ✅ DisplacementMap | 14.2× | 12.2× | `displacement_map/displacement_map.cpp` `applyNeon64` (WP1) — **fixed**; arm32 NEON32 also fixed (8.2× @2048²) |
 | Lighting | 0.97x | 0.98x | `lighting/lighting_distant_diffuse_aarch64_neon.S` (≈ no gain) (WP2 target) |
 
 Worth noting: **Lighting was fixed on x86** (host 15–16x, x86-32 rebuild 38–55x,
@@ -80,10 +79,8 @@ consistent with either a broken-but-fallback path or a simply non-optimal kernel
 | Turbulence | 6.69x | 6.69x | 🟢, well below arm64's 20x |
 
 Winners here: Morphology 139–143x, GaussianBlur 42x, ConvolveMatrix 14–18x,
-ArithmeticComposite (non-linear) 18–23x. `DisplacementMap` has **no** ARM32 SIMD
-backend (scalar only) — same situation as x86-32. The 512px rows for
-ArithmeticComposite (non-linear) neon32, DisplacementMap scalar, GaussianBlur
-neon32 and Morphology neon32 were flagged UNSTABLE by the harness.
+ArithmeticComposite (non-linear) 18–23x. `DisplacementMap` neon32 now
+**fixed** by the arm32 register-aliasing fixes (10.9× @512², 8.2× @2048²).
 
 ### 2.3 Emulator (x86-32, `ssse3`)
 
@@ -234,17 +231,16 @@ Lighting x86 only (15–16x host; 38–55x x86-32).
 ## 6. Prioritized action list
 
 1. ~~**Blocker**: unblock `armeabi-v7a` lighting — obtain the correct ARM32 NEON
-   source or exclude the file (scalar fallback).~~ ✅ done via in-place ARM32
-   rewrite (see 1.1); 32-bit benchmark also ran (see 2.2). Remaining task is the
-   ARM32 device parity run.
+    source or exclude the file (scalar fallback).~~ ✅ done via in-place ARM32
+    rewrite (see 1.1); 32-bit benchmark also ran (see 2.2). ARM32 device parity
+    **done ✅** (10/10, register-aliasing bugs fixed).
 2. ~~Device neon64 regressions (UnLinearize, ComponentTransfer, Arithmetic-linear,
-   DisplacementMap, Lighting): investigate/fix or disable + rerun parity.~~
-   **LUT trio done ✅ (WP3)** — UnLinearize/ComponentTransfer gated to scalar on
-   ARM, Arithmetic-linear → scalar; x86-64 keeps AVX2. Remaining: DisplacementMap
-   (WP1) and Lighting arm64 (WP2).
+    DisplacementMap, Lighting): investigate/fix or disable + rerun parity.~~
+    **LUT trio done ✅ (WP3)** — UnLinearize/ComponentTransfer gated to scalar on
+    ARM, Arithmetic-linear → scalar; x86-64 keeps AVX2. Remaining: Lighting arm64 (WP2).
 3. ~~`ssse3` x86 regressions for the same LUT kernels.~~ ✅ SSSE3 no longer
-   advertised for UnLinearize/ComponentTransfer; linear Arithmetic → scalar on
-   non-AVX2 hosts. Re-verified host parity.
+    advertised for UnLinearize/ComponentTransfer; linear Arithmetic → scalar on
+    non-AVX2 hosts. Re-verified host parity.
 4. Classify "silent fallback" rows in the bench harness instead of reporting 🔴.
-5. Close parity gaps: arm64 device suite, emulator parity via `am instrument`.
+5. ~~Close parity gaps: arm64 device suite, emulator parity via `am instrument`.~~ ✅ done (arm64 + arm32 device parity 10/10).
 6. Nits: i386 AVX-512 lighting drafts, `benchmarks_host_.csv` naming.

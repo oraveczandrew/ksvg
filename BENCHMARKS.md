@@ -50,12 +50,14 @@ Measured on macOS (i7-7820X, 64-bit host build); initial run 2026-09-06, LUT-tri
 | ConvolveMatrix | ssse3 | 2048x2048 | 35.846 | 117.01 | 0.94 | 3.93x | 🟢 |
 | ConvolveMatrix | avx2 | 2048x2048 | 22.161 | 189.27 | 1.51 | 6.36x | 🟢 |
 | ConvolveMatrix | avx512 | 2048x2048 | 17.715 | 236.76 | 1.89 | 7.96x | 🟢 |
-| DisplacementMap | scalar | 512x512 | 2.379 | 110.20 | 1.32 | 1.00x |  |
-| DisplacementMap | avx2 | 512x512 | 0.817 | 320.73 | 3.85 | 2.91x | 🟢 |
-| DisplacementMap | avx512 | 512x512 | 0.717 | 365.39 | 4.38 | 3.32x | 🟢 |
-| DisplacementMap | scalar | 2048x2048 | 36.760 | 114.10 | 1.37 | 1.00x |  |
-| DisplacementMap | avx2 | 2048x2048 | 14.150 | 296.42 | 3.56 | 2.60x | 🟢 |
-| DisplacementMap | avx512 | 2048x2048 | 12.963 | 323.57 | 3.88 | 2.84x | 🟢 |
+| DisplacementMap | scalar | 512x512 | 2.296 | 114.15 | 1.37 | 1.00x |  |
+| DisplacementMap | sse2 | 512x512 | 1.020 | 256.91 | 3.08 | 2.25x | 🟢 |
+| DisplacementMap | avx2 | 512x512 | 0.712 | 368.14 | 4.42 | 3.22x | 🟢 |
+| DisplacementMap | avx512 | 512x512 | 0.691 | 379.28 | 4.55 | 3.32x | 🟢 |
+| DisplacementMap | scalar | 2048x2048 | 36.262 | 115.67 | 1.39 | 1.00x |  |
+| DisplacementMap | sse2 | 2048x2048 | 17.160 | 244.43 | 2.93 | 2.11x | 🟢 |
+| DisplacementMap | avx2 | 2048x2048 | 14.066 | 298.18 | 3.58 | 2.58x | 🟢 |
+| DisplacementMap | avx512 | 2048x2048 | 12.972 | 323.33 | 3.88 | 2.80x | 🟢 |
 | GaussianBlur | scalar | 512x512 | 20.248 | 12.95 | 0.10 | 1.00x |  |
 | GaussianBlur | ssse3 | 512x512 | 6.040 | 43.40 | 0.35 | 3.35x | 🟢 |
 | GaussianBlur | avx2 | 512x512 | 6.039 | 43.41 | 0.35 | 3.35x | 🟢 |
@@ -147,7 +149,7 @@ If a kernel row is missing a backend it is not advertised on this ABI (e.g. `Mor
 
 ## Device Results (OnePlus 11)
 
-Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBenchmark { }` harness.
+Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBenchmark { }` harness (medians, fresh 2026-09-07 re-measurement after the WP1 arm32 register-aliasing fixes).
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: |
@@ -167,10 +169,10 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBen
 | ConvolveMatrix | neon64 | 512x512 | 5.921 | 44.27 | 0.35 | **17.04x** | 🚀 |
 | ConvolveMatrix | scalar | 2048x2048 | 1589.315 | 2.64 | 0.02 | 1.00x |  |
 | ConvolveMatrix | neon64 | 2048x2048 | 83.963 | 49.95 | 0.40 | **18.93x** | 🚀 |
-| DisplacementMap | scalar | 512x512 | 5.705 | 45.95 | 0.37 | 1.00x |  |
-| DisplacementMap | neon64 | 512x512 | 9.316 | 28.14 | 0.23 | 0.61x | 🔴 |
-| DisplacementMap | scalar | 2048x2048 | 91.168 | 46.01 | 0.37 | 1.00x |  |
-| DisplacementMap | neon64 | 2048x2048 | 149.828 | 27.99 | 0.22 | 0.61x | 🔴 |
+| DisplacementMap | scalar | 512x512 | 6.765 | 38.75 | 0.31 | 1.00x |  |
+| DisplacementMap | neon64 | 512x512 | 0.476 | 550.73 | 4.41 | **14.21x** | 🚀 | byte-exact NEON64 |
+| DisplacementMap | scalar | 2048x2048 | 91.717 | 45.73 | 0.37 | 1.00x |  |
+| DisplacementMap | neon64 | 2048x2048 | 7.502 | 559.08 | 4.47 | **12.23x** | 🚀 | byte-exact NEON64 |
 | GaussianBlur | scalar | 512x512 | 245.457 | 1.07 | 0.01 | 1.00x |  |
 | GaussianBlur | neon64 | 512x512 | 4.419 | 59.32 | 0.47 | **55.55x** | 🚀 |
 | GaussianBlur | scalar | 2048x2048 | 4012.708 | 1.05 | 0.01 | 1.00x |  |
@@ -214,8 +216,10 @@ Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit) test APK usi
 | ConvolveMatrix | neon32 | 512x512 | 14.543 | 18.03 | 0.14 | **13.87x** | 🚀 |  |
 | ConvolveMatrix | scalar | 2048x2048 | 2949.058 | 1.42 | 0.01 | 1.00x |  |  |
 | ConvolveMatrix | neon32 | 2048x2048 | 166.404 | 25.21 | 0.20 | **17.72x** | 🚀 |  |
-| DisplacementMap | scalar | 512x512 | 10.494 | 24.98 | 0.20 | 1.00x |  | no ARM32 SIMD kernel; scalar only; UNSTABLE (noisy timing) |
-| DisplacementMap | scalar | 2048x2048 | 186.859 | 22.45 | 0.18 | 1.00x |  | no ARM32 SIMD kernel; scalar only |
+| DisplacementMap | scalar | 512x512 | 10.580 | 24.78 | 0.20 | 1.00x |  |  |
+| DisplacementMap | neon32 | 512x512 | 0.967 | 271.18 | 2.17 | **10.94x** | 🚀 | byte-exact NEON32 |  |
+| DisplacementMap | scalar | 2048x2048 | 187.798 | 22.33 | 0.18 | 1.00x |  |  |
+| DisplacementMap | neon32 | 2048x2048 | 23.020 | 182.20 | 1.46 | **8.16x** | 🚀 | byte-exact NEON32 |  |
 | GaussianBlur | scalar | 512x512 | 369.019 | 0.71 | 0.01 | 1.00x |  |  |
 | GaussianBlur | neon32 | 512x512 | 8.748 | 29.97 | 0.24 | **42.19x** | 🚀 | UNSTABLE (noisy timing) |
 | GaussianBlur | scalar | 2048x2048 | 5959.443 | 0.70 | 0.01 | 1.00x |  |  |
