@@ -93,11 +93,38 @@ Same three LUT-heavy kernels, worse relative to scalar on 32-bit.
 
 | Kernel | 512 | 2048 |
 | :--- | :---: | :---: |
-| UnLinearize | 0.70x | 0.68x |
+| UnLinearize | 0.58x | 0.61x |
 | ComponentTransfer | 0.20x | 0.21x |
 
 (The `avx2`/`avx512` rows for these kernels are fine — this is a `pshufb`
 path problem.)
+
+**UnLinearize SSSE3 A/B/C structural study** — all three variants gated by the
+mandated correctness suite (random 256-entry LUTs, random pixel data, widths
+not divisible by 4 or 16, in-place `src == dst` and out-of-place, byte-exact
+vs `KotlinKernels.unLinearize`):
+
+| variant | structure | hot-loop ops/px | 512x512 | 2048x2048 |
+| :--- | :--- | ---: | :---: | :---: |
+| A (baseline) | 4 px/iter, 328-byte stack-cached LUT rows, callee-saved XMM | — | 0.52x | 0.52x |
+| B (winner) | 16 px / 4-vector static unroll, no stack, alpha in regs | 31.25 | 0.59x | 0.59x |
+| C | 8 px / 2-vector, same microstructure as B | ~31.25 | 0.59x | 0.60x |
+
+Production now ships the **B** layout (`ksvgUnlinearizeApplySsse3`, unified
+benchmark 0.58x / 0.61x). Removing the full structural overhead — stack LUT
+cache, alpha round-trips through memory, runtime index dispatch, and all
+callee-saved xmm8..xmm15 — bought only ~13% (0.52x → 0.59x); the unroll factor
+(B vs C) is noise. **All variants remain well below 1.0x, so the bottleneck is
+the 16-row PSHUFB cascade itself, not its surroundings.** The mandated op audit
+confirms it: the B hot loop is 500 instructions per 16 px = 31.25 ops/px, of
+which the row-cascade core costs ~17 (4× `pshufb`, 4× `pcmpeqb`, 5× `pand`,
+4× `por` per pixel) plus 8.25 LUT-row loads / rowid advances and 4.75 `movdqa`
+copies — versus **19 ops/px** for the Release scalar loop (which needs no
+shifts thanks to `movzbl %dh/%dl` indexing). The SSSE3 path does ~1.6× the
+work of a cache-hot 256-byte scalar byte gather and gets nothing back because
+the LUT never misses. Verdict: stop micro-optimizing the 16-row pshufb scheme
+(A/B/C are final for it); the next step is a **different SSSE3 lookup
+algorithm** or dropping the SIMD path for this kernel (§2.6 candidate (a)).
 
 ### 2.5 Silent fallback that pollutes the table
 
@@ -112,10 +139,13 @@ path problem.)
 UnLinearize / ComponentTransfer / Arithmetic(linear) are all **table-LUT kernels**:
 the "vector" path is a `pshufb`/NEON `vtbl` per-byte lookup that is slower than
 the cache-hot scalar loop with 256-entry tables. Single 256-byte LUT and scalar
-alignment make the SIMD version pointless. Candidates: (a) drop SIMD and use
-scalar for these three; (b) reduce work (e.g. only re-map changed components);
-(c) verify Automatic vs forced path selection. Clear decision + parity rerun is
-needed.
+alignment make the SIMD version pointless. For UnLinearize the A/B/C structural
+study (§2.4) has now ruled out surrounding overhead and pinned the pshufb
+row-cascade itself as the cost. Candidates: (a) drop SIMD and use scalar for
+these three; (b) reduce work (e.g. only re-map changed components);
+(c) verify Automatic vs forced path selection; (d) for UnLinearize, research a
+*different* SSSE3 lookup algorithm (the 16-row pshufb cascade is final).
+Clear decision + parity rerun is needed.
 
 ---
 

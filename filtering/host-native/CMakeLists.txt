@@ -24,6 +24,9 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/component_transfer.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize_ssse3_x86_64.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize_ssse3_x86_64_vA.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize_ssse3_x86_64_vB.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize_ssse3_x86_64_vC.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_sse.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map.cpp
@@ -56,3 +59,9 @@ target_include_directories(ksvgblur PRIVATE
 target_compile_options(ksvgblur PRIVATE -ffp-contract=off -mssse3)
 set_source_files_properties(${AVX2_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx2")
 set_source_files_properties(${AVX512_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw")
+
+# Host build only: lets unlinearize.cpp expose the experimental vA/vB/vC SSSE3
+# assembly variants (UnLinearizeNative.applySsse3Variant) for the A/B/C
+# structural-overhead correctness/benchmark harness. Never defined for the
+# Android/NDK build, so the device kernels never reference the variants.
+target_compile_definitions(ksvgblur PRIVATE KSSVG_HOST_BUILD)

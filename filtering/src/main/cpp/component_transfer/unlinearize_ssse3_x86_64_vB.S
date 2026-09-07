@@ -1,30 +1,28 @@
 /*
- * x86-64 SSSE3 implementation of UnLinearize.
+ * x86-64 SSSE3 implementation of UnLinearize — version B.
  *
- * void ksvgUnlinearizeApplySsse3(
+ * void ksvgUnlinearizeApplySsse3vB(
  *     jint* src, jint* dst, jint width, jint height, const jbyte* table);
  *
  * SysV x86-64 ABI:
  *   rdi = src, rsi = dst, edx = width, ecx = height, r8 = 256-byte LUT
  *
  * 16 ARGB8888 pixels (64 bytes) per iteration, statically unrolled over four
- * 4-pixel vectors. LUT layout: 16 rows x 16 bytes; the high nibble selects the
- * row, the low nibble the entry within the row via SSSE3 PSHUFB - a pure byte
- * permutation, bit-exact with the scalar reference.
+ * vectors. LUT layout: 16 rows x 16 bytes; high nibble selects the row, low
+ * nibble selects within the row via SSSE3 PSHUFB — the lookup is a pure byte
+ * permutation, byte-exact with the scalar reference.
  *
- * This is the layout chosen by the A/B/C structural-overhead study (the
- * benchmarked SSSE3 tables and the per-pixel hot-loop op counts are in
- * KERNEL_REVIEW.md, section "UnLinearize SSSE3 A/C"):
- *  - No stack frame: every LUT row is loaded directly from the table pointer
- *    (%r8). No 328-byte stack cache, no stack -> XMM reloads.
+ * Structural differences vs baseline (vA):
+ *  - No stack frame at all: every LUT row is loaded directly from the table
+ *    pointer (%r8). No 328-byte stack cache, no stack -> XMM reloads.
  *  - Alpha never touches memory: it is split into its own register up front
  *    (movdqa + pand) and only re-combined with a final pand/por at the store.
- *  - True static unrolling over the four input vectors - every vector is
+ *  - True static unrolling over the four input vectors — every vector is
  *    loaded exactly once (movdqu 0/16/32/48(%rdi)) and processed inline; there
  *    is no runtime index dispatch (no cmp/jcc between vectors).
- *  - Only volatile xmm0..xmm7 (SysV caller-saved) are used. No callee-saved
- *    xmm8..xmm15 is read or written, so the function needs no prologue/epilogue
- *    save/restore and stays ABI-correct.
+ *  - Register map uses only volatile xmm0..xmm7 (SysV caller-saved). No
+ *    callee-saved xmm8..xmm15 are read or written, so the function needs no
+ *    prologue/epilogue save/restore and remains ABI-correct.
  *  - The row-id counter is kept as a broadcast byte vector (xmm7) and advanced
  *    with a single paddb per row; the mask is computed into a scratch register
  *    (xmm6) so the hi-nibble vector (xmm2) is never clobbered.
@@ -40,7 +38,6 @@
  *   xmm7 = row-id broadcast (0..15), +1 per row
  */
 
-
 #ifdef __APPLE__
 #define SYM(x) _##x
 #define TYPE(x,y)
@@ -53,9 +50,9 @@
 
 .text
 .p2align 5
-.globl SYM(ksvgUnlinearizeApplySsse3)
-TYPE(SYM(ksvgUnlinearizeApplySsse3), @function)
-SYM(ksvgUnlinearizeApplySsse3):
+.globl SYM(ksvgUnlinearizeApplySsse3vB)
+TYPE(SYM(ksvgUnlinearizeApplySsse3vB), @function)
+SYM(ksvgUnlinearizeApplySsse3vB):
 
     /* total = width * height; blocks16 = total / 16; tail = total % 16 */
     movl    %edx, %eax
@@ -715,4 +712,4 @@ SYM(ksvgUnlinearizeApplySsse3):
     .byte 0x00,0x00,0x00,0xff, 0x00,0x00,0x00,0xff
 
 .text
-SIZE(SYM(ksvgUnlinearizeApplySsse3))
+SIZE(SYM(ksvgUnlinearizeApplySsse3vB))

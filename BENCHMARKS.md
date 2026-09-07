@@ -74,12 +74,12 @@ Measured on macOS (i7-7820X, 64-bit host build, 2026-09-06) using the `KernelPer
 | Turbulence | scalar | 2048x2048 | 260.597 | 16.09 | 0.06 | 1.00x |  |
 | Turbulence | ssse3 | 2048x2048 | 124.115 | 33.79 | 0.14 | 2.10x | 🟢 |
 | Turbulence | avx2 | 2048x2048 | 102.231 | 41.03 | 0.16 | 2.55x | 🟢 |
-| UnLinearize | scalar | 512x512 | 0.302 | 867.67 | 6.94 | 1.00x |  |
-| UnLinearize | ssse3 | 512x512 | 0.430 | 609.60 | 4.88 | 0.70x | 🔴 |
-| UnLinearize | avx2 | 512x512 | 0.197 | 1330.95 | 10.65 | 1.53x | 🟢 |
-| UnLinearize | scalar | 2048x2048 | 4.584 | 914.94 | 7.32 | 1.00x |  |
-| UnLinearize | ssse3 | 2048x2048 | 6.773 | 619.25 | 4.95 | 0.68x | 🔴 |
-| UnLinearize | avx2 | 2048x2048 | 3.644 | 1151.09 | 9.21 | 1.26x | 🟢 |
+| UnLinearize | scalar | 512x512 | 0.281 | 934.48 | 7.48 | 1.00x |  |
+| UnLinearize | ssse3 | 512x512 | 0.482 | 544.13 | 4.35 | 0.58x | 🔴 |
+| UnLinearize | avx2 | 512x512 | 0.190 | 1380.23 | 11.04 | 1.52x | 🟢 |
+| UnLinearize | scalar | 2048x2048 | 4.653 | 901.47 | 7.21 | 1.00x |  |
+| UnLinearize | ssse3 | 2048x2048 | 7.688 | 545.60 | 4.36 | 0.61x | 🔴 |
+| UnLinearize | avx2 | 2048x2048 | 3.494 | 1200.42 | 9.60 | 1.37x | 🟢 |
 
 ## Host Results (x86-32, Android emulator)
 
