@@ -6241,7 +6241,7 @@ SYM(ksvgDisplacementMapApplySse2):       # @ksvgDisplacementMapApplySse2
 	CFI_DEF_CFA_OFFSET(8)
 	retq
 .Lfunc_end0:
-	SIZE(SYM(ksvgDisplacementMapApplySse2))
+// SIZE(SYM(ksvgDisplacementMapApplySse2))
 	CFI_END
 #if defined(__APPLE__)
 	.section __TEXT,__const

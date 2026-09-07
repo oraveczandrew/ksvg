@@ -122,4 +122,4 @@ SYM(ksvgMorphologyApplyRowAvx512):
 .Lrv_done:
     vzeroupper
     pop %r15; pop %r14; pop %r13; pop %r12; pop %rbp; pop %rbx; ret
-SIZE(SYM(ksvgMorphologyApplyRowAvx512))
+//// SIZE(SYM(ksvgMorphologyApplyRowAvx512))

@@ -46,7 +46,7 @@ SYM(ksvgDisplacementMapApplyNeon64):
     ldr     w9, [x8, w7, uxtw #2]
     add     x8, x8, w9, sxtw
     br      x8
-    SIZE(SYM(ksvgDisplacementMapApplyNeon64))
+   // SIZE(SYM(ksvgDisplacementMapApplyNeon64))
 
     .macro DEFINE_KERNEL name, xshift, yshift
     .global SYM(\name)
@@ -204,7 +204,7 @@ SYM(\name):
 
 .Lret_\name:
     ret
-    SIZE(SYM(\name))
+   // SIZE(SYM(\name))
     .endm
 
     DEFINE_KERNEL ksvgDisplacementMapApplyNeon64_RR, 16, 16

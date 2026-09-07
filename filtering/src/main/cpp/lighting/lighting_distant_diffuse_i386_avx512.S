@@ -237,4 +237,4 @@ SYM(ksvgLightingDistantDiffuseRowAvx512):
 .Ltwo_imm:      .float 2.0
 .Lthree_halves: .float 1.5
 
-SIZE(SYM(ksvgLightingDistantDiffuseRowAvx512))
+//// SIZE(SYM(ksvgLightingDistantDiffuseRowAvx512))

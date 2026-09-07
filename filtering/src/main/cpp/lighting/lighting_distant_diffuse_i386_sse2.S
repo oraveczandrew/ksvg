@@ -234,4 +234,4 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     pop     %ebp
     ret
 
-SIZE(SYM(ksvgLightingDistantDiffuseRowSse2))
+//// SIZE(SYM(ksvgLightingDistantDiffuseRowSse2))

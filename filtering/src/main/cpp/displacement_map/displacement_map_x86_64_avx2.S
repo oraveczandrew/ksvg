@@ -9178,7 +9178,7 @@ SYM(ksvgDisplacementMapApplyAvx2):       # @ksvgDisplacementMapApplyAvx2
 	vzeroupper
 	retq
 .Lfunc_end0:
-	SIZE(SYM(ksvgDisplacementMapApplyAvx2))
+// SIZE(SYM(ksvgDisplacementMapApplyAvx2))
 	CFI_END
 #if defined(__APPLE__)
 	.section __TEXT,__const

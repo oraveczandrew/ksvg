@@ -225,7 +225,7 @@ SYM(ksvgUnlinearizeApplyAvx2):
 .L_done:
     vzeroupper
     ret
-SIZE(SYM(ksvgUnlinearizeApplyAvx2))
+//// SIZE(SYM(ksvgUnlinearizeApplyAvx2))
 
 #ifdef __APPLE__
 .section __TEXT,__const

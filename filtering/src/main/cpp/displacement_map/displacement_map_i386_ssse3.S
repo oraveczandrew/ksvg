@@ -304,7 +304,7 @@ SYM(\LABEL):
         pop     ebx
         pop     ebp
         ret
-        SIZE(SYM(\LABEL))
+       // SIZE(SYM(\LABEL))
 .endm
 
         KERNEL .Ldm_k00, DM_MASK_B_OFF, DM_MASK_B_OFF, 0, 0

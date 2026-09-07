@@ -296,6 +296,20 @@ Without the property all ABIs build as usual (this is wired in
   -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
 ```
 
+**x86 (i386 / 32-bit) test builds** — pass `-PfilterAbis=x86` to build a
+32-bit-only test APK for emulators. This lets you exercise the i386 kernels
+(`turbulence_noise_i386_avx2.S`, `lighting_distant_diffuse_i386_sse2.S`) on
+emulated x86 environments.
+
+```bash
+# 32-bit-only emulator benchmark for the Turbulence kernel:
+./gradlew :filtering:runDeviceBenchmark \
+  -PfilterAbis=x86 \
+  -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
+  -Pandroid.testInstrumentationRunnerArguments.benchmark.kernel=Turbulence \
+  -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
+```
+
 Methodology note: for everything except Morphology, `ms` is the raw-runner
 **average** (2026-09-02); the Morphology rows come from the stable `nativeBenchmark { }`
 harness (spec §6.2, median of 5 batches with warmup + thermal gating + batch-CV
@@ -308,6 +322,14 @@ optimization revision of the hand-written AArch64 kernel (`morphology_neon64.S`)
 the tail loop was replaced by a straight-line 1-or-3-pixel tail (`tbz w12, #1`) and
 the per-iteration `cbz` was hoisted out of the vector loop; the previous inline NEON
 path measured **0.44x** vs scalar.
+
+- 2026-09-07 — Ported the full row/pixel/octave loop logic to x86_64 and i386
+  assembly for the feTurbulence filter (AVX2 and SSE2 backends). This matches the
+  full-loop-in-ASM architecture of the AArch64 version, reducing C++ overhead and
+  enabling future interleaving optimizations. Unified symbol naming for Convolve
+  and Lighting across all x86 variants to simplify dispatch and library linking.
+  Enabled Mach-O compatibility for host benchmarking on macOS by porting section
+  directives and commenting out ELF-specific SIZE attributes.
 
 ---
 

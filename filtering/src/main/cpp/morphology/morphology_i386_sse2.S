@@ -109,4 +109,4 @@ SYM(ksvgMorphologyApplyRowSse2):
     movd %xmm0,%eax; mov -8(%ebp),%edx; mov %eax,(%edx); add $4,%edx; mov %edx,-8(%ebp); add $4,%edi; dec %ecx; jnz .Lrs32_hmin_px
 .Lrs32_done:
     add $48,%esp; pop %edi; pop %esi; pop %ebx; pop %ebp; ret
-SIZE(SYM(ksvgMorphologyApplyRowSse2))
+//// SIZE(SYM(ksvgMorphologyApplyRowSse2))

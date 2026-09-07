@@ -21,8 +21,57 @@
 #include <cassert>
 #include "cpu_dispatch.h"
 #include "turbulence_tables.h"
-#include "turbulence_x86.h"
 #include "turbulence_arm.h"
+
+#if defined(__x86_64__) || defined(__i386__)
+extern "C" {
+#if defined(__x86_64__)
+void ksvgTurbulenceApplyAvx2_x86_64(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed);
+
+void ksvgTurbulenceApplySse2_x86_64(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed);
+#elif defined(__i386__)
+void ksvgTurbulenceApplyAvx2_i386(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed);
+
+void ksvgTurbulenceApplySse2_i386(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed);
+#endif
+}
+#endif
 
 namespace {
 
@@ -115,9 +164,84 @@ void applyScalar(
     }
 }
 
+#if defined(__x86_64__)
+void applySsse3(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed) {
+    ksvgTurbulenceApplySse2_x86_64(
+            pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+            baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+            invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+            unitSizeX, unitSizeY, seed);
+}
+
+void applyAvx2(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed) {
+    ksvgTurbulenceApplyAvx2_x86_64(
+            pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+            baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+            invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+            unitSizeX, unitSizeY, seed);
+}
+#elif defined(__i386__)
+void applySsse3(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed) {
+    ksvgTurbulenceApplySse2_i386(
+            pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+            baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+            invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+            unitSizeX, unitSizeY, seed);
+}
+
+void applyAvx2(
+        jint* pixels, jint width, jint height,
+        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jdouble baseFrequencyX, jdouble baseFrequencyY,
+        jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+        jdouble userLeft, jdouble userTop,
+        jdouble originX, jdouble originY,
+        jdouble unitSizeX, jdouble unitSizeY,
+        jint seed) {
+    ksvgTurbulenceApplyAvx2_i386(
+            pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+            baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+            invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+            unitSizeX, unitSizeY, seed);
+}
+#endif
+
 jint nativeBackendForAbi() {
     jint backends = SIMD_BACKEND_SCALAR;
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(__x86_64__)
+    backends |= SIMD_BACKEND_SSSE3;
+    if (detectSimdLevel() >= SIMD_AVX2) {
+        backends |= SIMD_BACKEND_AVX2;
+    }
+#elif defined(__i386__)
     backends |= SIMD_BACKEND_SSSE3;
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
@@ -141,7 +265,7 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_nativeBackend(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
         JNIEnv* env, [[maybe_unused]] jclass clazz,
-        const jintArray jPixels,
+        jintArray jPixels,
         const jint width, const jint height,
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jdouble baseFrequencyX, const jdouble baseFrequencyY,
@@ -161,7 +285,7 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
                     invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                     unitSizeX, unitSizeY, seed);
     } else {
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(__x86_64__)
         if (simdBackend == SIMD_BACKEND_AVX2) {
             applyAvx2(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
                       baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
@@ -173,7 +297,21 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
                        invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                        unitSizeX, unitSizeY, seed);
         } else {
-            assert(false && "unsupported forced turbulence backend on x86");
+            assert(false && "unsupported forced turbulence backend on x86_64");
+        }
+#elif defined(__i386__)
+        if (simdBackend == SIMD_BACKEND_AVX2) {
+            applyAvx2(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                      baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                      invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                      unitSizeX, unitSizeY, seed);
+        } else if (simdBackend == SIMD_BACKEND_SSSE3) {
+            applySsse3(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                       baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
+                       invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                       unitSizeX, unitSizeY, seed);
+        } else {
+            assert(false && "unsupported forced turbulence backend on i386");
         }
 #elif defined(__aarch64__)
         if (simdBackend == SIMD_BACKEND_NEON64) {
@@ -222,7 +360,7 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_apply(
     auto* pixels = env->GetIntArrayElements(jPixels, nullptr);
     if (pixels == nullptr) return;
 
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(__x86_64__) || defined(__i386__)
     SimdLevel level = detectSimdLevel();
     if (level >= SIMD_AVX2) {
         applyAvx2(pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,

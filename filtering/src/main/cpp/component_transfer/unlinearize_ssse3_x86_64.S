@@ -715,4 +715,4 @@ SYM(ksvgUnlinearizeApplySsse3):
     .byte 0x00,0x00,0x00,0xff, 0x00,0x00,0x00,0xff
 
 .text
-SIZE(SYM(ksvgUnlinearizeApplySsse3))
+//// SIZE(SYM(ksvgUnlinearizeApplySsse3))

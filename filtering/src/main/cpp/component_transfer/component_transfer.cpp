@@ -33,12 +33,14 @@
 // lane 0 mod 4 is blue and lane 3 mod 4 is alpha everywhere below.
 //
 // Acceleration:
-//  - AArch64: NEON, 16 px/iteration, vld4q/vqtbl4q against the full 256-entry
-//    tables. Pure permutation — bit-exact with scalar.
-//  - x86 (SSSE3): 4 px/iteration, pshufb-based 16-row selection scheme
-//    (entry = table[hi*16+lo]). Pure byte permutation — bit-exact.
-//  - armv7 (NEON): 8 px/iteration, same 16-row scheme with vtbl2_u8.
+//  - x86 (AVX2): wide LUT-cascade gather; pure byte permutation — bit-exact
+//    with scalar.
 //  - Anything else: scalar reference loop.
+//
+// WP3 regression gate (see REGRESSION_FIX_WORKLOG.md): the NEON64/NEON32/SSSE3
+// LUT cascades lose to the plain scalar loop, so production dispatch and
+// nativeBackend() keep only the AVX2 path. The NEON/SSSE3 kernels stay compiled
+// and reachable via Java_..._applyForced for validation.
 
 namespace {
 
@@ -381,12 +383,7 @@ void runForced(const jint* src, jint* dst, jint width, jint height,
 
 jint nativeBackendForAbi() {
     jint backends = SIMD_BACKEND_SCALAR;
-#if defined(__aarch64__)
-    backends |= SIMD_BACKEND_NEON64;
-#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
-    backends |= SIMD_BACKEND_NEON32;
-#elif defined(__SSSE3__)
-    backends |= SIMD_BACKEND_SSSE3;
+#if defined(__SSSE3__)
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }
@@ -481,20 +478,14 @@ Java_hu_oandras_ksvg_filtering_ComponentTransferNative_apply(
         return;
     }
 
-#if defined(__aarch64__)
-    applyNeon64(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
-                tableA, tableR, tableG, tableB);
-#elif defined(__SSSE3__)
+#if defined(__SSSE3__)
     if (detectSimdLevel() >= SIMD_AVX2) {
         ksvgComponentTransferApplyAvx2(src, dst, width, height,
             clipLeft, clipTop, clipRight, clipBottom, tableA, tableR, tableG, tableB);
     } else {
-        applySsse3(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
-                   tableA, tableR, tableG, tableB);
+        applyScalar(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    tableA, tableR, tableG, tableB);
     }
-#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
-    applyNeon32(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
-                tableA, tableR, tableG, tableB);
 #else
     applyScalar(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 tableA, tableR, tableG, tableB);

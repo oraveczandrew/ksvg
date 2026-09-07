@@ -356,4 +356,4 @@ SYM(ksvgMorphologyApplyRowAvx2):
     pop     %rbp
     pop     %rbx
     ret
-SIZE(SYM(ksvgMorphologyApplyRowAvx2))
+//// SIZE(SYM(ksvgMorphologyApplyRowAvx2))

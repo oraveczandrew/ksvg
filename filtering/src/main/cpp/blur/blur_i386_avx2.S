@@ -140,7 +140,7 @@ SYM(ksvgBlurVerticalAvx2_i386):
     popl %ebx
     popl %ebp
     ret
-SIZE(SYM(ksvgBlurVerticalAvx2_i386))
+//// SIZE(SYM(ksvgBlurVerticalAvx2_i386))
 
 .globl SYM(ksvgBlurHorizontalAvx2_i386)
 TYPE(SYM(ksvgBlurHorizontalAvx2_i386),@function)
@@ -242,7 +242,7 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     popl %ebx
     popl %ebp
     ret
-SIZE(SYM(ksvgBlurHorizontalAvx2_i386))
+//// SIZE(SYM(ksvgBlurHorizontalAvx2_i386))
 #ifndef __APPLE__
 .section .note.GNU-stack,"",@progbits
 #endif

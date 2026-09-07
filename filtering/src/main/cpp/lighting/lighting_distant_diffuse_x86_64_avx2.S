@@ -208,4 +208,4 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
 .Lthree_halves:     .float 1.5
 .LmaskAlphaShifted: .long 0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000
 
-SIZE(SYM(ksvgLightingDistantDiffuseRowAvx2))
+//// SIZE(ksvgLightingDistantDiffuseRowAvx2)

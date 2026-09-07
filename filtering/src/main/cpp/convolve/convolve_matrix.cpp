@@ -48,29 +48,38 @@ void convolveScalarPixel(
 
     for (jint ky = 0; ky < orderY; ky++) {
         for (jint kx = 0; kx < orderX; kx++) {
-            const jint sx = sampleCoordinate(x + kx - targetX, width, edgeMode);
-            const jint sy = sampleCoordinate(y + ky - targetY, height, edgeMode);
-            const jint pixel = (sx < 0 || sy < 0) ? 0 : src[sy * width + sx];
-            const float weight = kernel[ky * orderX + kx];
+            jint sx = sampleCoordinate(x + kx - targetX, width, edgeMode);
+            jint sy = sampleCoordinate(y + ky - targetY, height, edgeMode);
 
-            r += static_cast<float>((pixel >> 16) & 0xFF) * weight;
-            g += static_cast<float>((pixel >> 8) & 0xFF) * weight;
-            b += static_cast<float>(pixel & 0xFF) * weight;
-            a += static_cast<float>((pixel >> 24) & 0xFF) * weight;
+            if (sx != -1 && sy != -1) {
+                jint pixel = src[sy * width + sx];
+                float weight = kernel[ky * orderX + kx];
+                r += ((pixel >> 16) & 0xFF) * weight;
+                g += ((pixel >> 8) & 0xFF) * weight;
+                b += (pixel & 0xFF) * weight;
+                a += ((pixel >> 24) & 0xFF) * weight;
+            }
         }
     }
 
-    const jint outR = ksvg::clamp255(r / divisor + bias * 255.f);
-    const jint outG = ksvg::clamp255(g / divisor + bias * 255.f);
-    const jint outB = ksvg::clamp255(b / divisor + bias * 255.f);
-    const jint outA = preserve ? (src[y * width + x] >> 24) & 0xFF
-                               : ksvg::clamp255(a / divisor + bias * 255.f);
-    dst[y * width + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
+    jint ir, ig, ib, ia;
+    if (preserve) {
+        ia = (src[y * width + x] >> 24) & 0xFF;
+    } else {
+        ia = ksvg::clamp255(std::floor(a / divisor + bias * 255.f + 0.5f));
+    }
+    ir = ksvg::clamp255(std::floor(r / divisor + bias * 255.f + 0.5f));
+    ig = ksvg::clamp255(std::floor(g / divisor + bias * 255.f + 0.5f));
+    ib = ksvg::clamp255(std::floor(b / divisor + bias * 255.f + 0.5f));
+
+    dst[y * width + x] = (ia << 24) | (ir << 16) | (ig << 8) | ib;
 }
 
-void applyScalar(const jint* src, jint* dst, jint width, jint height,
-                 const float* kernel, jint orderX, jint orderY, jint targetX, jint targetY,
-                 float divisor, float bias, bool preserveAlpha, jint edgeMode) {
+void applyScalar(
+        const jint *src, jint *dst, const jint width, const jint height,
+        const jfloat *kernel,
+        const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const jfloat divisor, const jfloat bias, const jboolean preserveAlpha, const jint edgeMode) {
     for (jint y = 0; y < height; y++) {
         for (jint x = 0; x < width; x++) {
             convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
@@ -78,26 +87,28 @@ void applyScalar(const jint* src, jint* dst, jint width, jint height,
     }
 }
 
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-void applyX86(const jint* src, jint* dst, jint width, jint height,
-              const float* kernel, jint orderX, jint orderY, jint targetX, jint targetY,
-              float divisor, float bias, bool preserveAlpha, jint edgeMode, jint forcedBackend) {
-    const jint xLo = targetX;
-    const jint xHi = width - orderX + 1 + targetX;
+#if defined(__i386__) || defined(__x86_64__)
+void applyX86(
+        const jint *src, jint *dst, const jint width, const jint height,
+        const jfloat *kernel,
+        const jint orderX, const jint orderY, const jint targetX, const jint targetY,
+        const jfloat divisor, const jfloat bias, const jboolean preserveAlpha, const jint edgeMode,
+        const jint forcedBackend) {
     const jint yLo = targetY;
     const jint yHi = height - orderY + 1 + targetY;
+    const jint xLo = targetX;
+    const jint xHi = width - orderX + 1 + targetX;
 
-    for (jint y = 0; y < yLo; y++)
-        for (jint x = 0; x < width; x++)
-            convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
-    for (jint y = yHi; y < height; y++)
-        for (jint x = 0; x < width; x++)
-            convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
-    for (jint y = yLo; y < yHi; y++) {
-        for (jint x = 0; x < xLo; x++)
-            convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
-        for (jint x = xHi; x < width; x++)
-            convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+    for (jint y = 0; y < height; y++) {
+        if (y >= yLo && y < yHi) {
+            for (jint x = 0; x < xLo; x++)
+                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+            for (jint x = xHi; x < width; x++)
+                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+        } else {
+            for (jint x = 0; x < width; x++)
+                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+        }
     }
 
     if (xLo < xHi && yLo < yHi) {
@@ -106,15 +117,18 @@ void applyX86(const jint* src, jint* dst, jint width, jint height,
             const SimdLevel level = detectSimdLevel();
             if (level >= SIMD_AVX512) backend = SIMD_BACKEND_AVX512;
             else if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
-            else backend = SIMD_BACKEND_SSSE3;
+            else backend = SIMD_BACKEND_SSE2;
         }
 
+#if defined(__x86_64__)
         if (backend == SIMD_BACKEND_AVX512) {
             ksvgConvolveApplyInteriorAvx512(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha);
-        } else if (backend == SIMD_BACKEND_AVX2) {
+        } else
+#endif
+        if (backend == SIMD_BACKEND_AVX2) {
             ksvgConvolveApplyInteriorAvx2(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha);
         } else {
-            applySseInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha);
+            ksvgConvolveApplyInteriorSse2(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha);
         }
     }
 }
@@ -124,87 +138,54 @@ void applyX86(const jint* src, jint* dst, jint width, jint height,
 
 namespace {
 
-jint nativeBackendForAbi() {
-    jint backends = SIMD_BACKEND_SCALAR;
-#if defined(__aarch64__)
-    backends |= SIMD_BACKEND_NEON64;
-#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
-    backends |= SIMD_BACKEND_NEON32;
-#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-    backends |= SIMD_BACKEND_SSSE3;
-    if (detectSimdLevel() >= SIMD_AVX2) {
-        backends |= SIMD_BACKEND_AVX2;
-    }
-    if (detectSimdLevel() >= SIMD_AVX512) {
-        backends |= SIMD_BACKEND_AVX512;
-    }
-#endif
-    return backends;
-}
-
-} // namespace
-
-extern "C" JNIEXPORT jint JNICALL
-Java_hu_oandras_ksvg_filtering_ConvolveNative_nativeBackend(
-        JNIEnv* env, jclass clazz) {
-    return nativeBackendForAbi();
-}
-
 extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_ConvolveNative_applyForced(
-        JNIEnv* env, jclass clazz,
-        const jintArray jSrc, const jintArray jDst,
-        const jint width, const jint height,
-        const jfloatArray jKernel, const jint orderX, const jint orderY,
-        const jint targetX, const jint targetY,
-        const jfloat divisor, const jfloat bias,
-        const jboolean preserveAlpha, const jint edgeMode,
-        const jint simdBackend) {
-    jint* src = env->GetIntArrayElements(jSrc, nullptr);
-    jint* dst = env->GetIntArrayElements(jDst, nullptr);
-    jfloat* kernel = env->GetFloatArrayElements(jKernel, nullptr);
+Java_hu_oandras_ksvg_filtering_ConvolveMatrixNative_applyForced(
+        JNIEnv *env, [[maybe_unused]] jclass clazz,
+        jintArray jSrc, jintArray jDst, jint width, jint height,
+        jfloatArray jKernel, jint orderX, jint orderY, jint targetX, jint targetY,
+        jfloat divisor, jfloat bias, jboolean preserveAlpha, jint edgeMode, jint simdBackend) {
+    jint *src = env->GetIntArrayElements(jSrc, nullptr);
+    jint *dst = env->GetIntArrayElements(jDst, nullptr);
+    jfloat *kernel = env->GetFloatArrayElements(jKernel, nullptr);
 
-    if (src && dst && kernel) {
-        if (simdBackend == SIMD_BACKEND_SCALAR) {
-            Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha == JNI_TRUE, edgeMode);
-        } else {
-#if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
-            Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha == JNI_TRUE, edgeMode);
-#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-            Convolve::applyX86(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha == JNI_TRUE, edgeMode, simdBackend);
-#endif
-        }
-    }
-
-    if (kernel) env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
-    if (dst) env->ReleaseIntArrayElements(jDst, dst, 0);
-    if (src) env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
-        JNIEnv* env, jclass clazz,
-        const jintArray jSrc, const jintArray jDst,
-        const jint width, const jint height,
-        const jfloatArray jKernel, const jint orderX, const jint orderY,
-        const jint targetX, const jint targetY,
-        const jfloat divisor, const jfloat bias,
-        const jboolean preserveAlpha, const jint edgeMode) {
-    jint* src = env->GetIntArrayElements(jSrc, nullptr);
-    jint* dst = env->GetIntArrayElements(jDst, nullptr);
-    jfloat* kernel = env->GetFloatArrayElements(jKernel, nullptr);
-
-    if (src && dst && kernel) {
-#if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
-        Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha == JNI_TRUE, edgeMode);
-#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-        Convolve::applyX86(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha == JNI_TRUE, edgeMode, -1);
+    if (simdBackend == SIMD_BACKEND_SCALAR) {
+        Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+    } else {
+#if defined(__aarch64__) || defined(__arm__)
+        Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+#elif defined(__i386__) || defined(__x86_64__)
+        Convolve::applyX86(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, simdBackend);
 #else
-        Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha == JNI_TRUE, edgeMode);
+        Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
 #endif
     }
 
-    if (kernel) env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
-    if (dst) env->ReleaseIntArrayElements(jDst, dst, 0);
-    if (src) env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_hu_oandras_ksvg_filtering_ConvolveMatrixNative_apply(
+        JNIEnv *env, [[maybe_unused]] jclass clazz,
+        jintArray jSrc, jintArray jDst, jint width, jint height,
+        jfloatArray jKernel, jint orderX, jint orderY, jint targetX, jint targetY,
+        jfloat divisor, jfloat bias, jboolean preserveAlpha, jint edgeMode) {
+    jint *src = env->GetIntArrayElements(jSrc, nullptr);
+    jint *dst = env->GetIntArrayElements(jDst, nullptr);
+    jfloat *kernel = env->GetFloatArrayElements(jKernel, nullptr);
+
+#if defined(__aarch64__) || defined(__arm__)
+    Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+#elif defined(__i386__) || defined(__x86_64__)
+    Convolve::applyX86(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, -1);
+#else
+    Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+#endif
+
+    env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
+    env->ReleaseIntArrayElements(jDst, dst, 0);
+    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
+}
+
 }

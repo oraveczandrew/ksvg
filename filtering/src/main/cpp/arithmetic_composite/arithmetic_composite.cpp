@@ -181,12 +181,28 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyNative(
 
     if (src1 && src2 && dst && srgbToLinear && linearToSrgb) {
 #if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
-        applyArithmeticNeon(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
-                            k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+        if (useLinear == JNI_TRUE) {
+            // WP3 regression gate (see REGRESSION_FIX_WORKLOG.md): the NEON
+            // linear mode routes through the srgb LUTs and loses to the plain
+            // scalar loop (neon64 0.34x, neon32 0.22x of scalar). Always run
+            // the scalar reference on ARM for linear; keep the fast non-linear
+            // formula asm below.
+            applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                  k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+        } else {
+            applyArithmeticNeon(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+        }
 #elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
         if (detectSimdLevel() >= SIMD_AVX2) {
+            // AVX2 linear is still faster than scalar (host 1.05-1.07x).
             ksvgArithmeticApplyAvx2(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                    k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+        } else if (useLinear == JNI_TRUE) {
+            // WP3 regression gate: the SSE linear mode loses to scalar (host
+            // 0.56-0.57x, device x86-32 0.17x), so run the scalar reference.
+            applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                  k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
         } else {
             ksvgArithmeticApplySse(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                  k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);

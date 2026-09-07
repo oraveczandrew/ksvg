@@ -55,6 +55,10 @@ if (ANDROID_ABI STREQUAL "x86_64")
             convolve/convolve_x86_64_avx2.S
             convolve/convolve_x86_64_avx512.S
     )
+    set(TURBULENCE_SOURCES
+            turbulence/turbulence_noise_x86_64_sse2.S
+            turbulence/turbulence_noise_x86_64_avx2.S
+    )
     set(DISPLACEMENT_MAP_SOURCES
             displacement_map/displacement_map_x86_64_sse2.S
             displacement_map/displacement_map_x86_64_avx2.S
@@ -77,6 +81,14 @@ if (ANDROID_ABI STREQUAL "x86")
     set(LIGHTING_SOURCES
             lighting/lighting_distant_diffuse_i386_sse2.S
     )
+    set(CONVOLVE_SOURCES
+            convolve/convolve_i386_sse2.S
+            convolve/convolve_i386_avx2.S
+    )
+    set(TURBULENCE_SOURCES
+            turbulence/turbulence_noise_i386_sse2.S
+            turbulence/turbulence_noise_i386_avx2.S
+    )
     set(DISPLACEMENT_MAP_SOURCES
             displacement_map/displacement_map_i386_ssse3.S
             displacement_map/displacement_map_i386_avx2.S
@@ -86,7 +98,6 @@ endif ()
 
 set(AVX2_SOURCES
         component_transfer/component_transfer_x86_avx2.cpp
-        turbulence/turbulence_x86_avx2.cpp
         arithmetic_composite/arithmetic_composite_x86_avx2.cpp
 )
 
@@ -97,9 +108,10 @@ add_library(ksvgblur SHARED
         component_transfer/component_transfer.cpp component_transfer/unlinearize.cpp
         displacement_map/displacement_map.cpp
         lighting/lighting.cpp
-        turbulence/turbulence.cpp turbulence/turbulence_x86.cpp turbulence/turbulence_arm.cpp
+        turbulence/turbulence.cpp turbulence/turbulence_arm.cpp
         arithmetic_composite/arithmetic_composite.cpp arithmetic_composite/arithmetic_composite_neon.cpp
         arithmetic_composite/arithmetic_composite_x86_sse.cpp
+        convolve/convolve_matrix_x86_sse.cpp
         ${AVX2_SOURCES}
         ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES})
 
@@ -122,6 +134,9 @@ target_compile_options(ksvgblur PRIVATE -ffp-contract=off)
 # Every known Android x86 device satisfies this.
 if (ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
     target_compile_options(ksvgblur PRIVATE -mssse3)
+    if (ANDROID_ABI STREQUAL "x86")
+        target_link_options(ksvgblur PRIVATE "-Wl,-z,notext")
+    endif ()
     # Per-file flags make <immintrin.h> declare the AVX2/AVX-512 intrinsics
     # (invalid options on ARM ABIs, hence the guard).
     set_source_files_properties(${AVX2_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx2")

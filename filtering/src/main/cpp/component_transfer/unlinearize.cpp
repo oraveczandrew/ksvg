@@ -34,14 +34,15 @@
 // trivially in-place safe.
 //
 // Acceleration:
-//  - AArch64: NEON, 16 px/iteration, vld4q/vst4q with a 16-row vqtbl1q_u8
-//    table selection (see note vs vqtbl4q below). Pure permutation — bit-exact.
-//  - x86 (SSSE3): 4 px/iteration, pshufb-based 16-row selection scheme
-//    (entry = table[hi*16+lo]). Pure byte permutation — bit-exact.
-//  - x86 (AVX2): 8 px/iteration, same 16-row scheme over a full 32-byte
+//  - x86-64 (AVX2): 8 px/iteration, same 16-row scheme over a full 32-byte
 //    register with alpha restored by masking. Pure byte permutation — bit-exact.
-//  - armv7 (NEON): 8 px/iteration, same 16-row scheme with vtbl2_u8.
 //  - Anything else: scalar reference loop.
+//
+// WP3 regression gate (see REGRESSION_FIX_WORKLOG.md): the SSSE3 (host
+// 0.58-0.61x), AArch64 NEON (device 0.05x) and armv7 NEON (device 0.01x) LUT
+// cascades all lose to the alias-free scalar loop, so production dispatch and
+// nativeBackend() keep only the AVX2 path. The applyNeon64/applyNeon32/applySsse3
+// kernels stay compiled and reachable via Java_..._applyForced for validation.
 
 namespace {
 
@@ -129,6 +130,10 @@ extern "C" void ksvgUnlinearizeApplySsse3vA(
 extern "C" void ksvgUnlinearizeApplySsse3vB(
         jint* src, jint* dst, jint width, jint height, const jbyte* table);
 extern "C" void ksvgUnlinearizeApplySsse3vC(
+        jint* src, jint* dst, jint width, jint height, const jbyte* table);
+extern "C" void ksvgUnlinearizeApplySsse3vD(
+        jint* src, jint* dst, jint width, jint height, const jbyte* table);
+extern "C" void ksvgUnlinearizeApplySsse3vE(
         jint* src, jint* dst, jint width, jint height, const jbyte* table);
 #endif
 
@@ -298,17 +303,10 @@ void runForced(jint* src, jint* dst, jint width, jint height,
 
 jint nativeBackendForAbi() {
     jint backends = SIMD_BACKEND_SCALAR;
-#if defined(__aarch64__)
-    backends |= SIMD_BACKEND_NEON64;
-#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
-    backends |= SIMD_BACKEND_NEON32;
-#elif defined(__SSSE3__)
-    backends |= SIMD_BACKEND_SSSE3;
-#if defined(__x86_64__)
+#if defined(__SSSE3__) && defined(__x86_64__)
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }
-#endif
 #endif
     return backends;
 }
@@ -382,24 +380,12 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
             env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
             return;
         }
-#if defined(__aarch64__)
-        applyNeon64(buf, buf, width, height, table);
-#elif defined(__SSSE3__)
+#if defined(__SSSE3__) && defined(__x86_64__)
         if (detectSimdLevel() >= SIMD_AVX2) {
-#if defined(__x86_64__)
             ksvgUnlinearizeApplyAvx2(buf, buf, width, height, table);
-#else
-            applySsse3(buf, buf, width, height, table);
-#endif
         } else {
-#if defined(__x86_64__)
-            ksvgUnlinearizeApplySsse3(buf, buf, width, height, table);
-#else
-            applySsse3(buf, buf, width, height, table);
-#endif
+            applyScalar(buf, buf, width, height, table);
         }
-#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
-        applyNeon32(buf, buf, width, height, table);
 #else
         applyScalar(buf, buf, width, height, table);
 #endif
@@ -420,24 +406,12 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
         return;
     }
 
-#if defined(__aarch64__)
-    applyNeon64(src, dst, width, height, table);
-#elif defined(__SSSE3__)
+#if defined(__SSSE3__) && defined(__x86_64__)
     if (detectSimdLevel() >= SIMD_AVX2) {
-#if defined(__x86_64__)
         ksvgUnlinearizeApplyAvx2(src, dst, width, height, table);
-#else
-        applySsse3(src, dst, width, height, table);
-#endif
     } else {
-#if defined(__x86_64__)
-        ksvgUnlinearizeApplySsse3(src, dst, width, height, table);
-#else
-        applySsse3(src, dst, width, height, table);
-#endif
+        applyScalar(src, dst, width, height, table);
     }
-#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
-    applyNeon32(src, dst, width, height, table);
 #else
     applyScalar(src, dst, width, height, table);
 #endif
@@ -457,17 +431,22 @@ void runVariant(jint* src, jint* dst, jint width, jint height,
     switch (variant) {
         case 0: ksvgUnlinearizeApplySsse3vA(src, dst, width, height, table); break;
         case 1: ksvgUnlinearizeApplySsse3vB(src, dst, width, height, table); break;
-        default: ksvgUnlinearizeApplySsse3vC(src, dst, width, height, table); break;
+        case 2: ksvgUnlinearizeApplySsse3vC(src, dst, width, height, table); break;
+        case 3: ksvgUnlinearizeApplySsse3vD(src, dst, width, height, table); break;
+        default:
+            // Later experimental variants (4 = E) and any fallback go here.
+            ksvgUnlinearizeApplySsse3vE(src, dst, width, height, table); break;
     }
 }
 
 } // namespace
 
-// Host-build-only experimental A/B/C variant selector (see applyForced). 0=A
-// (committed baseline, 4 px/iter), 1=B (16 px static unroll, no stack), 2=C
-// (8 px / 2-vector unroll). Not present in NDK builds, so `external fun` in
-// UnLinearizeNative is never resolvable on devices — which is intended: this
-// exists solely for the structural-overhead A/B/C measurement on the host JVM.
+// Host-build-only experimental SSSE3 variant selector (see applyForced).
+// 0=A (committed baseline, 4 px/iter), 1=B (16 px static unroll, no stack),
+// 2=C (8 px / 2-vector), 3=D (block-hoisted resident-row, 16-px block).
+// Not present in NDK builds, so `external fun` in UnLinearizeNative is never
+// resolvable on devices — which is intended: this exists solely for the
+// structural-overhead measurements on the host JVM.
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_UnLinearizeNative_applySsse3Variant(
         JNIEnv* env, [[maybe_unused]] jclass clazz,

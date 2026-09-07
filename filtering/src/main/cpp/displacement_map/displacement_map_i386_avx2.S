@@ -77,7 +77,7 @@ SYM(ksvgDisplacementMapApplyAvx2_i386):
         cmp     eax, 15
         je      SYM(ksvgDisplacementMapApplyAvx2_i386_k15)
         ret
-        SIZE(SYM(ksvgDisplacementMapApplyAvx2_i386))
+       // SIZE(SYM(ksvgDisplacementMapApplyAvx2_i386))
 
 .set DM_MASK_OFF, .Ldm_mask_ff - .Ldm_const
 .set DM_HALF_OFF, .Ldm_half - .Ldm_const
@@ -296,7 +296,7 @@ SYM(\LABEL):
         pop     ebx
         pop     ebp
         ret
-        SIZE(SYM(\LABEL))
+       // SIZE(SYM(\LABEL))
 .endm
 
         KERNEL ksvgDisplacementMapApplyAvx2_i386_k00, 16, 16

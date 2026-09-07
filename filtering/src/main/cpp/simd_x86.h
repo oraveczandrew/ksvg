@@ -66,6 +66,11 @@ void ksvgConvolveApplyInteriorAvx2(
         const float* kernel, jint orderX, jint orderY,
         jint targetX, jint targetY,
         jfloat divisor, jfloat bias, jboolean preserveAlpha);
+void ksvgConvolveApplyInteriorSse2(
+        jint* dst, const jint* src, jint width, jint height,
+        const float* kernel, jint orderX, jint orderY,
+        jint targetX, jint targetY,
+        jfloat divisor, jfloat bias, jboolean preserveAlpha);
 void ksvgConvolveApplyInteriorAvx512(
         jint* dst, const jint* src, jint width, jint height,
         const float* kernel, jint orderX, jint orderY,
