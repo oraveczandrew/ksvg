@@ -41,6 +41,9 @@ Animations must respect `dur`, `repeatCount`, `repeatDur`, and `end`.
 Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/NEON assembly, AArch64 assembly, GPU shaders, or generated coefficient/lookup tables). If such a file is required and you cannot reproduce it exactly, **ask the user to provide the file** — it is always acceptable to request it rather than invent a subtly-wrong version.
 *   When wiring in a third-party source (e.g. the RIR Toolkit `Blur` kernels), confirm the exact symbol/ABI contract before calling into it; mismatched calling conventions produce silent, hard-to-debug corruption.
 
+### 5. Benchmark table conventions
+*   `BENCHMARKS.md` kernel rows follow the ISA superset order (each ISA builds on the previous): x86 `scalar → sse2 → ssse3 → avx2 → avx512`; ARM `scalar → neon32 → neon64`. Keep this ordering when adding or re-measuring rows — never append `sse2` after `avx512`.
+
 ## How-To Guides
 
 ### Adding a new CSS property
