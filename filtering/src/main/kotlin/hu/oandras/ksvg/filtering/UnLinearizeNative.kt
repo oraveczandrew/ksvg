@@ -64,23 +64,4 @@ internal object UnLinearizeNative {
     /** Reports the backend the production dispatcher actually selects on this ABI. */
     @JvmStatic
     external fun nativeBackend(): Int
-
-    /**
-     * Host-build-only experimental SSSE3 assembly variant selector
-     * (unlinearize_ssse3_x86_64_v{A,B,C}.S): 0 = A (committed baseline, 4 px/
-     * iteration), 1 = B (16 px / 4-vector static unroll, no stack, alpha in
-     * registers), 2 = C (8 px / 2-vector, same microstructure as B). The JNI
-     * entry is compiled only into the host libksvgblur (KSSVG_HOST_BUILD), so
-     * calling this on a device throws UnsatisfiedLinkError — it exists solely
-     * for the A/B/C structural-overhead correctness and benchmark harness.
-     */
-    @JvmStatic
-    external fun applySsse3Variant(
-        src: IntArray,
-        dst: IntArray,
-        width: Int,
-        height: Int,
-        table: ByteArray,
-        variant: Int,
-    )
 }

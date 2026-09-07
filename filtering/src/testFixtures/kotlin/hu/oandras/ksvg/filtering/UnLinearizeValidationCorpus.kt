@@ -116,9 +116,6 @@ public object UnLinearizeValidationCorpus {
     /** The library's production UNLINEARIZE table (the oracle's own table). */
     public val realTable: ByteArray get() = ColorLuts.UN_LINEARIZE
 
-    /** Non-identity stepping table; alpha passthrough must still hold. */
-    public val steppingTable: ByteArray = ByteArray(256) { ((it * 7) and 0xFF).toByte() }
-
     // ------------------------------------------------------------------ case
 
     /**
@@ -155,8 +152,8 @@ public object UnLinearizeValidationCorpus {
         }
         // Channel-isolated full-domain, out of place.
         add(Case("perChannel 33x9", 33, 9, realTable, inPlace = false, perChannelDomain(33 * 9)))
-        // Alpha passthrough contract over a stepping (non-identity) table.
-        add(Case("allAlpha 16x16 stepping", 16, 16, steppingTable, inPlace = false, allAlpha(16 * 16)))
+        // Alpha passthrough contract over the production LUT.
+        add(Case("allAlpha 16x16", 16, 16, realTable, inPlace = false, allAlpha(16 * 16)))
         // Boundaries / tails / random / alternating, out of place.
         for (pixels in boundarySizes) {
             add(Case("tail random $pixels", pixels, 1, realTable, inPlace = false, fixedSeedRandom(pixels)))

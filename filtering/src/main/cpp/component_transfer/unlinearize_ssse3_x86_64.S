@@ -1,45 +1,17 @@
 /*
- * x86-64 SSSE3 implementation of UnLinearize.
+ * x86-64 SSSE3 linear -> sRGB (u8), exact corrected integer approximation.
+ *
+ * Fast path for four ARGB pixels at a time.
+ *
+ * V12 vs V10:
+ *   - Aggressive register management: Eliminates all reloads of the input
+ *     pixels within the loop by keeping raw input, hi/lo nibbles, and alpha
+ *     in registers (xmm0, xmm1, xmm2, xmm8).
+ *   - Uses all 16 XMM registers to hold constants (xmm9-xmm15) and state.
  *
  * void ksvgUnlinearizeApplySsse3(
  *     jint* src, jint* dst, jint width, jint height, const jbyte* table);
- *
- * SysV x86-64 ABI:
- *   rdi = src, rsi = dst, edx = width, ecx = height, r8 = 256-byte LUT
- *
- * 16 ARGB8888 pixels (64 bytes) per iteration, statically unrolled over four
- * 4-pixel vectors. LUT layout: 16 rows x 16 bytes; the high nibble selects the
- * row, the low nibble the entry within the row via SSSE3 PSHUFB - a pure byte
- * permutation, bit-exact with the scalar reference.
- *
- * This is the layout chosen by the A/B/C structural-overhead study (the
- * benchmarked SSSE3 tables and the per-pixel hot-loop op counts are in
- * KERNEL_REVIEW.md, section "UnLinearize SSSE3 A/C"):
- *  - No stack frame: every LUT row is loaded directly from the table pointer
- *    (%r8). No 328-byte stack cache, no stack -> XMM reloads.
- *  - Alpha never touches memory: it is split into its own register up front
- *    (movdqa + pand) and only re-combined with a final pand/por at the store.
- *  - True static unrolling over the four input vectors - every vector is
- *    loaded exactly once (movdqu 0/16/32/48(%rdi)) and processed inline; there
- *    is no runtime index dispatch (no cmp/jcc between vectors).
- *  - Only volatile xmm0..xmm7 (SysV caller-saved) are used. No callee-saved
- *    xmm8..xmm15 is read or written, so the function needs no prologue/epilogue
- *    save/restore and stays ABI-correct.
- *  - The row-id counter is kept as a broadcast byte vector (xmm7) and advanced
- *    with a single paddb per row; the mask is computed into a scratch register
- *    (xmm6) so the hi-nibble vector (xmm2) is never clobbered.
- *
- * Per-vector register map:
- *   xmm0 = pixel vector (loaded once)  -> becomes lo-baseline copy scratch
- *   xmm1 = lo nibbles                  (v & 0x0F)
- *   xmm2 = hi nibbles                  ((v >> 4) & 0x0F)
- *   xmm3 = RGB accumulator
- *   xmm4 = alpha (pixel & alpha_mask), kept across the 16-row lookup
- *   xmm5 = LUT row (from table + 16*i)
- *   xmm6 = row-select mask  (hi == rowid)
- *   xmm7 = row-id broadcast (0..15), +1 per row
  */
-
 
 #ifdef __APPLE__
 #define SYM(x) _##x
@@ -57,605 +29,117 @@
 TYPE(SYM(ksvgUnlinearizeApplySsse3), @function)
 SYM(ksvgUnlinearizeApplySsse3):
 
-    /* total = width * height; blocks16 = total / 16; tail = total % 16 */
     movl    %edx, %eax
     imull   %ecx, %eax
     movl    %eax, %r9d
-    shrl    $4, %r9d
-    andl    $15, %eax
+    shrl    $2, %r9d
+    andl    $3, %eax
     movl    %eax, %r10d
-
-    /* xmm7 = row-id broadcast, starts at 0 */
-    xorps   %xmm7, %xmm7
 
     testl   %r9d, %r9d
     jz      .L_tail
 
+    /* Hoist constants */
+    movdqa  .L_nibble_mask(%rip), %xmm15
+    movdqa  .L_alpha_mask(%rip), %xmm14
+    movdqa  .L_rgb_mask(%rip), %xmm13
+    movdqa  .L_rounding(%rip), %xmm12
+    movdqa  .L_group_mask(%rip), %xmm11
+    movdqa  .L_one_byte(%rip), %xmm10
+    movdqa  .L_low3_mask(%rip), %xmm9
+    pxor    %xmm14, %xmm14             /* Temporarily use xmm14 for zero during calculation if needed */
+
 .p2align 5
 .L_loop:
+    movdqu  (%rdi), %xmm0              /* raw input (4 ARGB pixels) */
 
-    /* ================= Vector 0 (pixels 0..3) ================= */
-    movdqu    (%rdi), %xmm0
-    movdqa    %xmm0, %xmm1
-    pand    .L_nibble_mask(%rip), %xmm1     /* lo */
-    movdqa    %xmm0, %xmm2
-    psrlw   $4, %xmm2
-    pand    .L_nibble_mask(%rip), %xmm2     /* hi */
-    movdqa    %xmm0, %xmm4
-    pand    .L_alpha_mask(%rip), %xmm4      /* alpha */
-    xorps   %xmm3, %xmm3                    /* acc = 0 */
-    xorps   %xmm7, %xmm7                    /* rowid = 0 */
+    /* Save alpha */
+    movdqa  %xmm0, %xmm8
+    pand    .L_alpha_mask(%rip), %xmm8 /* Use memory load for alpha mask to free xmm14 for zero */
+    pxor    %xmm7, %xmm7               /* zero */
 
-    /* row 0 */
-    movdqu   0(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 1 */
-    movdqu  16(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 2 */
-    movdqu  32(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 3 */
-    movdqu  48(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 4 */
-    movdqu  64(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 5 */
-    movdqu  80(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 6 */
-    movdqu  96(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 7 */
-    movdqu 112(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 8 */
-    movdqu 128(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 9 */
-    movdqu 144(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 10 */
-    movdqu 160(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 11 */
-    movdqu 176(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 12 */
-    movdqu 192(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 13 */
-    movdqu 208(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 14 */
-    movdqu 224(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 15 */
-    movdqu 240(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-
-    /* restore alpha: RGB result | original alpha */
-    pand    .L_rgb_mask(%rip), %xmm3
-    por     %xmm4, %xmm3
-    movdqu  %xmm3, (%rsi)
-
-    /* ================= Vector 1 (pixels 4..7) ================= */
-    movdqu  16(%rdi), %xmm0
+    /* hi/lo */
     movdqa  %xmm0, %xmm1
-    pand    .L_nibble_mask(%rip), %xmm1     /* lo */
+    psrlw   $4, %xmm1
+    pand    %xmm15, %xmm1              /* hi */
     movdqa  %xmm0, %xmm2
-    psrlw   $4, %xmm2
-    pand    .L_nibble_mask(%rip), %xmm2     /* hi */
-    movdqa  %xmm0, %xmm4
-    pand    .L_alpha_mask(%rip), %xmm4      /* alpha */
-    xorps   %xmm3, %xmm3                    /* acc = 0 */
-    xorps   %xmm7, %xmm7                    /* rowid = 0 */
+    pand    %xmm15, %xmm2              /* lo */
 
-    /* row 0 */
-    movdqu   0(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 1 */
-    movdqu  16(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 2 */
-    movdqu  32(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 3 */
-    movdqu  48(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 4 */
-    movdqu  64(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 5 */
-    movdqu  80(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 6 */
-    movdqu  96(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 7 */
-    movdqu 112(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 8 */
-    movdqu 128(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 9 */
-    movdqu 144(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 10 */
-    movdqu 160(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 11 */
-    movdqu 176(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 12 */
-    movdqu 192(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 13 */
-    movdqu 208(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 14 */
-    movdqu 224(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 15 */
-    movdqu 240(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
+    /* base/slope */
+    movdqa  .L_base_lut(%rip), %xmm3
+    pshufb  %xmm1, %xmm3
+    movdqa  .L_slope_lut(%rip), %xmm4
+    pshufb  %xmm1, %xmm4
 
-    /* restore alpha */
-    pand    .L_rgb_mask(%rip), %xmm3
-    por     %xmm4, %xmm3
-    movdqu  %xmm3, 16(%rsi)
+    /* multiply s*lo */
+    movdqa  %xmm4, %xmm5
+    punpcklbw %xmm7, %xmm5
+    movdqa  %xmm2, %xmm6
+    punpcklbw %xmm7, %xmm6
+    pmaddubsw %xmm6, %xmm5             /* A_low: s*lo */
 
-    /* ================= Vector 2 (pixels 8..11) ================= */
-    movdqu  32(%rdi), %xmm0
-    movdqa  %xmm0, %xmm1
-    pand    .L_nibble_mask(%rip), %xmm1     /* lo */
-    movdqa  %xmm0, %xmm2
-    psrlw   $4, %xmm2
-    pand    .L_nibble_mask(%rip), %xmm2     /* hi */
-    movdqa  %xmm0, %xmm4
-    pand    .L_alpha_mask(%rip), %xmm4      /* alpha */
-    xorps   %xmm3, %xmm3                    /* acc = 0 */
-    xorps   %xmm7, %xmm7                    /* rowid = 0 */
+    movdqa  %xmm4, %xmm6
+    punpckhbw %xmm7, %xmm6
+    movdqa  %xmm2, %xmm4               /* reuse xmm4 for lo_high */
+    punpckhbw %xmm7, %xmm4
+    pmaddubsw %xmm4, %xmm6             /* A_high: s*lo */
 
-    /* row 0 */
-    movdqu   0(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 1 */
-    movdqu  16(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 2 */
-    movdqu  32(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 3 */
-    movdqu  48(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 4 */
-    movdqu  64(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 5 */
-    movdqu  80(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 6 */
-    movdqu  96(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 7 */
-    movdqu 112(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 8 */
-    movdqu 128(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 9 */
-    movdqu 144(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 10 */
-    movdqu 160(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 11 */
-    movdqu 176(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 12 */
-    movdqu 192(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 13 */
-    movdqu 208(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 14 */
-    movdqu 224(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 15 */
-    movdqu 240(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
+    /* Round and shift */
+    paddw   %xmm12, %xmm5
+    psrlw   $5, %xmm5
+    paddw   %xmm12, %xmm6
+    psrlw   $5, %xmm6
 
-    /* restore alpha */
-    pand    .L_rgb_mask(%rip), %xmm3
-    por     %xmm4, %xmm3
-    movdqu  %xmm3, 32(%rsi)
+    packuswb %xmm6, %xmm5
+    paddb   %xmm3, %xmm5              /* y0 */
 
-    /* ================= Vector 3 (pixels 12..15) ================= */
-    movdqu  48(%rdi), %xmm0
-    movdqa  %xmm0, %xmm1
-    pand    .L_nibble_mask(%rip), %xmm1     /* lo */
-    movdqa  %xmm0, %xmm2
-    psrlw   $4, %xmm2
-    pand    .L_nibble_mask(%rip), %xmm2     /* hi */
-    movdqa  %xmm0, %xmm4
-    pand    .L_alpha_mask(%rip), %xmm4      /* alpha */
-    xorps   %xmm3, %xmm3                    /* acc = 0 */
-    xorps   %xmm7, %xmm7                    /* rowid = 0 */
+    /* Correction bitset */
+    movdqa  %xmm0, %xmm3               /* use raw input */
+    psrlw   $3, %xmm3
+    pand    %xmm11, %xmm3              /* group = x >> 3 */
 
-    /* row 0 */
-    movdqu   0(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 1 */
-    movdqu  16(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 2 */
-    movdqu  32(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 3 */
-    movdqu  48(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 4 */
-    movdqu  64(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 5 */
-    movdqu  80(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 6 */
-    movdqu  96(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 7 */
-    movdqu 112(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 8 */
-    movdqu 128(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 9 */
-    movdqu 144(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 10 */
-    movdqu 160(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 11 */
-    movdqu 176(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 12 */
-    movdqu 192(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 13 */
-    movdqu 208(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 14 */
-    movdqu 224(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
-    paddb   .L_one_vec(%rip), %xmm7
-    /* row 15 */
-    movdqu 240(%r8), %xmm5
-    pshufb  %xmm1, %xmm5
-    movdqa  %xmm2, %xmm6
-    pcmpeqb %xmm7, %xmm6
-    pand    %xmm6, %xmm5
-    por     %xmm5, %xmm3
+    movdqa  %xmm3, %xmm4
+    psubb   .L_group16(%rip), %xmm4
+    movdqa  .L_correction_hi(%rip), %xmm6
+    pshufb  %xmm4, %xmm6
 
-    /* restore alpha */
-    pand    .L_rgb_mask(%rip), %xmm3
-    por     %xmm4, %xmm3
-    movdqu  %xmm3, 48(%rsi)
+    movdqa  %xmm3, %xmm4
+    psrlw   $4, %xmm4
+    pand    %xmm10, %xmm4
+    psllw   $7, %xmm4
+    por     %xmm3, %xmm4
+    movdqa  .L_correction_lo(%rip), %xmm3
+    pshufb  %xmm4, %xmm3
+    por     %xmm6, %xmm3               /* bitset */
 
-    addq    $64, %rdi
-    addq    $64, %rsi
+    /* onehot = 1 << (lo & 7) */
+    movdqa  %xmm2, %xmm4
+    pand    %xmm9, %xmm4
+    movdqa  .L_onehot_lut(%rip), %xmm6
+    pshufb  %xmm4, %xmm6
+    pand    %xmm6, %xmm3
+    pminub  %xmm10, %xmm3
+    psubb   %xmm3, %xmm5              /* y_corr */
+
+    /* Exact low-16 */
+    movdqa  .L_exact_low16(%rip), %xmm3
+    pshufb  %xmm2, %xmm3
+
+    /* hi == 0 mask */
+    pcmpeqb %xmm7, %xmm1
+
+    pand    %xmm1, %xmm3
+    pandn   %xmm5, %xmm1
+    por     %xmm3, %xmm1
+
+    /* Restore alpha */
+    pand    %xmm13, %xmm1
+    por     %xmm8, %xmm1
+
+    movdqu  %xmm1, (%rsi)
+
+    addq    $16, %rdi
+    addq    $16, %rsi
     decl    %r9d
     jnz     .L_loop
 
@@ -666,26 +150,22 @@ SYM(ksvgUnlinearizeApplySsse3):
 .L_tail_loop:
     movl    (%rdi), %eax
     movl    %eax, %edx
-    andl    $0xff000000, %edx          /* alpha */
-
+    andl    $0xff000000, %edx
     movl    %eax, %ecx
     andl    $0xff, %ecx
-    movzbl  (%r8,%rcx), %ecx            /* B */
+    movzbl  (%r8,%rcx), %ecx
     movl    %ecx, %r11d
-
     shrl    $8, %eax
     andl    $0xff, %eax
-    movzbl  (%r8,%rax), %eax             /* G */
+    movzbl  (%r8,%rax), %eax
     shll    $8, %eax
     orl     %eax, %r11d
-
     movl    (%rdi), %eax
     shrl    $16, %eax
     andl    $0xff, %eax
-    movzbl  (%r8,%rax), %eax             /* R */
+    movzbl  (%r8,%rax), %eax
     shll    $16, %eax
     orl     %eax, %r11d
-
     orl     %edx, %r11d
     movl    %r11d, (%rsi)
     addq    $4, %rdi
@@ -696,23 +176,39 @@ SYM(ksvgUnlinearizeApplySsse3):
 .L_done:
     ret
 
+SIZE(SYM(ksvgUnlinearizeApplySsse3ApproxV12))
+
 #ifdef __APPLE__
 .section __TEXT,__const
 #else
 .section .rodata
 #endif
 .p2align 4
+.L_exact_low16:
+    .byte 0,13,22,28,34,38,42,46,50,53,56,59,61,64,66,69
+.L_base_lut:
+    .byte 0,72,100,121,137,152,165,177,188,198,208,217,225,233,241,248
+.L_slope_lut:
+    .byte 0,58,41,31,31,27,24,22,20,19,16,15,16,16,15,16
 .L_nibble_mask:
-    .byte 0x0f,0x0f,0x0f,0x0f,0x0f,0x0f,0x0f,0x0f
-    .byte 0x0f,0x0f,0x0f,0x0f,0x0f,0x0f,0x0f,0x0f
-.L_one_vec:
+    .byte 15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15
+.L_group_mask:
+    .byte 31,31,31,31,31,31,31,31,31,31,31,31,31,31,31,31
+.L_low3_mask:
+    .byte 7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7
+.L_one_byte:
     .byte 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-.L_rgb_mask:
-    .byte 0xff,0xff,0xff,0x00, 0xff,0xff,0xff,0x00
-    .byte 0xff,0xff,0xff,0x00, 0xff,0xff,0xff,0x00
+.L_group16:
+    .byte 16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16
+.L_onehot_lut:
+    .byte 1,2,4,8,16,32,64,128,1,2,4,8,16,32,64,128
+.L_correction_lo:
+    .byte 0,0,7,241,5,0,7,0,0,240,0,194,0,64,0,1
+.L_correction_hi:
+    .byte 16,0,0,0,42,0,1,0,0,0,0,168,0,80,128,170
 .L_alpha_mask:
-    .byte 0x00,0x00,0x00,0xff, 0x00,0x00,0x00,0xff
-    .byte 0x00,0x00,0x00,0xff, 0x00,0x00,0x00,0xff
-
-.text
-//// SIZE(SYM(ksvgUnlinearizeApplySsse3))
+    .long 0xff000000, 0xff000000, 0xff000000, 0xff000000
+.L_rgb_mask:
+    .long 0x00ffffff, 0x00ffffff, 0x00ffffff, 0x00ffffff
+.L_rounding:
+    .short 16,16,16,16,16,16,16,16

@@ -116,26 +116,8 @@ void applyNeon64(const jint* src, jint* dst, const jint width, const jint height
 #if defined(__SSSE3__)
 #include <tmmintrin.h>
 
-// External SSSE3 assembly implementation (x86 and x86_64).
 extern "C" void ksvgUnlinearizeApplySsse3(
         jint* src, jint* dst, jint width, jint height, const jbyte* table);
-
-// Experimental vA/vB/vC SSSE3 assembly variants (unlinearize_ssse3_x86_64_
-// vA/vB/vC.S). These are host-build-only: they are linked into libksvgblur only
-// when KSSVG_HOST_BUILD is defined (see the filtering host-native CMake target),
-// and only ever reached through UnLinearizeNative.applySsse3Variant (test-only).
-#if defined(KSSVG_HOST_BUILD) && defined(__x86_64__)
-extern "C" void ksvgUnlinearizeApplySsse3vA(
-        jint* src, jint* dst, jint width, jint height, const jbyte* table);
-extern "C" void ksvgUnlinearizeApplySsse3vB(
-        jint* src, jint* dst, jint width, jint height, const jbyte* table);
-extern "C" void ksvgUnlinearizeApplySsse3vC(
-        jint* src, jint* dst, jint width, jint height, const jbyte* table);
-extern "C" void ksvgUnlinearizeApplySsse3vD(
-        jint* src, jint* dst, jint width, jint height, const jbyte* table);
-extern "C" void ksvgUnlinearizeApplySsse3vE(
-        jint* src, jint* dst, jint width, jint height, const jbyte* table);
-#endif
 
 static inline __m128i lutRow128(const jbyte* table, int row) {
     return _mm_loadu_si128(reinterpret_cast<const __m128i*>(table + row * 16));
@@ -304,7 +286,11 @@ void runForced(jint* src, jint* dst, jint width, jint height,
 jint nativeBackendForAbi() {
     jint backends = SIMD_BACKEND_SCALAR;
 #if defined(__SSSE3__) && defined(__x86_64__)
-    if (detectSimdLevel() >= SIMD_AVX2) {
+    const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
+    if (level >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }
 #endif
@@ -381,8 +367,11 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
             return;
         }
 #if defined(__SSSE3__) && defined(__x86_64__)
-        if (detectSimdLevel() >= SIMD_AVX2) {
+        const SimdLevel level = detectSimdLevel();
+        if (level >= SIMD_AVX2) {
             ksvgUnlinearizeApplyAvx2(buf, buf, width, height, table);
+        } else if (level >= SIMD_SSSE3) {
+            ksvgUnlinearizeApplySsse3(buf, buf, width, height, table);
         } else {
             applyScalar(buf, buf, width, height, table);
         }
@@ -407,8 +396,11 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
     }
 
 #if defined(__SSSE3__) && defined(__x86_64__)
-    if (detectSimdLevel() >= SIMD_AVX2) {
+    const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_AVX2) {
         ksvgUnlinearizeApplyAvx2(src, dst, width, height, table);
+    } else if (level >= SIMD_SSSE3) {
+        ksvgUnlinearizeApplySsse3(src, dst, width, height, table);
     } else {
         applyScalar(src, dst, width, height, table);
     }
@@ -422,70 +414,3 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
     env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
     env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
 }
-
-#if defined(KSSVG_HOST_BUILD) && defined(__SSSE3__) && defined(__x86_64__)
-namespace {
-
-void runVariant(jint* src, jint* dst, jint width, jint height,
-                const jbyte* table, jint variant) {
-    switch (variant) {
-        case 0: ksvgUnlinearizeApplySsse3vA(src, dst, width, height, table); break;
-        case 1: ksvgUnlinearizeApplySsse3vB(src, dst, width, height, table); break;
-        case 2: ksvgUnlinearizeApplySsse3vC(src, dst, width, height, table); break;
-        case 3: ksvgUnlinearizeApplySsse3vD(src, dst, width, height, table); break;
-        default:
-            // Later experimental variants (4 = E) and any fallback go here.
-            ksvgUnlinearizeApplySsse3vE(src, dst, width, height, table); break;
-    }
-}
-
-} // namespace
-
-// Host-build-only experimental SSSE3 variant selector (see applyForced).
-// 0=A (committed baseline, 4 px/iter), 1=B (16 px static unroll, no stack),
-// 2=C (8 px / 2-vector), 3=D (block-hoisted resident-row, 16-px block).
-// Not present in NDK builds, so `external fun` in UnLinearizeNative is never
-// resolvable on devices — which is intended: this exists solely for the
-// structural-overhead measurements on the host JVM.
-extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_UnLinearizeNative_applySsse3Variant(
-        JNIEnv* env, [[maybe_unused]] jclass clazz,
-        const jintArray jSrc, const jintArray jDst,
-        const jint width, const jint height,
-        const jbyteArray jTable, const jint variant) {
-    auto* table = env->GetByteArrayElements(jTable, nullptr);
-    if (table == nullptr) {
-        return;
-    }
-    const bool inPlace = env->IsSameObject(jSrc, jDst) == JNI_TRUE;
-    if (inPlace) {
-        auto* buf = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
-        if (buf == nullptr) {
-            env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
-            return;
-        }
-        runVariant(buf, buf, width, height, table, variant);
-        env->ReleasePrimitiveArrayCritical(jSrc, buf, JNI_ABORT);
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
-        return;
-    }
-
-    auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
-    if (src == nullptr) {
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
-        return;
-    }
-    auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
-    if (dst == nullptr) {
-        env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
-        return;
-    }
-
-    runVariant(src, dst, width, height, table, variant);
-
-    env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
-    env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
-    env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
-}
-#endif // KSSVG_HOST_BUILD && __SSSE3__ && __x86_64__

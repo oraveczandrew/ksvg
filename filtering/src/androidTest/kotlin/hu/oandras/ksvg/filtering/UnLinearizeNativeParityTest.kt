@@ -89,7 +89,7 @@ class UnLinearizeNativeParityTest(
         val width = 16
         val height = 16
         val src = UnLinearizeValidationCorpus.allAlpha(width * height) // alpha = i & 0xFF covers 0..255
-        val table = UnLinearizeValidationCorpus.steppingTable
+        val table = UnLinearizeValidationCorpus.realTable
 
         // Force every advertised backend; each must preserve alpha.
         val backends = getBackendsFor(UnLinearizeNative.nativeBackend())

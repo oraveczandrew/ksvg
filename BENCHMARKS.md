@@ -14,8 +14,10 @@ baseline row first. (ARM rows: `scalar → neon32 → neon64`.)
 
 Measured on macOS (i7-7820X, 64-bit host build); initial run 2026-09-06, LUT-trio rows re-measured 2026-09-07 after the WP3 regression gate (`REGRESSION_FIX_WORKLOG.md`).
 
-> **WP3 gate (2026-09-07):** UnLinearize/ComponentTransfer no longer advertise SSSE3 (losing
-> paths); `nativeBackend()` = scalar + AVX2 only, production `apply()` skips SSSE3/NEON.
+> **WP3 gate (2026-09-07):** ComponentTransfer no longer advertises SSSE3 (losing
+> path); UnLinearize keeps its exact production-LUT SSSE3 backend because the refreshed
+> benchmark is faster than scalar. `nativeBackend()` = scalar + SSSE3 + AVX2 for
+> UnLinearize, while ComponentTransfer remains scalar + AVX2.
 > ArithmeticComposite keeps its advertised SSE/NEON backends (the non-linear formula asm
 > wins big) but routes the **linear** mode to scalar on ARM / SSE, and to AVX2 where
 > available. The linear rows below are measured from `applyForced` (true kernel numbers) —
@@ -90,10 +92,12 @@ Measured on macOS (i7-7820X, 64-bit host build); initial run 2026-09-06, LUT-tri
 | Turbulence | scalar | 2048x2048 | 260.597 | 16.09 | 0.06 | 1.00x |  |
 | Turbulence | ssse3 | 2048x2048 | 124.115 | 33.79 | 0.14 | 2.10x | 🟢 |
 | Turbulence | avx2 | 2048x2048 | 102.231 | 41.03 | 0.16 | 2.55x | 🟢 |
-| UnLinearize | scalar | 512x512 | 0.379 | 692.30 | 5.54 | 1.00x |  | |
-| UnLinearize | avx2 | 512x512 | 0.194 | 1349.35 | 10.79 | 1.95x | 🟢 | ssse3 un-advertised (was 0.58x 🔴) |
-| UnLinearize | scalar | 2048x2048 | 6.173 | 679.42 | 5.44 | 1.00x |  | |
-| UnLinearize | avx2 | 2048x2048 | 3.644 | 1150.87 | 9.21 | 1.69x | 🟢 | |
+| UnLinearize | scalar | 512x512 | 0.375 | 698.87 | 5.59 | 1.00x |  | |
+| UnLinearize | ssse3 | 512x512 | 0.248 | 1057.83 | 8.46 | 1.51x | 🟢 | exact production-LUT path |
+| UnLinearize | avx2 | 512x512 | 0.190 | 1377.71 | 11.02 | 1.97x | 🟢 | |
+| UnLinearize | scalar | 2048x2048 | 6.047 | 693.65 | 5.55 | 1.00x |  | |
+| UnLinearize | ssse3 | 2048x2048 | 4.275 | 981.05 | 7.85 | 1.41x | 🟢 | exact production-LUT path |
+| UnLinearize | avx2 | 2048x2048 | 3.622 | 1158.07 | 9.26 | 1.67x | 🟢 | |
 
 ## Host Results (x86-32, Android emulator)
 

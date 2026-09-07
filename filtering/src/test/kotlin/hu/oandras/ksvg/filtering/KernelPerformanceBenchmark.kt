@@ -50,7 +50,6 @@ class KernelPerformanceBenchmark {
         val target = System.getProperty("benchmark.kernel")
 
         if (target.isNullOrEmpty() || target == "UnLinearize") benchmarkUnLinearize()
-        if (target == "UnLinearizeVariants") benchmarkUnLinearizeVariants()
         if (target.isNullOrEmpty() || target == "ComponentTransfer") benchmarkComponentTransfer()
         if (target.isNullOrEmpty() || target == "Morphology") benchmarkMorphology()
         if (target.isNullOrEmpty() || target == "ArithmeticComposite") {
@@ -87,64 +86,6 @@ class KernelPerformanceBenchmark {
                     height = h,
                     table = table,
                     simdBackend = b
-                )
-            }
-        }
-    }
-
-    /**
-     * A/B/C structural-overhead measurement of the SSSE3 UnLinearize kernel
-     * (mandated format): scalar, then the three experimental assembly variants
-     * [UnLinearizeNative.applySsse3Variant] on the SAME input & LUT, at 512x512
-     * and 2048x2048. Run with `-Pbenchmark.kernel=UnLinearizeVariants`; the
-     * default suite never executes this (the variants are host-build-only).
-     *
-     *  - A: committed baseline, 4 px/iteration (unlinearize_ssse3_x86_64_vA.S)
-     *  - B: 16 px / 4-vector static unroll, no stack, alpha in registers (vB)
-     *  - C: 8 px / 2-vector, same microstructure as B (vC)
-     */
-    private fun benchmarkUnLinearizeVariants() {
-        val table = ByteArray(256) { it.toByte() }
-        val isQuick = System.getProperty("benchmark.quick") == "true"
-        for ((w, h) in sizes) {
-            val src = IntArray(w * h)
-            val dst = IntArray(w * h)
-            val iterations = if (isQuick) 1 else (if (w <= 512) 50 else 5)
-            val run = { variant: Int ->
-                UnLinearizeNative.applySsse3Variant(src, dst, w, h, table, variant)
-            }
-            KernelBenchmarkRunner.runBenchmark(
-                kernel = "UnLinearize",
-                backendName = "scalar",
-                width = w,
-                height = h,
-                iterations = iterations,
-                numBuffers = 2,
-                runKernel = {
-                    UnLinearizeNative.applyForced(
-                        src = src,
-                        dst = dst,
-                        width = w,
-                        height = h,
-                        table = table,
-                        simdBackend = SIMD_SCALAR,
-                    )
-                }
-            )
-            val variants = listOf(
-                UnLinearizeVariantCorrectnessTest.VAR_A to "ssse3-vA",
-                UnLinearizeVariantCorrectnessTest.VAR_B to "ssse3-vB",
-                UnLinearizeVariantCorrectnessTest.VAR_C to "ssse3-vC",
-            )
-            for ((variant, name) in variants) {
-                KernelBenchmarkRunner.runBenchmark(
-                    kernel = "UnLinearize",
-                    backendName = name,
-                    width = w,
-                    height = h,
-                    iterations = iterations,
-                    numBuffers = 2,
-                    runKernel = { run(variant) },
                 )
             }
         }
@@ -263,7 +204,7 @@ class KernelPerformanceBenchmark {
                     k2 = 0.5f,
                     k3 = 0.5f,
                     k4 = 0.1f,
-                    useLinear = false,
+                    useLinear = true,
                     simdBackend = b
                 )
             }
