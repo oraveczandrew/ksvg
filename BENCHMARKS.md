@@ -56,12 +56,12 @@ Measured on macOS (i7-7820X, 64-bit host build); initial run 2026-09-06, LUT-tri
 | DisplacementMap | scalar | 2048x2048 | 36.760 | 114.10 | 1.37 | 1.00x |  |
 | DisplacementMap | avx2 | 2048x2048 | 14.150 | 296.42 | 3.56 | 2.60x | 🟢 |
 | DisplacementMap | avx512 | 2048x2048 | 12.963 | 323.57 | 3.88 | 2.84x | 🟢 |
-| GaussianBlur | scalar | 512x512 | 21.185 | 12.37 | 0.10 | 1.00x |  |
-| GaussianBlur | ssse3 | 512x512 | 12.003 | 21.84 | 0.17 | 1.76x | 🟢 |
-| GaussianBlur | avx2 | 512x512 | 10.819 | 24.23 | 0.19 | 1.96x | 🟢 |
-| GaussianBlur | scalar | 2048x2048 | 338.473 | 12.39 | 0.10 | 1.00x |  |
-| GaussianBlur | ssse3 | 2048x2048 | 168.316 | 24.92 | 0.20 | 2.01x | 🟢 |
-| GaussianBlur | avx2 | 2048x2048 | 178.952 | 23.44 | 0.19 | 1.89x | 🟢 |
+| GaussianBlur | scalar | 512x512 | 20.248 | 12.95 | 0.10 | 1.00x |  |
+| GaussianBlur | ssse3 | 512x512 | 6.040 | 43.40 | 0.35 | 3.35x | 🟢 |
+| GaussianBlur | avx2 | 512x512 | 6.039 | 43.41 | 0.35 | 3.35x | 🟢 |
+| GaussianBlur | scalar | 2048x2048 | 358.530 | 11.70 | 0.09 | 1.00x |  |
+| GaussianBlur | ssse3 | 2048x2048 | 94.757 | 44.26 | 0.35 | 3.78x | 🟢 |
+| GaussianBlur | avx2 | 2048x2048 | 94.987 | 44.16 | 0.35 | 3.77x | 🟢 |
 | Lighting | scalar | 512x512 | 13.247 | 19.79 | 0.16 | 1.00x |  |
 | Lighting | sse2 | 512x512 | 0.897 | 292.31 | 2.34 | **14.77x** | 🚀 |
 | Lighting | ssse3 | 512x512 | 0.825 | 317.70 | 2.54 | **16.05x** | 🚀 |
@@ -117,10 +117,10 @@ Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark
 | ConvolveMatrix | ssse3 | 2048x2048 | 603.232 | 6.95 | 0.06 | 2.65x | 🟢 |  |
 | DisplacementMap | scalar | 512x512 | 7.432 | 35.27 | 0.28 | 1.00x |  | no SIMD backend on x86 |
 | DisplacementMap | scalar | 2048x2048 | 117.106 | 35.82 | 0.29 | 1.00x |  | no SIMD backend on x86 |
-| GaussianBlur | scalar | 512x512 | 245.435 | 1.07 | 0.01 | 1.00x |  |  |
-| GaussianBlur | ssse3 | 512x512 | 126.926 | 2.07 | 0.02 | 1.93x | 🟢 |  |
-| GaussianBlur | scalar | 2048x2048 | 4097.046 | 1.02 | 0.01 | 1.00x |  |  |
-| GaussianBlur | ssse3 | 2048x2048 | 1920.226 | 2.18 | 0.02 | 2.13x | 🟢 |  |
+| GaussianBlur | scalar | 512x512 | 250.787 | 1.05 | 0.01 | 1.00x |  |  |
+| GaussianBlur | ssse3 | 512x512 | 11.752 | 22.31 | 0.18 | **21.34x** | 🚀 | i386 asm kernel |
+| GaussianBlur | scalar | 2048x2048 | 4100.986 | 1.02 | 0.01 | 1.00x |  |  |
+| GaussianBlur | ssse3 | 2048x2048 | 169.971 | 24.68 | 0.20 | **24.13x** | 🚀 | i386 asm kernel |
 | Lighting | scalar | 512x512 | 67.943 | 3.86 | 0.03 | 1.00x |  |  |
 | Lighting | sse2 | 512x512 | 1.771 | 148.00 | 1.18 | **38.4x** | 🚀 | rebuilt kernel, parity-verified |
 | Lighting | ssse3 | 512x512 | 1.853 | 141.51 | 1.13 | **36.7x** | 🚀 | same SSE2 kernel |

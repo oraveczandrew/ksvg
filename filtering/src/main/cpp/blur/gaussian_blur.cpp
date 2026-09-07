@@ -39,10 +39,25 @@ extern "C" void rsdIntrinsicBlurU4_K(uint8_t* out, const uint8_t* in,
 #elif defined(__i386__) || defined(__x86_64__)
 #include "simd_x86.h"
 
-extern "C" void rsdIntrinsicBlurVFU4_K(void* dst, const void* pin, int stride,
-                                       const void* gptr, int rct, int x1, int x2);
-extern "C" void rsdIntrinsicBlurHFU4_K(void* dst, const void* pin,
-                                       const void* gptr, int rct, int x1, int x2);
+#if defined(__x86_64__)
+extern "C" void rsdIntrinsicBlurVFU4_K_x86_64_ssse3(void* dst, const void* pin, int stride,
+                                                    const void* gptr, int rct, int x1, int x2);
+extern "C" void rsdIntrinsicBlurHFU4_K_x86_64_ssse3(void* dst, const void* pin,
+                                                    const void* gptr, int rct, int x1, int x2);
+extern "C" void ksvgBlurVerticalAvx2_x86_64(void* dst, const void* pin, int stride,
+                                            const void* gptr, int rct, int x1, int x2);
+extern "C" void ksvgBlurHorizontalAvx2_x86_64(void* dst, const void* pin,
+                                              const void* gptr, int rct, int x1, int x2);
+#elif defined(__i386__)
+extern "C" void rsdIntrinsicBlurVFU4_K_i386_ssse3(void* dst, const void* pin, int stride,
+                                                  const void* gptr, int rct, int x1, int x2);
+extern "C" void rsdIntrinsicBlurHFU4_K_i386_ssse3(void* dst, const void* pin,
+                                                  const void* gptr, int rct, int x1, int x2);
+extern "C" void ksvgBlurVerticalAvx2_i386(void* dst, const void* pin, int stride,
+                                          const void* gptr, int rct, int x1, int x2);
+extern "C" void ksvgBlurHorizontalAvx2_i386(void* dst, const void* pin,
+                                            const void* gptr, int rct, int x1, int x2);
+#endif
 #endif
 
 // Caller-owned scratch, passed in via JNI as a jlong handle. All reusable
@@ -118,7 +133,7 @@ void blurScalar(jint* pix, const int w, const int h,
                 for (int k = -radius; k <= radius; ++k) {
                     const int coord = (horizontal ? x : y) + k;
                     if (coord >= 0 && coord < dim) {
-                        const int idx = (horizontal ? (y * w + coord) : (coord * w + x)) * 4;
+                        const int idx = (horizontal ? y * w + coord : coord * w + x) * 4;
                         const float wgt = wt[k + radius];
                         sa += s.bufA[idx + 0] * wgt;
                         sr += s.bufA[idx + 1] * wgt;
@@ -196,17 +211,27 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
         const uint8_t* inTop = in.data() + static_cast<size_t>((y - r) * pw) * 4;
 
         // Vertical pass -> float4 per column (fbuf_mid[0..pw)).
-        // AVX2 path handles 8 columns per iteration; the SSE kernel covers
+        // AVX2 path handles 8 columns per iteration; the SSSE3 kernel covers
         // pairs; the remaining <=7 tail runs scalar either way.
         int vEnd;
         if (detectSimdLevel() >= SIMD_AVX2) {
             vEnd = pw & ~7;
-            if (vEnd > 0)
-                ksvgBlurVerticalAvx2(fbuf_mid, inTop, (int)stride, gptr, rct, 0, vEnd);
+            if (vEnd > 0) {
+#if defined(__x86_64__)
+                ksvgBlurVerticalAvx2_x86_64(fbuf_mid, inTop, (int)stride, gptr, rct, 0, vEnd);
+#else
+                ksvgBlurVerticalAvx2_i386(fbuf_mid, inTop, (int)stride, gptr, rct, 0, vEnd);
+#endif
+            }
         } else {
             vEnd = pw & ~1;
-            if (vEnd > 0)
-                rsdIntrinsicBlurVFU4_K(fbuf_mid, inTop, (int)stride, gptr, rct, 0, vEnd);
+            if (vEnd > 0) {
+#if defined(__x86_64__)
+                rsdIntrinsicBlurVFU4_K_x86_64_ssse3(fbuf_mid, inTop, (int)stride, gptr, rct, 0, vEnd);
+#else
+                rsdIntrinsicBlurVFU4_K_i386_ssse3(fbuf_mid, inTop, (int)stride, gptr, rct, 0, vEnd);
+#endif
+            }
         }
         for (int xx = vEnd; xx < pw; ++xx) {
             float a = 0.0f, rr = 0.0f, g = 0.0f, b = 0.0f;
@@ -226,8 +251,19 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
         // black via the bounds guard below).
         uint8_t* outRow = out.data() + static_cast<size_t>(y) * stride;
         const int hx2 = pw - r;
-        if (hx2 > 0)
-            rsdIntrinsicBlurHFU4_K(outRow, fbuf0, gptr, rct, 0, hx2);
+        if (hx2 > 0) {
+#if defined(__x86_64__)
+            if (detectSimdLevel() >= SIMD_AVX2)
+                ksvgBlurHorizontalAvx2_x86_64(outRow, fbuf0, gptr, rct, 0, hx2);
+            else
+                rsdIntrinsicBlurHFU4_K_x86_64_ssse3(outRow, fbuf0, gptr, rct, 0, hx2);
+#else
+            if (detectSimdLevel() >= SIMD_AVX2)
+                ksvgBlurHorizontalAvx2_i386(outRow, fbuf0, gptr, rct, 0, hx2);
+            else
+                rsdIntrinsicBlurHFU4_K_i386_ssse3(outRow, fbuf0, gptr, rct, 0, hx2);
+#endif
+        }
 
         for (int xx = hx2; xx < pw; ++xx) {
             float a = 0.0f, rr = 0.0f, g = 0.0f, b = 0.0f;
@@ -264,7 +300,7 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
 // Validation/test-only: run an explicitly selected backend (see SimdBackend).
 namespace {
 
-void runForced(GaussianScratch* s, jint* pix, int w, int h, float stdDeviationX, float stdDeviationY, int backend) {
+void runForced(GaussianScratch* s, jint* pix, const int w, const int h, const float stdDeviationX, const float stdDeviationY, const int backend) {
     std::vector<float> wx, wy;
     const int rx = computeWeights(stdDeviationX, wx);
     const int ry = computeWeights(stdDeviationY, wy);
@@ -274,7 +310,7 @@ void runForced(GaussianScratch* s, jint* pix, int w, int h, float stdDeviationX,
         return;
     }
 
-    const bool isotropic = (rx == ry);
+    const bool isotropic = rx == ry;
     if (!isotropic || rx < 1 || rx > kMaxKernelRadius) {
         // Kernels only support isotropic small radius; if forced, fall back to scalar
         // rather than crashing if the test provides incompatible params, but log it?
@@ -298,12 +334,12 @@ void runForced(GaussianScratch* s, jint* pix, int w, int h, float stdDeviationX,
 #endif
 }
 
-jint nativeBackendForAbi(float stdDeviationX, float stdDeviationY) {
+jint nativeBackendForAbi(const float stdDeviationX, const float stdDeviationY) {
     jint backends = SIMD_BACKEND_SCALAR;
     std::vector<float> wx, wy;
     const int rx = computeWeights(stdDeviationX, wx);
     const int ry = computeWeights(stdDeviationY, wy);
-    const bool isotropic = (rx == ry);
+    const bool isotropic = rx == ry;
 
     if (isotropic && rx >= 1 && rx <= kMaxKernelRadius) {
 #if defined(__aarch64__)
@@ -324,14 +360,14 @@ jint nativeBackendForAbi(float stdDeviationX, float stdDeviationY) {
 
 extern "C" JNIEXPORT jint JNICALL
 Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_nativeBackend(
-        JNIEnv* env, jclass clazz, jfloat stdDeviationX, jfloat stdDeviationY) {
+        [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz, const jfloat stdDeviationX, const jfloat stdDeviationY) {
     return nativeBackendForAbi(stdDeviationX, stdDeviationY);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_applyForced(
-        JNIEnv* env, jclass clazz, jlong scratchHandle, jintArray pixels,
-        jint width, jint height, jfloat stdDeviationX, jfloat stdDeviationY, jint simdBackend) {
+        JNIEnv* env, [[maybe_unused]] jclass clazz, const jlong scratchHandle, const jintArray pixels,
+        const jint width, const jint height, const jfloat stdDeviationX, const jfloat stdDeviationY, const jint simdBackend) {
     GaussianScratch* const s = reinterpret_cast<GaussianScratch*>(scratchHandle);
     jint* pix = env->GetIntArrayElements(pixels, nullptr);
     if (pix == nullptr) return;
@@ -357,7 +393,7 @@ extern "C"
 JNIEXPORT void JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_nativeBlur(
         JNIEnv* env, jclass, const jlong scratchHandle, const jintArray pixels, const jint width,
         const jint height, const jfloat stdDeviationX, const jfloat stdDeviationY) {
-    GaussianScratch* const s = reinterpret_cast<GaussianScratch*>(scratchHandle);
+    const auto s = reinterpret_cast<GaussianScratch*>(scratchHandle);
     jint* pix = env->GetIntArrayElements(pixels, nullptr);
     if (pix == nullptr) return;
 
@@ -373,7 +409,7 @@ JNIEXPORT void JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_nativeB
     }
 
     // Isotropic + small-enough radius -> optimized RIR kernels.
-    const bool isotropic = (rx == ry);
+    const bool isotropic = rx == ry;
     if (isotropic && rx >= 1 && rx <= kMaxKernelRadius) {
         if (blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s)) {
             env->ReleaseIntArrayElements(pixels, pix, 0);

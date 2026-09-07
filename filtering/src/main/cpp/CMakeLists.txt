@@ -25,6 +25,22 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
     set(BLUR_SOURCES blur/blur_aarch64_neon.S)
 endif()
 
+# x86-64 SIMD kernels (hand-written assembly, RIR-compatible ABI).
+if(ANDROID_ABI STREQUAL "x86_64")
+    set(BLUR_SOURCES
+        blur/blur_x86_64_ssse3.S
+        blur/blur_x86_64_avx2.S
+    )
+endif()
+
+# x86 (32-bit) SIMD kernels (same kernels in cdecl).
+if(ANDROID_ABI STREQUAL "x86")
+    set(BLUR_SOURCES
+        blur/blur_i386_ssse3.S
+        blur/blur_i386_avx2.S
+    )
+endif()
+
 if(ANDROID_ABI STREQUAL "arm64-v8a")
     set(CONVOLVE_SOURCES convolve/convolve_aarch64_neon.S)
 endif()
@@ -97,7 +113,6 @@ if(ANDROID_ABI STREQUAL "x86")
 endif()
 
 set(AVX2_SOURCES
-    blur/blur_x86_avx2.cpp
     convolve/convolve_matrix_x86_avx2.cpp
     component_transfer/component_transfer_x86_avx2.cpp
     displacement_map/displacement_map_x86_avx2.cpp
@@ -111,7 +126,7 @@ set(AVX512_SOURCES
 )
 
 add_library(ksvgblur SHARED
-    blur/gaussian_blur.cpp blur/blur_x86.cpp
+    blur/gaussian_blur.cpp
     convolve/convolve_matrix.cpp convolve/convolve_matrix_neon.cpp convolve/convolve_matrix_x86_sse.cpp
     morphology/morphology.cpp
     component_transfer/component_transfer.cpp component_transfer/unlinearize.cpp

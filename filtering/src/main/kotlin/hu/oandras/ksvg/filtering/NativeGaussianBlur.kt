@@ -115,6 +115,9 @@ public fun StackBlurScratch(): StackBlurScratch =
  */
 internal object NativeGaussianBlur {
 
+    @JvmField
+    val isAvailable: Boolean = NativeBackend.isAvailable
+
     @JvmStatic
     external fun nativeBlur(
         scratch: Long,
