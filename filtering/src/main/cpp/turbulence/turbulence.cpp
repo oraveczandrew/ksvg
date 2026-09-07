@@ -265,7 +265,7 @@ Java_hu_oandras_ksvg_filtering_TurbulenceNative_nativeBackend(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_TurbulenceNative_applyForced(
         JNIEnv* env, [[maybe_unused]] jclass clazz,
-        jintArray jPixels,
+        const jintArray jPixels,
         const jint width, const jint height,
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jdouble baseFrequencyX, const jdouble baseFrequencyY,

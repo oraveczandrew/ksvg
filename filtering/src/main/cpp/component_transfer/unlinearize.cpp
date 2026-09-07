@@ -67,7 +67,7 @@ void applyScalar(const jint* src, jint* dst, const jint width, const jint height
 // wide tables only address 64 entries, so they are NOT usable for an 8-bit input
 // index — they would silently zero channels 64..255. The 16-row scheme is the
 // correct byte-exact form, mirroring the x86/armv7 implementations.)
-uint8x16_t lutLookupNeon64(const uint8x16_t* rows, uint8x16_t indices) {
+uint8x16_t lutLookupNeon64(const uint8x16_t* rows, const uint8x16_t indices) {
     const uint8x16_t loMask = vdupq_n_u8(0x0F);
     const uint8x16_t lo = vandq_u8(indices, loMask);
     const uint8x16_t hi = vandq_u8(vshrq_n_u8(indices, 4), loMask);

@@ -18,7 +18,6 @@
 #include <cmath>
 #include <cassert>
 #include <algorithm>
-#include <cstring>
 #include "cpu_dispatch.h"
 #include "shared/math_utils.h"
 
@@ -38,35 +37,33 @@ extern "C" void ksvgLightingDistantDiffuseRowNeon32(
 
 namespace {
 
-constexpr jint kMaxVecRowSpan = 4096;
-
  jint clamp255f(const float v) {
-    return static_cast<jint>(ksvg::clamp255(v));
+    return ksvg::clamp255(v);
 }
 
  float heightAt(const jint* pix, const jint width, const jint height, const jint x, const jint y, const float ss) {
-    const jint cx = x < 0 ? 0 : (x > width - 1 ? width - 1 : x);
-    const jint cy = y < 0 ? 0 : (y > height - 1 ? height - 1 : y);
+    const jint cx = x < 0 ? 0 : x > width - 1 ? width - 1 : x;
+    const jint cy = y < 0 ? 0 : y > height - 1 ? height - 1 : y;
     return static_cast<float>((pix[cy * width + cx] >> 24) & 0xff) * ss;
 }
 
- float clamp01(const float v) { return v < 0.f ? 0.f : (v > 1.f ? 1.f : v); }
+ float clamp01(const float v) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; }
 
  jint sRgbToLight(const jint c) {
     const float a = static_cast<float>(c) / 255.f;
-    const float v = (a <= 0.04045f) ? (a / 12.92f * 255.f)
-                                    : (std::pow((a + 0.055f) / 1.055f, 2.4f) * 255.f);
+    const float v = a <= 0.04045f ? a / 12.92f * 255.f
+                                    : std::pow((a + 0.055f) / 1.055f, 2.4f) * 255.f;
     return clamp255f(v);
 }
 
  jint linearToLightSRgb(const jint c) {
     const float a = static_cast<float>(c) / 255.f;
-    const float v = (a <= 0.0031308f) ? (a * 12.92f * 255.f)
-                                      : ((1.055f * std::pow(a, 1.f / 2.4f) - 0.055f) * 255.f);
+    const float v = a <= 0.0031308f ? a * 12.92f * 255.f
+                                      : (1.055f * std::pow(a, 1.f / 2.4f) - 0.055f) * 255.f;
     return clamp255f(v);
 }
 
-inline jint packPixel(jint outA, jint outR, jint outG, jint outB) {
+inline jint packPixel(const jint outA, const jint outR, const jint outG, const jint outB) {
     return (outA << 24) | (outR << 16) | (outG << 8) | outB;
 }
 
@@ -167,24 +164,24 @@ inline void applyScalarPixel_full(
         outB = linearToLightSRgb(outB);
     }
     const jint outA = isSpecular
-            ? (outR > outG ? (outR > outB ? outR : outB) : (outG > outB ? outG : outB))
+            ? (outR > outG ? (outR > outB ? outR : outB) : outG > outB ? outG : outB)
             : 255;
 
-    out[y * width + x] = (isSpecular && premultiplied)
-            ? ((clamp255f(intensity * 255.f) << 24) | (jint(lr + 0.5f) << 16) | (jint(lg + 0.5f) << 8) | jint(lb + 0.5f))
+    out[y * width + x] = isSpecular && premultiplied
+            ? (clamp255f(intensity * 255.f) << 24) | (static_cast<jint>(lr + 0.5f) << 16) | (static_cast<jint>(lg + 0.5f) << 8) | static_cast<jint>(lb + 0.5f)
             : packPixel(outA, outR, outG, outB);
 }
 
 void applyScalar(
-        jint* pix, jint* out, jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        float ss, jdouble invCanvasScaleX, jdouble invCanvasScaleY,
-        jdouble userLeft, jdouble userTop, jdouble originX, jdouble originY,
-        jdouble unitSizeX, jdouble unitSizeY,
-        float canvasScaleX, float canvasScaleY,
-        jint lightType, bool isSpecular, float k, float exponent,
-        float fr, float fg, float fb, const jdouble* params,
-        bool premultiplied, bool useLinear) {
+        const jint* pix, jint* out, const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const float ss, const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+        const jdouble userLeft, const jdouble userTop, const jdouble originX, const jdouble originY,
+        const jdouble unitSizeX, const jdouble unitSizeY,
+        const float canvasScaleX, const float canvasScaleY,
+        const jint lightType, const bool isSpecular, const float k, const float exponent,
+        const float fr, const float fg, const float fb, const jdouble* params,
+        const bool premultiplied, const bool useLinear) {
     const float lr = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fr))) : fr;
     const float lg = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fg))) : fg;
     const float lb = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fb))) : fb;
@@ -203,15 +200,15 @@ void applyScalar(
 }
 
 void applyVector(
-        jint* pix, jint* out, jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        float ss, jdouble invCanvasScaleX, jdouble invCanvasScaleY,
-        jdouble userLeft, jdouble userTop, jdouble originX, jdouble originY,
-        jdouble unitSizeX, jdouble unitSizeY,
-        float canvasScaleX, float canvasScaleY,
-        jint lightType, bool isSpecular, float k, float exponent,
-        float fr, float fg, float fb, const jdouble* params,
-        bool premultiplied, bool useLinear, jint backend) {
+        const jint* pix, jint* out, const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const float ss, const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+        const jdouble userLeft, const jdouble userTop, const jdouble originX, const jdouble originY,
+        const jdouble unitSizeX, const jdouble unitSizeY,
+        const float canvasScaleX, const float canvasScaleY,
+        const jint lightType, const bool isSpecular, const float k, const float exponent,
+        const float fr, const float fg, const float fb, const jdouble* params,
+        const bool premultiplied, const bool useLinear, jint backend) {
     const float lr = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fr))) : fr;
     const float lg = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fg))) : fg;
     const float lb = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fb))) : fb;
@@ -228,7 +225,9 @@ void applyVector(
         lz = static_cast<float>(std::sin(el));
     }
 
-    const LightingParams lp = { invDx, invDy, k, lx, ly, lz, lr, lg, lb, ss };
+    const LightingParams lp = {
+        .invDx = invDx, .invDy = invDy, .k = k, .lx = lx, .ly = ly, .lz = lz, .lr = lr, .lg = lg, .lb = lb, .ss = ss
+    };
 
     for (jint y = clipTop; y < clipBottom; y++) {
         const jint rowOffset = y * width;
@@ -257,8 +256,8 @@ void applyVector(
         }
 
         jint x = ixLo;
-        if (lightType == 0 && !isSpecular && !useLinear && (ixHi - ixLo) >= 4) {
-            const jint count = (ixHi - ixLo) & ~3;
+        if (lightType == 0 && !isSpecular && !useLinear && ixHi - ixLo >= 4) {
+            const jint count = ixHi - ixLo & ~3;
             if (count > 0) {
                 const jint* srcT = pix + (y - 1) * width + (x - 1);
                 const jint* srcM = pix + y * width + (x - 1);
@@ -322,16 +321,16 @@ void applyVector(
 
 namespace {
 
-void runForced(jint* pix, jint* out, jint width, jint height,
-               jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-               float ss, jdouble invCanvasScaleX, jdouble invCanvasScaleY,
-               jdouble userLeft, jdouble userTop, jdouble originX, jdouble originY,
-               jdouble unitSizeX, jdouble unitSizeY,
-               float canvasScaleX, float canvasScaleY,
-               jint lightType, bool isSpecular, float k, float exponent,
-               float fr, float fg, float fb, const jdouble* params,
-               bool premultiplied, bool useLinear,
-               jint backend) {
+void runForced(const jint* pix, jint* out, const jint width, const jint height,
+               const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+               const float ss, const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+               const jdouble userLeft, const jdouble userTop, const jdouble originX, const jdouble originY,
+               const jdouble unitSizeX, const jdouble unitSizeY,
+               const float canvasScaleX, const float canvasScaleY,
+               const jint lightType, const bool isSpecular, const float k, const float exponent,
+               const float fr, const float fg, const float fb, const jdouble* params,
+               const bool premultiplied, const bool useLinear,
+               const jint backend) {
     if (backend == SIMD_BACKEND_SCALAR) {
         applyScalar(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
                     ss, invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
@@ -370,24 +369,24 @@ jint nativeBackendForAbi() {
 
 extern "C" JNIEXPORT jint JNICALL
 Java_hu_oandras_ksvg_filtering_LightingNative_nativeBackend(
-        JNIEnv* env, jclass clazz) {
+        [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz) {
     return nativeBackendForAbi();
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_LightingNative_applyForced(
-        JNIEnv* env, jclass clazz,
+        JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jPix, const jintArray jOut,
-        jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        jfloat surfaceScaleNormalized,
-        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
-        jdouble userLeft, jdouble userTop,
-        jdouble originX, jdouble originY,
-        jdouble unitSizeX, jdouble unitSizeY,
-        jfloat canvasScaleX, jfloat canvasScaleY,
-        jint lightType, const jboolean specular,
-        jfloat k, jfloat exponent,
+        const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jfloat surfaceScaleNormalized,
+        const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+        const jdouble userLeft, const jdouble userTop,
+        const jdouble originX, const jdouble originY,
+        const jdouble unitSizeX, const jdouble unitSizeY,
+        const jfloat canvasScaleX, const jfloat canvasScaleY,
+        const jint lightType, const jboolean specular,
+        const jfloat k, const jfloat exponent,
         const jint lightR, const jint lightG, const jint lightB,
         const jdoubleArray jParams,
         const jboolean premultipliedOutput,
@@ -423,18 +422,18 @@ Java_hu_oandras_ksvg_filtering_LightingNative_applyForced(
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_LightingNative_apply(
-        JNIEnv* env, jclass clazz,
+        JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jPix, const jintArray jOut,
-        jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        jfloat surfaceScaleNormalized,
-        jdouble invCanvasScaleX, jdouble invCanvasScaleY,
-        jdouble userLeft, jdouble userTop,
-        jdouble originX, jdouble originY,
-        jdouble unitSizeX, jdouble unitSizeY,
-        jfloat canvasScaleX, jfloat canvasScaleY,
-        jint lightType, const jboolean specular,
-        jfloat k, jfloat exponent,
+        const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jfloat surfaceScaleNormalized,
+        const jdouble invCanvasScaleX, const jdouble invCanvasScaleY,
+        const jdouble userLeft, const jdouble userTop,
+        const jdouble originX, const jdouble originY,
+        const jdouble unitSizeX, const jdouble unitSizeY,
+        const jfloat canvasScaleX, const jfloat canvasScaleY,
+        const jint lightType, const jboolean specular,
+        const jfloat k, const jfloat exponent,
         const jint lightR, const jint lightG, const jint lightB,
         const jdoubleArray jParams,
         const jboolean premultipliedOutput,

@@ -16,9 +16,6 @@
 
 #include <jni.h>
 #include <cmath>
-#include <cstring>
-#include <algorithm>
-#include <cassert>
 #include "cpu_dispatch.h"
 #include "convolve.h"
 #include "shared/math_utils.h"
@@ -26,13 +23,13 @@
 
 namespace Convolve {
 
-inline jint sampleCoordinate(jint coordinate, jint limit, jint edgeMode) {
+static inline jint sampleCoordinate(const jint coordinate, const jint limit, const jint edgeMode) {
     if (coordinate >= 0 && coordinate < limit) return coordinate;
     switch (edgeMode) {
         case 2: // None (transparent black)
             return -1;
         case 1: { // Wrap
-            jint m = coordinate % limit;
+            const jint m = coordinate % limit;
             return (m < 0) ? m + limit : m;
         }
         default: // Duplicate (clamp)
@@ -48,12 +45,12 @@ void convolveScalarPixel(
 
     for (jint ky = 0; ky < orderY; ky++) {
         for (jint kx = 0; kx < orderX; kx++) {
-            jint sx = sampleCoordinate(x + kx - targetX, width, edgeMode);
-            jint sy = sampleCoordinate(y + ky - targetY, height, edgeMode);
+            const jint sx = sampleCoordinate(x + kx - targetX, width, edgeMode);
+            const jint sy = sampleCoordinate(y + ky - targetY, height, edgeMode);
 
             if (sx != -1 && sy != -1) {
-                jint pixel = src[sy * width + sx];
-                float weight = kernel[ky * orderX + kx];
+                const jint pixel = src[sy * width + sx];
+                const float weight = kernel[ky * orderX + kx];
                 r += ((pixel >> 16) & 0xFF) * weight;
                 g += ((pixel >> 8) & 0xFF) * weight;
                 b += (pixel & 0xFF) * weight;
@@ -62,15 +59,15 @@ void convolveScalarPixel(
         }
     }
 
-    jint ir, ig, ib, ia;
+    jint ia;
     if (preserve) {
         ia = (src[y * width + x] >> 24) & 0xFF;
     } else {
         ia = ksvg::clamp255(std::floor(a / divisor + bias * 255.f + 0.5f));
     }
-    ir = ksvg::clamp255(std::floor(r / divisor + bias * 255.f + 0.5f));
-    ig = ksvg::clamp255(std::floor(g / divisor + bias * 255.f + 0.5f));
-    ib = ksvg::clamp255(std::floor(b / divisor + bias * 255.f + 0.5f));
+    jint ir = ksvg::clamp255(std::floor(r / divisor + bias * 255.f + 0.5f));
+    jint ig = ksvg::clamp255(std::floor(g / divisor + bias * 255.f + 0.5f));
+    jint ib = ksvg::clamp255(std::floor(b / divisor + bias * 255.f + 0.5f));
 
     dst[y * width + x] = (ia << 24) | (ir << 16) | (ig << 8) | ib;
 }
@@ -132,17 +129,38 @@ void applyX86(
         }
     }
 }
+
+jint nativeBackendForAbi() {
+    jint backends = SIMD_BACKEND_SCALAR;
+#if defined(__x86_64__) || defined(__i386__)
+    const SimdLevel level = detectSimdLevel();
+    backends |= SIMD_BACKEND_SSE2;
+    if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
+    if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
+#endif
+    return backends;
+}
 #endif
 
 } // namespace Convolve
 
 namespace {
 
+extern "C" JNIEXPORT jint JNICALL
+Java_hu_oandras_ksvg_filtering_ConvolveNative_nativeBackend(
+        [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz) {
+#if defined(__i386__) || defined(__x86_64__)
+    return Convolve::nativeBackendForAbi();
+#else
+    return SIMD_BACKEND_SCALAR;
+#endif
+}
+
 extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_ConvolveMatrixNative_applyForced(
+Java_hu_oandras_ksvg_filtering_ConvolveNative_applyForced(
         JNIEnv *env, [[maybe_unused]] jclass clazz,
-        jintArray jSrc, jintArray jDst, jint width, jint height,
-        jfloatArray jKernel, jint orderX, jint orderY, jint targetX, jint targetY,
+        const jintArray jSrc, const jintArray jDst, jint width, jint height,
+        const jfloatArray jKernel, jint orderX, jint orderY, jint targetX, jint targetY,
         jfloat divisor, jfloat bias, jboolean preserveAlpha, jint edgeMode, jint simdBackend) {
     jint *src = env->GetIntArrayElements(jSrc, nullptr);
     jint *dst = env->GetIntArrayElements(jDst, nullptr);
@@ -166,10 +184,10 @@ Java_hu_oandras_ksvg_filtering_ConvolveMatrixNative_applyForced(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_ConvolveMatrixNative_apply(
+Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
         JNIEnv *env, [[maybe_unused]] jclass clazz,
-        jintArray jSrc, jintArray jDst, jint width, jint height,
-        jfloatArray jKernel, jint orderX, jint orderY, jint targetX, jint targetY,
+        const jintArray jSrc, const jintArray jDst, jint width, jint height,
+        const jfloatArray jKernel, jint orderX, jint orderY, jint targetX, jint targetY,
         jfloat divisor, jfloat bias, jboolean preserveAlpha, jint edgeMode) {
     jint *src = env->GetIntArrayElements(jSrc, nullptr);
     jint *dst = env->GetIntArrayElements(jDst, nullptr);

@@ -69,7 +69,7 @@ namespace {
 #include <arm_neon.h>
 
 inline uint8x16_t lookup256Neon(
-        uint8x16_t indices,
+        const uint8x16_t indices,
         const uint8x16_t table[16]) {
     const uint8x16_t lo = vandq_u8(indices, vdupq_n_u8(0x0F));
     const uint8x16_t hi = vshrq_n_u8(indices, 4);
@@ -170,9 +170,9 @@ void applyNeon64(
                     (static_cast<jint>(
                             static_cast<uint8_t>(
                                     tableG[(c >> 8) & 0xFF])) << 8) |
-                    (static_cast<jint>(
-                            static_cast<uint8_t>(
-                                    tableB[c & 0xFF])));
+                    static_cast<jint>(
+                        static_cast<uint8_t>(
+                            tableB[c & 0xFF]));
         }
     }
 }

@@ -140,12 +140,12 @@ namespace {
 #include <arm_neon.h>
     using Vec = uint8x16_t;
     inline Vec vecLoad(const jint *p) { return vld1q_u8(reinterpret_cast<const uint8_t *>(p)); }
-    inline Vec vecMin(Vec a, Vec b) { return vminq_u8(a, b); }
-    inline Vec vecMax(Vec a, Vec b) { return vmaxq_u8(a, b); }
-    inline Vec vecInit(jint v) { return vreinterpretq_u8_s32(vdupq_n_s32(v)); }
-    inline Vec vecInitByte(jint v) { return vdupq_n_u8(static_cast<uint8_t>(v)); }
+    inline Vec vecMin(const Vec a, const Vec b) { return vminq_u8(a, b); }
+    inline Vec vecMax(const Vec a, const Vec b) { return vmaxq_u8(a, b); }
+    inline Vec vecInit(const jint v) { return vreinterpretq_u8_s32(vdupq_n_s32(v)); }
+    inline Vec vecInitByte(const jint v) { return vdupq_n_u8(static_cast<uint8_t>(v)); }
 
-    inline jint lane(Vec v, int i) {
+    inline jint lane(const Vec v, const int i) {
         alignas(16) uint8_t bytes[16];
         vst1q_u8(bytes, v);
         return static_cast<jint>(bytes[i]);
@@ -171,8 +171,8 @@ namespace {
      * pixel boundaries. Tail taps (< 4 px) run scalar.
      */
     inline void applyVectorPixel(
-        const jint *src, jint *dst, jint width,
-        jint radiusX, jint radiusY, bool isErode, jint init, jint x, jint y) {
+        const jint *src, jint *dst, const jint width,
+        const jint radiusX, const jint radiusY, const bool isErode, jint init, const jint x, const jint y) {
         const jint top = y - radiusY;
         const jint bottom = y + radiusY;
         const jint left = x - radiusX;
@@ -232,10 +232,10 @@ namespace {
 
 // Validation/test-only: run an explicitly selected backend (see SimdBackend).
 namespace {
-    void runForced(const jint *src, jint *dst, jint width, jint height,
+    void runForced(const jint *src, jint *dst, jint width, const jint height,
                    jint radiusX, jint radiusY, bool erode,
-                   jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-                   jint backend) {
+                   const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+                   const jint backend) {
         const jint init = erode ? 255 : 0;
         std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
 
@@ -344,13 +344,13 @@ namespace {
 
 extern "C" JNIEXPORT jint JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_nativeBackend(
-    JNIEnv *env, jclass clazz) {
+    [[maybe_unused]] JNIEnv *env, [[maybe_unused]] jclass clazz) {
     return nativeBackendForAbi();
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForced(
-    JNIEnv *env, jclass clazz,
+    JNIEnv *env, [[maybe_unused]] jclass clazz,
     const jintArray jSrc, const jintArray jDst,
     const jint width, const jint height,
     const jint radiusX, const jint radiusY, const jboolean erode,
@@ -373,7 +373,7 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForced(
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
-    JNIEnv *env, jclass clazz,
+    JNIEnv *env, [[maybe_unused]] jclass clazz,
     const jintArray jSrc, const jintArray jDst,
     const jint width, const jint height,
     const jint radiusX, const jint radiusY, const jboolean erode,
@@ -528,7 +528,7 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
-    JNIEnv *env, jclass clazz,
+    JNIEnv *env, [[maybe_unused]] jclass clazz,
     const jintArray jSrc, const jintArray jDst,
     const jint width, const jint height,
     const jint radiusX, const jint radiusY, const jboolean erode,
