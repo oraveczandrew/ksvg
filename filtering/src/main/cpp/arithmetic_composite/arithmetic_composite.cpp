@@ -31,15 +31,11 @@ inline uint8_t arithmeticChannel(const uint8_t in1, const uint8_t in2, const flo
     return static_cast<uint8_t>(ksvg::clamp255((k1 * a * b + k2 * a + k3 * b + k4) * 255.f));
 }
 
-} // namespace
-
-extern "C" {
-
-void applyArithmeticScalar(
+template <bool kUseLinear>
+void applyArithmeticScalarImpl(
         const jint* src1, const jint* src2, jint* dst,
         const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4,
-        const jboolean useLinear,
         const jbyte* srgbToLinear, const jbyte* linearToSrgb) {
     for (jint y = clipTop; y < clipBottom; y++) {
         const jint rowOffset = y * width;
@@ -61,7 +57,7 @@ void applyArithmeticScalar(
             const uint8_t outA = arithmeticChannel(a1, a2, k1, k2, k3, k4);
             uint8_t outR, outG, outB;
 
-            if (useLinear == JNI_TRUE) {
+            if constexpr (kUseLinear) {
                 outR = static_cast<uint8_t>(linearToSrgb[arithmeticChannel(static_cast<uint8_t>(srgbToLinear[r1]), static_cast<uint8_t>(srgbToLinear[r2]), k1, k2, k3, k4)]);
                 outG = static_cast<uint8_t>(linearToSrgb[arithmeticChannel(static_cast<uint8_t>(srgbToLinear[g1]), static_cast<uint8_t>(srgbToLinear[g2]), k1, k2, k3, k4)]);
                 outB = static_cast<uint8_t>(linearToSrgb[arithmeticChannel(static_cast<uint8_t>(srgbToLinear[b1]), static_cast<uint8_t>(srgbToLinear[b2]), k1, k2, k3, k4)]);
@@ -76,7 +72,22 @@ void applyArithmeticScalar(
     }
 }
 
-} // extern "C"
+} // namespace
+
+extern "C" {
+void applyArithmeticScalar(
+        const jint* src1, const jint* src2, jint* dst,
+        const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4,
+        const jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb) {
+    if (useLinear == JNI_TRUE) {
+        applyArithmeticScalarImpl<true>(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom, k1, k2, k3, k4, srgbToLinear, linearToSrgb);
+    } else {
+        applyArithmeticScalarImpl<false>(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom, k1, k2, k3, k4, srgbToLinear, linearToSrgb);
+    }
+}
+}
 
 namespace {
 
