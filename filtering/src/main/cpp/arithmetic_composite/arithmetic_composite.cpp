@@ -101,7 +101,7 @@ void runForced(const jint* src1, const jint* src2, jint* dst,
                const jbyte* srgbToLinear, const jbyte* linearToSrgb,
                const jint backend) {
 #if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
-    if (backend == SIMD_BACKEND_SCALAR) {
+    if (backend == SIMD_BACKEND_SCALAR || useLinear == JNI_TRUE) {
         applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                               k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
     } else {
