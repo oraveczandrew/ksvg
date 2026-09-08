@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg.filtering
 
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,7 +70,7 @@ class UnLinearizeNativeParityTest(
             out
         }
 
-        assertArrayEquals(
+        assertColorArrayEquals(
             "unlinearize mismatch on [$name] backend ${backendName(backend)}",
             ref, native,
         )

@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg.filtering
 
-import org.junit.Assert.assertArrayEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -70,7 +69,7 @@ class LightingNativeParityTest(
             backend
         )
 
-        assertArrayEquals(
+        assertColorArrayEquals(
             "lighting mismatch on [$name] backend ${backendName(backend)}",
             ref, out,
         )

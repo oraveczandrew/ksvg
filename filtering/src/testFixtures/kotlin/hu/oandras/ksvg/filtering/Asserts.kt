@@ -25,3 +25,25 @@ public fun assertNativeBackendAvailable(): Unit {
         NativeBackend.isAvailable,
     )
 }
+
+/** Asserts ARGB pixel arrays and reports the first mismatch in hexadecimal. */
+public fun assertColorArrayEquals(
+    message: String,
+    expected: IntArray,
+    actual: IntArray,
+): Unit {
+    if (expected.size != actual.size) {
+        throw AssertionError(
+            "$message: array lengths differ, expected=${expected.size}, actual=${actual.size}",
+        )
+    }
+    for (index in expected.indices) {
+        if (expected[index] != actual[index]) {
+            throw AssertionError(
+                "$message: mismatch at index $index, " +
+                    "expected=0x${expected[index].toHexString(HexFormat.UpperCase)}, " +
+                    "actual=0x${actual[index].toHexString(HexFormat.UpperCase)}",
+            )
+        }
+    }
+}

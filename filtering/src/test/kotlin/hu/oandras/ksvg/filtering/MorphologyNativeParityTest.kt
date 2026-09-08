@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg.filtering
 
-import org.junit.Assert.assertArrayEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -69,7 +68,7 @@ class MorphologyNativeParityTest(
             case.clipLeft, case.clipTop, case.clipRight, case.clipBottom, backend,
         )
 
-        assertArrayEquals(
+        assertColorArrayEquals(
             "morphology mismatch on [$name] backend ${backendName(backend)}",
             ref, native,
         )
