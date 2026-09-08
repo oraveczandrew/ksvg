@@ -143,10 +143,10 @@ Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark
 | Morphology | scalar | 2048x2048 | 2584.828 | 1.62 | 0.01 | 1.00x |  |  |
 | Morphology | sse2 | 2048x2048 | 24.652 | 170.14 | 1.36 | **104.9x** | 🚀 |  |
 | Morphology | ssse3 | 2048x2048 | 2807.434 | 1.49 | 0.01 | 0.92x | 🔴 | no x86-32 kernel; falls back to scalar |
-| Turbulence | scalar | 512x512 | 67.906 | 3.86 | 0.03 | 1.00x |  |  |
-| Turbulence | ssse3 | 512x512 | 53.685 | 4.88 | 0.04 | 1.26x | 🟢 |  |
-| Turbulence | scalar | 2048x2048 | 1083.207 | 3.87 | 0.03 | 1.00x |  |  |
-| Turbulence | ssse3 | 2048x2048 | 853.463 | 4.91 | 0.04 | 1.27x | 🟢 |  |
+| Turbulence | scalar | 512x512 | 69.761 | 3.76 | 0.03 | 1.00x |  | fresh full i386 emulator run |
+| Turbulence | ssse3 | 512x512 | 13.730 | 19.09 | 0.15 | **5.08x** | 🟢 | i386 SSSE3 assembly; parity-verified |
+| Turbulence | scalar | 2048x2048 | 1113.571 | 3.77 | 0.03 | 1.00x |  | fresh full i386 emulator run |
+| Turbulence | ssse3 | 2048x2048 | 218.275 | 19.22 | 0.15 | **5.10x** | 🟢 | i386 SSSE3 assembly; parity-verified |
 | UnLinearize | scalar | 512x512 | 0.927 | 311.55 | 2.49 | 1.00x | 🟢 | accepted benchmark result |
 | UnLinearize | ssse3 | 512x512 | 0.281 | 1090.64 | 8.72 | **3.30x** | 🟢 | accepted benchmark result |
 | UnLinearize | scalar | 2048x2048 | 13.635 | 309.91 | 2.48 | 1.00x | 🟢 | accepted benchmark result |

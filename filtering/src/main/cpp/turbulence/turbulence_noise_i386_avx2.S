@@ -718,8 +718,7 @@ LBB0_12:                                ## =>This Inner Loop Header: Depth=1
 	pushl	%edx
 	calll	.Lksvg_pcrel_get_pc_edx
 1:
-	leal	(LCPI0_3-1b)(%edx), %edx
-	vmovaps	(%edx), %ymm0                  ## ymm0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
+	vmovaps	(LCPI0_3-1b)(%edx), %ymm0       ## ymm0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
 	vmovups	%ymm0, 1216(%esp)
 	vmovaps	(LCPI0_4-1b)(%edx), %ymm0                  ## ymm0 = [32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63]
 	vmovups	%ymm0, 1248(%esp)
@@ -817,13 +816,12 @@ LBB0_17:                                ## =>This Inner Loop Header: Depth=1
 	movl	16(%ebp), %eax
 	imull	12(%ebp), %eax
 	shll	$2, %eax
-	subl	$4, %esp
-	pushl	%eax
-	pushl	$0
-	pushl	8(%ebp)
+	movl	8(%ebp), %edi
+	movl	%eax, %ecx
+	shrl	$2, %ecx
+	xorl	%eax, %eax
 	vzeroupper
-	CALL_SYM(memset)
-	addl	$16, %esp
+	rep	stosl
 	movl	52(%ebp), %edx
 	testl	%edx, %edx
 	setg	%ah

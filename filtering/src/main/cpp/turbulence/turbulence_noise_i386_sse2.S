@@ -359,6 +359,12 @@ SYM(ksvgTurbulenceApplySse2_i386):                             ## @applySse2
 	.cfi_offset %esi, -20
 	.cfi_offset %edi, -16
 	.cfi_offset %ebx, -12
+	fnstcw	-69840(%ebp)
+	movzwl	-69840(%ebp), %eax
+	andl	$-3073, %eax
+	orl	$1024, %eax
+	movw	%ax, -69842(%ebp)
+	fldcw	-69842(%ebp)
 	# Hot scalar constants cached in the local frame.
 	movl	$0, -69776(%ebp)
 	movl	$1064304640, -69772(%ebp)
@@ -715,8 +721,7 @@ LBB0_18:
 	pushl	%edx
 	calll	.Lksvg_pcrel_get_pc_edx
 1:
-	leal	(LCPI0_1-1b)(%edx), %edx
-	movaps	(%edx), %xmm0                  ## xmm0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+	movaps	(LCPI0_1-1b)(%edx), %xmm0       ## xmm0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
 	movaps	%xmm0, -69768(%ebp)
 	movaps	(LCPI0_2-1b)(%edx), %xmm0                  ## xmm0 = [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
 	movaps	%xmm0, -69752(%ebp)
@@ -829,11 +834,11 @@ LBB0_21:                                ## =>This Inner Loop Header: Depth=1
 ## %bb.22:
 	imull	12(%ebp), %ebx
 	shll	$2, %ebx
-	movl	8(%ebp), %eax
-	movl	%eax, (%esp)
-	movl	%ebx, 8(%esp)
-	movl	$0, 4(%esp)
-	CALL_SYM(memset)
+	movl	8(%ebp), %edi
+	movl	%ebx, %ecx
+	shrl	$2, %ecx
+	xorl	%eax, %eax
+	rep	stosl
 	cmpl	$0, 52(%ebp)
 	setg	-13(%ebp)                       ## 1-byte Folded Spill
 	cmpl	$0, 56(%ebp)
@@ -941,7 +946,8 @@ LBB0_28:                                ##   Parent Loop BB0_26 Depth=1
 	addsd	-69792(%ebp), %xmm1
 	movsd	%xmm1, -104(%ebp)               ## 8-byte Spill
 	movsd	%xmm1, (%esp)
-	CALL_SYM(floor)
+	fldl	(%esp)
+	frndint
 	fstpl	-216(%ebp)
 	movsd	-216(%ebp), %xmm0               ## xmm0 = mem[0],zero
 	cvttsd2si	%xmm0, %ebx
@@ -956,7 +962,8 @@ LBB0_28:                                ##   Parent Loop BB0_26 Depth=1
 	movaps	-136(%ebp), %xmm0               ## 16-byte Reload
 	movhps	%xmm0, (%esp)
 	movl	%ecx, -24(%ebp)                 ## 4-byte Spill
-	CALL_SYM(floor)
+	fldl	(%esp)
+	frndint
 	movsd	-56(%ebp), %xmm0                ## 8-byte Reload
                                         ## xmm0 = mem[0],zero
 	fstpl	-208(%ebp)
@@ -1001,7 +1008,8 @@ LBB0_45:                                ##   in Loop: Header=BB0_33 Depth=2
 	movsd	-69816(%ebp), %xmm1                 ## xmm1 = [5.0E-1,0.0E+0]
 	addsd	%xmm1, %xmm0
 	movsd	%xmm0, (%esp)
-	CALL_SYM(floor)
+	fldl	(%esp)
+	frndint
 	fstpl	-168(%ebp)
 	cvttsd2si	-168(%ebp), %esi
 	cmpl	$255, %esi
@@ -1017,7 +1025,8 @@ LBB0_45:                                ##   in Loop: Header=BB0_33 Depth=2
 	mulsd	-48(%ebp), %xmm0                ## 8-byte Folded Reload
 	addsd	-69816(%ebp), %xmm0
 	movsd	%xmm0, (%esp)
-	CALL_SYM(floor)
+	fldl	(%esp)
+	frndint
 	fstpl	-160(%ebp)
 	cvttsd2si	-160(%ebp), %edi
 	cmpl	$255, %edi
@@ -1031,7 +1040,8 @@ LBB0_45:                                ##   in Loop: Header=BB0_33 Depth=2
 	mulsd	-48(%ebp), %xmm0                ## 8-byte Folded Reload
 	addsd	-69816(%ebp), %xmm0
 	movsd	%xmm0, (%esp)
-	CALL_SYM(floor)
+	fldl	(%esp)
+	frndint
 	fstpl	-184(%ebp)
 	cvttsd2si	-184(%ebp), %ebx
 	cmpl	$255, %ebx
@@ -1046,7 +1056,8 @@ LBB0_45:                                ##   in Loop: Header=BB0_33 Depth=2
 	mulsd	-48(%ebp), %xmm0                ## 8-byte Folded Reload
 	addsd	-69816(%ebp), %xmm0
 	movsd	%xmm0, (%esp)
-	CALL_SYM(floor)
+	fldl	(%esp)
+	frndint
 	fstpl	-176(%ebp)
 	cvttsd2si	-176(%ebp), %eax
 	cmpl	$255, %eax
@@ -1125,7 +1136,8 @@ LBB0_38:                                ##   Parent Loop BB0_26 Depth=1
 	je	LBB0_40
 ## %bb.39:                              ##   in Loop: Header=BB0_38 Depth=3
 	movhpd	%xmm1, (%esp)
-	CALL_SYM(floor)
+	fldl	(%esp)
+	frndint
 	movapd	-136(%ebp), %xmm1               ## 16-byte Reload
 	fstpl	-200(%ebp)
 	cvttsd2si	-200(%ebp), %esi
@@ -1134,7 +1146,8 @@ LBB0_40:                                ##   in Loop: Header=BB0_38 Depth=3
 	addsd	-69792(%ebp), %xmm1
 	movsd	%xmm1, -120(%ebp)               ## 8-byte Spill
 	movsd	%xmm1, (%esp)
-	CALL_SYM(floor)
+	fldl	(%esp)
+	frndint
 	movsd	-120(%ebp), %xmm1               ## 8-byte Reload
                                         ## xmm1 = mem[0],zero
 	fstpl	-192(%ebp)
@@ -1280,7 +1293,8 @@ LBB0_42:                                ##   in Loop: Header=BB0_38 Depth=3
 	andpd	%xmm2, %xmm1
 	jmp	LBB0_44
 LBB0_36:
-	addl	$69772, %esp                    ## imm = 0x1108C
+	fldcw	-69840(%ebp)
+	addl	$69868, %esp                    ## imm = 0x1108C
 	popl	%esi
 	popl	%edi
 	popl	%ebx
