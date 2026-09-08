@@ -164,7 +164,8 @@ SYM(\LABEL):
         /* sx = clamp(x + dx, 0, width-1). */
         movdqa  xmm6, xmm4
         paddd   xmm6, xmm1
-        movdqa  xmm3, XMMWORD PTR [esp+36]
+        movd    xmm3, DWORD PTR [esp+36]
+        pshufd  xmm3, xmm3, 0
         movdqa  xmm1, xmm6
         pcmpgtd xmm6, xmm3                 /* candidate > max */
         pand    xmm3, xmm6                 /* max where needed */
@@ -180,7 +181,8 @@ SYM(\LABEL):
         /* sy = clamp(y + dy, 0, height-1). */
         movdqa  xmm6, xmm5
         paddd   xmm6, xmm2
-        movdqa  xmm3, XMMWORD PTR [esp+40]
+        movd    xmm3, DWORD PTR [esp+40]
+        pshufd  xmm3, xmm3, 0
         movdqa  xmm2, xmm6
         pcmpgtd xmm6, xmm3                 /* candidate > max */
         pand    xmm3, xmm6
@@ -307,21 +309,22 @@ SYM(\LABEL):
        // SIZE(SYM(\LABEL))
 .endm
 
-        KERNEL .Ldm_k00, DM_MASK_B_OFF, DM_MASK_B_OFF, 0, 0
-        KERNEL .Ldm_k01, DM_MASK_B_OFF, DM_MASK_G_OFF, 0, 8
-        KERNEL .Ldm_k02, DM_MASK_B_OFF, DM_MASK_R_OFF, 0, 16
-        KERNEL .Ldm_k03, DM_MASK_B_OFF, DM_MASK_A_OFF, 0, 24
-        KERNEL .Ldm_k04, DM_MASK_G_OFF, DM_MASK_B_OFF, 8, 0
+        /* xChannel/yChannel use the public R=0, G=1, B=2, A=3 order. */
+        KERNEL .Ldm_k00, DM_MASK_R_OFF, DM_MASK_R_OFF, 0, 0
+        KERNEL .Ldm_k01, DM_MASK_R_OFF, DM_MASK_G_OFF, 0, 8
+        KERNEL .Ldm_k02, DM_MASK_R_OFF, DM_MASK_B_OFF, 0, 16
+        KERNEL .Ldm_k03, DM_MASK_R_OFF, DM_MASK_A_OFF, 0, 24
+        KERNEL .Ldm_k04, DM_MASK_G_OFF, DM_MASK_R_OFF, 8, 0
         KERNEL .Ldm_k05, DM_MASK_G_OFF, DM_MASK_G_OFF, 8, 8
-        KERNEL .Ldm_k06, DM_MASK_G_OFF, DM_MASK_R_OFF, 8, 16
+        KERNEL .Ldm_k06, DM_MASK_G_OFF, DM_MASK_B_OFF, 8, 16
         KERNEL .Ldm_k07, DM_MASK_G_OFF, DM_MASK_A_OFF, 8, 24
-        KERNEL .Ldm_k08, DM_MASK_R_OFF, DM_MASK_B_OFF, 16, 0
-        KERNEL .Ldm_k09, DM_MASK_R_OFF, DM_MASK_G_OFF, 16, 8
-        KERNEL .Ldm_k10, DM_MASK_R_OFF, DM_MASK_R_OFF, 16, 16
-        KERNEL .Ldm_k11, DM_MASK_R_OFF, DM_MASK_A_OFF, 16, 24
-        KERNEL .Ldm_k12, DM_MASK_A_OFF, DM_MASK_B_OFF, 24, 0
+        KERNEL .Ldm_k08, DM_MASK_B_OFF, DM_MASK_R_OFF, 16, 0
+        KERNEL .Ldm_k09, DM_MASK_B_OFF, DM_MASK_G_OFF, 16, 8
+        KERNEL .Ldm_k10, DM_MASK_B_OFF, DM_MASK_B_OFF, 16, 16
+        KERNEL .Ldm_k11, DM_MASK_B_OFF, DM_MASK_A_OFF, 16, 24
+        KERNEL .Ldm_k12, DM_MASK_A_OFF, DM_MASK_R_OFF, 24, 0
         KERNEL .Ldm_k13, DM_MASK_A_OFF, DM_MASK_G_OFF, 24, 8
-        KERNEL .Ldm_k14, DM_MASK_A_OFF, DM_MASK_R_OFF, 24, 16
+        KERNEL .Ldm_k14, DM_MASK_A_OFF, DM_MASK_B_OFF, 24, 16
         KERNEL .Ldm_k15, DM_MASK_A_OFF, DM_MASK_A_OFF, 24, 24
 
         .p2align 4
