@@ -66,7 +66,7 @@ namespace Convolve {
         const jint *src, jint *dst,
         const jint width, const jint height, const jfloat *kernel,
         const jint orderX, const jint orderY, const jint targetX, const jint targetY,
-        const float divisor, const float bias,
+        const float divisor, const float bias255,
         const bool preserve, const jint x, const jint y) {
         float r = 0.f, g = 0.f, b = 0.f, a = 0.f;
         for (jint ky = 0; ky < orderY; ky++) {
@@ -81,12 +81,12 @@ namespace Convolve {
                 a += static_cast<float>((pixel >> 24) & 0xFF) * w;
             }
         }
-        const jint outR = clamp255Neon(r / divisor + bias * 255.f);
-        const jint outG = clamp255Neon(g / divisor + bias * 255.f);
-        const jint outB = clamp255Neon(b / divisor + bias * 255.f);
+        const jint outR = clamp255Neon(r / divisor + bias255);
+        const jint outG = clamp255Neon(g / divisor + bias255);
+        const jint outB = clamp255Neon(b / divisor + bias255);
         const jint outA = preserve
                               ? (src[y * width + x] >> 24) & 0xFF
-                              : clamp255Neon(a / divisor + bias * 255.f);
+                              : clamp255Neon(a / divisor + bias255);
         dst[y * width + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
     }
 
@@ -99,6 +99,7 @@ namespace Convolve {
         const jint targetX, const jint targetY,
         const float divisor, const float bias,
         const bool preserve) {
+        const float bias255 = bias * 255.f;
         const jint xLo = targetX;
         const jint xHi = width - orderX + targetX + 1;
 
@@ -111,18 +112,18 @@ namespace Convolve {
         for (jint y = 0; y < yLo; y++)
             for (jint x = 0; x < width; x++)
                 convolveScalarPixelEdged<EDGE_MODE>(
-                    src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, x, y);
+                    src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
         for (jint y = yHi; y < height; y++)
             for (jint x = 0; x < width; x++)
                 convolveScalarPixelEdged<EDGE_MODE>(
-                    src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, x, y);
+                    src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
         for (jint y = yLo; y < yHi; y++) {
             for (jint x = 0; x < xLo; x++)
                 convolveScalarPixelEdged<EDGE_MODE>(
-                    src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, x, y);
+                    src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
             for (jint x = xHi; x < width; x++)
                 convolveScalarPixelEdged<EDGE_MODE>(
-                    src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, x, y);
+                    src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
         }
 
         // Interior.
@@ -144,14 +145,14 @@ namespace Convolve {
                 for (jint y = yLo; y < yHi; y++) {
                     for (jint x = tailX; x < xHi; x++) {
                         convolveScalarPixelEdged<EDGE_MODE>(
-                            src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, x, y);
+                            src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
                     }
                 }
             } else {
                 for (jint y = yLo; y < yHi; y++) {
                     for (jint x = xLo; x < xHi; x++) {
                         convolveScalarPixelEdged<EDGE_MODE>(
-                            src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserve, x, y);
+                            src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
                     }
                 }
             }

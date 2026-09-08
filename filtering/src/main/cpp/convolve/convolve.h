@@ -32,14 +32,7 @@ namespace Convolve {
     void convolveScalarPixel(
         const jint *src, jint *dst, const jint width, const jint height,
         const jfloat *kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
-        const jfloat divisor, const jfloat bias, const bool preserve, const jint edgeMode, const jint x, const jint y);
-
-#if !defined(__aarch64__) && defined(__SSE2__)
-    void applySseInterior(
-        jint *dst, const jint *src, jint width, jint height,
-        const jfloat *kernel, jint orderX, jint orderY, jint targetX, jint targetY,
-        jfloat divisor, jfloat bias, bool preserve);
-#endif
+        const jfloat divisor, const jfloat bias255, const bool preserve, const jint edgeMode, const jint x, const jint y);
 
 #ifdef __aarch64__
     // Parameter block consumed by ksvgConvolveGenericNeonAsm in

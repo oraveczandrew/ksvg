@@ -40,7 +40,7 @@ static inline jint sampleCoordinate(const jint coordinate, const jint limit, con
 void convolveScalarPixel(
         const jint *src, jint *dst, const jint width, const jint height,
         const jfloat *kernel, const jint orderX, const jint orderY, const jint targetX, const jint targetY,
-        const jfloat divisor, const jfloat bias, const bool preserve, const jint edgeMode, const jint x, const jint y) {
+        const jfloat divisor, const jfloat bias255, const bool preserve, const jint edgeMode, const jint x, const jint y) {
     float r = 0.f, g = 0.f, b = 0.f, a = 0.f;
 
     for (jint ky = 0; ky < orderY; ky++) {
@@ -63,11 +63,11 @@ void convolveScalarPixel(
     if (preserve) {
         ia = (src[y * width + x] >> 24) & 0xFF;
     } else {
-        ia = ksvg::clamp255(std::floor(a / divisor + bias * 255.f + 0.5f));
+        ia = ksvg::clamp255(std::floor(a / divisor + bias255 + 0.5f));
     }
-    const jint ir = ksvg::clamp255(std::floor(r / divisor + bias * 255.f + 0.5f));
-    const jint ig = ksvg::clamp255(std::floor(g / divisor + bias * 255.f + 0.5f));
-    const jint ib = ksvg::clamp255(std::floor(b / divisor + bias * 255.f + 0.5f));
+    const jint ir = ksvg::clamp255(std::floor(r / divisor + bias255 + 0.5f));
+    const jint ig = ksvg::clamp255(std::floor(g / divisor + bias255 + 0.5f));
+    const jint ib = ksvg::clamp255(std::floor(b / divisor + bias255 + 0.5f));
 
     dst[y * width + x] = (ia << 24) | (ir << 16) | (ig << 8) | ib;
 }
@@ -76,10 +76,11 @@ void applyScalar(
         const jint *src, jint *dst, const jint width, const jint height,
         const jfloat *kernel,
         const jint orderX, const jint orderY, const jint targetX, const jint targetY,
-        const jfloat divisor, const jfloat bias, const jboolean preserveAlpha, const jint edgeMode) {
+    const jfloat divisor, const jfloat bias, const jboolean preserveAlpha, const jint edgeMode) {
+    const jfloat bias255 = bias * 255.f;
     for (jint y = 0; y < height; y++) {
         for (jint x = 0; x < width; x++) {
-            convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+            convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserveAlpha, edgeMode, x, y);
         }
     }
 }
@@ -91,6 +92,7 @@ void applyX86(
         const jint orderX, const jint orderY, const jint targetX, const jint targetY,
         const jfloat divisor, const jfloat bias, const jboolean preserveAlpha, const jint edgeMode,
         const jint forcedBackend) {
+    const jfloat bias255 = bias * 255.f;
     const jint yLo = targetY;
     const jint yHi = height - orderY + 1 + targetY;
     const jint xLo = targetX;
@@ -99,12 +101,12 @@ void applyX86(
     for (jint y = 0; y < height; y++) {
         if (y >= yLo && y < yHi) {
             for (jint x = 0; x < xLo; x++)
-                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserveAlpha, edgeMode, x, y);
             for (jint x = xHi; x < width; x++)
-                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserveAlpha, edgeMode, x, y);
         } else {
             for (jint x = 0; x < width; x++)
-                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserveAlpha, edgeMode, x, y);
         }
     }
 
@@ -136,7 +138,7 @@ void applyX86(
         const jint asmEnd = targetX + ((xHi - targetX) & ~(vecWidth - 1));
         for (jint y = yLo; y < yHi; y++) {
             for (jint x = asmEnd; x < xHi; x++)
-                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
+                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserveAlpha, edgeMode, x, y);
         }
     }
 }

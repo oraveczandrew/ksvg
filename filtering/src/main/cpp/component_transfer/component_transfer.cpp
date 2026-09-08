@@ -49,9 +49,7 @@ namespace {
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB) {
     const jint total = width * height;
-    for (jint i = 0; i < total; i++) {
-        dst[i] = 0;
-    }
+    memset(dst, 0, static_cast<size_t>(total) * sizeof(*dst));
     for (jint y = clipTop; y < clipBottom; y++) {
         const jint rowOffset = y * width;
         for (jint x = clipLeft; x < clipRight; x++) {
