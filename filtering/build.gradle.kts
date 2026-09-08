@@ -141,6 +141,27 @@ val buildHostNativeLib = tasks.register<Exec>("buildHostNativeLib") {
 }
 tasks.matching { it.name == "testDebugUnitTest" }.configureEach { dependsOn(buildHostNativeLib) }
 
+val uninstallBenchmarkApk = tasks.register("uninstallBenchmarkApk") {
+    group = "verification"
+    description = "Removes the previous filtering instrumentation APK before benchmarking."
+    doLast {
+        val adb = System.getenv("ANDROID_HOME")?.let { h -> File(h, "platform-tools/adb") }
+            ?.takeIf { it.exists() } ?: File("adb")
+        val proc = ProcessBuilder(adb.absolutePath, "uninstall", "hu.oandras.filtering.test")
+            .redirectErrorStream(true)
+            .start()
+        val out = proc.inputStream.readBytes().toString(Charsets.UTF_8).trim()
+        proc.waitFor()
+        if (proc.exitValue() == 0) {
+            logger.lifecycle("runDeviceBenchmark: removed hu.oandras.filtering.test")
+        } else if (out.isNotBlank()) {
+            logger.lifecycle("runDeviceBenchmark: APK was not installed (adb uninstall: $out)")
+        }
+    }
+}
+tasks.matching { it.name == "connectedDebugAndroidTest" }
+    .configureEach { mustRunAfter(uninstallBenchmarkApk) }
+
 /*
  * Device kernel benchmark wrapper.
  *
@@ -173,16 +194,13 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
     //       -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
     //       -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
 
-    // Resolve adb and the tmp dir once, at configuration time, so the doLast
-    // action only touches serializable File/String values (configuration-cache
-    // safe). Prefer ANDROID_HOME/platform-tools/adb, else fall back to PATH.
+    // Resolve the tmp dir once, at configuration time, so the doLast action
+    // only touches serializable File/String values (configuration-cache safe).
     val adb: File = System.getenv("ANDROID_HOME")?.let { h -> File(h, "platform-tools/adb") }
         ?.takeIf { it.exists() } ?: File("adb")
     val tmpDir: File = rootProject.file("tmp")
 
-    val connectedTest = tasks.named("connectedDebugAndroidTest")
-
-    dependsOn(connectedTest)
+    dependsOn(uninstallBenchmarkApk, tasks.named("connectedDebugAndroidTest"))
 
     doLast {
         // Clear previous results from the host's tmp directory so the Markdown
