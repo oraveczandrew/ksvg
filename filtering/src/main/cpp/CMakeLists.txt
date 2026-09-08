@@ -47,8 +47,8 @@ if (ANDROID_ABI STREQUAL "x86_64")
             lighting/lighting_distant_diffuse_x86_64_avx512.S
     )
     set(UNLINEARIZE_SOURCES
-            component_transfer/unlinearize_ssse3_x86_64.S
-            component_transfer/unlinearize_avx2_x86_64.S
+            component_transfer/unlinearize_x86_64_ssse3.S
+            component_transfer/unlinearize_x86_64_avx2.S
     )
     set(CONVOLVE_SOURCES
             convolve/convolve_x86_64_sse2.S
