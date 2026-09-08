@@ -5,7 +5,6 @@ set(JAVA_HOME "$ENV{JAVA_HOME}")
 
 set(AVX2_SOURCES
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/component_transfer_x86_avx2.cpp
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize_x86_avx2.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_avx2.cpp
 )
 
@@ -16,6 +15,7 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/component_transfer.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize_ssse3_x86_64.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize_avx2_x86_64.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_sse.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map.cpp
