@@ -10,7 +10,6 @@
 
 	.text
 	.file	"ksvgConvolveApplyInteriorAvx2I386.cpp"
-	.section	.rodata.cst4,"aM",@progbits,4
 	.p2align	2, 0x0                          # -- Begin function ksvgConvolveApplyInteriorAvx2I386
 .LCPI0_0:
 	.long	0x437f0000                      # float 255
@@ -21,7 +20,6 @@
 	.byte	0                               # 0x0
 .LCPI0_4:
 	.long	0x3f000000                      # float 0.5
-	.section	.rodata.cst32,"aM",@progbits,32
 	.p2align	5, 0x0
 .LCPI0_2:
 	.byte	1                               # 0x1
@@ -106,20 +104,36 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	.cfi_def_cfa_offset 16
 	pushl	%esi
 	.cfi_def_cfa_offset 20
-	subl	$124, %esp
-	.cfi_def_cfa_offset 144
+	subl	$236, %esp
+	.cfi_def_cfa_offset 256
 	.cfi_offset %esi, -20
 	.cfi_offset %edi, -16
 	.cfi_offset %ebx, -12
 	.cfi_offset %ebp, -8
-	movl	172(%esp), %ecx
-	movl	164(%esp), %esi
-	movl	152(%esp), %edx
-	movl	156(%esp), %eax
+	call	1f
+1:	popl	%eax
+	leal	.LCPI0_0-1b(%eax), %eax
+	movd	(%eax), %xmm0
+	vmovd	%xmm0, 104(%esp)
+	movd	4(%eax), %xmm0
+	vmovd	%xmm0, 96(%esp)
+	movd	8(%eax), %xmm0
+	vmovd	%xmm0, 100(%esp)
+	leal	.LCPI0_2-.LCPI0_0(%eax), %eax
+	vmovdqu	(%eax), %ymm0
+	vmovdqu	%ymm0, (%esp)
+	vmovdqu	32(%eax), %ymm0
+	vmovdqu	%ymm0, 32(%esp)
+	vmovdqu	64(%eax), %ymm0
+	vmovdqu	%ymm0, 64(%esp)
+	movl	284(%esp), %ecx
+	movl	276(%esp), %esi
+	movl	264(%esp), %edx
+	movl	268(%esp), %eax
 	subl	%esi, %edx
 	leal	(%edx,%ecx), %ebp
 	incl	%ebp
-	subl	168(%esp), %eax
+	subl	280(%esp), %eax
 	leal	1(%eax), %edi
 	testl	%edi, %edi
 	jle	.LBB0_23
@@ -130,7 +144,7 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 .LBB0_23:
 	andl	$-8, %ebp
 	movl	%ebp, %eax
-	addl	$124, %esp
+	addl	$236, %esp
 	.cfi_def_cfa_offset 20
 	popl	%esi
 	.cfi_def_cfa_offset 16
@@ -143,35 +157,35 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	vzeroupper
 	retl
 .LBB0_2:
-	.cfi_def_cfa_offset 144
-	movl	188(%esp), %edx
-	movl	176(%esp), %edi
-	vmovss	184(%esp), %xmm0                # xmm0 = mem[0],zero,zero,zero
+	.cfi_def_cfa_offset 256
+	movl	300(%esp), %edx
+	movl	288(%esp), %edi
+	vmovss	296(%esp), %xmm0                # xmm0 = mem[0],zero,zero,zero
 	addl	%edi, %eax
 	incl	%eax
-	movl	%eax, 32(%esp)                  # 4-byte Spill
-	vmulss	.LCPI0_0, %xmm0, %xmm0
+	movl	%eax, 144(%esp)                 # 4-byte Spill
+	vmulss	104(%esp), %xmm0, %xmm0
 	vbroadcastss	%xmm0, %ymm0
-	vmovups	%ymm0, 80(%esp)                 # 32-byte Spill
+	vmovups	%ymm0, 192(%esp)                # 32-byte Spill
 	leal	8(%ecx), %eax
-	movl	%eax, 28(%esp)                  # 4-byte Spill
-	vbroadcastss	.LCPI0_1, %ymm2         # ymm2 = [255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0]
+	movl	%eax, 140(%esp)                 # 4-byte Spill
+	vbroadcastss	96(%esp), %ymm2         # ymm2 = [255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0,255,0,0,0]
 	leal	(,%esi,4), %eax
-	movl	%eax, 24(%esp)                  # 4-byte Spill
-	movl	152(%esp), %eax
+	movl	%eax, 136(%esp)                 # 4-byte Spill
+	movl	264(%esp), %eax
 	leal	(,%eax,4), %ebx
 	movl	%edi, %eax
-	movl	144(%esp), %edi
-	movl	%ebp, 16(%esp)                  # 4-byte Spill
-	vmovups	%ymm2, 48(%esp)                 # 32-byte Spill
+	movl	256(%esp), %edi
+	movl	%ebp, 128(%esp)                 # 4-byte Spill
+	vmovups	%ymm2, 160(%esp)                # 32-byte Spill
 	jmp	.LBB0_3
 	.p2align	4, 0x90
 .LBB0_22:                               #   in Loop: Header=BB0_3 Depth=1
-	movl	36(%esp), %eax                  # 4-byte Reload
+	movl	148(%esp), %eax                 # 4-byte Reload
 	incl	%eax
-	movl	12(%esp), %edi                  # 4-byte Reload
+	movl	124(%esp), %edi                 # 4-byte Reload
 	addl	%ebx, %edi
-	cmpl	32(%esp), %eax                  # 4-byte Folded Reload
+	cmpl	144(%esp), %eax                 # 4-byte Folded Reload
 	jge	.LBB0_23
 .LBB0_3:                                # =>This Loop Header: Depth=1
                                         #     Child Loop BB0_4 Depth 2
@@ -180,24 +194,24 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
                                         #         Child Loop BB0_14 Depth 4
                                         #       Child Loop BB0_25 Depth 3
                                         #         Child Loop BB0_26 Depth 4
-	movl	%edi, 12(%esp)                  # 4-byte Spill
-	movl	%eax, 36(%esp)                  # 4-byte Spill
-	imull	152(%esp), %eax
-	movl	148(%esp), %edi
+	movl	%edi, 124(%esp)                 # 4-byte Spill
+	movl	%eax, 148(%esp)                 # 4-byte Spill
+	imull	264(%esp), %eax
+	movl	260(%esp), %edi
 	leal	(%edi,%eax,4), %eax
-	movl	%eax, 40(%esp)                  # 4-byte Spill
-	movl	12(%esp), %eax                  # 4-byte Reload
-	movl	%eax, 8(%esp)                   # 4-byte Spill
-	movl	28(%esp), %eax                  # 4-byte Reload
-	movl	%ecx, 20(%esp)                  # 4-byte Spill
+	movl	%eax, 152(%esp)                 # 4-byte Spill
+	movl	124(%esp), %eax                 # 4-byte Reload
+	movl	%eax, 120(%esp)                 # 4-byte Spill
+	movl	140(%esp), %eax                 # 4-byte Reload
+	movl	%ecx, 132(%esp)                 # 4-byte Spill
 	jmp	.LBB0_4
 	.p2align	4, 0x90
 .LBB0_21:                               #   in Loop: Header=BB0_4 Depth=2
-	vbroadcastss	180(%esp), %ymm4
+	vbroadcastss	292(%esp), %ymm4
 	vdivps	%ymm4, %ymm5, %ymm3
-	vmovups	80(%esp), %ymm5                 # 32-byte Reload
+	vmovups	192(%esp), %ymm5                # 32-byte Reload
 	vaddps	%ymm3, %ymm5, %ymm3
-	vbroadcastss	.LCPI0_4, %ymm6         # ymm6 = [5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1]
+	vbroadcastss	100(%esp), %ymm6        # ymm6 = [5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1]
 	vaddps	%ymm6, %ymm3, %ymm3
 	vroundps	$1, %ymm3, %ymm3
 	vcvttps2dq	%ymm3, %ymm3
@@ -212,7 +226,7 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	vaddps	%ymm6, %ymm0, %ymm0
 	vroundps	$1, %ymm0, %ymm0
 	vcvttps2dq	%ymm0, %ymm0
-	vbroadcastss	180(%esp), %ymm3
+	vbroadcastss	292(%esp), %ymm3
 	vdivps	%ymm3, %ymm7, %ymm3
 	vpmaxsd	%ymm4, %ymm0, %ymm0
 	vpminsd	%ymm2, %ymm0, %ymm0
@@ -225,13 +239,13 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	vpslld	$8, %ymm0, %ymm0
 	vpor	%ymm0, %ymm3, %ymm0
 	vpor	%ymm0, %ymm1, %ymm0
-	movl	40(%esp), %eax                  # 4-byte Reload
-	movl	20(%esp), %edi                  # 4-byte Reload
+	movl	152(%esp), %eax                 # 4-byte Reload
+	movl	132(%esp), %edi                 # 4-byte Reload
 	vmovdqu	%ymm0, (%eax,%edi,4)
-	movl	44(%esp), %edi                  # 4-byte Reload
+	movl	156(%esp), %edi                 # 4-byte Reload
 	leal	8(%edi), %eax
-	addl	$32, 8(%esp)                    # 4-byte Folded Spill
-	movl	%edi, 20(%esp)                  # 4-byte Spill
+	addl	$32, 120(%esp)                  # 4-byte Folded Spill
+	movl	%edi, 132(%esp)                 # 4-byte Spill
 	cmpl	%ebp, %eax
 	jg	.LBB0_22
 .LBB0_4:                                #   Parent Loop BB0_3 Depth=1
@@ -241,8 +255,8 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
                                         #         Child Loop BB0_14 Depth 4
                                         #       Child Loop BB0_25 Depth 3
                                         #         Child Loop BB0_26 Depth 4
-	movl	%eax, 44(%esp)                  # 4-byte Spill
-	cmpl	$0, 168(%esp)
+	movl	%eax, 156(%esp)                 # 4-byte Spill
+	cmpl	$0, 280(%esp)
 	jle	.LBB0_5
 # %bb.6:                                #   in Loop: Header=BB0_4 Depth=2
 	testl	%esi, %esi
@@ -254,17 +268,17 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	xorl	%ebp, %ebp
 	vxorps	%xmm3, %xmm3, %xmm3
 	vxorps	%xmm5, %xmm5, %xmm5
-	movl	8(%esp), %eax                   # 4-byte Reload
-	movl	160(%esp), %edx
+	movl	120(%esp), %eax                 # 4-byte Reload
+	movl	272(%esp), %edx
 	vxorps	%xmm0, %xmm0, %xmm0
 	vxorps	%xmm7, %xmm7, %xmm7
 	jmp	.LBB0_9
 	.p2align	4, 0x90
 .LBB0_17:                               #   in Loop: Header=BB0_9 Depth=3
 	incl	%ebp
-	addl	24(%esp), %edx                  # 4-byte Folded Reload
+	addl	136(%esp), %edx                 # 4-byte Folded Reload
 	addl	%ebx, %eax
-	cmpl	168(%esp), %ebp
+	cmpl	280(%esp), %ebp
 	je	.LBB0_18
 .LBB0_9:                                #   Parent Loop BB0_3 Depth=1
                                         #     Parent Loop BB0_4 Depth=2
@@ -272,7 +286,7 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
                                         #         Child Loop BB0_11 Depth 4
                                         #         Child Loop BB0_14 Depth 4
 	xorl	%edi, %edi
-	cmpl	176(%esp), %ebp
+	cmpl	288(%esp), %ebp
 	jne	.LBB0_10
 # %bb.13:                               #   in Loop: Header=BB0_9 Depth=3
 	vmovaps	%ymm3, %ymm1
@@ -284,11 +298,11 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	vcvtdq2ps	%ymm4, %ymm4
 	vmulps	%ymm4, %ymm1, %ymm4
 	vaddps	%ymm4, %ymm7, %ymm7
-	vpshufb	.LCPI0_2, %ymm6, %ymm4          # ymm4 = ymm6[1],zero,zero,zero,ymm6[5],zero,zero,zero,ymm6[9],zero,zero,zero,ymm6[13],zero,zero,zero,ymm6[17],zero,zero,zero,ymm6[21],zero,zero,zero,ymm6[25],zero,zero,zero,ymm6[29],zero,zero,zero
+	vpshufb	(%esp), %ymm6, %ymm4            # ymm4 = ymm6[1],zero,zero,zero,ymm6[5],zero,zero,zero,ymm6[9],zero,zero,zero,ymm6[13],zero,zero,zero,ymm6[17],zero,zero,zero,ymm6[21],zero,zero,zero,ymm6[25],zero,zero,zero,ymm6[29],zero,zero,zero
 	vcvtdq2ps	%ymm4, %ymm4
 	vmulps	%ymm4, %ymm1, %ymm4
 	vaddps	%ymm4, %ymm0, %ymm0
-	vpshufb	.LCPI0_3, %ymm6, %ymm4          # ymm4 = ymm6[2],zero,zero,zero,ymm6[6],zero,zero,zero,ymm6[10],zero,zero,zero,ymm6[14],zero,zero,zero,ymm6[18],zero,zero,zero,ymm6[22],zero,zero,zero,ymm6[26],zero,zero,zero,ymm6[30],zero,zero,zero
+	vpshufb	32(%esp), %ymm6, %ymm4          # ymm4 = ymm6[2],zero,zero,zero,ymm6[6],zero,zero,zero,ymm6[10],zero,zero,zero,ymm6[14],zero,zero,zero,ymm6[18],zero,zero,zero,ymm6[22],zero,zero,zero,ymm6[26],zero,zero,zero,ymm6[30],zero,zero,zero
 	vcvtdq2ps	%ymm4, %ymm4
 	vmulps	%ymm4, %ymm1, %ymm1
 	vaddps	%ymm1, %ymm5, %ymm5
@@ -309,7 +323,7 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	jmp	.LBB0_16
 	.p2align	4, 0x90
 .LBB0_10:                               #   in Loop: Header=BB0_9 Depth=3
-	vmovdqa	.LCPI0_3, %ymm2                 # ymm2 = [2,128,128,128,6,128,128,128,10,128,128,128,14,128,128,128,18,128,128,128,22,128,128,128,26,128,128,128,30,128,128,128]
+	vmovdqa	32(%esp), %ymm2                 # ymm2 = [2,128,128,128,6,128,128,128,10,128,128,128,14,128,128,128,18,128,128,128,22,128,128,128,26,128,128,128,30,128,128,128]
 	.p2align	4, 0x90
 .LBB0_11:                               #   Parent Loop BB0_3 Depth=1
                                         #     Parent Loop BB0_4 Depth=2
@@ -317,11 +331,11 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
                                         # =>      This Inner Loop Header: Depth=4
 	vmovups	(%eax,%edi,4), %ymm1
 	vbroadcastss	(%edx,%edi,4), %ymm6
-	vandps	48(%esp), %ymm1, %ymm4          # 32-byte Folded Reload
+	vandps	160(%esp), %ymm1, %ymm4         # 32-byte Folded Reload
 	vcvtdq2ps	%ymm4, %ymm4
 	vmulps	%ymm4, %ymm6, %ymm4
 	vaddps	%ymm4, %ymm7, %ymm7
-	vpshufb	.LCPI0_2, %ymm1, %ymm4          # ymm4 = ymm1[1],zero,zero,zero,ymm1[5],zero,zero,zero,ymm1[9],zero,zero,zero,ymm1[13],zero,zero,zero,ymm1[17],zero,zero,zero,ymm1[21],zero,zero,zero,ymm1[25],zero,zero,zero,ymm1[29],zero,zero,zero
+	vpshufb	(%esp), %ymm1, %ymm4            # ymm4 = ymm1[1],zero,zero,zero,ymm1[5],zero,zero,zero,ymm1[9],zero,zero,zero,ymm1[13],zero,zero,zero,ymm1[17],zero,zero,zero,ymm1[21],zero,zero,zero,ymm1[25],zero,zero,zero,ymm1[29],zero,zero,zero
 	vcvtdq2ps	%ymm4, %ymm4
 	vmulps	%ymm4, %ymm6, %ymm4
 	vaddps	%ymm4, %ymm0, %ymm0
@@ -333,7 +347,7 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	cmpl	%edi, %esi
 	jne	.LBB0_11
 # %bb.12:                               #   in Loop: Header=BB0_9 Depth=3
-	vmovups	48(%esp), %ymm2                 # 32-byte Reload
+	vmovups	160(%esp), %ymm2                # 32-byte Reload
 	jmp	.LBB0_17
 	.p2align	4, 0x90
 .LBB0_5:                                #   in Loop: Header=BB0_4 Depth=2
@@ -349,16 +363,16 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 .LBB0_18:                               #   in Loop: Header=BB0_4 Depth=2
 	vpsrld	$24, %ymm3, %ymm1
 	vxorps	%xmm6, %xmm6, %xmm6
-	movl	16(%esp), %ebp                  # 4-byte Reload
-	movl	188(%esp), %edx
+	movl	128(%esp), %ebp                 # 4-byte Reload
+	movl	300(%esp), %edx
 	testl	%edx, %edx
 	jne	.LBB0_21
 	jmp	.LBB0_20
 .LBB0_24:                               #   in Loop: Header=BB0_4 Depth=2
 	xorl	%eax, %eax
 	vxorps	%xmm6, %xmm6, %xmm6
-	movl	8(%esp), %edx                   # 4-byte Reload
-	movl	160(%esp), %ebp
+	movl	120(%esp), %edx                 # 4-byte Reload
+	movl	272(%esp), %ebp
 	vxorps	%xmm5, %xmm5, %xmm5
 	vxorps	%xmm0, %xmm0, %xmm0
 	vxorps	%xmm7, %xmm7, %xmm7
@@ -368,7 +382,7 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
                                         # =>    This Loop Header: Depth=3
                                         #         Child Loop BB0_26 Depth 4
 	xorl	%edi, %edi
-	vmovups	48(%esp), %ymm2                 # 32-byte Reload
+	vmovups	160(%esp), %ymm2                # 32-byte Reload
 	.p2align	4, 0x90
 .LBB0_26:                               #   Parent Loop BB0_3 Depth=1
                                         #     Parent Loop BB0_4 Depth=2
@@ -380,11 +394,11 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	vcvtdq2ps	%ymm4, %ymm4
 	vmulps	%ymm4, %ymm3, %ymm4
 	vaddps	%ymm4, %ymm7, %ymm7
-	vpshufb	.LCPI0_2, %ymm1, %ymm4          # ymm4 = ymm1[1],zero,zero,zero,ymm1[5],zero,zero,zero,ymm1[9],zero,zero,zero,ymm1[13],zero,zero,zero,ymm1[17],zero,zero,zero,ymm1[21],zero,zero,zero,ymm1[25],zero,zero,zero,ymm1[29],zero,zero,zero
+	vpshufb	(%esp), %ymm1, %ymm4            # ymm4 = ymm1[1],zero,zero,zero,ymm1[5],zero,zero,zero,ymm1[9],zero,zero,zero,ymm1[13],zero,zero,zero,ymm1[17],zero,zero,zero,ymm1[21],zero,zero,zero,ymm1[25],zero,zero,zero,ymm1[29],zero,zero,zero
 	vcvtdq2ps	%ymm4, %ymm4
 	vmulps	%ymm4, %ymm3, %ymm4
 	vaddps	%ymm4, %ymm0, %ymm0
-	vpshufb	.LCPI0_3, %ymm1, %ymm4          # ymm4 = ymm1[2],zero,zero,zero,ymm1[6],zero,zero,zero,ymm1[10],zero,zero,zero,ymm1[14],zero,zero,zero,ymm1[18],zero,zero,zero,ymm1[22],zero,zero,zero,ymm1[26],zero,zero,zero,ymm1[30],zero,zero,zero
+	vpshufb	32(%esp), %ymm1, %ymm4          # ymm4 = ymm1[2],zero,zero,zero,ymm1[6],zero,zero,zero,ymm1[10],zero,zero,zero,ymm1[14],zero,zero,zero,ymm1[18],zero,zero,zero,ymm1[22],zero,zero,zero,ymm1[26],zero,zero,zero,ymm1[30],zero,zero,zero
 	vcvtdq2ps	%ymm4, %ymm4
 	vmulps	%ymm4, %ymm3, %ymm4
 	vaddps	%ymm4, %ymm5, %ymm5
@@ -397,27 +411,27 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 	jne	.LBB0_26
 # %bb.27:                               #   in Loop: Header=BB0_25 Depth=3
 	incl	%eax
-	addl	24(%esp), %ebp                  # 4-byte Folded Reload
+	addl	136(%esp), %ebp                 # 4-byte Folded Reload
 	addl	%ebx, %edx
-	cmpl	168(%esp), %eax
+	cmpl	280(%esp), %eax
 	jne	.LBB0_25
 # %bb.28:                               #   in Loop: Header=BB0_4 Depth=2
 	vxorps	%xmm1, %xmm1, %xmm1
-	movl	16(%esp), %ebp                  # 4-byte Reload
-	movl	188(%esp), %edx
-	vmovups	48(%esp), %ymm2                 # 32-byte Reload
+	movl	128(%esp), %ebp                 # 4-byte Reload
+	movl	300(%esp), %edx
+	vmovups	160(%esp), %ymm2                # 32-byte Reload
 	testl	%edx, %edx
 	jne	.LBB0_21
 	.p2align	4, 0x90
 .LBB0_20:                               #   in Loop: Header=BB0_4 Depth=2
-	vbroadcastss	180(%esp), %ymm1
+	vbroadcastss	292(%esp), %ymm1
 	vdivps	%ymm1, %ymm6, %ymm1
-	vaddps	80(%esp), %ymm1, %ymm1          # 32-byte Folded Reload
-	vbroadcastss	.LCPI0_4, %ymm3         # ymm3 = [5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1]
+	vaddps	192(%esp), %ymm1, %ymm1         # 32-byte Folded Reload
+	vbroadcastss	100(%esp), %ymm3        # ymm3 = [5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1,5.0E-1]
 	vaddps	%ymm3, %ymm1, %ymm1
 	vroundps	$1, %ymm1, %ymm1
 	vcvttps2dq	%ymm1, %ymm1
-	vpmaxsd	.LCPI0_5, %ymm1, %ymm1
+	vpmaxsd	64(%esp), %ymm1, %ymm1
 	vpminsd	%ymm2, %ymm1, %ymm1
 	jmp	.LBB0_21
 .Lfunc_end0:

@@ -3,21 +3,31 @@
 #define TYPE(x,y)
 #define SIZE(x)
 #define TEXT_SECTION .section __TEXT,__text,regular,pure_instructions
-#define CONST4_SECTION .section __TEXT,__literal4,4byte_literals
-#define CONST8_SECTION .section __TEXT,__literal8,8byte_literals
-#define CONST16_SECTION .section __TEXT,__literal16,16byte_literals
-#define CONST32_SECTION .section __TEXT,__literal32,32byte_literals
-#define CONST_SECTION .section __TEXT,__const
+#define CONST4_SECTION TEXT_SECTION
+#define CONST8_SECTION TEXT_SECTION
+#define CONST16_SECTION TEXT_SECTION
+#define CONST32_SECTION TEXT_SECTION
+#define CONST_SECTION TEXT_SECTION
+#ifdef __APPLE__
+#define CALL_SYM(x) calll SYM(x)
+#else
+#define CALL_SYM(x) calll SYM(x)@PLT
+#endif
 #else
 #define SYM(x) x
 #define TYPE(x,y) .type x,y
 #define SIZE(x) .size x,.-x
 #define TEXT_SECTION .text
-#define CONST4_SECTION .section .rodata
-#define CONST8_SECTION .section .rodata
-#define CONST16_SECTION .section .rodata
-#define CONST32_SECTION .section .rodata
-#define CONST_SECTION .section .rodata
+#define CONST4_SECTION TEXT_SECTION
+#define CONST8_SECTION TEXT_SECTION
+#define CONST16_SECTION TEXT_SECTION
+#define CONST32_SECTION TEXT_SECTION
+#define CONST_SECTION TEXT_SECTION
+#ifdef __APPLE__
+#define CALL_SYM(x) calll SYM(x)
+#else
+#define CALL_SYM(x) calll SYM(x)@PLT
+#endif
 #endif
 
 .text
@@ -365,6 +375,10 @@ LCPI0_27:
 	.long	1064304640
 TEXT_SECTION
 	.globl SYM(ksvgTurbulenceApplyAvx2_i386)
+.Lksvg_pcrel_get_pc_edx:
+	movl	(%esp), %edx
+	retl
+
 TYPE(ksvgTurbulenceApplyAvx2_i386,@function)
 	.p2align	4, 0x90
 SYM(ksvgTurbulenceApplyAvx2_i386):                             ## @applyAvx2
@@ -379,10 +393,40 @@ SYM(ksvgTurbulenceApplyAvx2_i386):                             ## @applyAvx2
 	pushl	%edi
 	pushl	%esi
 	andl	$-32, %esp
-	subl	$69600, %esp                    ## imm = 0x10FE0
+	subl	$69664, %esp                    ## imm = 0x10FE0
 	.cfi_offset %esi, -20
 	.cfi_offset %edi, -16
 	.cfi_offset %ebx, -12
+	# Hot constants cached in the local frame.
+	movl	$0, -69376(%ebp)
+	movl	$1085276160, -69372(%ebp)
+	movl	$0, -69384(%ebp)
+	movl	$3220176896, -69380(%ebp)
+	movl	$0, -69392(%ebp)
+	movl	$1074266112, -69388(%ebp)
+	movl	$0, -69400(%ebp)
+	movl	$1081073664, -69396(%ebp)
+	movl	$0, -69408(%ebp)
+	movl	$1071644672, -69404(%ebp)
+	movl	$0, -69416(%ebp)
+	movl	$1072693248, -69412(%ebp)
+	movl	$0, -69424(%ebp)
+	movl	$1080025088, -69420(%ebp)
+	movl	$0, -69432(%ebp)
+	movl	$1064304640, -69428(%ebp)
+	movl	$0, -69440(%ebp)
+	movl	$1072693248, -69436(%ebp)
+	movl	$0, -69448(%ebp)
+	movl	$1072693248, -69444(%ebp)
+	movl	$0, -69456(%ebp)
+	movl	$1071644672, -69452(%ebp)
+	movl	$0, -69472(%ebp)
+	movl	$1080025088, -69468(%ebp)
+	movl	$0, -69488(%ebp)
+	movl	$0, -69484(%ebp)
+	movl	$0, -69480(%ebp)
+	movl	$1072693248, -69476(%ebp)	## [0.0, 1.0]
+	movl	$524304, -69504(%ebp)	## [16, 8, 0, 0] as dwords
 	movl	132(%ebp), %eax
 	testl	%eax, %eax
 	jg	LBB0_2
@@ -397,11 +441,21 @@ LBB0_2:
 	cmpl	$2147483646, %eax               ## imm = 0x7FFFFFFE
 	movl	$2147483646, %ecx               ## imm = 0x7FFFFFFE
 	cmovbl	%eax, %ecx
-	vpbroadcastd	LCPI0_0, %xmm0          ## xmm0 = [4294966784,4294966784,4294966784,4294966784]
+	pushl	%edx
+	calll	.Lksvg_pcrel_get_pc_edx
+1:
+	leal	(LCPI0_0-1b)(%edx), %edx
+	vpbroadcastd	(%edx), %xmm0          ## xmm0 = [4294966784,4294966784,4294966784,4294966784]
+	popl	%edx
 	xorl	%edi, %edi
 	movl	$-2092037281, %ebx              ## imm = 0x834E0B5F
-	vpbroadcastd	LCPI0_1, %xmm1          ## xmm1 = [4294967040,4294967040,4294967040,4294967040]
-	vmovddup	LCPI0_27, %xmm2                 ## xmm2 = [3.90625E-3,3.90625E-3]
+	pushl	%edx
+	calll	.Lksvg_pcrel_get_pc_edx
+1:
+	leal	(LCPI0_1-1b)(%edx), %edx
+	vpbroadcastd	(%edx), %xmm1          ## xmm1 = [4294967040,4294967040,4294967040,4294967040]
+	popl	%edx
+	vmovddup	-69432(%ebp), %xmm2                 ## xmm2 = [3.90625E-3,3.90625E-3]
                                         ## xmm2 = mem[0,0]
 	vxorpd	%xmm3, %xmm3, %xmm3
 	vpcmpeqd	%xmm4, %xmm4, %xmm4
@@ -661,22 +715,27 @@ LBB0_12:                                ## =>This Inner Loop Header: Depth=1
 	cmpl	$256, %edi                      ## imm = 0x100
 	jne	LBB0_12
 ## %bb.14:
-	vmovaps	LCPI0_3, %ymm0                  ## ymm0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
+	pushl	%edx
+	calll	.Lksvg_pcrel_get_pc_edx
+1:
+	leal	(LCPI0_3-1b)(%edx), %edx
+	vmovaps	(%edx), %ymm0                  ## ymm0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
 	vmovups	%ymm0, 1216(%esp)
-	vmovaps	LCPI0_4, %ymm0                  ## ymm0 = [32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63]
+	vmovaps	(LCPI0_4-1b)(%edx), %ymm0                  ## ymm0 = [32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63]
 	vmovups	%ymm0, 1248(%esp)
-	vmovaps	LCPI0_5, %ymm0                  ## ymm0 = [64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95]
+	vmovaps	(LCPI0_5-1b)(%edx), %ymm0                  ## ymm0 = [64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95]
 	vmovups	%ymm0, 1280(%esp)
-	vmovaps	LCPI0_6, %ymm0                  ## ymm0 = [96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127]
+	vmovaps	(LCPI0_6-1b)(%edx), %ymm0                  ## ymm0 = [96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127]
 	vmovups	%ymm0, 1312(%esp)
-	vmovaps	LCPI0_7, %ymm0                  ## ymm0 = [128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159]
+	vmovaps	(LCPI0_7-1b)(%edx), %ymm0                  ## ymm0 = [128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159]
 	vmovups	%ymm0, 1344(%esp)
-	vmovaps	LCPI0_8, %ymm0                  ## ymm0 = [160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191]
+	vmovaps	(LCPI0_8-1b)(%edx), %ymm0                  ## ymm0 = [160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191]
 	vmovups	%ymm0, 1376(%esp)
-	vmovaps	LCPI0_9, %ymm0                  ## ymm0 = [192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223]
+	vmovaps	(LCPI0_9-1b)(%edx), %ymm0                  ## ymm0 = [192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223]
 	vmovups	%ymm0, 1408(%esp)
-	vmovapd	LCPI0_10, %ymm0                 ## ymm0 = [224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255]
+	vmovapd	(LCPI0_10-1b)(%edx), %ymm0                 ## ymm0 = [224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255]
 	vmovupd	%ymm0, 1440(%esp)
+	popl	%edx
 	movl	$256, %esi                      ## imm = 0x100
 	movl	$-2092037281, %ebx              ## imm = 0x834E0B5F
 	.p2align	4, 0x90
@@ -763,7 +822,7 @@ LBB0_17:                                ## =>This Inner Loop Header: Depth=1
 	pushl	$0
 	pushl	8(%ebp)
 	vzeroupper
-	calll	SYM(memset)
+	CALL_SYM(memset)
 	addl	$16, %esp
 	movl	52(%ebp), %edx
 	testl	%edx, %edx
@@ -829,11 +888,11 @@ LBB0_24:                                ##   in Loop: Header=BB0_22 Depth=2
 	movl	%ecx, 4(%eax)
 	vsubsd	%xmm7, %xmm6, %xmm0
 	vmovsd	%xmm0, 8(%eax)
-	vaddsd	LCPI0_12, %xmm0, %xmm3
+	vaddsd	-69384(%ebp), %xmm0, %xmm3
 	vmovsd	%xmm3, 16(%eax)
 	vmulsd	%xmm0, %xmm0, %xmm3
 	vaddsd	%xmm0, %xmm0, %xmm0
-	vmovsd	LCPI0_13, %xmm1                 ## xmm1 = [3.0E+0,0.0E+0]
+	vmovsd	-69392(%ebp), %xmm1                 ## xmm1 = [3.0E+0,0.0E+0]
 	vsubsd	%xmm0, %xmm1, %xmm0
 	vmulsd	%xmm0, %xmm3, %xmm0
 	vmovsd	%xmm0, 24(%eax)
@@ -848,7 +907,7 @@ LBB0_24:                                ##   in Loop: Header=BB0_22 Depth=2
 LBB0_22:                                ##   Parent Loop BB0_20 Depth=1
                                         ## =>  This Inner Loop Header: Depth=2
 	movl	%ebx, 64(%esp)                  ## 4-byte Spill
-	vaddsd	LCPI0_11, %xmm5, %xmm6
+	vaddsd	-69376(%ebp), %xmm5, %xmm6
 	vroundsd	$9, %xmm6, %xmm6, %xmm7
 	vcvttsd2si	%xmm7, %edx
 	leal	1(%edx), %ecx
@@ -890,35 +949,38 @@ LBB0_25:                                ##   in Loop: Header=BB0_20 Depth=1
 	jmp	LBB0_27
 	.p2align	4, 0x90
 LBB0_39:                                ##   in Loop: Header=BB0_27 Depth=2
-	vaddpd	LCPI0_21, %xmm2, %xmm0
-	vmulpd	LCPI0_22, %xmm0, %xmm0
-	vaddpd	LCPI0_17, %xmm0, %xmm0
+	vaddpd	-69440(%ebp), %xmm2, %xmm0
+	vmulpd	-69472(%ebp), %xmm0, %xmm0
+	vaddpd	-69456(%ebp), %xmm0, %xmm0
 	vroundpd	$9, %xmm0, %xmm0
 	vcvttpd2dq	%xmm0, %xmm0
 	vextractf128	$1, %ymm2, %xmm1
-	vmovsd	LCPI0_23, %xmm3                 ## xmm3 = [1.0E+0,0.0E+0]
+	vmovsd	-69416(%ebp), %xmm3                 ## xmm3 = [1.0E+0,0.0E+0]
 	vaddsd	%xmm3, %xmm1, %xmm2
-	vmovsd	LCPI0_24, %xmm4                 ## xmm4 = [1.275E+2,0.0E+0]
+	vmovsd	-69424(%ebp), %xmm4                 ## xmm4 = [1.275E+2,0.0E+0]
 	vmulsd	%xmm4, %xmm2, %xmm2
-	vmovsd	LCPI0_20, %xmm6                 ## xmm6 = [5.0E-1,0.0E+0]
+	vmovsd	-69408(%ebp), %xmm6                 ## xmm6 = [5.0E-1,0.0E+0]
 	vaddsd	%xmm6, %xmm2, %xmm2
 	vroundsd	$9, %xmm2, %xmm2, %xmm2
 	vcvttsd2si	%xmm2, %ecx
-	vpbroadcastd	LCPI0_18, %xmm2         ## xmm2 = [255,255,255,255]
+	vpcmpeqd	%xmm7, %xmm7, %xmm7
+	vpsrld	$24, %xmm7, %xmm7         ## xmm7 = [255,255,255,255]
 	cmpl	$255, %ecx
 	movl	$255, %edx
 	cmovgel	%edx, %ecx
-	vpminsd	%xmm2, %xmm0, %xmm0
+	vpminsd	%xmm7, %xmm0, %xmm0
 	testl	%ecx, %ecx
 	cmovlel	%esi, %ecx
-	vpmaxsd	LCPI0_26, %xmm0, %xmm5
+	vpxor	%xmm5, %xmm5, %xmm5
+	vpmaxsd	%xmm5, %xmm0, %xmm5
 	vshufpd	$1, %xmm1, %xmm1, %xmm0         ## xmm0 = xmm1[1,0]
 	vaddsd	%xmm3, %xmm0, %xmm0
 	vmovapd	%xmm6, %xmm2
 	vmulsd	%xmm4, %xmm0, %xmm0
 LBB0_40:                                ##   in Loop: Header=BB0_27 Depth=2
 	movl	32(%esp), %edi                  ## 4-byte Reload
-	vpsllvd	LCPI0_25, %xmm5, %xmm1
+	vmovd	-69504(%ebp), %xmm1
+	vpsllvd	%xmm1, %xmm5, %xmm1
 	vaddsd	%xmm2, %xmm0, %xmm0
 	vroundsd	$9, %xmm0, %xmm0, %xmm0
 	vcvttsd2si	%xmm0, %eax
@@ -956,7 +1018,7 @@ LBB0_27:                                ##   Parent Loop BB0_20 Depth=1
 	vmovsd	36(%ebp), %xmm1                 ## xmm1 = mem[0],zero
 	vmulsd	%xmm1, %xmm3, %xmm3
 	vmulsd	%xmm1, %xmm0, %xmm0
-	vblendpd	$2, LCPI0_14, %xmm0, %xmm4      ## xmm4 = xmm0[0],mem[1]
+	vblendpd	$2, -69488(%ebp), %xmm0, %xmm4      ## xmm4 = xmm0[0],mem[1]
 	vxorpd	%xmm2, %xmm2, %xmm2
 	leal	192(%esp), %ecx
 	movl	28(%esp), %eax                  ## 4-byte Reload
@@ -983,13 +1045,13 @@ LBB0_32:                                ##   Parent Loop BB0_20 Depth=1
                                         ## =>    This Inner Loop Header: Depth=3
 	movl	%eax, 36(%esp)                  ## 4-byte Spill
 	vmovsd	%xmm3, 40(%esp)                 ## 8-byte Spill
-	vaddsd	LCPI0_11, %xmm3, %xmm0
+	vaddsd	-69376(%ebp), %xmm3, %xmm0
 	vroundsd	$9, %xmm0, %xmm0, %xmm3
 	vcvttsd2si	%xmm3, %edx
 	leal	1(%edx), %eax
 	vsubsd	%xmm3, %xmm0, %xmm7
 	vmovsd	%xmm7, 112(%esp)
-	vaddsd	LCPI0_12, %xmm7, %xmm0
+	vaddsd	-69384(%ebp), %xmm7, %xmm0
 	vmovsd	%xmm0, 120(%esp)
 	testl	%ebx, %ebx
 	vmovapd	%ymm2, 64(%esp)                 ## 32-byte Spill
@@ -1026,7 +1088,7 @@ LBB0_34:                                ##   in Loop: Header=BB0_32 Depth=3
 	vmovups	%xmm0, 128(%esp)
 	vmulsd	%xmm7, %xmm7, %xmm0
 	vaddsd	%xmm7, %xmm7, %xmm3
-	vmovsd	LCPI0_13, %xmm1                 ## xmm1 = [3.0E+0,0.0E+0]
+	vmovsd	-69392(%ebp), %xmm1                 ## xmm1 = [3.0E+0,0.0E+0]
 	vsubsd	%xmm3, %xmm1, %xmm3
 	vmulsd	%xmm3, %xmm0, %xmm0
 	vmovsd	%xmm0, 144(%esp)
@@ -1070,8 +1132,9 @@ LBB0_34:                                ##   in Loop: Header=BB0_32 Depth=3
 	cmpl	$1, 64(%ebp)
 	je	LBB0_36
 ## %bb.35:                              ##   in Loop: Header=BB0_32 Depth=3
-	vbroadcastsd	LCPI0_15, %ymm1         ## ymm1 = [NaN,NaN,NaN,NaN]
-	vandpd	%ymm1, %ymm0, %ymm0
+	vpcmpeqd	%ymm7, %ymm7, %ymm7
+	vpsrlq	$1, %ymm7, %ymm7
+	vandpd	%ymm7, %ymm0, %ymm0
 	jmp	LBB0_36
 	.p2align	4, 0x90
 LBB0_28:                                ##   in Loop: Header=BB0_27 Depth=2
@@ -1080,17 +1143,20 @@ LBB0_37:                                ##   in Loop: Header=BB0_27 Depth=2
 	cmpl	$1, 64(%ebp)
 	je	LBB0_39
 ## %bb.38:                              ##   in Loop: Header=BB0_27 Depth=2
-	vmulpd	LCPI0_16, %xmm2, %xmm0
-	vaddpd	LCPI0_17, %xmm0, %xmm0
+	vmovddup	-69400(%ebp), %xmm1
+	vmulpd	%xmm1, %xmm2, %xmm0
+	vaddpd	-69456(%ebp), %xmm0, %xmm0
 	vroundpd	$9, %xmm0, %xmm0
 	vcvttpd2dq	%xmm0, %xmm0
-	vpbroadcastd	LCPI0_18, %xmm1         ## xmm1 = [255,255,255,255]
+	vpcmpeqd	%xmm1, %xmm1, %xmm1
+	vpsrld	$24, %xmm1, %xmm1
 	vpminsd	%xmm1, %xmm0, %xmm0
-	vpmaxsd	LCPI0_26, %xmm0, %xmm5
+	vpxor	%xmm5, %xmm5, %xmm5
+	vpmaxsd	%xmm5, %xmm0, %xmm5
 	vextractf128	$1, %ymm2, %xmm0
-	vmovsd	LCPI0_19, %xmm3                 ## xmm3 = [2.55E+2,0.0E+0]
+	vmovsd	-69400(%ebp), %xmm3                 ## xmm3 = [2.55E+2,0.0E+0]
 	vmulsd	%xmm3, %xmm0, %xmm1
-	vmovsd	LCPI0_20, %xmm2                 ## xmm2 = [5.0E-1,0.0E+0]
+	vmovsd	-69408(%ebp), %xmm2                 ## xmm2 = [5.0E-1,0.0E+0]
 	vaddsd	%xmm2, %xmm1, %xmm1
 	vroundsd	$9, %xmm1, %xmm1, %xmm1
 	vcvttsd2si	%xmm1, %ecx
