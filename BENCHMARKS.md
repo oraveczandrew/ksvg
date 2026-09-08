@@ -9,6 +9,7 @@ superset hierarchy — each ISA builds on the previous one:
 `scalar → sse2 → ssse3 → avx2 → avx512`. Keep this order when adding or
 re-measuring rows (missing levels are simply absent). `scalar` is always the
 baseline row first. (ARM rows: `scalar → neon32 → neon64`.)
+Kernel rows are ordered alphabetically by kernel name; within each kernel, sizes are ordered from 512x512 to 2048x2048.
 
 ## Host Results (i7-7820X)
 
@@ -28,36 +29,22 @@ Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 
 | Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
-| UnLinearize | scalar | 512x512 | 0.278 | 944.57 | 7.56 | 1.00x |  |  |
-| UnLinearize | ssse3 | 512x512 | 0.253 | 1035.23 | 8.28 | 1.10x | 🟢 | exact production-LUT path |
-| UnLinearize | avx2 | 512x512 | 0.264 | 994.29 | 7.95 | 1.05x | 🟢 |  |
-| UnLinearize | scalar | 2048x2048 | 4.682 | 895.91 | 7.17 | 1.00x |  |  |
-| UnLinearize | ssse3 | 2048x2048 | 4.252 | 986.42 | 7.89 | 1.10x | 🟢 | exact production-LUT path |
-| UnLinearize | avx2 | 2048x2048 | 4.488 | 934.62 | 7.48 | 1.04x | 🟢 |  |
-| ComponentTransfer | scalar | 512x512 | 0.350 | 749.06 | 5.99 | 1.00x |  |  |
-| ComponentTransfer | avx2 | 512x512 | 0.335 | 782.71 | 6.26 | 1.04x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
-| ComponentTransfer | scalar | 2048x2048 | 6.110 | 686.49 | 5.49 | 1.00x |  |  |
-| ComponentTransfer | avx2 | 2048x2048 | 5.271 | 795.75 | 6.37 | 1.16x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
-| Morphology | scalar | 512x512 | 23.872 | 10.98 | 0.09 | 1.00x |  |  |
-| Morphology | sse2 | 512x512 | 1.323 | 198.14 | 1.59 | **18.04x** | 🚀 |  |
-| Morphology | avx2 | 512x512 | 1.254 | 209.07 | 1.67 | **19.04x** | 🚀 |  |
-| Morphology | avx512 | 512x512 | 2.163 | 121.18 | 0.97 | **11.04x** | 🚀 |  |
-| Morphology | scalar | 2048x2048 | 499.261 | 8.40 | 0.07 | 1.00x |  |  |
-| Morphology | sse2 | 2048x2048 | 24.340 | 172.32 | 1.38 | **20.51x** | 🚀 |  |
-| Morphology | avx2 | 2048x2048 | 24.339 | 172.33 | 1.38 | **20.51x** | 🚀 |  |
-| Morphology | avx512 | 2048x2048 | 38.556 | 108.78 | 0.87 | **12.95x** | 🚀 |  |
-| ArithmeticComposite (non-linear) | scalar | 512x512 | 0.828 | 316.68 | 2.53 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | ssse3 | 512x512 | 0.508 | 516.52 | 4.13 | 1.63x | 🟢 |  |
-| ArithmeticComposite (non-linear) | avx2 | 512x512 | 0.277 | 944.89 | 7.56 | 2.98x | 🟢 |  |
-| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 13.690 | 306.37 | 2.45 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 8.443 | 496.76 | 3.97 | 1.62x | 🟢 |  |
-| ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 5.201 | 806.40 | 6.45 | 2.63x | 🟢 |  |
 | ArithmeticComposite (linear) | scalar | 512x512 | 3.082 | 85.07 | 0.68 | 1.00x |  | linear → scalar fallback on ARM/SSE |
 | ArithmeticComposite (linear) | ssse3 | 512x512 | 5.634 | 46.53 | 0.37 | 0.55x | 🔴 | un-advertised; linear LUT loss |
 | ArithmeticComposite (linear) | avx2 | 512x512 | 2.874 | 91.21 | 0.73 | 1.07x | 🟢 |  |
 | ArithmeticComposite (linear) | scalar | 2048x2048 | 49.367 | 84.96 | 0.68 | 1.00x |  | linear → scalar fallback on ARM/SSE |
 | ArithmeticComposite (linear) | ssse3 | 2048x2048 | 89.069 | 47.09 | 0.38 | 0.55x | 🔴 | un-advertised; linear LUT loss |
 | ArithmeticComposite (linear) | avx2 | 2048x2048 | 45.578 | 92.03 | 0.74 | 1.08x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 512x512 | 0.828 | 316.68 | 2.53 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | ssse3 | 512x512 | 0.508 | 516.52 | 4.13 | 1.63x | 🟢 |  |
+| ArithmeticComposite (non-linear) | avx2 | 512x512 | 0.277 | 944.89 | 7.56 | 2.98x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 13.690 | 306.37 | 2.45 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 8.443 | 496.76 | 3.97 | 1.62x | 🟢 |  |
+| ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 5.201 | 806.40 | 6.45 | 2.63x | 🟢 |  |
+| ComponentTransfer | scalar | 512x512 | 0.350 | 749.06 | 5.99 | 1.00x |  |  |
+| ComponentTransfer | avx2 | 512x512 | 0.335 | 782.71 | 6.26 | 1.04x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
+| ComponentTransfer | scalar | 2048x2048 | 6.110 | 686.49 | 5.49 | 1.00x |  |  |
+| ComponentTransfer | avx2 | 2048x2048 | 5.271 | 795.75 | 6.37 | 1.16x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
 | ConvolveMatrix | scalar | 512x512 | 12.710 | 20.63 | 0.17 | 1.00x |  |  |
 | ConvolveMatrix | sse2 | 512x512 | 2.201 | 119.12 | 0.95 | 5.78x | 🟢 |  |
 | ConvolveMatrix | avx2 | 512x512 | 1.201 | 218.32 | 1.75 | **10.58x** | 🚀 |  |
@@ -74,6 +61,12 @@ Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 | DisplacementMap | sse2 | 2048x2048 | 16.677 | 251.50 | 3.02 | 2.15x | 🟢 |  |
 | DisplacementMap | avx2 | 2048x2048 | 15.066 | 278.39 | 3.34 | 2.38x | 🟢 |  |
 | DisplacementMap | avx512 | 2048x2048 | 13.048 | 321.46 | 3.86 | 2.75x | 🟢 |  |
+| GaussianBlur | scalar | 512x512 | 19.921 | 13.16 | 0.11 | 1.00x |  |  |
+| GaussianBlur | ssse3 | 512x512 | 6.213 | 42.20 | 0.34 | 3.21x | 🟢 |  |
+| GaussianBlur | avx2 | 512x512 | 6.123 | 42.82 | 0.34 | 3.25x | 🟢 |  |
+| GaussianBlur | scalar | 2048x2048 | 359.959 | 11.65 | 0.09 | 1.00x |  |  |
+| GaussianBlur | ssse3 | 2048x2048 | 96.724 | 43.36 | 0.35 | 3.72x | 🟢 |  |
+| GaussianBlur | avx2 | 2048x2048 | 94.774 | 44.26 | 0.35 | 3.80x | 🟢 |  |
 | Lighting | scalar | 512x512 | 12.827 | 20.44 | 0.16 | 1.00x |  |  |
 | Lighting | sse2 | 512x512 | 0.871 | 300.83 | 2.41 | **14.72x** | 🚀 |  |
 | Lighting | ssse3 | 512x512 | 0.866 | 302.84 | 2.42 | **14.82x** | 🚀 |  |
@@ -84,18 +77,26 @@ Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 | Lighting | ssse3 | 2048x2048 | 13.476 | 311.25 | 2.49 | **15.64x** | 🚀 |  |
 | Lighting | avx2 | 2048x2048 | 13.289 | 315.63 | 2.53 | **15.86x** | 🚀 |  |
 | Lighting | avx512 | 2048x2048 | 13.811 | 303.69 | 2.43 | **15.26x** | 🚀 |  |
+| Morphology | scalar | 512x512 | 23.872 | 10.98 | 0.09 | 1.00x |  |  |
+| Morphology | sse2 | 512x512 | 1.323 | 198.14 | 1.59 | **18.04x** | 🚀 |  |
+| Morphology | avx2 | 512x512 | 1.254 | 209.07 | 1.67 | **19.04x** | 🚀 |  |
+| Morphology | avx512 | 512x512 | 2.163 | 121.18 | 0.97 | **11.04x** | 🚀 |  |
+| Morphology | scalar | 2048x2048 | 499.261 | 8.40 | 0.07 | 1.00x |  |  |
+| Morphology | sse2 | 2048x2048 | 24.340 | 172.32 | 1.38 | **20.51x** | 🚀 |  |
+| Morphology | avx2 | 2048x2048 | 24.339 | 172.33 | 1.38 | **20.51x** | 🚀 |  |
+| Morphology | avx512 | 2048x2048 | 38.556 | 108.78 | 0.87 | **12.95x** | 🚀 |  |
 | Turbulence | scalar | 512x512 | 15.466 | 16.95 | 0.07 | 1.00x |  |  |
 | Turbulence | ssse3 | 512x512 | 11.179 | 23.45 | 0.09 | 1.38x | 🟢 |  |
 | Turbulence | avx2 | 512x512 | 7.251 | 36.15 | 0.14 | 2.13x | 🟢 |  |
 | Turbulence | scalar | 2048x2048 | 250.909 | 16.72 | 0.07 | 1.00x |  |  |
 | Turbulence | ssse3 | 2048x2048 | 179.375 | 23.38 | 0.09 | 1.40x | 🟢 |  |
 | Turbulence | avx2 | 2048x2048 | 120.001 | 34.95 | 0.14 | 2.09x | 🟢 |  |
-| GaussianBlur | scalar | 512x512 | 19.921 | 13.16 | 0.11 | 1.00x |  |  |
-| GaussianBlur | ssse3 | 512x512 | 6.213 | 42.20 | 0.34 | 3.21x | 🟢 |  |
-| GaussianBlur | avx2 | 512x512 | 6.123 | 42.82 | 0.34 | 3.25x | 🟢 |  |
-| GaussianBlur | scalar | 2048x2048 | 359.959 | 11.65 | 0.09 | 1.00x |  |  |
-| GaussianBlur | ssse3 | 2048x2048 | 96.724 | 43.36 | 0.35 | 3.72x | 🟢 |  |
-| GaussianBlur | avx2 | 2048x2048 | 94.774 | 44.26 | 0.35 | 3.80x | 🟢 |  |
+| UnLinearize | scalar | 512x512 | 0.278 | 944.57 | 7.56 | 1.00x |  |  |
+| UnLinearize | ssse3 | 512x512 | 0.253 | 1035.23 | 8.28 | 1.10x | 🟢 | exact production-LUT path |
+| UnLinearize | avx2 | 512x512 | 0.264 | 994.29 | 7.95 | 1.05x | 🟢 |  |
+| UnLinearize | scalar | 2048x2048 | 4.682 | 895.91 | 7.17 | 1.00x |  |  |
+| UnLinearize | ssse3 | 2048x2048 | 4.252 | 986.42 | 7.89 | 1.10x | 🟢 | exact production-LUT path |
+| UnLinearize | avx2 | 2048x2048 | 4.488 | 934.62 | 7.48 | 1.04x | 🟢 |  |
 ## Host Results (x86-32, Android emulator)
 
 Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark { }` harness (medians).
