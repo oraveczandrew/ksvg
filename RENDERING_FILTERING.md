@@ -193,6 +193,23 @@ linear space, then applies `linearToSRgb` to the straight output when
 - Caller-owned scratch state (`StackBlurScratch` etc.) — never global mutable
   state; reuse is owned by the current render operation and is not thread-shared.
 
+### 4.1 i386 assembly and TEXTREL
+
+Hand-written i386 assembly must be position-independent. Absolute references to
+local literal-pool labels in `.text` create `R_386_32` relocations inside the
+executable text segment; the resulting `DF_TEXTREL` library is rejected by
+Android when native libraries are loaded from an uncompressed APK. The failure
+usually appears only as a swallowed `UnsatisfiedLinkError`, leaving the native
+kernel unavailable and silently selecting the Kotlin/scalar path.
+
+For i386 kernels, establish a read-only literal-pool base with a local
+`call`/`pop` pair and address constants relative to that register. Keep the
+literal pool in the same output section as the code so the assembler/linker can
+resolve the section difference at link time. Verify every x86-32 native build
+with `llvm-readelf -d` (no `TEXTREL`) and `llvm-readelf -r` (no text-segment
+`R_386_32` relocations), then run the forced native parity test on the x86
+emulator; a successful build alone does not prove that the library will load.
+
 ---
 
 ## 5. Performance rules (REVIEW BEFORE HOT-PATH EDITS)
