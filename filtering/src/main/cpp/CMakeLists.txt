@@ -93,7 +93,10 @@ if (ANDROID_ABI STREQUAL "x86")
             displacement_map/displacement_map_i386_ssse3.S
             displacement_map/displacement_map_i386_avx2.S
     )
-    # x86 (32-bit) uses C++ SSSE3 implementation for unlinearize.
+    set(UNLINEARIZE_SOURCES
+            component_transfer/unlinearize_i386_ssse3.S
+            component_transfer/unlinearize_i386_avx2.S
+    )
 endif ()
 
 set(AVX2_SOURCES
@@ -134,7 +137,10 @@ target_compile_options(ksvgblur PRIVATE -ffp-contract=off)
 # Every known Android x86 device satisfies this.
 if (ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
     target_compile_options(ksvgblur PRIVATE -mssse3)
-    if (ANDROID_ABI STREQUAL "x86")
+    # All i386 asm is PIC now ({rodata,LCPI} constants live in .text, addressed
+    # via the call/1: popl/1b symdiff pattern), so the library no longer needs
+    # -z,notext and links TEXTREL-free on x86-32.
+    if (FALSE)
         target_link_options(ksvgblur PRIVATE "-Wl,-z,notext")
     endif ()
     # Per-file flags make <immintrin.h> declare the AVX2/AVX-512 intrinsics

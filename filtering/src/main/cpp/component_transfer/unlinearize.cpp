@@ -34,15 +34,20 @@
 // trivially in-place safe.
 //
 // Acceleration:
-//  - x86-64 (AVX2): 8 px/iteration, same 16-row scheme over a full 32-byte
-//    register with alpha restored by masking. Pure byte permutation — bit-exact.
+//  - x86-64 (AVX2): 8 px/iteration, 16-row pshufb scheme over a full 32-byte
+//    register with alpha restored by masking. Pure byte permutation — bit-exact
+//    for any caller table.
+//  - x86-64 (SSSE3): the bit-exact integer approximation of the production
+//    sRGB LUT (exact to the std-table byte map; scalar tail reads the caller
+//    table).
+//  - x86-32 (SSSE3/AVX2): bit-exact production-table approximations
+//    (ksvgUnlinearizeApplySsse3ApproxV31 / ksvgUnlinearizeApplyAvx2ApproxV26).
 //  - Anything else: scalar reference loop.
 //
-// WP3 regression gate (see REGRESSION_FIX_WORKLOG.md): the SSSE3 (host
-// 0.58-0.61x), AArch64 NEON (device 0.05x) and armv7 NEON (device 0.01x) LUT
-// cascades all lose to the alias-free scalar loop, so production dispatch and
-// nativeBackend() keep only the AVX2 path. The applyNeon64/applyNeon32/applySsse3
-// kernels stay compiled and reachable via Java_..._applyForced for validation.
+// The LUT-cascade SIMD paths (SSSE3/NEON16-row) lose to the alias-free scalar
+// loop per WP3 (see REGRESSION_FIX_WORKLOG.md); production keeps only the
+// approximation kernels on x86. The applyNeon64/applyNeon32/reference paths stay
+// compiled and reachable via Java_..._applyForced for validation.
 
 namespace {
 
@@ -114,69 +119,15 @@ void applyNeon64(const jint* src, jint* dst, const jint width, const jint height
 #endif // __aarch64__
 
 #if defined(__SSSE3__)
-#include <tmmintrin.h>
-
+#if defined(__x86_64__)
 extern "C" void ksvgUnlinearizeApplySsse3(
         jint* src, jint* dst, jint width, jint height, const jbyte* table);
-
-static inline __m128i lutRow128(const jbyte* table, int row) {
-    return _mm_loadu_si128(reinterpret_cast<const __m128i*>(table + row * 16));
-}
-
-/**
- * 256-entry LUT over the 16 bytes of `value` using pshufb.
- * The table's natural row-major layout means entry = rows[hi][lo], so for
- * each high-nibble value i we select candidates with one shuffle and mask
- * them in with cmpeq. R/G/B share the table, so we transform every byte
- * (alpha included) in one pass; alpha is restored afterwards by masking.
- * Pure byte permutation — bit-exact with scalar.
- */
-static inline __m128i lut256Ssse3(__m128i value, const __m128i rows[16]) {
-    const __m128i loMask = _mm_set1_epi8(0x0F);
-    const __m128i lo = _mm_and_si128(value, loMask);
-    const __m128i hi = _mm_and_si128(_mm_srli_epi16(value, 4), loMask);
-    __m128i result = _mm_setzero_si128();
-    for (int row = 0; row < 16; ++row) {
-        const __m128i candidate = _mm_shuffle_epi8(rows[row], lo);
-        const __m128i selected = _mm_cmpeq_epi8(hi, _mm_set1_epi8(static_cast<char>(row)));
-        result = _mm_or_si128(result, _mm_and_si128(candidate, selected));
-    }
-    return result;
-}
-
-void applySsse3(jint* src, jint* dst, jint width, jint height, const jbyte* table) {
-    __m128i rows[16];
-    for (int i = 0; i < 16; i++) {
-        rows[i] = lutRow128(table, i);
-    }
-
-    // Packed jint is little-endian: [B G R A] [B G R A] ...
-    // Transform B/G/R with the same LUT; restore original alpha bytes (the
-    // 4th byte of each pixel) afterwards.
-    const __m128i alphaMask = _mm_setr_epi8(
-            0, 0, 0, -1,
-            0, 0, 0, -1,
-            0, 0, 0, -1,
-            0, 0, 0, -1);
-
-    const jint total = width * height;
-    jint i = 0;
-    for (; i + 4 <= total; i += 4) {
-        const __m128i p = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src + i));
-        const __m128i transformed = lut256Ssse3(p, rows);
-        const __m128i out = _mm_or_si128(
-                _mm_andnot_si128(alphaMask, transformed),
-                _mm_and_si128(alphaMask, p));
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + i), out);
-    }
-    for (; i < total; i++) {
-        const jint c = src[i];
-        dst[i] = (c & 0xFF000000) |
-                (static_cast<jint>(static_cast<uint8_t>(table[(c >> 16) & 0xFF])) << 16) |
-                (static_cast<jint>(static_cast<uint8_t>(table[(c >> 8) & 0xFF])) << 8) |
-                static_cast<jint>(static_cast<uint8_t>(table[c & 0xFF]));
-    }
-}
+#else
+extern "C" void ksvgUnlinearizeApplySsse3ApproxV31(
+        jint* src, jint* dst, jint width, jint height, const jbyte* table);
+extern "C" void ksvgUnlinearizeApplyAvx2ApproxV26(
+        jint* src, jint* dst, jint width, jint height, const jbyte* table);
+#endif
 #endif // __SSSE3__
 
 #if defined(__ARM_NEON__) || defined(__ARM_NEON)
@@ -242,7 +193,7 @@ void applyNeon32(jint* src, jint* dst, jint width, jint height, const jbyte* tab
 namespace {
 
 void runForced(jint* src, jint* dst, jint width, jint height,
-               const jbyte* table, jint backend) {
+               const jbyte* table, const jint backend) {
 #if defined(__aarch64__)
     if (backend == SIMD_BACKEND_SCALAR) {
         applyScalar(src, dst, width, height, table);
@@ -264,15 +215,14 @@ void runForced(jint* src, jint* dst, jint width, jint height,
 #if defined(__x86_64__)
             ksvgUnlinearizeApplySsse3(src, dst, width, height, table);
 #else
-            applySsse3(src, dst, width, height, table);
+            ksvgUnlinearizeApplySsse3ApproxV31(src, dst, width, height, table);
 #endif
             break;
         case SIMD_BACKEND_AVX2:
 #if defined(__x86_64__)
             ksvgUnlinearizeApplyAvx2(src, dst, width, height, table);
 #else
-            // AVX2 not available on 32-bit x86; fall back to SSSE3
-            applySsse3(src, dst, width, height, table);
+            ksvgUnlinearizeApplyAvx2ApproxV26(src, dst, width, height, table);
 #endif
             break;
         default:                  assert(false && "unsupported forced unlinearize backend on x86");
@@ -285,7 +235,7 @@ void runForced(jint* src, jint* dst, jint width, jint height,
 
 jint nativeBackendForAbi() {
     jint backends = SIMD_BACKEND_SCALAR;
-#if defined(__SSSE3__) && defined(__x86_64__)
+#if defined(__SSSE3__) && (defined(__x86_64__) || defined(__i386__))
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_SSSE3) {
         backends |= SIMD_BACKEND_SSSE3;
@@ -359,19 +309,26 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
     if (table == nullptr) {
         return;
     }
-    const bool inPlace = env->IsSameObject(jSrc, jDst) == JNI_TRUE;
-    if (inPlace) {
+    if (env->IsSameObject(jSrc, jDst) == JNI_TRUE) {
         auto* buf = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
         if (buf == nullptr) {
             env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
             return;
         }
-#if defined(__SSSE3__) && defined(__x86_64__)
+#if defined(__SSSE3__)
         const SimdLevel level = detectSimdLevel();
         if (level >= SIMD_AVX2) {
+#if defined(__x86_64__)
             ksvgUnlinearizeApplyAvx2(buf, buf, width, height, table);
+#else
+            ksvgUnlinearizeApplyAvx2ApproxV26(buf, buf, width, height, table);
+#endif
         } else if (level >= SIMD_SSSE3) {
+#if defined(__x86_64__)
             ksvgUnlinearizeApplySsse3(buf, buf, width, height, table);
+#else
+            ksvgUnlinearizeApplySsse3ApproxV31(buf, buf, width, height, table);
+#endif
         } else {
             applyScalar(buf, buf, width, height, table);
         }
@@ -395,12 +352,20 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
         return;
     }
 
-#if defined(__SSSE3__) && defined(__x86_64__)
+#if defined(__SSSE3__)
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_AVX2) {
+#if defined(__x86_64__)
         ksvgUnlinearizeApplyAvx2(src, dst, width, height, table);
+#else
+        ksvgUnlinearizeApplyAvx2ApproxV26(src, dst, width, height, table);
+#endif
     } else if (level >= SIMD_SSSE3) {
+#if defined(__x86_64__)
         ksvgUnlinearizeApplySsse3(src, dst, width, height, table);
+#else
+        ksvgUnlinearizeApplySsse3ApproxV31(src, dst, width, height, table);
+#endif
     } else {
         applyScalar(src, dst, width, height, table);
     }
