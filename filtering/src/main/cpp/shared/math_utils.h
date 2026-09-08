@@ -24,12 +24,12 @@ namespace ksvg {
 
 inline int clamp255(const float v) {
     const int i = static_cast<int>(std::floor(v + 0.5f));
-    return i < 0 ? 0 : (i > 255 ? 255 : i);
+    return i < 0 ? 0 : i > 255 ? 255 : i;
 }
 
 inline int clamp255(const double v) {
     const int i = static_cast<int>(std::floor(v + 0.5));
-    return i < 0 ? 0 : (i > 255 ? 255 : i);
+    return i < 0 ? 0 : i > 255 ? 255 : i;
 }
 
 } // namespace ksvg

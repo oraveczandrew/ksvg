@@ -19,6 +19,7 @@
 #include <jni.h>
 #include <cmath>
 #include "convolve.h"
+#include "shared/math_utils.h"
 
 #if defined(__aarch64__)
 #include <arm_neon.h>
@@ -34,14 +35,6 @@ extern "C" jint ksvgConvolveGenericNeonAsm32(
 #endif
 
 namespace Convolve {
-
-    // Bit-exact replica of clamp255() in convolve_matrix.cpp (that helper is
-    // static there, so it is invisible from this TU). Round-half-up, matching
-    // the Kotlin reference / convolveScalarPixel().
-    static inline jint clamp255Neon(const float v) {
-        const jint i = static_cast<jint>(std::floor(v + 0.5f));
-        return i < 0 ? 0 : i > 255 ? 255 : i;
-    }
 
     // Compile-time edgeMode specialization of scalar coordinate sampling for the
     // boundary bands (bit-exact with sampleCoordinate() in convolve_matrix.cpp).
@@ -81,12 +74,12 @@ namespace Convolve {
                 a += static_cast<float>((pixel >> 24) & 0xFF) * w;
             }
         }
-        const jint outR = clamp255Neon(r / divisor + bias255);
-        const jint outG = clamp255Neon(g / divisor + bias255);
-        const jint outB = clamp255Neon(b / divisor + bias255);
+        const jint outR = ksvg::clamp255(r / divisor + bias255);
+        const jint outG = ksvg::clamp255(g / divisor + bias255);
+        const jint outB = ksvg::clamp255(b / divisor + bias255);
         const jint outA = preserve
                               ? (src[y * width + x] >> 24) & 0xFF
-                              : clamp255Neon(a / divisor + bias255);
+                              : ksvg::clamp255(a / divisor + bias255);
         dst[y * width + x] = (outA << 24) | (outR << 16) | (outG << 8) | outB;
     }
 

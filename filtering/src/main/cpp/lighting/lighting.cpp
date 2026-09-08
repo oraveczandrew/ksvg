@@ -37,10 +37,6 @@ extern "C" void ksvgLightingDistantDiffuseRowNeon32(
 
 namespace {
 
- jint clamp255f(const float v) {
-    return ksvg::clamp255(v);
-}
-
  float heightAt(const jint* pix, const jint width, const jint height, const jint x, const jint y, const float ss) {
     const jint cx = x < 0 ? 0 : x > width - 1 ? width - 1 : x;
     const jint cy = y < 0 ? 0 : y > height - 1 ? height - 1 : y;
@@ -53,14 +49,14 @@ namespace {
     const float a = static_cast<float>(c) / 255.f;
     const float v = a <= 0.04045f ? a / 12.92f * 255.f
                                     : std::pow((a + 0.055f) / 1.055f, 2.4f) * 255.f;
-    return clamp255f(v);
+    return ksvg::clamp255(v);
 }
 
  jint linearToLightSRgb(const jint c) {
     const float a = static_cast<float>(c) / 255.f;
     const float v = a <= 0.0031308f ? a * 12.92f * 255.f
                                       : (1.055f * std::pow(a, 1.f / 2.4f) - 0.055f) * 255.f;
-    return clamp255f(v);
+    return ksvg::clamp255(v);
 }
 
 inline jint packPixel(const jint outA, const jint outR, const jint outG, const jint outB) {
@@ -155,9 +151,9 @@ inline void applyScalarPixel_full(
         intensity = clamp01(k * static_cast<float>(p) * factor);
     }
 
-    jint outR = clamp255f(lr * intensity);
-    jint outG = clamp255f(lg * intensity);
-    jint outB = clamp255f(lb * intensity);
+    jint outR = ksvg::clamp255(lr * intensity);
+    jint outG = ksvg::clamp255(lg * intensity);
+    jint outB = ksvg::clamp255(lb * intensity);
     if (useLinear) {
         outR = linearToLightSRgb(outR);
         outG = linearToLightSRgb(outG);
@@ -168,7 +164,7 @@ inline void applyScalarPixel_full(
             : 255;
 
     out[y * width + x] = isSpecular && premultiplied
-            ? (clamp255f(intensity * 255.f) << 24) | (static_cast<jint>(lr + 0.5f) << 16) | (static_cast<jint>(lg + 0.5f) << 8) | static_cast<jint>(lb + 0.5f)
+            ? (ksvg::clamp255(intensity * 255.f) << 24) | (static_cast<jint>(lr + 0.5f) << 16) | (static_cast<jint>(lg + 0.5f) << 8) | static_cast<jint>(lb + 0.5f)
             : packPixel(outA, outR, outG, outB);
 }
 
