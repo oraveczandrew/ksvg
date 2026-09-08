@@ -41,30 +41,30 @@ extern "C" void applyArithmetic64Asm(
 
 #ifdef __aarch64__
 inline uint8x16_t applyArithmeticFormulaNeon64(
-    uint8x16_t in1, uint8x16_t in2,
-    float k1, float k2, float k3, float k4_255) {
+    const uint8x16_t in1, const uint8x16_t in2,
+    const float k1, const float k2, const float k3, const float k4_255) {
 
     // We need to convert u8 to f32. 16 bytes -> four float32x4.
     uint16x8_t low_u16 = vmovl_u8(vget_low_u8(in1));
     uint16x8_t high_u16 = vmovl_u8(vget_high_u8(in1));
-    float32x4_t in1_0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(low_u16)));
-    float32x4_t in1_1 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(low_u16)));
-    float32x4_t in1_2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(high_u16)));
-    float32x4_t in1_3 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(high_u16)));
+    const float32x4_t in1_0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(low_u16)));
+    const float32x4_t in1_1 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(low_u16)));
+    const float32x4_t in1_2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(high_u16)));
+    const float32x4_t in1_3 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(high_u16)));
 
     low_u16 = vmovl_u8(vget_low_u8(in2));
     high_u16 = vmovl_u8(vget_high_u8(in2));
-    float32x4_t in2_0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(low_u16)));
-    float32x4_t in2_1 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(low_u16)));
-    float32x4_t in2_2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(high_u16)));
-    float32x4_t in2_3 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(high_u16)));
+    const float32x4_t in2_0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(low_u16)));
+    const float32x4_t in2_1 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(low_u16)));
+    const float32x4_t in2_2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(high_u16)));
+    const float32x4_t in2_3 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(high_u16)));
 
     // result = (k1 * a * b + k2 * a + k3 * b + k4) * 255
     // a = in1/255, b = in2/255
     // result = k1*in1*in2/255 + k2*in1 + k3*in2 + k4*255
-    float k1_div_255 = k1 / 255.0f;
+    const float k1_div_255 = k1 / 255.0f;
 
-    auto compute = [&](float32x4_t a, float32x4_t b) {
+    auto compute = [&](const float32x4_t a, const float32x4_t b) {
         float32x4_t res = vmulq_n_f32(vmulq_f32(a, b), k1_div_255);
         res = vfmaq_n_f32(res, a, k2);
         res = vfmaq_n_f32(res, b, k3);
@@ -75,10 +75,10 @@ inline uint8x16_t applyArithmeticFormulaNeon64(
         return vqmovn_u32(vcvtq_u32_f32(res)); // u32x4 -> u16x4
     };
 
-    uint16x4_t r0 = compute(in1_0, in2_0);
-    uint16x4_t r1 = compute(in1_1, in2_1);
-    uint16x4_t r2 = compute(in1_2, in2_2);
-    uint16x4_t r3 = compute(in1_3, in2_3);
+    const uint16x4_t r0 = compute(in1_0, in2_0);
+    const uint16x4_t r1 = compute(in1_1, in2_1);
+    const uint16x4_t r2 = compute(in1_2, in2_2);
+    const uint16x4_t r3 = compute(in1_3, in2_3);
 
     return vcombine_u8(vqmovn_u16(vcombine_u16(r0, r1)), vqmovn_u16(vcombine_u16(r2, r3)));
 }
@@ -119,9 +119,9 @@ inline uint8x8_t applyArithmeticFormulaNeon32(
 
 void applyArithmeticNeon(
         const jint* src1, const jint* src2, jint* dst,
-        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        jfloat k1, jfloat k2, jfloat k3, jfloat k4,
-        jboolean useLinear,
+        const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        jfloat k1, jfloat k2, jfloat k3, const jfloat k4,
+        const jboolean useLinear,
         const jbyte* srgbToLinear, const jbyte* linearToSrgb) {
 
 #ifdef __aarch64__
@@ -160,16 +160,16 @@ void applyArithmeticNeon(
 
         jint x = clipLeft;
         for (; x + 16 <= clipRight; x += 16) {
-            uint8x16x4_t p1 = vld4q_u8(reinterpret_cast<const uint8_t*>(src1 + rowOffset + x));
-            uint8x16x4_t p2 = vld4q_u8(reinterpret_cast<const uint8_t*>(src2 + rowOffset + x));
+            const uint8x16x4_t p1 = vld4q_u8(reinterpret_cast<const uint8_t*>(src1 + rowOffset + x));
+            const uint8x16x4_t p2 = vld4q_u8(reinterpret_cast<const uint8_t*>(src2 + rowOffset + x));
             uint8x16x4_t out;
 
             // Alpha remains non-linear in linear-light mode.
             out.val[3] = applyArithmeticFormulaNeon64(p1.val[3], p2.val[3], k1, k2, k3, k4_255);
             for (int c = 0; c < 3; c++) {
-                uint8x16_t l1 = lookup256Neon64(p1.val[c], tS2L);
-                uint8x16_t l2 = lookup256Neon64(p2.val[c], tS2L);
-                uint8x16_t res = applyArithmeticFormulaNeon64(l1, l2, k1, k2, k3, k4_255);
+                const uint8x16_t l1 = lookup256Neon64(p1.val[c], tS2L);
+                const uint8x16_t l2 = lookup256Neon64(p2.val[c], tS2L);
+                const uint8x16_t res = applyArithmeticFormulaNeon64(l1, l2, k1, k2, k3, k4_255);
                 out.val[c] = lookup256Neon64(res, tL2S);
             }
 

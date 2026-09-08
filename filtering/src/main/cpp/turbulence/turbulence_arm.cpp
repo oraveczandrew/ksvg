@@ -50,7 +50,7 @@ void applyNeon64(
             0,
             static_cast<size_t>(width) * static_cast<size_t>(height) * sizeof(jint));
 
-    Turbulence64AsmArgs args {
+    const Turbulence64AsmArgs args {
             tables.selector32,
             &tables.gradPackedX[0][0],
             &tables.gradPackedY[0][0],

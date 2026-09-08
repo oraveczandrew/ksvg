@@ -30,10 +30,10 @@ static inline jint sampleCoordinate(const jint coordinate, const jint limit, con
             return -1;
         case 1: { // Wrap
             const jint m = coordinate % limit;
-            return (m < 0) ? m + limit : m;
+            return m < 0 ? m + limit : m;
         }
         default: // Duplicate (clamp)
-            return (coordinate < 0) ? 0 : limit - 1;
+            return coordinate < 0 ? 0 : limit - 1;
     }
 }
 

@@ -87,7 +87,7 @@ inline uint8x16_t lookup256Neon(
 inline void loadTable256(
         const jbyte* src,
         uint8x16_t table[16]) {
-    const uint8_t* t = reinterpret_cast<const uint8_t*>(src);
+    auto t = reinterpret_cast<const uint8_t*>(src);
 
     for (int i = 0; i < 16; ++i) {
         table[i] = vld1q_u8(t + i * 16);

@@ -73,7 +73,7 @@ namespace Convolve {
             const jint srcY = sampleCoordinateNeonEdgeT<EDGE_MODE>(y + ky - targetY, height);
             for (jint kx = 0; kx < orderX; kx++) {
                 const jint srcX = sampleCoordinateNeonEdgeT<EDGE_MODE>(x + kx - targetX, width);
-                const jint pixel = (srcX < 0 || srcY < 0) ? 0 : src[srcY * width + srcX];
+                const jint pixel = srcX < 0 || srcY < 0 ? 0 : src[srcY * width + srcX];
                 const float w = kernel[ky * orderX + kx];
                 r += static_cast<float>((pixel >> 16) & 0xFF) * w;
                 g += static_cast<float>((pixel >> 8) & 0xFF) * w;

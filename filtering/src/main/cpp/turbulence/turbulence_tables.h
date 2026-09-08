@@ -29,7 +29,7 @@ struct PnrRandom {
         // Mirror Kotlin LcgRandom.setupSeed: resolve seed <= 0 and clamp the
         // upper bound so the native lattice matches the reference sequence
         // (librsvg / SVG 1.1 §15.25).
-        const int32_t kMaxSeed = 2147483647 - 1; // 2147483646
+        constexpr int32_t kMaxSeed = 2147483647 - 1; // 2147483646
         if (seed <= 0) {
             seed = -(seed % kMaxSeed) + 1;
         }

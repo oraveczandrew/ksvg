@@ -148,7 +148,7 @@ namespace {
     inline jint lane(const Vec v, const int i) {
         alignas(16) uint8_t bytes[16];
         vst1q_u8(bytes, v);
-        return static_cast<jint>(bytes[i]);
+        return bytes[i];
     }
 #else
 #include <emmintrin.h>
@@ -172,7 +172,7 @@ namespace {
      */
     inline void applyVectorPixel(
         const jint *src, jint *dst, const jint width,
-        const jint radiusX, const jint radiusY, const bool isErode, jint init, const jint x, const jint y) {
+        const jint radiusX, const jint radiusY, const bool isErode, [[maybe_unused]] jint init, const jint x, const jint y) {
         const jint top = y - radiusY;
         const jint bottom = y + radiusY;
         const jint left = x - radiusX;
@@ -265,7 +265,7 @@ namespace {
         }
 
         const jint span = vxHi - vxLo + 2 * radiusX;
-        jint *spanBuf = (backend != SIMD_BACKEND_SCALAR && span > 0) ? new jint[span] : nullptr;
+        jint *spanBuf = backend != SIMD_BACKEND_SCALAR && span > 0 ? new jint[span] : nullptr;
 
         for (jint y = vyLo; y < vyHi; y++) {
             for (jint x = xLo; x < vxLo; x++) {

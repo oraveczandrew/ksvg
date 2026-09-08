@@ -368,7 +368,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_applyForced(
         JNIEnv* env, [[maybe_unused]] jclass clazz, const jlong scratchHandle, const jintArray pixels,
         const jint width, const jint height, const jfloat stdDeviationX, const jfloat stdDeviationY, const jint simdBackend) {
-    GaussianScratch* const s = reinterpret_cast<GaussianScratch*>(scratchHandle);
+    const auto s = reinterpret_cast<GaussianScratch*>(scratchHandle);
     jint* pix = env->GetIntArrayElements(pixels, nullptr);
     if (pix == nullptr) return;
 

@@ -37,9 +37,9 @@ extern "C" {
 
 void applyArithmeticScalar(
         const jint* src1, const jint* src2, jint* dst,
-        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        jfloat k1, jfloat k2, jfloat k3, jfloat k4,
-        jboolean useLinear,
+        const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4,
+        const jboolean useLinear,
         const jbyte* srgbToLinear, const jbyte* linearToSrgb) {
     for (jint y = clipTop; y < clipBottom; y++) {
         const jint rowOffset = y * width;
@@ -96,10 +96,10 @@ jint nativeBackendForAbi() {
 }
 
 void runForced(const jint* src1, const jint* src2, jint* dst,
-               jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-               jfloat k1, jfloat k2, jfloat k3, jfloat k4, jboolean useLinear,
+               const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+               const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear,
                const jbyte* srgbToLinear, const jbyte* linearToSrgb,
-               jint backend) {
+               const jint backend) {
 #if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
     if (backend == SIMD_BACKEND_SCALAR) {
         applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
@@ -136,13 +136,13 @@ void runForced(const jint* src1, const jint* src2, jint* dst,
 
 extern "C" JNIEXPORT jint JNICALL
 Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_nativeBackend(
-        JNIEnv* env, jclass clazz) {
+    [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz) {
     return nativeBackendForAbi();
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyForcedNative(
-        JNIEnv* env, jclass clazz,
+        JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jSrc1, const jintArray jSrc2, const jintArray jDst,
         const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear,
@@ -168,7 +168,7 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyForcedNative(
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyNative(
-        JNIEnv* env, jclass clazz,
+        JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jSrc1, const jintArray jSrc2, const jintArray jDst,
         const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear,
