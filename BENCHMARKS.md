@@ -12,7 +12,7 @@ baseline row first. (ARM rows: `scalar → neon32 → neon64`.)
 
 ## Host Results (i7-7820X)
 
-Measured on macOS (i7-7820X, 64-bit host build); initial run 2026-09-06, LUT-trio rows re-measured 2026-09-07 after the WP3 regression gate (`REGRESSION_FIX_WORKLOG.md`).
+Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 
 > **WP3 gate (2026-09-07):** ComponentTransfer no longer advertises SSSE3 (losing
 > path); UnLinearize keeps its exact production-LUT SSSE3 backend because the refreshed
@@ -26,79 +26,76 @@ Measured on macOS (i7-7820X, 64-bit host build); initial run 2026-09-06, LUT-tri
 > **Benchmark bug fixed 2026-09-07:** the previous "ArithmeticComposite (linear)" rows were
 > actually non-linear measurements (`KernelPerformanceBenchmark` passed `useLinear=false`).
 
-| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status |
-| :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: |
-| ArithmeticComposite (linear) | scalar | 512x512 | 3.117 | 84.10 | 0.67 | 1.00x |  | linear → scalar fallback on ARM/SSE |
-| ArithmeticComposite (linear) | ssse3 | 512x512 | 5.477 | 47.87 | 0.38 | 0.57x | 🔴 | un-advertised; linear LUT loss |
-| ArithmeticComposite (linear) | avx2 | 512x512 | 2.917 | 89.87 | 0.72 | 1.07x | 🟢 |  |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 50.346 | 83.31 | 0.67 | 1.00x |  |  |
-| ArithmeticComposite (linear) | ssse3 | 2048x2048 | 89.592 | 46.82 | 0.37 | 0.56x | 🔴 | un-advertised; linear LUT loss |
-| ArithmeticComposite (linear) | avx2 | 2048x2048 | 48.025 | 87.34 | 0.70 | 1.05x | 🟢 |  |
-| ArithmeticComposite (non-linear) | scalar | 512x512 | 0.819 | 319.89 | 2.56 | 1.00x |  |
-| ArithmeticComposite (non-linear) | ssse3 | 512x512 | 0.497 | 527.40 | 4.22 | 1.65x | 🟢 |
-| ArithmeticComposite (non-linear) | avx2 | 512x512 | 0.279 | 940.75 | 7.53 | 2.94x | 🟢 |
-| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 13.447 | 311.91 | 2.50 | 1.00x |  |
-| ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 8.503 | 493.30 | 3.95 | 1.58x | 🟢 |
-| ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 5.461 | 768.05 | 6.14 | 2.46x | 🟢 |
-| ComponentTransfer | scalar | 512x512 | 0.346 | 756.96 | 6.06 | 1.00x |  | |
-| ComponentTransfer | avx2 | 512x512 | 0.339 | 772.62 | 6.18 | 1.02x | 🟢 | ssse3 un-advertised (was 0.20x 🔴) |
-| ComponentTransfer | scalar | 2048x2048 | 5.944 | 705.65 | 5.65 | 1.00x |  | |
-| ComponentTransfer | avx2 | 2048x2048 | 5.467 | 767.15 | 6.14 | 1.09x | 🟢 | |
-| ConvolveMatrix | scalar | 512x512 | 8.735 | 30.01 | 0.24 | 1.00x |  |
-| ConvolveMatrix | ssse3 | 512x512 | 2.104 | 124.60 | 1.00 | 4.15x | 🟢 |
-| ConvolveMatrix | avx2 | 512x512 | 1.285 | 204.02 | 1.63 | 6.80x | 🟢 |
-| ConvolveMatrix | avx512 | 512x512 | 1.204 | 217.67 | 1.74 | 7.25x | 🟢 |
-| ConvolveMatrix | scalar | 2048x2048 | 141.026 | 29.74 | 0.24 | 1.00x |  |
-| ConvolveMatrix | ssse3 | 2048x2048 | 35.846 | 117.01 | 0.94 | 3.93x | 🟢 |
-| ConvolveMatrix | avx2 | 2048x2048 | 22.161 | 189.27 | 1.51 | 6.36x | 🟢 |
-| ConvolveMatrix | avx512 | 2048x2048 | 17.715 | 236.76 | 1.89 | 7.96x | 🟢 |
-| DisplacementMap | scalar | 512x512 | 2.296 | 114.15 | 1.37 | 1.00x |  |
-| DisplacementMap | sse2 | 512x512 | 1.020 | 256.91 | 3.08 | 2.25x | 🟢 |
-| DisplacementMap | avx2 | 512x512 | 0.712 | 368.14 | 4.42 | 3.22x | 🟢 |
-| DisplacementMap | avx512 | 512x512 | 0.691 | 379.28 | 4.55 | 3.32x | 🟢 |
-| DisplacementMap | scalar | 2048x2048 | 36.262 | 115.67 | 1.39 | 1.00x |  |
-| DisplacementMap | sse2 | 2048x2048 | 17.160 | 244.43 | 2.93 | 2.11x | 🟢 |
-| DisplacementMap | avx2 | 2048x2048 | 14.066 | 298.18 | 3.58 | 2.58x | 🟢 |
-| DisplacementMap | avx512 | 2048x2048 | 12.972 | 323.33 | 3.88 | 2.80x | 🟢 |
-| GaussianBlur | scalar | 512x512 | 20.248 | 12.95 | 0.10 | 1.00x |  |
-| GaussianBlur | ssse3 | 512x512 | 6.040 | 43.40 | 0.35 | 3.35x | 🟢 |
-| GaussianBlur | avx2 | 512x512 | 6.039 | 43.41 | 0.35 | 3.35x | 🟢 |
-| GaussianBlur | scalar | 2048x2048 | 358.530 | 11.70 | 0.09 | 1.00x |  |
-| GaussianBlur | ssse3 | 2048x2048 | 94.757 | 44.26 | 0.35 | 3.78x | 🟢 |
-| GaussianBlur | avx2 | 2048x2048 | 94.987 | 44.16 | 0.35 | 3.77x | 🟢 |
-| Lighting | scalar | 512x512 | 13.247 | 19.79 | 0.16 | 1.00x |  |
-| Lighting | sse2 | 512x512 | 0.897 | 292.31 | 2.34 | **14.77x** | 🚀 |
-| Lighting | ssse3 | 512x512 | 0.825 | 317.70 | 2.54 | **16.05x** | 🚀 |
-| Lighting | avx2 | 512x512 | 0.813 | 322.57 | 2.58 | **16.30x** | 🚀 |
-| Lighting | avx512 | 512x512 | 0.841 | 311.85 | 2.49 | **15.76x** | 🚀 |
-| Lighting | scalar | 2048x2048 | 209.468 | 20.02 | 0.16 | 1.00x |  |
-| Lighting | sse2 | 2048x2048 | 14.079 | 297.91 | 2.38 | **14.88x** | 🚀 |
-| Lighting | ssse3 | 2048x2048 | 13.850 | 302.84 | 2.42 | **15.12x** | 🚀 |
-| Lighting | avx2 | 2048x2048 | 13.829 | 303.29 | 2.43 | **15.15x** | 🚀 |
-| Lighting | avx512 | 2048x2048 | 13.878 | 302.24 | 2.42 | **15.09x** | 🚀 |
-| Morphology | scalar | 512x512 | 24.077 | 10.89 | 0.09 | 1.00x |  |
-| Morphology | sse2 | 512x512 | 1.339 | 195.72 | 1.57 | **17.98x** | 🚀 |
-| Morphology | ssse3 | 512x512 | 9.120 | 28.74 | 0.23 | 2.64x | 🟢 |
-| Morphology | avx2 | 512x512 | 1.353 | 193.80 | 1.55 | **17.80x** | 🚀 |
-| Morphology | avx512 | 512x512 | 2.155 | 121.66 | 0.97 | **11.17x** | 🚀 |
-| Morphology | scalar | 2048x2048 | 508.204 | 8.25 | 0.07 | 1.00x |  |
-| Morphology | sse2 | 2048x2048 | 25.781 | 162.69 | 1.30 | **19.71x** | 🚀 |
-| Morphology | ssse3 | 2048x2048 | 168.184 | 24.94 | 0.20 | 3.02x | 🟢 |
-| Morphology | avx2 | 2048x2048 | 25.416 | 165.03 | 1.32 | **20.00x** | 🚀 |
-| Morphology | avx512 | 2048x2048 | 38.927 | 107.75 | 0.86 | **13.06x** | 🚀 |
-| Turbulence | scalar | 512x512 | 15.739 | 16.66 | 0.07 | 1.00x |  |
-| Turbulence | ssse3 | 512x512 | 7.562 | 34.67 | 0.14 | 2.08x | 🟢 |
-| Turbulence | avx2 | 512x512 | 6.079 | 43.12 | 0.17 | 2.59x | 🟢 |
-| Turbulence | scalar | 2048x2048 | 260.597 | 16.09 | 0.06 | 1.00x |  |
-| Turbulence | ssse3 | 2048x2048 | 124.115 | 33.79 | 0.14 | 2.10x | 🟢 |
-| Turbulence | avx2 | 2048x2048 | 102.231 | 41.03 | 0.16 | 2.55x | 🟢 |
-| UnLinearize | scalar | 512x512 | 0.375 | 698.87 | 5.59 | 1.00x |  | |
-| UnLinearize | ssse3 | 512x512 | 0.248 | 1057.83 | 8.46 | 1.51x | 🟢 | exact production-LUT path |
-| UnLinearize | avx2 | 512x512 | 0.190 | 1377.71 | 11.02 | 1.97x | 🟢 | |
-| UnLinearize | scalar | 2048x2048 | 6.047 | 693.65 | 5.55 | 1.00x |  | |
-| UnLinearize | ssse3 | 2048x2048 | 4.275 | 981.05 | 7.85 | 1.41x | 🟢 | exact production-LUT path |
-| UnLinearize | avx2 | 2048x2048 | 3.622 | 1158.07 | 9.26 | 1.67x | 🟢 | |
-
+| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status | Note |
+| :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
+| ArithmeticComposite (linear) | scalar | 512x512 | 3.075 | 85.24 | 0.68 | 1.00x |  | linear → scalar fallback on ARM/SSE |
+| ArithmeticComposite (linear) | ssse3 | 512x512 | 5.564 | 47.11 | 0.38 | 0.55x | 🔴 | un-advertised; linear LUT loss |
+| ArithmeticComposite (linear) | avx2 | 512x512 | 2.853 | 91.87 | 0.73 | 1.08x | 🟢 |  |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 48.949 | 85.69 | 0.69 | 1.00x |  | linear → scalar fallback on ARM/SSE |
+| ArithmeticComposite (linear) | ssse3 | 2048x2048 | 89.511 | 46.86 | 0.37 | 0.55x | 🔴 | un-advertised; linear LUT loss |
+| ArithmeticComposite (linear) | avx2 | 2048x2048 | 45.959 | 91.26 | 0.73 | 1.07x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 512x512 | 0.818 | 320.64 | 2.57 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | ssse3 | 512x512 | 0.498 | 526.16 | 4.21 | 1.64x | 🟢 |  |
+| ArithmeticComposite (non-linear) | avx2 | 512x512 | 0.290 | 903.51 | 7.23 | 2.82x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 13.648 | 307.31 | 2.46 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 8.148 | 514.74 | 4.12 | 1.67x | 🟢 |  |
+| ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 5.223 | 803.11 | 6.42 | 2.61x | 🟢 |  |
+| ComponentTransfer | scalar | 512x512 | 0.355 | 738.78 | 5.91 | 1.00x |  |  |
+| ComponentTransfer | avx2 | 512x512 | 0.333 | 787.90 | 6.30 | 1.07x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
+| ComponentTransfer | scalar | 2048x2048 | 5.906 | 710.12 | 5.68 | 1.00x |  |  |
+| ComponentTransfer | avx2 | 2048x2048 | 5.275 | 795.08 | 6.36 | 1.12x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
+| ConvolveMatrix | scalar | 512x512 | 12.515 | 20.95 | 0.17 | 1.00x |  |  |
+| ConvolveMatrix | sse2 | 512x512 | 2.194 | 119.48 | 0.96 | 5.70x | 🟢 |  |
+| ConvolveMatrix | avx2 | 512x512 | 1.197 | 219.02 | 1.75 | **10.46x** | 🚀 |  |
+| ConvolveMatrix | avx512 | 512x512 | 1.266 | 207.04 | 1.66 | **9.88x** | 🚀 |  |
+| ConvolveMatrix | scalar | 2048x2048 | 201.894 | 20.77 | 0.17 | 1.00x |  |  |
+| ConvolveMatrix | sse2 | 2048x2048 | 37.423 | 112.08 | 0.90 | 5.39x | 🟢 |  |
+| ConvolveMatrix | avx2 | 2048x2048 | 19.159 | 218.92 | 1.75 | **10.54x** | 🚀 |  |
+| ConvolveMatrix | avx512 | 2048x2048 | 17.090 | 245.43 | 1.96 | **11.81x** | 🚀 |  |
+| DisplacementMap | scalar | 512x512 | 2.312 | 113.37 | 1.36 | 1.00x |  |  |
+| DisplacementMap | sse2 | 512x512 | 1.010 | 259.55 | 3.11 | 2.29x | 🟢 |  |
+| DisplacementMap | avx2 | 512x512 | 0.769 | 340.96 | 4.09 | 3.01x | 🟢 |  |
+| DisplacementMap | avx512 | 512x512 | 0.517 | 507.44 | 6.09 | 4.48x | 🟢 |  |
+| DisplacementMap | scalar | 2048x2048 | 35.956 | 116.65 | 1.40 | 1.00x |  |  |
+| DisplacementMap | sse2 | 2048x2048 | 16.831 | 249.21 | 2.99 | 2.14x | 🟢 |  |
+| DisplacementMap | avx2 | 2048x2048 | 14.587 | 287.53 | 3.45 | 2.46x | 🟢 |  |
+| DisplacementMap | avx512 | 2048x2048 | 13.112 | 319.88 | 3.84 | 2.74x | 🟢 |  |
+| GaussianBlur | scalar | 512x512 | 20.060 | 13.07 | 0.10 | 1.00x |  |  |
+| GaussianBlur | ssse3 | 512x512 | 6.245 | 41.98 | 0.34 | 3.21x | 🟢 |  |
+| GaussianBlur | avx2 | 512x512 | 6.039 | 43.41 | 0.35 | 3.32x | 🟢 |  |
+| GaussianBlur | scalar | 2048x2048 | 360.458 | 11.64 | 0.09 | 1.00x |  |  |
+| GaussianBlur | ssse3 | 2048x2048 | 98.641 | 42.52 | 0.34 | 3.65x | 🟢 |  |
+| GaussianBlur | avx2 | 2048x2048 | 95.162 | 44.08 | 0.35 | 3.79x | 🟢 |  |
+| Lighting | scalar | 512x512 | 12.935 | 20.27 | 0.16 | 1.00x |  |  |
+| Lighting | sse2 | 512x512 | 0.838 | 312.90 | 2.50 | **15.44x** | 🚀 |  |
+| Lighting | ssse3 | 512x512 | 0.798 | 328.35 | 2.63 | **16.20x** | 🚀 |  |
+| Lighting | avx2 | 512x512 | 0.870 | 301.36 | 2.41 | **14.87x** | 🚀 |  |
+| Lighting | avx512 | 512x512 | 0.866 | 302.59 | 2.42 | **14.93x** | 🚀 |  |
+| Lighting | scalar | 2048x2048 | 205.543 | 20.41 | 0.16 | 1.00x |  |  |
+| Lighting | sse2 | 2048x2048 | 13.168 | 318.52 | 2.55 | **15.61x** | 🚀 |  |
+| Lighting | ssse3 | 2048x2048 | 13.852 | 302.79 | 2.42 | **14.84x** | 🚀 |  |
+| Lighting | avx2 | 2048x2048 | 13.854 | 302.74 | 2.42 | **14.84x** | 🚀 |  |
+| Lighting | avx512 | 2048x2048 | 13.388 | 313.28 | 2.51 | **15.35x** | 🚀 |  |
+| Morphology | scalar | 512x512 | 23.492 | 11.16 | 0.09 | 1.00x |  |  |
+| Morphology | sse2 | 512x512 | 1.297 | 202.06 | 1.62 | **18.11x** | 🚀 |  |
+| Morphology | avx2 | 512x512 | 1.254 | 209.04 | 1.67 | **18.73x** | 🚀 |  |
+| Morphology | avx512 | 512x512 | 2.105 | 124.51 | 1.00 | **11.16x** | 🚀 |  |
+| Morphology | scalar | 2048x2048 | 495.957 | 8.46 | 0.07 | 1.00x |  |  |
+| Morphology | sse2 | 2048x2048 | 24.375 | 172.07 | 1.38 | **20.35x** | 🚀 |  |
+| Morphology | avx2 | 2048x2048 | 24.679 | 169.95 | 1.36 | **20.10x** | 🚀 |  |
+| Morphology | avx512 | 2048x2048 | 38.816 | 108.06 | 0.86 | **12.78x** | 🚀 |  |
+| Turbulence | scalar | 512x512 | 15.520 | 16.89 | 0.07 | 1.00x |  |  |
+| Turbulence | ssse3 | 512x512 | 11.161 | 23.49 | 0.09 | 1.39x | 🟢 |  |
+| Turbulence | avx2 | 512x512 | 7.245 | 36.18 | 0.14 | 2.14x | 🟢 |  |
+| Turbulence | scalar | 2048x2048 | 249.062 | 16.84 | 0.07 | 1.00x |  |  |
+| Turbulence | ssse3 | 2048x2048 | 179.455 | 23.37 | 0.09 | 1.39x | 🟢 |  |
+| Turbulence | avx2 | 2048x2048 | 120.448 | 34.82 | 0.14 | 2.07x | 🟢 |  |
+| UnLinearize | scalar | 512x512 | 0.281 | 934.13 | 7.47 | 1.00x |  |  |
+| UnLinearize | ssse3 | 512x512 | 0.251 | 1045.08 | 8.36 | 1.12x | 🟢 | exact production-LUT path |
+| UnLinearize | avx2 | 512x512 | 0.193 | 1359.32 | 10.87 | 1.46x | 🟢 |  |
+| UnLinearize | scalar | 2048x2048 | 4.858 | 863.45 | 6.91 | 1.00x |  |  |
+| UnLinearize | ssse3 | 2048x2048 | 4.271 | 982.00 | 7.86 | 1.14x | 🟢 | exact production-LUT path |
+| UnLinearize | avx2 | 2048x2048 | 3.818 | 1098.53 | 8.79 | 1.27x | 🟢 |  |
 ## Host Results (x86-32, Android emulator)
 
 Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark { }` harness (medians).
@@ -137,12 +134,10 @@ Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark
 | Lighting | scalar | 2048x2048 | 1087.123 | 3.86 | 0.03 | 1.00x |  |  |
 | Lighting | sse2 | 2048x2048 | 19.766 | 212.20 | 1.70 | **55.0x** | 🚀 | rebuilt kernel, parity-verified |
 | Lighting | ssse3 | 2048x2048 | 19.510 | 214.98 | 1.72 | **55.7x** | 🚀 | same SSE2 kernel |
-| Morphology | scalar | 512x512 | 156.698 | 1.67 | 0.01 | 1.00x |  |  |
-| Morphology | sse2 | 512x512 | 1.520 | 172.41 | 1.38 | **103.1x** | 🚀 |  |
-| Morphology | ssse3 | 512x512 | 170.287 | 1.54 | 0.01 | 0.92x | 🔴 | no x86-32 kernel; falls back to scalar |
-| Morphology | scalar | 2048x2048 | 2584.828 | 1.62 | 0.01 | 1.00x |  |  |
-| Morphology | sse2 | 2048x2048 | 24.652 | 170.14 | 1.36 | **104.9x** | 🚀 |  |
-| Morphology | ssse3 | 2048x2048 | 2807.434 | 1.49 | 0.01 | 0.92x | 🔴 | no x86-32 kernel; falls back to scalar |
+| Morphology | scalar | 512x512 | 155.450 | 1.69 | 0.01 | 1.00x |  | fresh full i386 emulator run |
+| Morphology | sse2 | 512x512 | 1.557 | 168.33 | 1.35 | **99.79x** | 🚀 | i386 SSE2 assembly; valid |
+| Morphology | scalar | 2048x2048 | 2537.789 | 1.65 | 0.01 | 1.00x |  | fresh full i386 emulator run |
+| Morphology | sse2 | 2048x2048 | 24.784 | 169.23 | 1.35 | **102.40x** | 🚀 | i386 SSE2 assembly; valid |
 | Turbulence | scalar | 512x512 | 69.761 | 3.76 | 0.03 | 1.00x |  | fresh full i386 emulator run |
 | Turbulence | ssse3 | 512x512 | 13.730 | 19.09 | 0.15 | **5.08x** | 🟢 | i386 SSSE3 assembly; parity-verified |
 | Turbulence | scalar | 2048x2048 | 1113.571 | 3.77 | 0.03 | 1.00x |  | fresh full i386 emulator run |
@@ -153,14 +148,14 @@ Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark
 | UnLinearize | ssse3 | 2048x2048 | 3.992 | 1057.71 | 8.46 | **3.42x** | 🟢 | accepted benchmark result |
 
 The emulator exposes only `scalar`/`sse2`/`ssse3` (AVX is gated out of runtime detection on 32-bit x86 by Android).
-If a kernel row is missing a backend it is not advertised on this ABI (e.g. `Morphology` `ssse3` silently runs the scalar fallback).
+If a kernel row is missing a backend it is not advertised on this ABI. Morphology exposes only scalar/SSE2/AVX2/AVX-512 on x86.
 
 ## Device Results (OnePlus 11)
 
 Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBenchmark { }` harness (medians, fresh 2026-09-07 re-measurement after the WP1 arm32 register-aliasing fixes).
 
-| Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status |
-| :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: |
+| Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
+| :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
 | ArithmeticComposite (linear) | scalar | 512x512 | 17.470 | 15.00 | 0.12 | 1.00x |  |
 | ArithmeticComposite (linear) | neon64 | 512x512 | 51.858 | 5.05 | 0.04 | 0.34x | 🔴 |
 | ArithmeticComposite (linear) | scalar | 2048x2048 | 280.386 | 14.96 | 0.12 | 1.00x |  |
@@ -200,8 +195,7 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBen
 | UnLinearize | scalar | 512x512 | 1.100 | 238.43 | 1.91 | 1.00x |  |
 | UnLinearize | neon64 | 512x512 | 24.242 | 10.81 | 0.09 | 0.05x | 🔴 |
 | UnLinearize | scalar | 2048x2048 | 17.811 | 235.48 | 1.88 | 1.00x |  |
-| UnLinearize | neon64 | 2048x2048 | 387.704 | 10.82 | 0.09 | 0.05x | 🔴 |
-
+| UnLinearize | neon64 | 2048x2048 | 387.704 | 10.82 | 0.09 | 0.05x | 🔴 |  |
 ## Device Results (OnePlus 11, 32-bit ARM)
 
 Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit) test APK using the stable `nativeBenchmark { }` harness (medians).

@@ -41,9 +41,6 @@ import org.junit.runner.RunWith
  *    ArithmeticComposite (both modes), ConvolveMatrix, DisplacementMap, Lighting,
  *    Turbulence, GaussianBlur; empty runs the full suite.
  *  - `benchmark.quick` = true runs 512x512 only (else 512x512 + 2048x2048).
- *  - `benchmark.row` = true runs only the aarch64 morphology **row** kernel
- *    (`neon64-row` backend label, via `MorphologyNative.applyForcedRow`), for
- *    comparing the multi-pixel-per-call variant against the per-pixel `neon64`.
  */
 @RunWith(AndroidJUnit4::class)
 class KernelPerformanceDeviceBenchmark {
@@ -71,13 +68,6 @@ class KernelPerformanceDeviceBenchmark {
         val quick =
             InstrumentationRegistry.getArguments().getString("benchmark.quick") == "true"
         val target = InstrumentationRegistry.getArguments().getString("benchmark.kernel")
-        val row = InstrumentationRegistry.getArguments().getString("benchmark.row") == "true"
-
-        if (row) {
-            benchmarkMorphologyRow(quick)
-            return
-        }
-
         if (target.isNullOrEmpty() || target == "UnLinearize") benchmarkUnLinearize(quick)
         if (target.isNullOrEmpty() || target == "ComponentTransfer") benchmarkComponentTransfer(quick)
         if (target.isNullOrEmpty() || target == "Morphology") benchmarkMorphology(quick)
@@ -169,44 +159,6 @@ class KernelPerformanceDeviceBenchmark {
                     clipBottom = h,
                     simdBackend = b
                 )
-            }
-        }
-    }
-
-    /**
-     * The aarch64 row kernel (one call per output row, overlapping horizontal
-     * windows share a scratch column-reduction row) is not advertised by
-     * [MorphologyNative.nativeBackend], so it is benchmarked explicitly with a
-     * `neon64-row` backend label and driven through [MorphologyNative.applyForcedRow].
-     */
-    private fun benchmarkMorphologyRow(quick: Boolean) {
-        for ((w, h) in sizes(quick)) {
-            val src = IntArray(w * h)
-            val dst = IntArray(w * h)
-            nativeBenchmark {
-                this.name = "Morphology"
-                backend = "neon64-row"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    MorphologyNative.applyForcedRow(
-                        src = src,
-                        dst = dst,
-                        width = w,
-                        height = h,
-                        radiusX = 5,
-                        radiusY = 5,
-                        erode = true,
-                        clipLeft = 0,
-                        clipTop = 0,
-                        clipRight = w,
-                        clipBottom = h,
-                        simdBackend = SIMD_NEON64,
-                    )
-                }
             }
         }
     }

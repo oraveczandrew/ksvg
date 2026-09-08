@@ -156,12 +156,12 @@ original layout/size 120), Kotlin `setNeon32DebugOut`, and deleted the throwaway
 
 Ran the device turbulence bench (armeabi-v7a build) after the parity fix+commit.
 
-| Kernel | Backend | Size | AvgMs | MPix/s | GB/s | Speedup |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| Turbulence | scalar | 512x512 | 136.992 | 1.91 | 0.01 | 1.00 |
-| Turbulence | neon32 | 512x512 | 40.719 | 6.44 | 0.03 | 3.36 |
-| Turbulence | scalar | 2048x2048 | 2165.834 | 1.94 | 0.01 | 1.00 |
-| Turbulence | neon32 | 2048x2048 | 660.526 | 6.35 | 0.03 | 3.28 |
+| Kernel | Backend | Size | AvgMs | MPix/s | GB/s | Speedup | Note |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Turbulence | scalar | 512x512 | 136.992 | 1.91 | 0.01 | 1.00 |  |
+| Turbulence | neon32 | 512x512 | 40.719 | 6.44 | 0.03 | 3.36 |  |
+| Turbulence | scalar | 2048x2048 | 2165.834 | 1.94 | 0.01 | 1.00 |  |
+| Turbulence | neon32 | 2048x2048 | 660.526 | 6.35 | 0.03 | 3.28 |  |
 
 ### Implication
 Phase 2's exit gate (neon32 >= 1.3x scalar in the same bench run) is ALREADY

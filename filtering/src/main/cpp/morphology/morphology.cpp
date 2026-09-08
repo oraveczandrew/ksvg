@@ -130,103 +130,6 @@ namespace {
         }
     }
 
-#ifndef MORPH_SIMD
-#define MORPH_SIMD
-#endif
-
-#ifdef MORPH_SIMD
-
-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
-#include <arm_neon.h>
-    using Vec = uint8x16_t;
-    inline Vec vecLoad(const jint *p) { return vld1q_u8(reinterpret_cast<const uint8_t *>(p)); }
-    inline Vec vecMin(const Vec a, const Vec b) { return vminq_u8(a, b); }
-    inline Vec vecMax(const Vec a, const Vec b) { return vmaxq_u8(a, b); }
-    inline Vec vecInit(const jint v) { return vreinterpretq_u8_s32(vdupq_n_s32(v)); }
-    inline Vec vecInitByte(const jint v) { return vdupq_n_u8(static_cast<uint8_t>(v)); }
-
-    inline jint lane(const Vec v, const int i) {
-        alignas(16) uint8_t bytes[16];
-        vst1q_u8(bytes, v);
-        return bytes[i];
-    }
-#else
-#include <emmintrin.h>
-    using Vec = __m128i;
-    inline Vec vecLoad(const jint *p) { return _mm_loadu_si128(reinterpret_cast<const __m128i *>(p)); }
-    inline Vec vecMin(Vec a, Vec b) { return _mm_min_epu8(a, b); }
-    inline Vec vecMax(Vec a, Vec b) { return _mm_max_epu8(a, b); }
-    inline Vec vecInit(jint v) { return _mm_set1_epi32(v); }
-    inline Vec vecInitByte(jint v) { return _mm_set1_epi8(static_cast<char>(v)); }
-    inline jint lane(Vec v, int i) {
-        alignas(16) uint8_t bytes[16];
-        _mm_storeu_si128(reinterpret_cast<__m128i *>(bytes), v);
-        return static_cast<jint>(bytes[i]);
-    }
-#endif
-
-    /**
-     * Interior pixel: window fully inside the image. Folds the square footprint
-     * through 16-byte vectors; lane 0/1/2/3 hold B/G/R/A because chunks start on
-     * pixel boundaries. Tail taps (< 4 px) run scalar.
-     */
-    inline void applyVectorPixel(
-        const jint *src, jint *dst, const jint width,
-        const jint radiusX, const jint radiusY, const bool isErode, [[maybe_unused]] jint init, const jint x, const jint y) {
-        const jint top = y - radiusY;
-        const jint bottom = y + radiusY;
-        const jint left = x - radiusX;
-        const jint right = x + radiusX;
-
-        Vec accMin = vecInitByte(isErode ? 255 : 0);
-        Vec accMax = vecInitByte(0);
-
-        for (jint ky = top; ky <= bottom; ky++) {
-            const jint *row = src + ky * width;
-            jint kx = left;
-            for (; kx + 4 <= right + 1; kx += 4) {
-                const Vec c = vecLoad(row + kx);
-                accMin = vecMin(accMin, c);
-                accMax = vecMax(accMax, c);
-            }
-            for (; kx <= right; kx++) {
-                const jint c = row[kx];
-                const Vec cv = vecInit(c);
-                accMin = vecMin(accMin, cv);
-                accMax = vecMax(accMax, cv);
-            }
-        }
-
-        const Vec acc = isErode ? accMin : accMax;
-        jint resA = 255, resR = 255, resG = 255, resB = 255;
-        if (!isErode) {
-            resA = 0;
-            resR = 0;
-            resG = 0;
-            resB = 0;
-        }
-
-        for (int i = 0; i < 4; i++) {
-            jint a = lane(acc, i * 4 + 3);
-            jint r = lane(acc, i * 4 + 2);
-            jint g = lane(acc, i * 4 + 1);
-            jint b = lane(acc, i * 4 + 0);
-            if (isErode) {
-                resA = std::min(resA, a);
-                resR = std::min(resR, r);
-                resG = std::min(resG, g);
-                resB = std::min(resB, b);
-            } else {
-                resA = std::max(resA, a);
-                resR = std::max(resR, r);
-                resG = std::max(resG, g);
-                resB = std::max(resB, b);
-            }
-        }
-        dst[y * width + x] = (resA << 24) | (resR << 16) | (resG << 8) | resB;
-    }
-
-#endif // MORPH_SIMD
 } // namespace
 
 
@@ -294,11 +197,6 @@ namespace {
                     case SIMD_BACKEND_AVX512:
                         ksvgMorphologyApplyRowAvx512(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
                         break;
-                    case SIMD_BACKEND_SSSE3:
-                        for (jint x = vxLo; x < vxHi; x++) {
-                            applyVectorPixel(src, dst, width, radiusX, radiusY, erode, init, x, y);
-                        }
-                        break;
                     default:
                         assert(false && "unsupported forced morphology backend on x86");
                 }
@@ -325,18 +223,15 @@ namespace {
 
     jint nativeBackendForAbi() {
         jint backends = SIMD_BACKEND_SCALAR;
-#ifdef MORPH_SIMD
 #if defined(__aarch64__)
         backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
         backends |= SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
         backends |= SIMD_BACKEND_SSE2;
-        backends |= SIMD_BACKEND_SSSE3;
         const SimdLevel level = detectSimdLevel();
         if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
         if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
-#endif
 #endif
         return backends;
     }
@@ -372,161 +267,6 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForced(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_hu_oandras_ksvg_filtering_MorphologyNative_applyForcedRow(
-    JNIEnv *env, [[maybe_unused]] jclass clazz,
-    const jintArray jSrc, const jintArray jDst,
-    const jint width, const jint height,
-    const jint radiusX, const jint radiusY, const jboolean erode,
-    const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
-    const jint simdBackend) {
-    auto *src = env->GetIntArrayElements(jSrc, nullptr);
-    if (src == nullptr) return;
-    auto *dst = env->GetIntArrayElements(jDst, nullptr);
-    if (dst == nullptr) {
-        env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
-        return;
-    }
-
-    std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
-
-#if defined(__aarch64__)
-    // Row-kernel forced variant: scalar borders + row kernel on the interior.
-    const jint yLo = clipTop;
-    const jint yHi = clipBottom;
-    const jint xLo = clipLeft;
-    const jint xHi = clipRight;
-
-    const jint vyLo = std::max(yLo, radiusY);
-    const jint vyHi = std::min(yHi, height - radiusY);
-    const jint vxLo = std::max(xLo, radiusX);
-    const jint vxHi = std::min(xHi, width - radiusX);
-
-    const bool isErode = erode == JNI_TRUE;
-    const jint init = isErode ? 255 : 0;
-    const jint span = vxHi - vxLo + 2 * radiusX;
-    jint *spanBuf = span > 0 ? new jint[span] : nullptr;
-
-    for (jint y = yLo; y < yHi; y++) {
-        if (y >= vyLo && y < vyHi) {
-            for (jint x = xLo; x < vxLo; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-            if (simdBackend == SIMD_BACKEND_SCALAR) {
-                for (jint x = vxLo; x < vxHi; x++) {
-                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-                }
-            } else {
-                ksvgMorphologyApplyRowNeon64(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
-            }
-            for (jint x = vxHi; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-        } else {
-            for (jint x = xLo; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-        }
-    }
-    delete[] spanBuf;
-#elif defined(__arm__)
-    const jint yLo = clipTop;
-    const jint yHi = clipBottom;
-    const jint xLo = clipLeft;
-    const jint xHi = clipRight;
-
-    const jint vyLo = std::max(yLo, radiusY);
-    const jint vyHi = std::min(yHi, height - radiusY);
-    const jint vxLo = std::max(xLo, radiusX);
-    const jint vxHi = std::min(xHi, width - radiusX);
-
-    const bool isErode = erode == JNI_TRUE;
-    const jint init = isErode ? 255 : 0;
-    const jint span = vxHi - vxLo + 2 * radiusX;
-    jint *spanBuf = span > 0 ? new jint[span] : nullptr;
-
-    for (jint y = yLo; y < yHi; y++) {
-        if (y >= vyLo && y < vyHi) {
-            for (jint x = xLo; x < vxLo; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-            if (simdBackend == SIMD_BACKEND_SCALAR) {
-                for (jint x = vxLo; x < vxHi; x++) {
-                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-                }
-            } else {
-                ksvgMorphologyApplyRowNeon32(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
-            }
-            for (jint x = vxHi; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-        } else {
-            for (jint x = xLo; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-        }
-    }
-    delete[] spanBuf;
-#elif defined(__i386__) || defined(__x86_64__)
-    const jint yLo = clipTop;
-    const jint yHi = clipBottom;
-    const jint xLo = clipLeft;
-    const jint xHi = clipRight;
-
-    const jint vyLo = std::max(yLo, radiusY);
-    const jint vyHi = std::min(yHi, height - radiusY);
-    const jint vxLo = std::max(xLo, radiusX);
-    const jint vxHi = std::min(xHi, width - radiusX);
-
-    const bool isErode = erode == JNI_TRUE;
-    const jint init = isErode ? 255 : 0;
-    const jint span = vxHi - vxLo + 2 * radiusX;
-    jint *spanBuf = span > 0 ? new jint[span] : nullptr;
-
-    for (jint y = yLo; y < yHi; y++) {
-        if (y >= vyLo && y < vyHi) {
-            for (jint x = xLo; x < vxLo; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-            switch (simdBackend) {
-                case SIMD_BACKEND_SCALAR:
-                    for (jint x = vxLo; x < vxHi; x++) {
-                        applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
-                    }
-                    break;
-                case SIMD_BACKEND_SSE2:
-                    ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
-                    break;
-                case SIMD_BACKEND_AVX2:
-                    ksvgMorphologyApplyRowAvx2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
-                    break;
-                case SIMD_BACKEND_AVX512:
-                    ksvgMorphologyApplyRowAvx512(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
-                    break;
-                default:
-                    for (jint x = vxLo; x < vxHi; x++) {
-                        applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-                    }
-            }
-            for (jint x = vxHi; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-        } else {
-            for (jint x = xLo; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
-            }
-        }
-    }
-    delete[] spanBuf;
-#else
-    runForced(src, dst, width, height, radiusX, radiusY, erode == JNI_TRUE,
-              clipLeft, clipTop, clipRight, clipBottom, SIMD_BACKEND_SCALAR);
-#endif
-
-    env->ReleaseIntArrayElements(jDst, dst, 0);
-    env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);
-}
-
-extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
     JNIEnv *env, [[maybe_unused]] jclass clazz,
     const jintArray jSrc, const jintArray jDst,
@@ -544,7 +284,6 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
     const bool isErode = erode == JNI_TRUE;
     const jint init = isErode ? 255 : 0;
 
-#ifdef MORPH_SIMD
     const jint yLo = clipTop;
     const jint yHi = clipBottom;
     const jint xLo = clipLeft;
@@ -608,7 +347,7 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             delete[] spanBuf;
 #else
             for (jint x = vxLo; x < vxHi; x++) {
-                applyVectorPixel(src, dst, width, radiusX, radiusY, isErode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
             }
 #endif
             for (jint x = vxHi; x < xHi; x++) {
@@ -621,10 +360,6 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             }
         }
     }
-#else
-    applyScalar(src, dst, width, height, radiusX, radiusY, isErode, init,
-                clipLeft, clipTop, clipRight, clipBottom);
-#endif
 
     env->ReleaseIntArrayElements(jDst, dst, 0);
     env->ReleaseIntArrayElements(jSrc, src, JNI_ABORT);

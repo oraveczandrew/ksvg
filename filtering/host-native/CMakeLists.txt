@@ -20,7 +20,6 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_sse.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix.cpp
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix_x86_sse.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology_x86_64_sse2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology_x86_64_avx2.S
