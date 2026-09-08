@@ -117,12 +117,16 @@ Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark
 | ComponentTransfer | ssse3 | 512x512 | 53.954 | 4.86 | 0.04 | 0.03x | 🔴 | ssse3 pshufb path slower than scalar |
 | ComponentTransfer | scalar | 2048x2048 | 21.847 | 191.99 | 1.54 | 1.00x |  |  |
 | ComponentTransfer | ssse3 | 2048x2048 | 867.596 | 4.83 | 0.04 | 0.03x | 🔴 | ssse3 pshufb path slower than scalar |
-| ConvolveMatrix | scalar | 512x512 | 99.742 | 2.63 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix | scalar | 512x512 | 98.760 | 2.66 | 0.02 | 1.00x |  | fresh i386 emulator run |
+| ConvolveMatrix | sse2 | 512x512 | 4.942 | 53.18 | 0.43 | **19.98x** | 🚀 | fresh i386 SSE2 assembly run |
 | ConvolveMatrix | ssse3 | 512x512 | 38.345 | 6.84 | 0.05 | 2.60x | 🟢 |  |
-| ConvolveMatrix | scalar | 2048x2048 | 1598.571 | 2.62 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix | scalar | 2048x2048 | 1573.879 | 2.67 | 0.02 | — | ⚠️ | harness-invalidated measurement; baseline not used |
+| ConvolveMatrix | sse2 | 2048x2048 | 59.464 | 70.61 | 0.56 | — | 🟢 | scalar baseline invalid in this run |
 | ConvolveMatrix | ssse3 | 2048x2048 | 603.232 | 6.95 | 0.06 | 2.65x | 🟢 |  |
-| DisplacementMap | scalar | 512x512 | 7.432 | 35.27 | 0.28 | 1.00x |  | no SIMD backend on x86 |
-| DisplacementMap | scalar | 2048x2048 | 117.106 | 35.82 | 0.29 | 1.00x |  | no SIMD backend on x86 |
+| DisplacementMap | scalar | 512x512 | 7.745 | 33.95 | 0.27 | 1.00x |  | full i386 emulator bench |
+| DisplacementMap | ssse3 | 512x512 | 0.494 | 553.52 | 4.43 | **15.68x** | 🚀 | i386 SSSE3 assembly; parity-verified |
+| DisplacementMap | scalar | 2048x2048 | 119.300 | 35.15 | 0.28 | 1.00x |  | full i386 emulator bench |
+| DisplacementMap | ssse3 | 2048x2048 | 7.745 | 542.29 | 4.34 | **15.40x** | 🚀 | i386 SSSE3 assembly; parity-verified |
 | GaussianBlur | scalar | 512x512 | 250.787 | 1.05 | 0.01 | 1.00x |  |  |
 | GaussianBlur | ssse3 | 512x512 | 11.752 | 22.31 | 0.18 | **21.34x** | 🚀 | i386 asm kernel |
 | GaussianBlur | scalar | 2048x2048 | 4100.986 | 1.02 | 0.01 | 1.00x |  |  |
@@ -143,10 +147,10 @@ Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark
 | Turbulence | ssse3 | 512x512 | 53.685 | 4.88 | 0.04 | 1.26x | 🟢 |  |
 | Turbulence | scalar | 2048x2048 | 1083.207 | 3.87 | 0.03 | 1.00x |  |  |
 | Turbulence | ssse3 | 2048x2048 | 853.463 | 4.91 | 0.04 | 1.27x | 🟢 |  |
-| UnLinearize | scalar | 512x512 | 1.170 | 224.10 | 1.79 | 1.00x |  |  |
-| UnLinearize | ssse3 | 512x512 | 12.195 | 21.50 | 0.17 | 0.10x | 🔴 | ssse3 pshufb path slower than scalar |
-| UnLinearize | scalar | 2048x2048 | 13.602 | 308.35 | 2.47 | 1.00x |  |  |
-| UnLinearize | ssse3 | 2048x2048 | 193.809 | 21.64 | 0.17 | 0.07x | 🔴 | ssse3 pshufb path slower than scalar |
+| UnLinearize | scalar | 512x512 | 0.927 | 311.55 | 2.49 | 1.00x | 🟢 | accepted benchmark result |
+| UnLinearize | ssse3 | 512x512 | 0.281 | 1090.64 | 8.72 | **3.30x** | 🟢 | accepted benchmark result |
+| UnLinearize | scalar | 2048x2048 | 13.635 | 309.91 | 2.48 | 1.00x | 🟢 | accepted benchmark result |
+| UnLinearize | ssse3 | 2048x2048 | 3.992 | 1057.71 | 8.46 | **3.42x** | 🟢 | accepted benchmark result |
 
 The emulator exposes only `scalar`/`sse2`/`ssse3` (AVX is gated out of runtime detection on 32-bit x86 by Android).
 If a kernel row is missing a backend it is not advertised on this ABI (e.g. `Morphology` `ssse3` silently runs the scalar fallback).
