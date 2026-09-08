@@ -156,7 +156,8 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vmulps  %ymm11, %ymm3, %ymm3
     vaddps  %ymm3, %ymm0, %ymm0         // dot
 
-    vmaxps  .Lzero(%rip), %ymm0, %ymm0
+    vxorps  %ymm4, %ymm4, %ymm4
+    vmaxps  %ymm4, %ymm0, %ymm0
     vmulps  %ymm8, %ymm0, %ymm0
     vbroadcastss .Lone(%rip), %ymm4
     vminps  %ymm4, %ymm0, %ymm0         // intensity

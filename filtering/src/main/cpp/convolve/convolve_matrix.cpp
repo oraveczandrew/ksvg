@@ -65,9 +65,9 @@ void convolveScalarPixel(
     } else {
         ia = ksvg::clamp255(std::floor(a / divisor + bias * 255.f + 0.5f));
     }
-    jint ir = ksvg::clamp255(std::floor(r / divisor + bias * 255.f + 0.5f));
-    jint ig = ksvg::clamp255(std::floor(g / divisor + bias * 255.f + 0.5f));
-    jint ib = ksvg::clamp255(std::floor(b / divisor + bias * 255.f + 0.5f));
+    const jint ir = ksvg::clamp255(std::floor(r / divisor + bias * 255.f + 0.5f));
+    const jint ig = ksvg::clamp255(std::floor(g / divisor + bias * 255.f + 0.5f));
+    const jint ib = ksvg::clamp255(std::floor(b / divisor + bias * 255.f + 0.5f));
 
     dst[y * width + x] = (ia << 24) | (ir << 16) | (ig << 8) | ib;
 }
@@ -126,6 +126,17 @@ void applyX86(
             ksvgConvolveApplyInteriorAvx2(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha);
         } else {
             ksvgConvolveApplyInteriorSse2(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha);
+        }
+
+        // The asm kernels only cover interior columns [xLo, asmEnd), where
+        // asmEnd is the start of the last full vector-width block. Fill the
+        // scalar remainder [asmEnd, xHi) explicitly so no interior pixel is
+        // left unwritten.
+        const jint vecWidth = (backend == SIMD_BACKEND_AVX512) ? 16 : (backend == SIMD_BACKEND_AVX2 ? 8 : 4);
+        const jint asmEnd = targetX + ((xHi - targetX) & ~(vecWidth - 1));
+        for (jint y = yLo; y < yHi; y++) {
+            for (jint x = asmEnd; x < xHi; x++)
+                convolveScalarPixel(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, x, y);
         }
     }
 }

@@ -91,10 +91,12 @@ SYM(ksvgConvolveApplyInteriorSse2):
     cmpl    %r9d, %r10d
     jge     .Lsse2_true_next_y
 
+    # Exact clone of the proven .Lsse2_false body (same register map):
+    # B=xmm0, G=xmm1, R=xmm2, A=xmm3, pixels=xmm4, weight=xmm5, scratch=xmm6.
     pxor    %xmm0, %xmm0              # B
     pxor    %xmm1, %xmm1              # G
     pxor    %xmm2, %xmm2              # R
-
+    pxor    %xmm3, %xmm3              # A
     movq    %rsi, %rdx
     movq    %r15, %rcx
     xorl    %eax, %eax                # ky
@@ -102,29 +104,35 @@ SYM(ksvgConvolveApplyInteriorSse2):
 .Lsse2_true_ky:
     leaq    (%rdx,%rbx,4), %r11       # end source row
 .Lsse2_true_kx:
-    movdqu  (%rdx), %xmm3
-    movss   (%rcx), %xmm4
-    shufps  $0, %xmm4, %xmm4
+    movdqu  (%rdx), %xmm4
+    movss   (%rcx), %xmm5
+    shufps  $0, %xmm5, %xmm5
 
-    movdqa  %xmm3, %xmm5
-    pand    %xmm10, %xmm5
-    cvtdq2ps %xmm5, %xmm5
-    mulps   %xmm4, %xmm5
-    addps   %xmm5, %xmm0
+    movdqa  %xmm4, %xmm6
+    pand    %xmm10, %xmm6
+    cvtdq2ps %xmm6, %xmm6
+    mulps   %xmm5, %xmm6
+    addps   %xmm6, %xmm0
 
-    movdqa  %xmm3, %xmm5
-    psrld   $8, %xmm5
-    pand    %xmm10, %xmm5
-    cvtdq2ps %xmm5, %xmm5
-    mulps   %xmm4, %xmm5
-    addps   %xmm5, %xmm1
+    movdqa  %xmm4, %xmm6
+    psrld   $8, %xmm6
+    pand    %xmm10, %xmm6
+    cvtdq2ps %xmm6, %xmm6
+    mulps   %xmm5, %xmm6
+    addps   %xmm6, %xmm1
 
-    movdqa  %xmm3, %xmm5
-    psrld   $16, %xmm5
-    pand    %xmm10, %xmm5
-    cvtdq2ps %xmm5, %xmm5
-    mulps   %xmm4, %xmm5
-    addps   %xmm5, %xmm2
+    movdqa  %xmm4, %xmm6
+    psrld   $16, %xmm6
+    pand    %xmm10, %xmm6
+    cvtdq2ps %xmm6, %xmm6
+    mulps   %xmm5, %xmm6
+    addps   %xmm6, %xmm2
+
+    movdqa  %xmm4, %xmm6
+    psrld   $24, %xmm6
+    cvtdq2ps %xmm6, %xmm6
+    mulps   %xmm5, %xmm6
+    addps   %xmm6, %xmm3
 
     addq    $4, %rdx
     addq    $4, %rcx
@@ -136,30 +144,27 @@ SYM(ksvgConvolveApplyInteriorSse2):
     cmpl    %ebp, %eax
     jb      .Lsse2_true_ky
 
-    # Round/clamp B/G/R. val = acc/divisor + bias255 + 0.5; floor via trunc + correction.
+    # Round/clamp B/G/R/A (identical to .Lsse2_false). For preserve=true the
+    # convolved A is unused; source alpha is injected at the pack below.
     divps   %xmm13, %xmm0
     addps   %xmm7, %xmm0
     addps   %xmm8, %xmm0
     cvttps2dq %xmm0, %xmm14
     cvtdq2ps %xmm14, %xmm15
     movaps  %xmm0, %xmm14
-    cmpltps %xmm14, %xmm15         # val < trunc
-    andps   %xmm9, %xmm15
-    subps   %xmm15, %xmm0
+    cmpltps %xmm15, %xmm14
+    andps   %xmm9, %xmm14
+    subps   %xmm14, %xmm0
     cvttps2dq %xmm0, %xmm0
-    # clamp B
-    # clamp lower: max(v,0)
     movdqa  %xmm0, %xmm14
     pcmpgtd %xmm12, %xmm14
-    pand    %xmm14, %xmm0
-    # clamp upper: min(v,255)
-    movdqa  %xmm0, %xmm14
-    movdqa  %xmm14, %xmm15
-    pcmpgtd %xmm11, %xmm15
-    pandn   %xmm15, %xmm14
-    pand    %xmm11, %xmm15
-    por     %xmm15, %xmm14
-    movdqa  %xmm14, %xmm0
+    pand    %xmm0, %xmm14
+    movdqa  %xmm11, %xmm15
+    pcmpgtd %xmm14, %xmm15
+    pand    %xmm15, %xmm14
+    pandn   %xmm11, %xmm15
+    por     %xmm14, %xmm15
+    movdqa  %xmm15, %xmm0
 
     divps   %xmm13, %xmm1
     addps   %xmm7, %xmm1
@@ -171,18 +176,15 @@ SYM(ksvgConvolveApplyInteriorSse2):
     andps   %xmm9, %xmm14
     subps   %xmm14, %xmm1
     cvttps2dq %xmm1, %xmm1
-    # clamp lower: max(v,0)
     movdqa  %xmm1, %xmm14
     pcmpgtd %xmm12, %xmm14
-    pand    %xmm14, %xmm1
-    # clamp upper: min(v,255)
-    movdqa  %xmm1, %xmm14
-    movdqa  %xmm14, %xmm15
-    pcmpgtd %xmm11, %xmm15
-    pandn   %xmm15, %xmm14
-    pand    %xmm11, %xmm15
-    por     %xmm15, %xmm14
-    movdqa  %xmm14, %xmm1
+    pand    %xmm1, %xmm14
+    movdqa  %xmm11, %xmm15
+    pcmpgtd %xmm14, %xmm15
+    pand    %xmm15, %xmm14
+    pandn   %xmm11, %xmm15
+    por     %xmm14, %xmm15
+    movdqa  %xmm15, %xmm1
 
     divps   %xmm13, %xmm2
     addps   %xmm7, %xmm2
@@ -194,28 +196,29 @@ SYM(ksvgConvolveApplyInteriorSse2):
     andps   %xmm9, %xmm14
     subps   %xmm14, %xmm2
     cvttps2dq %xmm2, %xmm2
-    # clamp lower: max(v,0)
     movdqa  %xmm2, %xmm14
     pcmpgtd %xmm12, %xmm14
-    pand    %xmm14, %xmm2
-    # clamp upper: min(v,255)
-    movdqa  %xmm2, %xmm14
-    movdqa  %xmm14, %xmm15
-    pcmpgtd %xmm11, %xmm15
-    pandn   %xmm15, %xmm14
-    pand    %xmm11, %xmm15
-    por     %xmm15, %xmm14
-    movdqa  %xmm14, %xmm2
+    pand    %xmm2, %xmm14
+    movdqa  %xmm11, %xmm15
+    pcmpgtd %xmm14, %xmm15
+    pand    %xmm15, %xmm14
+    pandn   %xmm11, %xmm15
+    por     %xmm14, %xmm15
+    movdqa  %xmm15, %xmm2
 
-    # Preserve alpha from the output pixel x (the center source pixel).
-    movq    0(%rsp), %rax
-    movdqu  (%rsi,%rax), %xmm3
-    psrld   $24, %xmm3
-    pslld   $24, %xmm3
+    # Pack BGR, then preserve alpha from the center source pixel src[x, y].
+    # rsi points at the window-top row (y - targetY) for column x, so add
+    # targetX*4 plus targetY*stride to reach the output column/row.
     pslld   $16, %xmm2
     pslld   $8, %xmm1
     por     %xmm1, %xmm0
     por     %xmm2, %xmm0
+    movslq  120(%rsp), %rax
+    imulq   %r14, %rax
+    addq    0(%rsp), %rax
+    movdqu  (%rsi,%rax), %xmm3
+    psrld   $24, %xmm3
+    pslld   $24, %xmm3
     por     %xmm3, %xmm0
     movdqu  %xmm0, (%rdi)
 

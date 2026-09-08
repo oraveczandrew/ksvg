@@ -147,9 +147,14 @@ SYM(ksvgConvolveApplyInteriorAvx512):
     vpmaxsd %zmm4, %zmm7, %zmm7
     vpminsd %zmm3, %zmm7, %zmm7
 
-    # preserve alpha from center source vector
+    # preserve alpha from center source pixel src[x, y]. r12 points at the
+    # window-top row (y - targetY) for column x; add targetY*stride to reach
+    # the output row.
     movslq %r10d, %rax
     shlq $2, %rax
+    movslq 120(%rsp), %rcx
+    imulq %r14, %rcx
+    addq %rcx, %rax
     vmovdqu32 (%r12,%rax), %zmm10
     vpsrld $24, %zmm10, %zmm10
 

@@ -338,7 +338,7 @@ namespace {
 void runForced(const jint* src, jint* dst, jint width, jint height,
                jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
                const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB,
-               jint backend) {
+               const jint backend) {
 #if defined(__aarch64__)
     if (backend == SIMD_BACKEND_SCALAR) {
         applyScalar(src, dst, width, height, clipLeft, clipTop, clipRight, clipBottom,

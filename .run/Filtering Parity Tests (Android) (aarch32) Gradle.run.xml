@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Filtering Parity Tests (Android) (32bit) Gradle" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="Filtering Parity Tests (Android) (aarch32) Gradle" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
