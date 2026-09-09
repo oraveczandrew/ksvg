@@ -48,41 +48,47 @@
  * Clobbers V0..V3, V5..V7, V12..V14.
  */
 .macro LUT8_14
-    and     v5.8b, v4.8b, v7.8b
-    ushr    v6.8b, v4.8b, #6
+    and     v5.8b, v4.8b, v12.8b   /* v12 = mask #63 */
+    ushr    v6.8b, v4.8b, #6       /* v6 = bank index 0..3 */
 
     tbl     v0.8b, {v16.16b-v19.16b}, v5.8b
     tbl     v1.8b, {v20.16b-v23.16b}, v5.8b
     tbl     v2.8b, {v24.16b-v27.16b}, v5.8b
     tbl     v3.8b, {v28.16b-v31.16b}, v5.8b
 
-    movi    v12.8b, #0
-    movi    v13.8b, #1
-    movi    v14.8b, #2
-    cmeq    v12.8b, v6.8b, v12.8b
-    cmeq    v13.8b, v6.8b, v13.8b
-    cmeq    v14.8b, v6.8b, v14.8b
-    bsl     v14.8b, v2.8b, v3.8b
-    bsl     v13.8b, v1.8b, v14.8b
-    bsl     v14.8b, v0.8b, v13.8b
+    movi    v5.8b, #0
+    movi    v7.8b, #1
+    movi    v13.8b, #2
+    cmeq    v5.8b, v6.8b, v5.8b    /* v5 = mask(0) */
+    cmeq    v7.8b, v6.8b, v7.8b    /* v7 = mask(1) */
+    cmeq    v13.8b, v6.8b, v13.8b   /* v13 = mask(2) */
+
+    bsl     v13.8b, v2.8b, v3.8b    /* v13 = (mask(2))? v2 : v3 */
+    bsl     v7.8b, v1.8b, v13.8b    /* v7  = (mask(1))? v1 : v13 */
+    bsl     v5.8b, v0.8b, v7.8b     /* v5  = (mask(0))? v0 : v7 */
+    mov     v14.8b, v5.8b           /* output in v14 */
 .endm
 
 .macro LUT8_15
-    and     v5.8b, v4.8b, v7.8b
+    and     v5.8b, v4.8b, v12.8b
     ushr    v6.8b, v4.8b, #6
+
     tbl     v0.8b, {v16.16b-v19.16b}, v5.8b
     tbl     v1.8b, {v20.16b-v23.16b}, v5.8b
     tbl     v2.8b, {v24.16b-v27.16b}, v5.8b
     tbl     v3.8b, {v28.16b-v31.16b}, v5.8b
-    movi    v12.8b, #0
-    movi    v13.8b, #1
-    movi    v14.8b, #2
-    cmeq    v12.8b, v6.8b, v12.8b
+
+    movi    v5.8b, #0
+    movi    v7.8b, #1
+    movi    v13.8b, #2
+    cmeq    v5.8b, v6.8b, v5.8b
+    cmeq    v7.8b, v6.8b, v7.8b
     cmeq    v13.8b, v6.8b, v13.8b
-    cmeq    v14.8b, v6.8b, v14.8b
-    bsl     v14.8b, v2.8b, v3.8b
-    bsl     v13.8b, v1.8b, v14.8b
-    bsl     v15.8b, v0.8b, v13.8b
+
+    bsl     v13.8b, v2.8b, v3.8b
+    bsl     v7.8b, v1.8b, v13.8b
+    bsl     v5.8b, v0.8b, v7.8b
+    mov     v15.8b, v5.8b           /* output in v15 */
 .endm
 
 /*
@@ -313,7 +319,7 @@ SYM(applyArithmeticNeon):
     fmov    s14, #0.5
     dup     v14.4s, v14.s[0]
     fadd    v11.4s, v13.4s, v14.4s
-    movi    v7.8b, #63
+    movi    v12.8b, #63
 
     /* Load S2L table into four 64-byte TBL4 banks. */
     mov     x8, x0
@@ -351,9 +357,7 @@ SYM(applyArithmeticNeon):
     /* B: S2L + arithmetic. */
     fmov    d4, x16
     fmov    d5, x17
-    movi    v7.8b, #63
     LUT8_14
-    mov     v14.8b, v14.8b
     /* second lookup uses original source2 in x17 */
     fmov    d4, x17
     LUT8_15
@@ -362,7 +366,6 @@ SYM(applyArithmeticNeon):
 
     /* G */
     fmov    d4, x18
-    movi    v7.8b, #63
     LUT8_14
     fmov    d4, x19
     LUT8_15
@@ -371,7 +374,6 @@ SYM(applyArithmeticNeon):
 
     /* R */
     fmov    d4, x20
-    movi    v7.8b, #63
     LUT8_14
     fmov    d4, x21
     LUT8_15
@@ -379,8 +381,8 @@ SYM(applyArithmeticNeon):
     umov    x20, v6.d[0]
 
     /* A: encoded domain, no S2L/L2S. */
-    fmov    d4, x22
-    fmov    d5, x23
+    fmov    d14, x22
+    fmov    d15, x23
     FORMULA8
     umov    x22, v6.d[0]
 
@@ -392,14 +394,12 @@ SYM(applyArithmeticNeon):
     ld1     {v28.16b-v31.16b}, [x8]
 
     fmov    d4, x16
-    movi    v7.8b, #63
     LUT8_14
     umov    x16, v14.d[0]
     fmov    d4, x18
     LUT8_15
     umov    x18, v15.d[0]
     fmov    d4, x20
-    movi    v7.8b, #63
     LUT8_14
     umov    x20, v14.d[0]
 
@@ -438,7 +438,7 @@ SYM(applyArithmeticNeon):
     sub     x9, x9, x13
     sub     x10, x10, x13
     sub     x11, x11, x13
-    b       .Lrow_start_linear
+    b       .Lrow_linear
 
 /* -------------------------------------------------------------------------
  * Scalar tails.

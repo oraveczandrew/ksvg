@@ -149,18 +149,18 @@ If a kernel row is missing a backend it is not advertised on this ABI. Morpholog
 
 ## Device Results (OnePlus 11)
 
-Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBenchmark { }` harness (medians, fresh 2026-09-07 re-measurement after the WP1 arm32 register-aliasing fixes).
+Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBenchmark { }` harness (medians, fresh 2026-09-08 re-measurement after fixing and verifying ArithmeticComposite linear performance).
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
-| ArithmeticComposite (linear) | scalar | 512x512 | 17.470 | 15.00 | 0.12 | 1.00x |  |
-| ArithmeticComposite (linear) | neon64 | 512x512 | 51.858 | 5.05 | 0.04 | 0.34x | 🔴 |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 280.386 | 14.96 | 0.12 | 1.00x |  |
-| ArithmeticComposite (linear) | neon64 | 2048x2048 | 830.059 | 5.05 | 0.04 | 0.34x | 🔴 |
-| ArithmeticComposite (non-linear) | scalar | 512x512 | 16.469 | 15.92 | 0.13 | 1.00x |  |
-| ArithmeticComposite (non-linear) | neon64 | 512x512 | 0.920 | 284.83 | 2.28 | **17.89x** | 🚀 |
-| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 264.485 | 15.86 | 0.13 | 1.00x |  |
-| ArithmeticComposite (non-linear) | neon64 | 2048x2048 | 13.585 | 308.75 | 2.47 | **19.47x** | 🚀 |
+| ArithmeticComposite (linear) | scalar | 512x512 | 17.50 | 14.98 | 0.12 | 1.00x |  |  |
+| ArithmeticComposite (linear) | neon64 | 512x512 | 1.83 | 143.16 | 1.15 | **9.56x** | 🚀 |  |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 280.36 | 14.96 | 0.12 | 1.00x |  |  |
+| ArithmeticComposite (linear) | neon64 | 2048x2048 | 32.72 | 128.18 | 1.03 | 8.57x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 512x512 | 16.80 | 15.60 | 0.12 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | neon64 | 512x512 | 1.14 | 229.41 | 1.84 | **14.74x** | 🚀 |  |
+| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 264.05 | 15.88 | 0.13 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | neon64 | 2048x2048 | 18.19 | 230.60 | 1.84 | **14.52x** | 🚀 |  |
 | ComponentTransfer | scalar | 512x512 | 2.164 | 121.15 | 0.97 | 1.00x |  |
 | ComponentTransfer | neon64 | 512x512 | 26.687 | 9.82 | 0.08 | 0.08x | 🔴 |
 | ComponentTransfer | scalar | 2048x2048 | 34.701 | 120.87 | 0.97 | 1.00x |  |
@@ -199,14 +199,14 @@ Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit) test APK usi
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
-| ArithmeticComposite (linear) | scalar | 512x512 | 32.484 | 8.07 | 0.06 | 1.00x |  |  |
-| ArithmeticComposite (linear) | neon32 | 512x512 | 149.170 | 1.76 | 0.01 | 0.22x | 🔴 |  |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 518.379 | 8.09 | 0.06 | 1.00x |  |  |
-| ArithmeticComposite (linear) | neon32 | 2048x2048 | 2383.754 | 1.76 | 0.01 | 0.22x | 🔴 |  |
-| ArithmeticComposite (non-linear) | scalar | 512x512 | 30.497 | 8.60 | 0.07 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | neon32 | 512x512 | 1.317 | 199.08 | 1.59 | **23.16x** | 🚀 | UNSTABLE (noisy timing) |
-| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 487.406 | 8.61 | 0.07 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | neon32 | 2048x2048 | 26.699 | 157.10 | 1.26 | **18.26x** | 🚀 |  |
+| ArithmeticComposite (linear) | scalar | 512x512 | 32.58 | 8.05 | 0.06 | 1.00x |  |  |
+| ArithmeticComposite (linear) | neon32 | 512x512 | 12.21 | 21.47 | 0.17 | 2.67x | 🟢 |  |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 518.90 | 8.08 | 0.06 | 1.00x |  |  |
+| ArithmeticComposite (linear) | neon32 | 2048x2048 | 195.42 | 21.46 | 0.17 | 2.66x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 512x512 | 30.64 | 8.56 | 0.07 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | neon32 | 512x512 | 2.47 | 106.14 | 0.85 | **12.40x** | 🚀 |  |
+| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 486.11 | 8.63 | 0.07 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | neon32 | 2048x2048 | 39.52 | 106.13 | 0.85 | **12.30x** | 🚀 |  |
 | ComponentTransfer | scalar | 512x512 | 1.925 | 136.15 | 1.09 | 1.00x |  |  |
 | ComponentTransfer | neon32 | 512x512 | 95.988 | 2.73 | 0.02 | 0.02x | 🔴 |  |
 | ComponentTransfer | scalar | 2048x2048 | 39.247 | 106.87 | 0.86 | 1.00x |  |  |

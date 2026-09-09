@@ -61,6 +61,7 @@
     vdup.8  d13, r12
     vceq.u8 d13, d9, d13
     vbsl    d13, d12, d15
+    vmov    d15, d13
     add     r3, r3, #16
     adds    r12, r12, #1
     cmp     r12, #16
