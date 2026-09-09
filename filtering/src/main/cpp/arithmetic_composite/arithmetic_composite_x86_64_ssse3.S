@@ -7,6 +7,10 @@
  *
  * Linear mode uses exact 16-segment integer LUT replacements for the RGB
  * transfer functions; the vector path processes four pixels/iteration.
+ *
+ * Iter29: the G channel uses FORMULA_LINEAR_INPUTS_INPLACE directly on the
+ * S2L4 outputs in xmm0/xmm1, eliminating two register copies before formula
+ * evaluation while preserving the scalar arithmetic order.
  */
 #if defined(__APPLE__)
 # define SYM(x) _##x
@@ -18,16 +22,17 @@
 # define SIZE(x) .size x,.-x
 #endif
 
+.equ ALPHA_SHIFT, 24
+
 .macro S2L4 reg
     /* Four packed bytes -> four dwords. Mutate REG in place; none of the
        scratch instructions below needs the original packed-byte register. */
-    /* Expand x0..x3 to even byte positions: x0,0,x1,0,... */
-    pshufb .Ls2lExpand4Even(%rip), \reg
-    movdqa \reg, %xmm3
+    /* Expand x0..x3 to words: x0,0,x1,0,... */
+    punpcklbw %xmm15, \reg
     movdqa \reg, %xmm4
     psrlw $4, %xmm4
     pand .Ls2lNibbleMask(%rip), %xmm4     /* hi nibble */
-    pand .Ls2lNibbleMask(%rip), %xmm3     /* lo nibble */
+    pand .Ls2lNibbleMask(%rip), \reg     /* lo nibble */
 
     movdqa .Ls2lBase(%rip), %xmm5
     pshufb %xmm4, %xmm5
@@ -35,52 +40,53 @@
     pshufb %xmm4, %xmm10
 
     /* slope*lo + base*32, then round to byte. */
-    movdqa %xmm10, %xmm11
-    movdqa %xmm3, %xmm12
-    pmaddubsw %xmm12, %xmm11
+    pmaddubsw \reg, %xmm10
     psllw $5, %xmm5
-    paddw %xmm5, %xmm11
-    paddw .Ls2lRounding(%rip), %xmm11
-    psrlw $5, %xmm11
-    packuswb %xmm11, %xmm11          /* four live approximation bytes */
+    paddw %xmm5, %xmm10
+    paddw .Ls2lRounding(%rip), %xmm10
+    psrlw $5, %xmm10
+    packuswb %xmm10, %xmm10          /* four live approximation bytes */
 
-    /* Correction bitset. */
+    /* Correction bitset. xmm3 is free in this macro, so keep the correction
+       there and subtract it from the approximation in xmm10.  This removes
+       the approximation-preservation movdqa xmm10 -> xmm11. */
     movdqa %xmm4, %xmm12
     pcmpgtb .Ls2lHi7(%rip), %xmm12
     movdqa .Ls2lSubLo(%rip), %xmm5
-    pshufb %xmm3, %xmm5
-    movdqa %xmm12, %xmm10
-    pandn %xmm5, %xmm10
+    pshufb \reg, %xmm5
+    movdqa %xmm12, %xmm3
+    pandn %xmm5, %xmm3
     movdqa .Ls2lSubHi(%rip), %xmm5
-    pshufb %xmm3, %xmm5
+    pshufb \reg, %xmm5
     pand %xmm12, %xmm5
-    por %xmm5, %xmm10
+    por %xmm5, %xmm3
     movdqa .Ls2lOneHotHi(%rip), %xmm5
     pshufb %xmm4, %xmm5
-    pand %xmm5, %xmm10
-    pminub .Ls2lOneByte(%rip), %xmm10
-    pshufb .LcompactEven4(%rip), %xmm10
-    psubb %xmm10, %xmm11
+    pand %xmm5, %xmm3
+    pminub .Ls2lOneByte(%rip), %xmm3
+    pshufb .LcompactEven4(%rip), %xmm3
+    psubb %xmm3, %xmm10
 
     /* Exact low-16 values. Compact selector/result/mask before blending. */
     movdqa .Ls2lExactLow16(%rip), %xmm5
-    pshufb %xmm3, %xmm5
+    pshufb \reg, %xmm5
     pshufb .LcompactEven4(%rip), %xmm5
-    movdqa %xmm4, %xmm10
-    pcmpeqb %xmm15, %xmm10
-    pshufb .LcompactEven4(%rip), %xmm10
-    pand %xmm10, %xmm5
-    pandn %xmm11, %xmm10
-    por %xmm5, %xmm10
+    /* xmm4 is no longer needed after the high-nibble test; use it as the
+       exact-low16 blend mask to avoid another register move. */
+    pcmpeqb %xmm15, %xmm4
+    pshufb .LcompactEven4(%rip), %xmm4
+    pand %xmm4, %xmm5
+    pandn %xmm10, %xmm4
+    por %xmm5, %xmm4
 
-    movdqa %xmm10, \reg
+    movdqa %xmm4, \reg
     punpcklbw %xmm15, \reg
     punpcklwd %xmm15, \reg
 .endm
 
 .macro L2S4 reg
     /* REG contains four packed bytes in lanes 0..3. Mutate it in place. */
-    pshufb .Ls2lExpand4Even(%rip), \reg  /* x0,0,x1,0,x2,0,x3,0 */
+    punpcklbw %xmm15, \reg  /* x0,0,x1,0,x2,0,x3,0 */
 
     movdqa \reg, %xmm3
     psrlw $4, %xmm3
@@ -93,16 +99,15 @@
     movdqa .L_slope_lut(%rip), %xmm6
     pshufb %xmm3, %xmm6
 
-    movdqa %xmm6, %xmm10
-    movdqa %xmm4, %xmm11
-    pmaddubsw %xmm11, %xmm10
-    paddw .L_rounding(%rip), %xmm10
-    psrlw $5, %xmm10
-    packuswb %xmm10, %xmm10
+    pmaddubsw %xmm4, %xmm6
+    paddw .L_rounding(%rip), %xmm6
+    psrlw $5, %xmm6
+    packuswb %xmm6, %xmm6
 
-    movdqa %xmm5, %xmm11
-    pshufb .LcompactEven4(%rip), %xmm11
-    paddb %xmm11, %xmm10
+    /* xmm5 is dead after the base lookup; compact it in place. */
+    pshufb .LcompactEven4(%rip), %xmm5
+    paddb %xmm5, %xmm6
+    movdqa %xmm6, %xmm10
 
     movdqa \reg, %xmm3
     psrlw $3, %xmm3
@@ -129,89 +134,21 @@
     psubb %xmm3, %xmm10
 
     movdqa .L_exact_low16(%rip), %xmm3
-    movdqa \reg, %xmm4
-    pand .L_nibble_mask(%rip), %xmm4
-    pshufb %xmm4, %xmm3
-    pshufb .LcompactEven4(%rip), %xmm3
+    /* REG is dead after this point except for the final result.  Extract
+       the high nibble first, then destructively keep only the low nibble
+       in REG for the exact-low16 lookup.  This removes one register copy. */
     movdqa \reg, %xmm6
     psrlw $4, %xmm6
     pand .L_nibble_mask(%rip), %xmm6
+    pand .L_nibble_mask(%rip), \reg
+    pshufb \reg, %xmm3
+    pshufb .LcompactEven4(%rip), %xmm3
     pcmpeqb %xmm15, %xmm6
     pshufb .LcompactEven4(%rip), %xmm6
     pand %xmm6, %xmm3
     pandn %xmm10, %xmm6
     por %xmm3, %xmm6
     movdqa %xmm6, \reg
-.endm
-
-.macro L2S4_PREFIX_GPR gpr, out
-    /* GPR holds four packed linear-light bytes. Produce the shared
-       LUT/PMADD approximation in OUT; keep source reloadable from GPR. */
-    movd \gpr, %xmm7
-    pshufb .Ls2lExpand4Even(%rip), %xmm7
-    movdqa %xmm7, %xmm3
-    psrlw $4, %xmm3
-    pand .L_nibble_mask(%rip), %xmm3
-    movdqa %xmm7, %xmm4
-    pand .L_nibble_mask(%rip), %xmm4
-
-    movdqa .L_base_lut(%rip), %xmm5
-    pshufb %xmm3, %xmm5
-    movdqa .L_slope_lut(%rip), \out
-    pshufb %xmm3, \out
-    movdqa %xmm4, %xmm11
-    pmaddubsw %xmm11, \out
-    paddw .L_rounding(%rip), \out
-    psrlw $5, \out
-    packuswb \out, \out
-    movdqa %xmm5, %xmm11
-    pshufb .LcompactEven4(%rip), %xmm11
-    paddb %xmm11, \out
-.endm
-
-.macro L2S4_CORRECT_GPR gpr, out
-    /* Apply correction + exact-low16 using a fresh source reload. */
-    movd \gpr, %xmm7
-    pshufb .Ls2lExpand4Even(%rip), %xmm7
-
-    movdqa %xmm7, %xmm3
-    psrlw $3, %xmm3
-    pand .L_group_mask(%rip), %xmm3
-    movdqa %xmm3, %xmm4
-    psubb .L_group16(%rip), %xmm4
-    movdqa .L_correction_hi(%rip), %xmm5
-    pshufb %xmm4, %xmm5
-    movdqa %xmm3, %xmm4
-    psrlw $4, %xmm4
-    pand .L_one_byte(%rip), %xmm4
-    psllw $7, %xmm4
-    por %xmm3, %xmm4
-    movdqa .L_correction_lo(%rip), %xmm2
-    pshufb %xmm4, %xmm2
-    por %xmm5, %xmm2
-    movdqa %xmm7, %xmm4
-    pand .L_low3_mask(%rip), %xmm4
-    movdqa .L_onehot_lut(%rip), %xmm5
-    pshufb %xmm4, %xmm5
-    pand %xmm5, %xmm2
-    pminub .L_one_byte(%rip), %xmm2
-    pshufb .LcompactEven4(%rip), %xmm2
-    psubb %xmm2, \out
-
-    movdqa .L_exact_low16(%rip), %xmm2
-    movdqa %xmm7, %xmm4
-    pand .L_nibble_mask(%rip), %xmm4
-    pshufb %xmm4, %xmm2
-    pshufb .LcompactEven4(%rip), %xmm2
-    movdqa %xmm7, %xmm5
-    psrlw $4, %xmm5
-    pand .L_nibble_mask(%rip), %xmm5
-    pcmpeqb %xmm15, %xmm5
-    pshufb .LcompactEven4(%rip), %xmm5
-    pand %xmm5, %xmm2
-    pandn \out, %xmm5
-    por %xmm2, %xmm5
-    movdqa %xmm5, \out
 .endm
 
 .macro FORMULA dst
@@ -229,6 +166,25 @@
     packssdw %xmm15, %xmm12
     packuswb %xmm15, %xmm12
     movdqa %xmm12, \dst
+.endm
+
+.macro FORMULA_LINEAR_INPUTS_INPLACE src1, src2
+    /* Same arithmetic as FORMULA_LINEAR_INPUTS, but keep the packed result
+       in src1. src1/src2 are dead after the alpha calculation, so this
+       removes the final result-copy movdqa without changing arithmetic order. */
+    cvtdq2ps \src1, \src1
+    cvtdq2ps \src2, \src2
+    movaps \src1, %xmm12
+    mulps \src2, \src1
+    mulps %xmm13, \src1
+    mulps %xmm8, %xmm12
+    addps %xmm12, \src1
+    mulps %xmm9, \src2
+    addps \src2, \src1
+    addps %xmm14, \src1
+    cvttps2dq \src1, \src1
+    packssdw %xmm15, \src1
+    packuswb %xmm15, \src1
 .endm
 
 .macro FORMULA_LINEAR dst
@@ -430,27 +386,19 @@ SYM(ksvgArithmeticApplySse):
     S2L4 %xmm0
     S2L4 %xmm1
 
-    /* B arithmetic; preserve its packed result in a GPR. */
-    FORMULA_LINEAR %xmm12
-    movd %xmm12, %r10d
+    /* B arithmetic: keep the packed result in xmm2. */
+    FORMULA_LINEAR %xmm2
 
-    /* G arithmetic can now overlap the independent B result handling. */
-    movdqa %xmm0, %xmm6
-    movdqa %xmm1, %xmm7
-    FORMULA_LINEAR %xmm12
-    movd %xmm12, %r11d
+    /* G arithmetic: consume the S2L4 outputs directly.  These registers are
+       dead after G, so the in-place form removes two register copies. */
+    FORMULA_LINEAR_INPUTS_INPLACE %xmm0, %xmm1
 
-    /* L2S phased pipeline: B/G share the LUT+PMADD stage first. */
-    L2S4_PREFIX_GPR %r10d, %xmm6
-    L2S4_PREFIX_GPR %r11d, %xmm10
+    /* Convert both channels without GPR round-trips, then interleave. */
+    L2S4 %xmm2
+    L2S4 %xmm0
+    punpcklbw %xmm0, %xmm2
 
-    /* Then run the correction/exact stage while both independent results are live. */
-    L2S4_CORRECT_GPR %r10d, %xmm6
-    L2S4_CORRECT_GPR %r11d, %xmm10
-    movd %xmm6, %r10d
-    movd %xmm10, %r11d
-
-    /* Reload source once for R/A; B/G are already in r10d/r11d. */
+    /* Reload source once for R/A; packed BG remains in xmm2. */
     movdqu (%rdi), %xmm0             /* raw p1 */
     movdqu (%rsi), %xmm1             /* raw p2 */
 
@@ -462,28 +410,20 @@ SYM(ksvgArithmeticApplySse):
     S2L4 %xmm6
     S2L4 %xmm7
     FORMULA_LINEAR %xmm12
-    movdqa %xmm12, %xmm7
-    L2S4 %xmm7
-    movd %xmm7, %r8d
+    L2S4 %xmm12
+    movd %xmm12, %r8d
 
-    /* A remains in encoded space. */
-    pshufb .LshuffleA(%rip), %xmm0
-    pshufb .LshuffleA(%rip), %xmm1
-    punpcklbw %xmm15, %xmm0
-    punpcklwd %xmm15, %xmm0
-    punpcklbw %xmm15, %xmm1
-    punpcklwd %xmm15, %xmm1
-    movdqa %xmm0, %xmm6
-    movdqa %xmm1, %xmm7
-    FORMULA_LINEAR %xmm12
-    movd %xmm12, %eax
+    /* A remains in encoded space. Raw p1/p2 are still live in xmm0/xmm1.
+       Alpha is already the top byte of each dword, so a dword shift replaces
+       the shuffle + byte/word unpack chain with two instructions. */
+    psrld $ALPHA_SHIFT, %xmm0
+    psrld $ALPHA_SHIFT, %xmm1
+    FORMULA_LINEAR_INPUTS_INPLACE %xmm0, %xmm1
+    movd %xmm0, %eax
 
-    /* Pack B/G/R/A from four packed dwords. */
-    movd %r10d, %xmm2
-    movd %r11d, %xmm3
+    /* Pack BG + RA from four packed dwords. */
     movd %r8d,  %xmm5
     movd %eax,  %xmm4
-    punpcklbw %xmm3, %xmm2
     punpcklbw %xmm4, %xmm5
     punpcklwd %xmm5, %xmm2
     movdqu %xmm2, (%rdx)
@@ -502,27 +442,32 @@ SYM(ksvgArithmeticApplySse):
     mulps %xmm12, %xmm14
     addps .Lhalf(%rip), %xmm14
 
-    /* Two-block unroll: expose an independent second 4-pixel iteration to
-       the OoO core so the long S2L/formula/L2S chains can overlap. */
+    /* Four-block unroll: expose four independent 4-pixel iterations to
+       the OoO core and amortize the loop branch/counter overhead. */
     movl %r9d, %eax
-    shrl $1, %r9d                  /* pair count */
-    andl $1, %eax                  /* odd block */
+    shrl $2, %r9d                  /* quad count */
+    andl $3, %eax                  /* remainder blocks */
     movl %eax, 28(%rsp)
 
     .p2align 4
-.Llinear_pair:
+.Llinear_quad:
     testl %r9d, %r9d
-    jz .Llinear_odd
+    jz .Llinear_remainder
+    LINEAR_BLOCK_UNROLLED
+    LINEAR_BLOCK_UNROLLED
     LINEAR_BLOCK_UNROLLED
     LINEAR_BLOCK_UNROLLED
     decl %r9d
-    jmp .Llinear_pair
+    jmp .Llinear_quad
 
-.Llinear_odd:
-    cmpl $0, 28(%rsp)
-    je .Ltail
+.Llinear_remainder:
+    movl 28(%rsp), %r9d
+.Llinear_remainder_loop:
+    testl %r9d, %r9d
+    jz .Ltail
     LINEAR_BLOCK_UNROLLED
-    jmp .Ltail
+    decl %r9d
+    jmp .Llinear_remainder_loop
 
 
 .Ltail:
@@ -604,8 +549,8 @@ SYM(ksvgArithmeticApplySse):
     jmp .Lnext_row
 
 .Ltail_linear:
-    /* Fixed transfer-function tail.  Use the same 16-segment SSSE3
-       transforms as the vector path; no caller LUTs are touched. */
+    /* Fixed transfer-function tail. Cache each source pixel in GPRs so
+       RGB extraction does not re-read the same two addresses. */
     movss 16(%rsp), %xmm13
     shufps $0, %xmm13, %xmm13
     movss .L255(%rip), %xmm12
@@ -617,31 +562,30 @@ SYM(ksvgArithmeticApplySse):
     mulps %xmm12, %xmm14
 
 .Ltail_linear_pixel:
-    /* p1 / p2 are reloaded for each channel so the transfer macros are
-       free to use all XMM scratch registers. */
+    movl (%rdi), %r8d                /* p1 */
+    movl (%rsi), %r9d                /* p2 */
 
-    /* Alpha: alpha remains in the encoded domain. */
-    movl (%rdi), %eax
-    movl (%rsi), %r9d
-    movl %eax, %r8d
-    shrl $24, %r8d
-    shrl $24, %r9d
-    movd %r8d, %xmm6
-    movd %r9d, %xmm7
-    FORMULA_LINEAR %xmm6
-    movd %xmm6, %r8d
-    andl $255, %r8d
-    shll $24, %r8d
-
-    /* R: sRGB -> fixed linear -> arithmetic -> fixed sRGB. */
-    movl (%rdi), %eax
-    movl (%rsi), %r9d
-    shrl $16, %eax
-    shrl $16, %r9d
-    andl $255, %eax
-    andl $255, %r9d
+    /* Alpha. */
+    movl %r8d, %eax
+    movl %r9d, %r10d
+    shrl $24, %eax
+    shrl $24, %r10d
     movd %eax, %xmm6
-    movd %r9d, %xmm7
+    movd %r10d, %xmm7
+    FORMULA_LINEAR %xmm6
+    movd %xmm6, %r10d
+    andl $255, %r10d
+    shll $24, %r10d
+
+    /* R. */
+    movl %r8d, %eax
+    movl %r9d, %r11d
+    shrl $16, %eax
+    shrl $16, %r11d
+    andl $255, %eax
+    andl $255, %r11d
+    movd %eax, %xmm6
+    movd %r11d, %xmm7
     S2L4 %xmm6
     S2L4 %xmm7
     FORMULA_LINEAR %xmm6
@@ -650,17 +594,17 @@ SYM(ksvgArithmeticApplySse):
     movd %xmm7, %eax
     andl $255, %eax
     shll $16, %eax
-    orl %eax, %r8d
+    orl %eax, %r10d
 
     /* G. */
-    movl (%rdi), %eax
-    movl (%rsi), %r9d
+    movl %r8d, %eax
+    movl %r9d, %r11d
     shrl $8, %eax
-    shrl $8, %r9d
+    shrl $8, %r11d
     andl $255, %eax
-    andl $255, %r9d
+    andl $255, %r11d
     movd %eax, %xmm6
-    movd %r9d, %xmm7
+    movd %r11d, %xmm7
     S2L4 %xmm6
     S2L4 %xmm7
     FORMULA_LINEAR %xmm6
@@ -669,15 +613,15 @@ SYM(ksvgArithmeticApplySse):
     movd %xmm7, %eax
     andl $255, %eax
     shll $8, %eax
-    orl %eax, %r8d
+    orl %eax, %r10d
 
     /* B. */
-    movl (%rdi), %eax
-    movl (%rsi), %r9d
+    movl %r8d, %eax
+    movl %r9d, %r11d
     andl $255, %eax
-    andl $255, %r9d
+    andl $255, %r11d
     movd %eax, %xmm6
-    movd %r9d, %xmm7
+    movd %r11d, %xmm7
     S2L4 %xmm6
     S2L4 %xmm7
     FORMULA_LINEAR %xmm6
@@ -685,9 +629,9 @@ SYM(ksvgArithmeticApplySse):
     L2S4 %xmm7
     movd %xmm7, %eax
     andl $255, %eax
-    orl %eax, %r8d
+    orl %eax, %r10d
 
-    movl %r8d, (%rdx)
+    movl %r10d, (%rdx)
     addq $4, %rdi
     addq $4, %rsi
     addq $4, %rdx

@@ -29,18 +29,18 @@ Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 
 | Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
-| ArithmeticComposite (linear) | scalar | 512x512 | 3.082 | 85.07 | 0.68 | 1.00x |  | linear → scalar fallback on ARM/SSE |
-| ArithmeticComposite (linear) | ssse3 | 512x512 | 5.634 | 46.53 | 0.37 | 0.55x | 🔴 | un-advertised; linear LUT loss |
-| ArithmeticComposite (linear) | avx2 | 512x512 | 2.874 | 91.21 | 0.73 | 1.07x | 🟢 |  |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 49.367 | 84.96 | 0.68 | 1.00x |  | linear → scalar fallback on ARM/SSE |
-| ArithmeticComposite (linear) | ssse3 | 2048x2048 | 89.069 | 47.09 | 0.38 | 0.55x | 🔴 | un-advertised; linear LUT loss |
-| ArithmeticComposite (linear) | avx2 | 2048x2048 | 45.578 | 92.03 | 0.74 | 1.08x | 🟢 |  |
-| ArithmeticComposite (non-linear) | scalar | 512x512 | 0.828 | 316.68 | 2.53 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | ssse3 | 512x512 | 0.508 | 516.52 | 4.13 | 1.63x | 🟢 |  |
-| ArithmeticComposite (non-linear) | avx2 | 512x512 | 0.277 | 944.89 | 7.56 | 2.98x | 🟢 |  |
-| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 13.690 | 306.37 | 2.45 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 8.443 | 496.76 | 3.97 | 1.62x | 🟢 |  |
-| ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 5.201 | 806.40 | 6.45 | 2.63x | 🟢 |  |
+| ArithmeticComposite (linear) | scalar | 512x512 | 3.179 | 82.45 | 0.66 | 1.00x |  | linear → scalar fallback on ARM/SSE |
+| ArithmeticComposite (linear) | ssse3 | 512x512 | 3.146 | 83.32 | 0.67 | 1.01x | 🟢 |  |
+| ArithmeticComposite (linear) | avx2 | 512x512 | 3.105 | 84.43 | 0.68 | 1.02x | 🟢 |  |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 50.961 | 82.30 | 0.66 | 1.00x |  | linear → scalar fallback on ARM/SSE |
+| ArithmeticComposite (linear) | ssse3 | 2048x2048 | 50.209 | 83.54 | 0.67 | 1.01x | 🟢 |  |
+| ArithmeticComposite (linear) | avx2 | 2048x2048 | 50.173 | 83.60 | 0.67 | 1.02x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 512x512 | 0.859 | 305.17 | 2.44 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | ssse3 | 512x512 | 0.499 | 525.65 | 4.21 | 1.72x | 🟢 |  |
+| ArithmeticComposite (non-linear) | avx2 | 512x512 | 0.315 | 832.47 | 6.66 | 2.73x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 14.114 | 297.18 | 2.38 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 8.086 | 518.72 | 4.15 | 1.75x | 🟢 |  |
+| ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 5.690 | 737.08 | 5.90 | 2.48x | 🟢 |  |
 | ComponentTransfer | scalar | 512x512 | 0.350 | 749.06 | 5.99 | 1.00x |  |  |
 | ComponentTransfer | avx2 | 512x512 | 0.335 | 782.71 | 6.26 | 1.04x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
 | ComponentTransfer | scalar | 2048x2048 | 6.110 | 686.49 | 5.49 | 1.00x |  |  |
