@@ -15,12 +15,9 @@
  */
 
 #include <jni.h>
-#include <cmath>
-#include <algorithm>
 #include <cassert>
 #include "cpu_dispatch.h"
 #include "arithmetic_composite.h"
-#include "simd_x86.h"
 #include "shared/math_utils.h"
 
 namespace {
@@ -97,7 +94,10 @@ jint nativeBackendForAbi() {
     backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     backends |= SIMD_BACKEND_NEON32;
-#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#elif defined(__x86_64__) || defined(_M_X64)
+    // i386 has no SIMD kernels anymore: arithmetic_composite routes every
+    // backend (including forced) through the scalar reference there, so it
+    // advertises only the scalar backend.
     backends |= SIMD_BACKEND_SSSE3;
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
@@ -119,7 +119,7 @@ void runForced(const jint* src1, const jint* src2, jint* dst,
         applyArithmeticNeon(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                             k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
     }
-#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#elif defined(__x86_64__) || defined(_M_X64)
     switch (backend) {
         case SIMD_BACKEND_SCALAR:
             applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
@@ -204,16 +204,13 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyNative(
             applyArithmeticNeon(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                 k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
         }
-#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-        if (detectSimdLevel() >= SIMD_AVX2) {
-            // AVX2 linear is still faster than scalar (host 1.05-1.07x).
-            ksvgArithmeticApplyAvx2(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
-                                   k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
-        } else if (useLinear == JNI_TRUE) {
-            // WP3 regression gate: the SSE linear mode loses to scalar (host
-            // 0.56-0.57x, device x86-32 0.17x), so run the scalar reference.
+#elif defined(__x86_64__) || defined(_M_X64)
+        if (useLinear == JNI_TRUE) {
             applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                   k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+        } else if (detectSimdLevel() >= SIMD_AVX2) {
+            ksvgArithmeticApplyAvx2(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                   k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
         } else {
             ksvgArithmeticApplySse(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                  k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);

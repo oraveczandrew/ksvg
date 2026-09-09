@@ -101,13 +101,10 @@ if (ANDROID_ABI STREQUAL "x86")
             component_transfer/unlinearize_i386_ssse3.S
             component_transfer/unlinearize_i386_avx2.S
     )
+    # i386 ships no SIMD arithmetic kernel: arithmetic_composite routes every
+    # backend through the scalar reference there (the hand-written x86-64 .S
+    # variants use 64-bit addressing and cannot be assembled for i386).
     set(ARITHMETIC_COMPOSITE_SOURCES
-            arithmetic_composite/arithmetic_composite_x86_sse.cpp
-    )
-    # i386 keeps the AVX2 kernel as the C++ intrinsics source (the hand-written
-    # x86-64 .S variant uses 64-bit addressing and cannot be assembled for i386).
-    set(ARITHMETIC_COMPOSITE_AVX2_CPP
-            arithmetic_composite/arithmetic_composite_x86_avx2.cpp
     )
 endif ()
 
@@ -124,7 +121,6 @@ add_library(ksvgblur SHARED
         lighting/lighting.cpp
         turbulence/turbulence.cpp turbulence/turbulence_arm.cpp
         arithmetic_composite/arithmetic_composite.cpp arithmetic_composite/arithmetic_composite_neon.cpp
-        ${ARITHMETIC_COMPOSITE_AVX2_CPP}
         ${AVX2_SOURCES}
         ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES})
 
@@ -155,7 +151,7 @@ if (ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
     endif ()
     # Per-file flags make <immintrin.h> declare the AVX2/AVX-512 intrinsics
     # (invalid options on ARM ABIs, hence the guard).
-    set_source_files_properties(${AVX2_SOURCES} ${ARITHMETIC_COMPOSITE_AVX2_CPP} PROPERTIES COMPILE_OPTIONS "-mavx2")
+    set_source_files_properties(${AVX2_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx2")
     set_source_files_properties(${AVX512_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw")
 endif ()
 

@@ -84,6 +84,8 @@ void ksvgComponentTransferApplyAvx2(
         const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB);
 
 // arithmetic_composite.cpp — per-channel LUT-based arithmetic
+// (x86-64 only: i386 routes every backend through the scalar reference).
+#if defined(__x86_64__) || defined(_M_X64)
 void ksvgArithmeticApplySse(
         const jint* src1, const jint* src2, jint* dst,
         jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
@@ -97,6 +99,7 @@ void ksvgArithmeticApplyAvx2(
         jfloat k1, jfloat k2, jfloat k3, jfloat k4,
         jboolean useLinear,
         const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+#endif
 
 // unlinearize.cpp — flat element-wise LUT pass with alpha passthrough.
 void ksvgUnlinearizeApplyAvx2(

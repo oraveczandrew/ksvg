@@ -38,7 +38,7 @@ void applyArithmeticNeon(
         const jbyte* srgbToLinear, const jbyte* linearToSrgb);
 #endif
 
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(__x86_64__) || defined(_M_X64)
 void ksvgArithmeticApplySse(
         const jint* src1, const jint* src2, jint* dst,
         jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,

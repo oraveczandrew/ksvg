@@ -29,10 +29,10 @@ Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 
 | Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
-| ArithmeticComposite (linear) | scalar | 512x512 | 3.179 | 82.45 | 0.66 | 1.00x |  | linear → scalar fallback on ARM/SSE |
+| ArithmeticComposite (linear) | scalar | 512x512 | 3.179 | 82.45 | 0.66 | 1.00x |  | linear → scalar fallback on all SIMD backends |
 | ArithmeticComposite (linear) | ssse3 | 512x512 | 3.146 | 83.32 | 0.67 | 1.01x | 🟢 |  |
 | ArithmeticComposite (linear) | avx2 | 512x512 | 3.105 | 84.43 | 0.68 | 1.02x | 🟢 |  |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 50.961 | 82.30 | 0.66 | 1.00x |  | linear → scalar fallback on ARM/SSE |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 50.961 | 82.30 | 0.66 | 1.00x |  | linear → scalar fallback on all SIMD backends |
 | ArithmeticComposite (linear) | ssse3 | 2048x2048 | 50.209 | 83.54 | 0.67 | 1.01x | 🟢 |  |
 | ArithmeticComposite (linear) | avx2 | 2048x2048 | 50.173 | 83.60 | 0.67 | 1.02x | 🟢 |  |
 | ArithmeticComposite (non-linear) | scalar | 512x512 | 0.859 | 305.17 | 2.44 | 1.00x |  |  |
