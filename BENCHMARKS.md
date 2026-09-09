@@ -200,13 +200,13 @@ Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit) test APK usi
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
 | ArithmeticComposite (linear) | scalar | 512x512 | 32.58 | 8.05 | 0.06 | 1.00x |  |  |
-| ArithmeticComposite (linear) | neon32 | 512x512 | 12.21 | 21.47 | 0.17 | 2.67x | 🟢 |  |
+| ArithmeticComposite (linear) | neon32 | 512x512 | 9.60 | 27.30 | 0.22 | 3.39x | 🟢 |  |
 | ArithmeticComposite (linear) | scalar | 2048x2048 | 518.90 | 8.08 | 0.06 | 1.00x |  |  |
-| ArithmeticComposite (linear) | neon32 | 2048x2048 | 195.42 | 21.46 | 0.17 | 2.66x | 🟢 |  |
+| ArithmeticComposite (linear) | neon32 | 2048x2048 | 154.46 | 27.16 | 0.22 | 3.36x | 🟢 |  |
 | ArithmeticComposite (non-linear) | scalar | 512x512 | 30.64 | 8.56 | 0.07 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | neon32 | 512x512 | 2.47 | 106.14 | 0.85 | **12.40x** | 🚀 |  |
+| ArithmeticComposite (non-linear) | neon32 | 512x512 | 2.28 | 114.82 | 0.92 | **13.44x** | 🚀 |  |
 | ArithmeticComposite (non-linear) | scalar | 2048x2048 | 486.11 | 8.63 | 0.07 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | neon32 | 2048x2048 | 39.52 | 106.13 | 0.85 | **12.30x** | 🚀 |  |
+| ArithmeticComposite (non-linear) | neon32 | 2048x2048 | 36.73 | 114.18 | 0.91 | **13.23x** | 🚀 |  |
 | ComponentTransfer | scalar | 512x512 | 1.925 | 136.15 | 1.09 | 1.00x |  |  |
 | ComponentTransfer | neon32 | 512x512 | 95.988 | 2.73 | 0.02 | 0.02x | 🔴 |  |
 | ComponentTransfer | scalar | 2048x2048 | 39.247 | 106.87 | 0.86 | 1.00x |  |  |

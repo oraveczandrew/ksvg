@@ -25,15 +25,7 @@
  * old x86 implementation while preserving exact LUT semantics.
  */
 
-#ifdef __APPLE__
-#define SYM(x) _##x
-#define TYPE(x, y)
-#define SIZE(x)
-#else
-#define SYM(x) x
-#define TYPE(x, y) .type x, y
-#define SIZE(x) .size x, .-x
-#endif
+#include "asm_macros.S"
 
 /*
  * Lookup 8 bytes in a 256-byte table resident in v16..v31.

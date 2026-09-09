@@ -113,6 +113,7 @@ set(AVX2_SOURCES
 )
 
 add_library(ksvgblur SHARED
+        common/color_luts.S
         blur/gaussian_blur.cpp
         convolve/convolve_matrix.cpp convolve/convolve_matrix_neon.cpp
         morphology/morphology.cpp
@@ -127,6 +128,7 @@ add_library(ksvgblur SHARED
 # Include path so per-filter headers resolve (convolve.h, turbulence_tables.h, etc.)
 target_include_directories(ksvgblur PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/common
         ${CMAKE_CURRENT_SOURCE_DIR}/blur
         ${CMAKE_CURRENT_SOURCE_DIR}/convolve
         ${CMAKE_CURRENT_SOURCE_DIR}/morphology
