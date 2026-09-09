@@ -73,7 +73,7 @@ extern "C" void ksvgMorphologyApplyRowAvx512(
 namespace {
     void applyScalarPixel(
         const jint *src, jint *dst, const jint width, const jint height,
-        const jint radiusX, const jint radiusY, const bool isErode, const jint init,
+        const jint radiusX, const jint radiusY, const bool isErode,
         const jint x, const jint y) {
         const jint top = y - radiusY < 0 ? 0 : y - radiusY;
         const jint bottom = y + radiusY > height - 1 ? height - 1 : y + radiusY;
@@ -86,46 +86,58 @@ namespace {
             return;
         }
 
-        jint a = init, r = init, g = init, b = init;
+        uint32_t a, r, g, b;
+        if (isErode) {
+            a = 255;
+            r = 0x00FF0000;
+            g = 0x0000FF00;
+            b = 255;
+        } else {
+            a = 0;
+            r = 0;
+            g = 0;
+            b = 0;
+        }
+
         const jint rowOffset = y * width;
         const jint left = touchesLR ? (x - radiusX < 0 ? 0 : x - radiusX) : x - radiusX;
         const jint right = touchesLR ? (x + radiusX > width - 1 ? width - 1 : x + radiusX) : x + radiusX;
         for (jint ky = top; ky <= bottom; ky++) {
             const jint kRowOffset = ky * width;
             for (jint kx = left; kx <= right; kx++) {
-                const jint c = src[kRowOffset + kx];
+                const uint32_t c = static_cast<uint32_t>(src[kRowOffset + kx]);
                 if (isErode) {
-                    const jint ca = (c >> 24) & 0xFF;
+                    const uint32_t ca = c >> 24;
                     if (ca < a) a = ca;
-                    const jint cr = (c >> 16) & 0xFF;
+                    const uint32_t cr = c & 0x00FF0000;
                     if (cr < r) r = cr;
-                    const jint cg = (c >> 8) & 0xFF;
+                    const uint32_t cg = c & 0x0000FF00;
                     if (cg < g) g = cg;
-                    const jint cb = c & 0xFF;
+                    const uint32_t cb = c & 0x000000FF;
                     if (cb < b) b = cb;
                 } else {
-                    const jint ca = (c >> 24) & 0xFF;
+                    const uint32_t ca = c >> 24;
                     if (ca > a) a = ca;
-                    const jint cr = (c >> 16) & 0xFF;
+                    const uint32_t cr = c & 0x00FF0000;
                     if (cr > r) r = cr;
-                    const jint cg = (c >> 8) & 0xFF;
+                    const uint32_t cg = c & 0x0000FF00;
                     if (cg > g) g = cg;
-                    const jint cb = c & 0xFF;
+                    const uint32_t cb = c & 0x000000FF;
                     if (cb > b) b = cb;
                 }
             }
         }
-        dst[rowOffset + x] = (a << 24) | (r << 16) | (g << 8) | b;
+        dst[rowOffset + x] = static_cast<jint>((a << 24) | r | g | b);
     }
 
     void applyScalar(
         const jint *src, jint *dst, const jint width, const jint height,
-        const jint radiusX, const jint radiusY, const bool isErode, const jint init,
+        const jint radiusX, const jint radiusY, const bool isErode,
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom) {
         std::memset(dst, 0, static_cast<size_t>(width) * height * sizeof(jint));
         for (jint y = clipTop; y < clipBottom; y++) {
             for (jint x = clipLeft; x < clipRight; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, x, y);
             }
         }
     }
@@ -155,7 +167,7 @@ namespace {
         if (vyLo >= vyHi || vxLo >= vxHi) {
             for (jint y = yLo; y < yHi; y++) {
                 for (jint x = xLo; x < xHi; x++) {
-                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, x, y);
                 }
             }
             return;
@@ -163,7 +175,7 @@ namespace {
 
         for (jint y = yLo; y < vyLo; y++) {
             for (jint x = xLo; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, x, y);
             }
         }
 
@@ -172,12 +184,12 @@ namespace {
 
         for (jint y = vyLo; y < vyHi; y++) {
             for (jint x = xLo; x < vxLo; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, x, y);
             }
 
             if (backend == SIMD_BACKEND_SCALAR) {
                 for (jint x = vxLo; x < vxHi; x++) {
-                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, x, y);
                 }
             } else {
 #if defined(__aarch64__)
@@ -202,13 +214,13 @@ namespace {
                 }
 #else
                 for (jint x = vxLo; x < vxHi; x++) {
-                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                    applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, x, y);
                 }
 #endif
             }
 
             for (jint x = vxHi; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, x, y);
             }
         }
 
@@ -216,7 +228,7 @@ namespace {
 
         for (jint y = vyHi; y < yHi; y++) {
             for (jint x = xLo; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, erode, x, y);
             }
         }
     }
@@ -282,7 +294,6 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
     }
 
     const bool isErode = erode == JNI_TRUE;
-    const jint init = isErode ? 255 : 0;
 
     const jint yLo = clipTop;
     const jint yHi = clipBottom;
@@ -298,13 +309,13 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
     if (vyLo >= vyHi || vxLo >= vxHi) {
         for (jint y = yLo; y < yHi; y++) {
             for (jint x = xLo; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, x, y);
             }
         }
     } else {
         for (jint y = yLo; y < vyLo; y++) {
             for (jint x = xLo; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, x, y);
             }
         }
 
@@ -314,7 +325,7 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
 
         for (jint y = vyLo; y < vyHi; y++) {
             for (jint x = xLo; x < vxLo; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, x, y);
             }
 #if defined(__aarch64__)
             // Row kernel for the whole interior run: header math (incl. the
@@ -347,16 +358,16 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             delete[] spanBuf;
 #else
             for (jint x = vxLo; x < vxHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, x, y);
             }
 #endif
             for (jint x = vxHi; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, x, y);
             }
         }
         for (jint y = vyHi; y < yHi; y++) {
             for (jint x = xLo; x < xHi; x++) {
-                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, init, x, y);
+                applyScalarPixel(src, dst, width, height, radiusX, radiusY, isErode, x, y);
             }
         }
     }

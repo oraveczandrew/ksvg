@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg.filtering
 
+import hu.oandras.ksvg.filtering.StackBlur
 import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
@@ -73,6 +74,16 @@ class KernelPerformanceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            benchmarkSingleManual(
+                kernel = "UnLinearize",
+                backend = "kotlin",
+                w = w,
+                h = h
+            ) {
+                KotlinKernels.unLinearize(src, dst, w, h, table)
+            }
+
             benchmarkSingle(
                 name = "UnLinearize",
                 backendFlags = UnLinearizeNative.nativeBackend(),
@@ -96,6 +107,29 @@ class KernelPerformanceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
+            
+            // Add Kotlin reference
+            benchmarkSingleManual(
+                kernel = "ComponentTransfer",
+                backend = "kotlin",
+                w = w,
+                h = h
+            ) {
+                KotlinKernels.componentTransfer(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    tableA = tables[0],
+                    tableR = tables[1],
+                    tableG = tables[2],
+                    tableB = tables[3]
+                )
+            }
+
             benchmarkSingle(
                 name = "ComponentTransfer",
                 backendFlags = ComponentTransferNative.nativeBackend(),
@@ -125,6 +159,29 @@ class KernelPerformanceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            // Add Kotlin reference
+            benchmarkSingleManual(
+                kernel = "Morphology",
+                backend = "kotlin",
+                w = w,
+                h = h
+            ) {
+                KotlinKernels.morphology(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    radiusX = 5,
+                    radiusY = 5,
+                    erode = true,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h
+                )
+            }
+
             benchmarkSingle(
                 name = "Morphology",
                 backendFlags = MorphologyNative.nativeBackend(),
@@ -154,6 +211,21 @@ class KernelPerformanceBenchmark {
             val src1 = IntArray(w * h)
             val src2 = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            benchmarkSingleManual(
+                kernel = "ArithmeticComposite (non-linear)",
+                backend = "kotlin",
+                w = w,
+                h = h
+            ) {
+                KotlinKernels.arithmeticComposite(
+                    src1, src2, dst, w,
+                    0, 0, w, h,
+                    0.5f, 0.5f, 0.5f, 0.1f,
+                    false
+                )
+            }
+
             benchmarkSingle(
                 name = "ArithmeticComposite (non-linear)",
                 backendFlags = ArithmeticCompositeNative.nativeBackend(),
@@ -185,6 +257,21 @@ class KernelPerformanceBenchmark {
             val src1 = IntArray(w * h)
             val src2 = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            benchmarkSingleManual(
+                kernel = "ArithmeticComposite (linear)",
+                backend = "kotlin",
+                w = w,
+                h = h
+            ) {
+                KotlinKernels.arithmeticComposite(
+                    src1, src2, dst, w,
+                    0, 0, w, h,
+                    0.5f, 0.5f, 0.5f, 0.1f,
+                    true
+                )
+            }
+
             benchmarkSingle(
                 name = "ArithmeticComposite (linear)",
                 backendFlags = ArithmeticCompositeNative.nativeBackend(),
@@ -216,6 +303,18 @@ class KernelPerformanceBenchmark {
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            benchmarkSingleManual(
+                kernel = "ConvolveMatrix",
+                backend = "kotlin",
+                w = w,
+                h = h
+            ) {
+                KotlinKernels.convolveMatrix(
+                    src, dst, w, h, kernel, 3, 3, 1, 1, 1f, 0f, true, 0
+                )
+            }
+
             benchmarkSingle(
                 name = "ConvolveMatrix",
                 backendFlags = ConvolveNative.nativeBackend(),
@@ -247,6 +346,19 @@ class KernelPerformanceBenchmark {
             val src = IntArray(w * h)
             val map = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            benchmarkSingleManual(
+                kernel = "DisplacementMap",
+                backend = "kotlin",
+                w = w,
+                h = h,
+                numBuffers = 3
+            ) {
+                KotlinKernels.displacementMap(
+                    src, map, dst, w, h, w, h, 20f, 0, 1
+                )
+            }
+
             benchmarkSingle(
                 name = "DisplacementMap",
                 backendFlags = DisplacementMapNative.nativeBackend(),
@@ -276,6 +388,20 @@ class KernelPerformanceBenchmark {
         for ((w, h) in sizes) {
             val pix = IntArray(w * h)
             val out = IntArray(w * h)
+
+            benchmarkSingleManual(
+                kernel = "Lighting",
+                backend = "kotlin",
+                w = w,
+                h = h
+            ) {
+                KotlinKernels.lighting(
+                    pix, out, w, h, 0, 0, w, h,
+                    1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f,
+                    0, false, 1f, 1f, 255, 255, 255, params
+                )
+            }
+
             benchmarkSingle(
                 name = "Lighting",
                 backendFlags = LightingNative.nativeBackend(),
@@ -321,6 +447,26 @@ class KernelPerformanceBenchmark {
     private fun benchmarkTurbulence() {
         for ((w, h) in sizes) {
             val pix = IntArray(w * h)
+            val seed = 123
+            val lcg = LcgRandom(seed)
+            val p = IntArray(SvgPathNoise.LATTICE_SIZE)
+            val generators = Array(4) { SvgPathNoise(lcg, p) }
+            SvgPathNoise.buildPermutation(lcg, p)
+
+            benchmarkSingleManual(
+                kernel = "Turbulence",
+                backend = "kotlin",
+                w = w,
+                h = h,
+                numBuffers = 1
+            ) {
+                KotlinKernels.turbulence(
+                    pix, w, h, 0, 0, w, h,
+                    0.01, 0.01, 0, 0, 1, false,
+                    1.0, 1.0, 0.0, 0.0, 1.0, 1.0, seed, generators
+                )
+            }
+
             benchmarkSingle(
                 name = "Turbulence",
                 backendFlags = TurbulenceNative.nativeBackend(),
@@ -350,7 +496,7 @@ class KernelPerformanceBenchmark {
                     originY = 0.0,
                     unitSizeX = 1.0,
                     unitSizeY = 1.0,
-                    seed = 123,
+                    seed = seed,
                     simdBackend = b
                 )
             }
@@ -362,6 +508,16 @@ class KernelPerformanceBenchmark {
         try {
             for ((w, h) in sizes) {
                 val pix = IntArray(w * h)
+
+                benchmarkSingleManual(
+                    kernel = "GaussianBlur",
+                    backend = "kotlin",
+                    w = w,
+                    h = h
+                ) {
+                    StackBlur.blur(pix, w, h, 5f, 5f)
+                }
+
                 benchmarkSingle(
                     name = "GaussianBlur",
                     backendFlags = NativeGaussianBlur.nativeBackend(5f, 5f),
@@ -406,5 +562,26 @@ class KernelPerformanceBenchmark {
                 runKernel = { run(b) }
             )
         }
+    }
+
+    private fun benchmarkSingleManual(
+        kernel: String,
+        backend: String,
+        w: Int,
+        h: Int,
+        numBuffers: Int = 2,
+        run: () -> Unit
+    ) {
+        val isQuick = System.getProperty("benchmark.quick") == "true"
+        val iterations = if (isQuick) 1 else (if (w <= 512) 50 else 5)
+        KernelBenchmarkRunner.runBenchmark(
+            kernel = kernel,
+            backendName = backend,
+            width = w,
+            height = h,
+            iterations = iterations,
+            numBuffers = numBuffers,
+            runKernel = run
+        )
     }
 }

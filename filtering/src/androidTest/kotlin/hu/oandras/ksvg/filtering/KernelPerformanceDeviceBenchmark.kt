@@ -20,6 +20,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.benchmark.clearPreviousResults
 import hu.oandras.ksvg.filtering.benchmark.nativeBenchmark
+import hu.oandras.ksvg.filtering.StackBlur
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -87,6 +88,20 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes(quick)) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            nativeBenchmark {
+                name = "UnLinearize"
+                backend = "kotlin"
+                width = w
+                height = h
+                warmupIterations = WARMUP_ITERATIONS
+                measurementBatches = MEASUREMENT_BATCHES
+                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                run {
+                    KotlinKernels.unLinearize(src, dst, w, h, table)
+                }
+            }
+
             benchmarkCells(
                 name = "UnLinearize",
                 backendFlags = UnLinearizeNative.nativeBackend(),
@@ -106,10 +121,36 @@ class KernelPerformanceDeviceBenchmark {
     }
 
     private fun benchmarkComponentTransfer(quick: Boolean) {
-        val tables = Array(4) { ByteArray(256) { it.toByte() } }
+        val tables = Array(4) { IntArray(256) { it shl it * 8 } }
         for ((w, h) in sizes(quick)) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            nativeBenchmark {
+                name = "ComponentTransfer"
+                backend = "kotlin"
+                width = w
+                height = h
+                warmupIterations = WARMUP_ITERATIONS
+                measurementBatches = MEASUREMENT_BATCHES
+                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                run {
+                    KotlinKernels.componentTransfer(
+                        src = src,
+                        dst = dst,
+                        width = w,
+                        clipLeft = 0,
+                        clipTop = 0,
+                        clipRight = w,
+                        clipBottom = h,
+                        tableA = tables[0],
+                        tableR = tables[1],
+                        tableG = tables[2],
+                        tableB = tables[3]
+                    )
+                }
+            }
+
             benchmarkCells(
                 name = "ComponentTransfer",
                 backendFlags = ComponentTransferNative.nativeBackend(),
@@ -139,6 +180,32 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes(quick)) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            nativeBenchmark {
+                name = "Morphology"
+                backend = "kotlin"
+                width = w
+                height = h
+                warmupIterations = WARMUP_ITERATIONS
+                measurementBatches = MEASUREMENT_BATCHES
+                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                run {
+                    KotlinKernels.morphology(
+                        src = src,
+                        dst = dst,
+                        width = w,
+                        height = h,
+                        radiusX = 5,
+                        radiusY = 5,
+                        erode = true,
+                        clipLeft = 0,
+                        clipTop = 0,
+                        clipRight = w,
+                        clipBottom = h
+                    )
+                }
+            }
+
             benchmarkCells(
                 name = "Morphology",
                 backendFlags = MorphologyNative.nativeBackend(),
@@ -168,6 +235,25 @@ class KernelPerformanceDeviceBenchmark {
             val src1 = IntArray(w * h)
             val src2 = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            nativeBenchmark {
+                name = if (useLinear) "ArithmeticComposite (linear)" else "ArithmeticComposite (non-linear)"
+                backend = "kotlin"
+                width = w
+                height = h
+                warmupIterations = WARMUP_ITERATIONS
+                measurementBatches = MEASUREMENT_BATCHES
+                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                run {
+                    KotlinKernels.arithmeticComposite(
+                        src1, src2, dst, w,
+                        0, 0, w, h,
+                        0.5f, 0.5f, 0.5f, 0.1f,
+                        useLinear
+                    )
+                }
+            }
+
             benchmarkCells(
                 name = if (useLinear) "ArithmeticComposite (linear)" else "ArithmeticComposite (non-linear)",
                 backendFlags = ArithmeticCompositeNative.nativeBackend(),
@@ -205,6 +291,22 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes(quick)) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            nativeBenchmark {
+                name = "ConvolveMatrix"
+                backend = "kotlin"
+                width = w
+                height = h
+                warmupIterations = WARMUP_ITERATIONS
+                measurementBatches = MEASUREMENT_BATCHES
+                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                run {
+                    KotlinKernels.convolveMatrix(
+                        src, dst, w, h, kernel, 5, 5, 2, 2, 16f, 0f, true, 0
+                    )
+                }
+            }
+
             benchmarkCells(
                 name = "ConvolveMatrix",
                 backendFlags = ConvolveNative.nativeBackend(),
@@ -236,6 +338,22 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val map = IntArray(w * h)
             val dst = IntArray(w * h)
+
+            nativeBenchmark {
+                name = "DisplacementMap"
+                backend = "kotlin"
+                width = w
+                height = h
+                warmupIterations = WARMUP_ITERATIONS
+                measurementBatches = MEASUREMENT_BATCHES
+                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                run {
+                    KotlinKernels.displacementMap(
+                        src, map, dst, w, h, w, h, 20f, 0, 1
+                    )
+                }
+            }
+
             benchmarkCells(
                 name = "DisplacementMap",
                 backendFlags = DisplacementMapNative.nativeBackend(),
@@ -264,6 +382,24 @@ class KernelPerformanceDeviceBenchmark {
         for ((w, h) in sizes(quick)) {
             val pix = IntArray(w * h)
             val out = IntArray(w * h)
+
+            nativeBenchmark {
+                name = "Lighting"
+                backend = "kotlin"
+                width = w
+                height = h
+                warmupIterations = WARMUP_ITERATIONS
+                measurementBatches = MEASUREMENT_BATCHES
+                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                run {
+                    KotlinKernels.lighting(
+                        pix, out, w, h, 0, 0, w, h,
+                        1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f,
+                        0, false, 1f, 1f, 255, 255, 255, params
+                    )
+                }
+            }
+
             benchmarkCells(
                 name = "Lighting",
                 backendFlags = LightingNative.nativeBackend(),
@@ -309,6 +445,29 @@ class KernelPerformanceDeviceBenchmark {
     private fun benchmarkTurbulence(quick: Boolean) {
         for ((w, h) in sizes(quick)) {
             val pixels = IntArray(w * h)
+            val seed = 123
+            val lcg = LcgRandom(seed)
+            val p = IntArray(SvgPathNoise.LATTICE_SIZE)
+            val generators = Array(4) { SvgPathNoise(lcg, p) }
+            SvgPathNoise.buildPermutation(lcg, p)
+
+            nativeBenchmark {
+                name = "Turbulence"
+                backend = "kotlin"
+                width = w
+                height = h
+                warmupIterations = WARMUP_ITERATIONS
+                measurementBatches = MEASUREMENT_BATCHES
+                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                run {
+                    KotlinKernels.turbulence(
+                        pixels, w, h, 0, 0, w, h,
+                        0.01, 0.01, 0, 0, 1, false,
+                        1.0, 1.0, 0.0, 0.0, 1.0, 1.0, seed, generators
+                    )
+                }
+            }
+
             benchmarkCells(
                 name = "Turbulence",
                 backendFlags = TurbulenceNative.nativeBackend(),
@@ -337,7 +496,7 @@ class KernelPerformanceDeviceBenchmark {
                     originY = 0.0,
                     unitSizeX = 1.0,
                     unitSizeY = 1.0,
-                    seed = 123,
+                    seed = seed,
                     simdBackend = b
                 )
             }
@@ -349,6 +508,20 @@ class KernelPerformanceDeviceBenchmark {
         try {
             for ((w, h) in sizes(quick)) {
                 val pix = IntArray(w * h)
+
+                nativeBenchmark {
+                    name = "GaussianBlur"
+                    backend = "kotlin"
+                    width = w
+                    height = h
+                    warmupIterations = WARMUP_ITERATIONS
+                    measurementBatches = MEASUREMENT_BATCHES
+                    iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                    run {
+                        StackBlur.blur(pix, w, h, 5f, 5f)
+                    }
+                }
+
                 benchmarkCells(
                     name = "GaussianBlur",
                     backendFlags = NativeGaussianBlur.nativeBackend(5f, 5f),

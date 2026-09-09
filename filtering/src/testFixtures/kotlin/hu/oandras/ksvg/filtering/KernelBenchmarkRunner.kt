@@ -103,15 +103,20 @@ public object KernelBenchmarkRunner {
         val md = StringBuilder("$mdHeader\n$mdSep\n")
 
         for (r in results) {
+            val scalarMs = results.find {
+                it.kernel == r.kernel && it.backend == "scalar" && it.width == r.width && it.height == r.height
+            }?.avgMs
+            val relSpeedup = if (scalarMs != null) scalarMs / r.avgMs else 1.0
+
             val line = String.format(
                 Locale.US, "%s,%s,%dx%d,%.3f,%.2f,%.2f,%.2f",
-                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, r.speedup,
+                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup,
             )
             csv.append(line + "\n")
 
             val mdLine = String.format(
                 Locale.US, "| %s | %s | %dx%d | %.3f | %.2f | %.2f | %.2fx |",
-                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, r.speedup,
+                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup,
             )
             md.append(mdLine + "\n")
         }

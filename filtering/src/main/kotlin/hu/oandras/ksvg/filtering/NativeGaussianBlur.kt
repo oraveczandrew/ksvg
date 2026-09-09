@@ -86,8 +86,8 @@ private class FallbackScratch : StackBlurScratch {
     ) {
         val rx = max((stdDeviationX * 2.5f + 0.5f).toInt(), 0)
         val ry = max((stdDeviationY * 2.5f + 0.5f).toInt(), 0)
-        if (rx > 0) stackBlur(pixels, width, height, rx, true, scratchX)
-        if (ry > 0) stackBlur(pixels, width, height, ry, false, scratchY)
+        if (rx > 0) StackBlur.stackBlur(pixels, width, height, rx, true, scratchX)
+        if (ry > 0) StackBlur.stackBlur(pixels, width, height, ry, false, scratchY)
     }
 }
 
