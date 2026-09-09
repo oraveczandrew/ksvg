@@ -192,15 +192,17 @@ ksvgMorphologyApplyRowNeon64:
     cbz     w13, .L_row_h_d_p
     tbz     w13, #1, .L_row_h_d_t1
     ld1     {v1.8b}, [x18], #8
-    umax    v0.8b, v0.8b, v1.8b
+    umax    v0.16b, v0.16b, v1.16b
     tbz     w13, #0, .L_row_h_d_p
 .L_row_h_d_t1:
     ldr     w21, [x18]
     dup     v1.4s, w21
     umax    v0.16b, v0.16b, v1.16b
 .L_row_h_d_p:
-    umaxv   b0, v0.16b
-    dup     v0.4s, v0.s[0]
+    ext     v1.16b, v0.16b, v0.16b, #8
+    umax    v0.16b, v0.16b, v1.16b
+    ext     v1.16b, v0.16b, v0.16b, #4
+    umax    v0.16b, v0.16b, v1.16b
     str     s0, [x16], #4
     add     x17, x17, #4
     subs    w10, w10, #1
@@ -239,16 +241,19 @@ ksvgMorphologyApplyRowNeon64:
 .L_row_h_e_t:
     cbz     w13, .L_row_h_e_p
     tbz     w13, #1, .L_row_h_e_t1
-    ld1     {v1.8b}, [x18], #8
-    umin    v0.8b, v0.8b, v1.8b
+    movi    v1.16b, #0xff
+    ld1     {v1.d}[0], [x18], #8
+    umin    v0.16b, v0.16b, v1.16b
     tbz     w13, #0, .L_row_h_e_p
 .L_row_h_e_t1:
     ldr     w21, [x18]
     dup     v1.4s, w21
     umin    v0.16b, v0.16b, v1.16b
 .L_row_h_e_p:
-    uminv   b0, v0.16b
-    dup     v0.4s, v0.s[0]
+    ext     v1.16b, v0.16b, v0.16b, #8
+    umin    v0.16b, v0.16b, v1.16b
+    ext     v1.16b, v0.16b, v0.16b, #4
+    umin    v0.16b, v0.16b, v1.16b
     str     s0, [x16], #4
     add     x17, x17, #4
     subs    w10, w10, #1
