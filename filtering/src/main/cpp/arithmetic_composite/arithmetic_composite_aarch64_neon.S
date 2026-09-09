@@ -154,6 +154,12 @@ SYM(applyArithmeticNeon):
     stp     x23, x24, [sp, #112]
     stp     x25, x26, [sp, #128]
 
+    /* Save raw coefficients k1..k4 in the spare frame slots.  The vector
+       loop clobbers v0..v3 with pixel data, so the scalar tails must reload
+       the coefficients from here instead of from s0..s3. */
+    stp     s0, s1, [sp, #144]
+    stp     s2, s3, [sp, #152]
+
     /* Preserve AAPCS64 callee-saved v8..v15 (lower 64 bits). */
     stp     d8, d9, [sp, #16]
     stp     d10, d11, [sp, #32]
@@ -188,6 +194,7 @@ SYM(applyArithmeticNeon):
     movk    w19, #0x3b80, lsl #16   /* float 1/255 */
     fmov    s8, w19
     dup     v8.4s, v8.s[0]
+    fmul    v8.4s, v8.4s, v0.s[0]    /* k1 / 255 */
     dup     v9.4s, v1.s[0]           /* k2 */
     dup     v10.4s, v2.s[0]          /* k3 */
 
@@ -218,71 +225,13 @@ SYM(applyArithmeticNeon):
     add     x11, x11, x12
 
 .Lrow_start_nonlin:
-    mov     w17, w13
-    lsr     w24, w17, #5             /* 32-pixel groups */
-    and     w25, w17, #31
-
-    cbz     w24, .Lnonlin_8_setup
-
-.Lnonlin_32:
-    /* Four 8-pixel groups per unrolled iteration. */
-    ld4     {v0.8b-v3.8b}, [x9], #32
-    ld4     {v4.8b-v7.8b}, [x10], #32
-    umov    x16, v0.d[0]
-    umov    x17, v4.d[0]
-    umov    x18, v1.d[0]
-    umov    x19, v5.d[0]
-    umov    x20, v2.d[0]
-    umov    x21, v6.d[0]
-    umov    x22, v3.d[0]
-    umov    x23, v7.d[0]
-
-    /* B */
-    fmov    d14, x16
-    fmov    d15, x17
-    FORMULA8
-    umov    x16, v6.d[0]
-    /* G */
-    fmov    d14, x18
-    fmov    d15, x19
-    FORMULA8
-    umov    x18, v6.d[0]
-    /* R */
-    fmov    d14, x20
-    fmov    d15, x21
-    FORMULA8
-    umov    x20, v6.d[0]
-    /* A */
-    fmov    d14, x22
-    fmov    d15, x23
-    FORMULA8
-    umov    x22, v6.d[0]
-
-    fmov    d0, x16
-    fmov    d1, x18
-    fmov    d2, x20
-    fmov    d3, x22
-    zip1    v4.8b, v0.8b, v1.8b
-    zip2    v5.8b, v0.8b, v1.8b
-    zip1    v6.8b, v2.8b, v3.8b
-    zip2    v7.8b, v2.8b, v3.8b
-    ins     v4.d[1], v5.d[0]
-    ins     v6.d[1], v7.d[0]
-    zip1    v0.8h, v4.8h, v6.8h
-    zip2    v1.8h, v4.8h, v6.8h
-    st1     {v0.16b, v1.16b}, [x11], #32
-
-    subs    w24, w24, #1
-    b.ne    .Lnonlin_32
-
-.Lnonlin_8_setup:
-    mov     w17, w25
-    cbz     w17, .Lnonlin_row_done
-
-    lsr     w24, w17, #3
+    lsr     w17, w13, #2             /* clipped width in pixels (w13 is bytes) */
+    lsr     w24, w17, #3             /* 8-pixel groups */
     and     w25, w17, #7
 
 .Lnonlin_8:
+    cbz     w24, .Lnonlin_row_done
+
     ld4     {v0.8b-v3.8b}, [x9], #32
     ld4     {v4.8b-v7.8b}, [x10], #32
     umov    x16, v0.d[0]
@@ -351,6 +300,7 @@ SYM(applyArithmeticNeon):
     movk    w19, #0x3b80, lsl #16
     fmov    s8, w19
     dup     v8.4s, v8.s[0]
+    fmul    v8.4s, v8.4s, v0.s[0]    /* k1 / 255 */
     dup     v9.4s, v1.s[0]
     dup     v10.4s, v2.s[0]
 
@@ -380,8 +330,8 @@ SYM(applyArithmeticNeon):
     add     x11, x11, x12
 
 .Lrow_start_linear:
-    mov     w17, w13
-    lsr     w24, w17, #3
+    lsr     w17, w13, #2             /* clipped width in pixels (w13 is bytes) */
+    lsr     w24, w17, #3             /* 8-pixel groups */
     and     w25, w17, #7
 
 .Llinear_8:
@@ -510,11 +460,19 @@ SYM(applyArithmeticNeon):
 .endm
 
 .Ltail_scalar_nonlin:
-    /* Recompute scalar constants: s8=1/255, s9=k2, s10=k3,
+    /* Reload raw coefficients k1..k4 saved in the prologue; the vector loop
+       overwrote v0..v3 with pixel data. */
+    ldr     s0, [sp, #144]
+    ldr     s1, [sp, #148]
+    ldr     s2, [sp, #152]
+    ldr     s3, [sp, #156]
+
+    /* Recompute scalar constants: s8=k1/255, s9=k2, s10=k3,
        s11=k4*255+0.5, s15=255. */
     mov     w20, #0x8081
     movk    w20, #0x3b80, lsl #16
     fmov    s8, w20
+    fmul    s8, s8, s0               /* k1 / 255 */
     mov     w20, #0x0000
     movk    w20, #0x437f, lsl #16
     fmov    s15, w20
@@ -566,10 +524,16 @@ SYM(applyArithmeticNeon):
     b       .Lrow_nonlin_next
 
 .Ltail_scalar_linear:
-    /* Exact scalar tail using the real caller-provided 256-byte LUTs. */
+    /* Exact scalar tail using the real caller-provided 256-byte LUTs.
+       Reload k1..k4 saved in the prologue; the vector loop clobbers v0..v3. */
+    ldr     s0, [sp, #144]
+    ldr     s1, [sp, #148]
+    ldr     s2, [sp, #152]
+    ldr     s3, [sp, #156]
     mov     w20, #0x8081
     movk    w20, #0x3b80, lsl #16
     fmov    s8, w20
+    fmul    s8, s8, s0               /* k1 / 255 */
     mov     w20, #0x0000
     movk    w20, #0x437f, lsl #16
     fmov    s15, w20
