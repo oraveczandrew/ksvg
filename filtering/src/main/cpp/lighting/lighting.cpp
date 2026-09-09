@@ -261,36 +261,51 @@ void applyVector(
                 jint* rowOut = out + rowOffset + x;
 
 #if defined(__aarch64__)
+                assert(backend == SIMD_BACKEND_NEON64);
                 ksvgLightingDistantDiffuseRowNeon64(srcT, srcM, srcB, rowOut, count, &lp);
 #elif defined(__arm__)
+                assert(backend == SIMD_BACKEND_NEON32);
                 ksvgLightingDistantDiffuseRowNeon32(srcT, srcM, srcB, rowOut, count, &lp);
 #elif defined(__i386__) || defined(__x86_64__)
 #if defined(__x86_64__)
-    const SimdLevel level = detectSimdLevel();
-    if (level >= SIMD_AVX512) {
-        const jint c16 = (ixHi - x) & ~15;
-        if (c16 > 0) {
-            ksvgLightingDistantDiffuseRowAvx512(srcT, srcM, srcB, rowOut, c16, &lp);
-            x += c16; srcT += c16; srcM += c16; srcB += c16; rowOut += c16;
-        }
-    }
-    if (x < ixHi) {
-        if (level >= SIMD_AVX2) {
-            const jint c8 = (ixHi - x) & ~7;
-            if (c8 > 0) {
-                ksvgLightingDistantDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp);
-                x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
-            }
-        }
+                switch (backend) {
+                    case SIMD_BACKEND_AVX512: {
+                        const jint c16 = (ixHi - x) & ~15;
+                        if (c16 > 0) {
+                            ksvgLightingDistantDiffuseRowAvx512(srcT, srcM, srcB, rowOut, c16, &lp);
+                            x += c16; srcT += c16; srcM += c16; srcB += c16; rowOut += c16;
+                        }
+                        break;
+                    }
+                    case SIMD_BACKEND_AVX2: {
+                        const jint c8 = (ixHi - x) & ~7;
+                        if (c8 > 0) {
+                            ksvgLightingDistantDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp);
+                            x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
+                        }
+                        break;
+                    }
+                    case SIMD_BACKEND_SSE2: {
+                        const jint c4 = (ixHi - x) & ~3;
+                        if (c4 > 0) {
+                            ksvgLightingDistantDiffuseRowSse2(srcT, srcM, srcB, rowOut, c4, &lp);
+                            x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
+                        }
+                        break;
+                    }
+                    default:
+                        assert(false && "unsupported forced lighting backend on x86-64");
+                }
+#else
+                assert(backend == SIMD_BACKEND_SSE2);
+                const jint c4 = (ixHi - x) & ~3;
+                if (c4 > 0) {
+                    ksvgLightingDistantDiffuseRowSse2(srcT, srcM, srcB, rowOut, c4, &lp);
+                    x += c4;
+                }
 #endif
-        const jint c4 = (ixHi - x) & ~3;
-        if (c4 > 0) {
-            ksvgLightingDistantDiffuseRowSse2(srcT, srcM, srcB, rowOut, c4, &lp);
-            x += c4;
-        }
-#if defined(__x86_64__)
-    }
-#endif
+#else
+                (void)backend;
 #endif
             }
         }
@@ -351,9 +366,8 @@ jint nativeBackendForAbi() {
     backends |= SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
     backends |= SIMD_BACKEND_SSE2;
-    const SimdLevel level = detectSimdLevel();
-    if (level >= SIMD_SSSE3) backends |= SIMD_BACKEND_SSSE3;
 #if defined(__x86_64__)
+    const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
     if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
 #endif

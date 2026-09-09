@@ -67,16 +67,14 @@ Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 | GaussianBlur | scalar | 2048x2048 | 359.959 | 11.65 | 0.09 | 1.00x |  |  |
 | GaussianBlur | ssse3 | 2048x2048 | 96.724 | 43.36 | 0.35 | 3.72x | 🟢 |  |
 | GaussianBlur | avx2 | 2048x2048 | 94.774 | 44.26 | 0.35 | 3.80x | 🟢 |  |
-| Lighting | scalar | 512x512 | 12.827 | 20.44 | 0.16 | 1.00x |  |  |
-| Lighting | sse2 | 512x512 | 0.871 | 300.83 | 2.41 | **14.72x** | 🚀 |  |
-| Lighting | ssse3 | 512x512 | 0.866 | 302.84 | 2.42 | **14.82x** | 🚀 |  |
-| Lighting | avx2 | 512x512 | 0.793 | 330.66 | 2.65 | **16.18x** | 🚀 |  |
-| Lighting | avx512 | 512x512 | 0.823 | 318.61 | 2.55 | **15.59x** | 🚀 |  |
-| Lighting | scalar | 2048x2048 | 210.770 | 19.90 | 0.16 | 1.00x |  |  |
-| Lighting | sse2 | 2048x2048 | 13.159 | 318.75 | 2.55 | **16.02x** | 🚀 |  |
-| Lighting | ssse3 | 2048x2048 | 13.476 | 311.25 | 2.49 | **15.64x** | 🚀 |  |
-| Lighting | avx2 | 2048x2048 | 13.289 | 315.63 | 2.53 | **15.86x** | 🚀 |  |
-| Lighting | avx512 | 2048x2048 | 13.811 | 303.69 | 2.43 | **15.26x** | 🚀 |  |
+| Lighting | scalar | 512x512 | 13.621 | 19.25 | 0.15 | 1.00x |  |  |
+| Lighting | sse2 | 512x512 | 1.496 | 175.29 | 1.40 | **9.11x** | 🚀 |  |
+| Lighting | avx2 | 512x512 | 1.161 | 225.75 | 1.81 | **11.73x** | 🚀 |  |
+| Lighting | avx512 | 512x512 | 1.184 | 221.48 | 1.77 | **11.51x** | 🚀 |  |
+| Lighting | scalar | 2048x2048 | 214.983 | 19.51 | 0.16 | 1.00x |  |  |
+| Lighting | sse2 | 2048x2048 | 25.379 | 165.27 | 1.32 | 8.47x | 🟢 |  |
+| Lighting | avx2 | 2048x2048 | 17.970 | 233.40 | 1.87 | **11.96x** | 🚀 |  |
+| Lighting | avx512 | 2048x2048 | 15.453 | 271.42 | 2.17 | **13.91x** | 🚀 |  |
 | Morphology | scalar | 512x512 | 23.872 | 10.98 | 0.09 | 1.00x |  |  |
 | Morphology | sse2 | 512x512 | 1.323 | 198.14 | 1.59 | **18.04x** | 🚀 |  |
 | Morphology | avx2 | 512x512 | 1.254 | 209.07 | 1.67 | **19.04x** | 🚀 |  |
@@ -92,10 +90,10 @@ Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 | Turbulence | ssse3 | 2048x2048 | 179.375 | 23.38 | 0.09 | 1.40x | 🟢 |  |
 | Turbulence | avx2 | 2048x2048 | 120.001 | 34.95 | 0.14 | 2.09x | 🟢 |  |
 | UnLinearize | scalar | 512x512 | 0.278 | 944.57 | 7.56 | 1.00x |  |  |
-| UnLinearize | ssse3 | 512x512 | 0.253 | 1035.23 | 8.28 | 1.10x | 🟢 | exact production-LUT path |
+| UnLinearize | ssse3 | 512x512 | 0.253 | 1035.23 | 8.28 | 1.10x | 🟢 |  |
 | UnLinearize | avx2 | 512x512 | 0.264 | 994.29 | 7.95 | 1.05x | 🟢 |  |
 | UnLinearize | scalar | 2048x2048 | 4.682 | 895.91 | 7.17 | 1.00x |  |  |
-| UnLinearize | ssse3 | 2048x2048 | 4.252 | 986.42 | 7.89 | 1.10x | 🟢 | exact production-LUT path |
+| UnLinearize | ssse3 | 2048x2048 | 4.252 | 986.42 | 7.89 | 1.10x | 🟢 |  |
 | UnLinearize | avx2 | 2048x2048 | 4.488 | 934.62 | 7.48 | 1.04x | 🟢 |  |
 ## Host Results (x86-32, Android emulator)
 
@@ -115,38 +113,36 @@ Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark
 | ComponentTransfer | ssse3 | 512x512 | 53.954 | 4.86 | 0.04 | 0.03x | 🔴 | ssse3 pshufb path slower than scalar |
 | ComponentTransfer | scalar | 2048x2048 | 21.847 | 191.99 | 1.54 | 1.00x |  |  |
 | ComponentTransfer | ssse3 | 2048x2048 | 867.596 | 4.83 | 0.04 | 0.03x | 🔴 | ssse3 pshufb path slower than scalar |
-| ConvolveMatrix | scalar | 512x512 | 98.760 | 2.66 | 0.02 | 1.00x |  | fresh i386 emulator run |
-| ConvolveMatrix | sse2 | 512x512 | 4.942 | 53.18 | 0.43 | **19.98x** | 🚀 | fresh i386 SSE2 assembly run |
+| ConvolveMatrix | scalar | 512x512 | 98.760 | 2.66 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix | sse2 | 512x512 | 4.942 | 53.18 | 0.43 | **19.98x** | 🚀 |  |
 | ConvolveMatrix | ssse3 | 512x512 | 38.345 | 6.84 | 0.05 | 2.60x | 🟢 |  |
 | ConvolveMatrix | scalar | 2048x2048 | 1573.879 | 2.67 | 0.02 | — | ⚠️ | harness-invalidated measurement; baseline not used |
 | ConvolveMatrix | sse2 | 2048x2048 | 59.464 | 70.61 | 0.56 | — | 🟢 | scalar baseline invalid in this run |
 | ConvolveMatrix | ssse3 | 2048x2048 | 603.232 | 6.95 | 0.06 | 2.65x | 🟢 |  |
-| DisplacementMap | scalar | 512x512 | 7.745 | 33.95 | 0.27 | 1.00x |  | full i386 emulator bench |
-| DisplacementMap | ssse3 | 512x512 | 0.494 | 553.52 | 4.43 | **15.68x** | 🚀 | i386 SSSE3 assembly; parity-verified |
-| DisplacementMap | scalar | 2048x2048 | 119.300 | 35.15 | 0.28 | 1.00x |  | full i386 emulator bench |
-| DisplacementMap | ssse3 | 2048x2048 | 7.745 | 542.29 | 4.34 | **15.40x** | 🚀 | i386 SSSE3 assembly; parity-verified |
+| DisplacementMap | scalar | 512x512 | 7.745 | 33.95 | 0.27 | 1.00x |  |  |
+| DisplacementMap | ssse3 | 512x512 | 0.494 | 553.52 | 4.43 | **15.68x** | 🚀 |  |
+| DisplacementMap | scalar | 2048x2048 | 119.300 | 35.15 | 0.28 | 1.00x |  |  |
+| DisplacementMap | ssse3 | 2048x2048 | 7.745 | 542.29 | 4.34 | **15.40x** | 🚀 |  |
 | GaussianBlur | scalar | 512x512 | 250.787 | 1.05 | 0.01 | 1.00x |  |  |
-| GaussianBlur | ssse3 | 512x512 | 11.752 | 22.31 | 0.18 | **21.34x** | 🚀 | i386 asm kernel |
+| GaussianBlur | ssse3 | 512x512 | 11.752 | 22.31 | 0.18 | **21.34x** | 🚀 |  |
 | GaussianBlur | scalar | 2048x2048 | 4100.986 | 1.02 | 0.01 | 1.00x |  |  |
-| GaussianBlur | ssse3 | 2048x2048 | 169.971 | 24.68 | 0.20 | **24.13x** | 🚀 | i386 asm kernel |
+| GaussianBlur | ssse3 | 2048x2048 | 169.971 | 24.68 | 0.20 | **24.13x** | 🚀 |  |
 | Lighting | scalar | 512x512 | 67.943 | 3.86 | 0.03 | 1.00x |  |  |
-| Lighting | sse2 | 512x512 | 1.771 | 148.00 | 1.18 | **38.4x** | 🚀 | rebuilt kernel, parity-verified |
-| Lighting | ssse3 | 512x512 | 1.853 | 141.51 | 1.13 | **36.7x** | 🚀 | same SSE2 kernel |
+| Lighting | sse2 | 512x512 | 1.771 | 148.00 | 1.18 | **38.4x** | 🚀 |  |
 | Lighting | scalar | 2048x2048 | 1087.123 | 3.86 | 0.03 | 1.00x |  |  |
-| Lighting | sse2 | 2048x2048 | 19.766 | 212.20 | 1.70 | **55.0x** | 🚀 | rebuilt kernel, parity-verified |
-| Lighting | ssse3 | 2048x2048 | 19.510 | 214.98 | 1.72 | **55.7x** | 🚀 | same SSE2 kernel |
-| Morphology | scalar | 512x512 | 155.450 | 1.69 | 0.01 | 1.00x |  | fresh full i386 emulator run |
-| Morphology | sse2 | 512x512 | 1.557 | 168.33 | 1.35 | **99.79x** | 🚀 | i386 SSE2 assembly; valid |
-| Morphology | scalar | 2048x2048 | 2537.789 | 1.65 | 0.01 | 1.00x |  | fresh full i386 emulator run |
-| Morphology | sse2 | 2048x2048 | 24.784 | 169.23 | 1.35 | **102.40x** | 🚀 | i386 SSE2 assembly; valid |
-| Turbulence | scalar | 512x512 | 69.761 | 3.76 | 0.03 | 1.00x |  | fresh full i386 emulator run |
-| Turbulence | ssse3 | 512x512 | 13.730 | 19.09 | 0.15 | **5.08x** | 🟢 | i386 SSSE3 assembly; parity-verified |
-| Turbulence | scalar | 2048x2048 | 1113.571 | 3.77 | 0.03 | 1.00x |  | fresh full i386 emulator run |
-| Turbulence | ssse3 | 2048x2048 | 218.275 | 19.22 | 0.15 | **5.10x** | 🟢 | i386 SSSE3 assembly; parity-verified |
-| UnLinearize | scalar | 512x512 | 0.927 | 311.55 | 2.49 | 1.00x | 🟢 | accepted benchmark result |
-| UnLinearize | ssse3 | 512x512 | 0.281 | 1090.64 | 8.72 | **3.30x** | 🟢 | accepted benchmark result |
-| UnLinearize | scalar | 2048x2048 | 13.635 | 309.91 | 2.48 | 1.00x | 🟢 | accepted benchmark result |
-| UnLinearize | ssse3 | 2048x2048 | 3.992 | 1057.71 | 8.46 | **3.42x** | 🟢 | accepted benchmark result |
+| Lighting | sse2 | 2048x2048 | 19.766 | 212.20 | 1.70 | **55.0x** | 🚀 |  |
+| Morphology | scalar | 512x512 | 155.450 | 1.69 | 0.01 | 1.00x |  |  |
+| Morphology | sse2 | 512x512 | 1.557 | 168.33 | 1.35 | **99.79x** | 🚀 |  |
+| Morphology | scalar | 2048x2048 | 2537.789 | 1.65 | 0.01 | 1.00x |  |  |
+| Morphology | sse2 | 2048x2048 | 24.784 | 169.23 | 1.35 | **102.40x** | 🚀 |  |
+| Turbulence | scalar | 512x512 | 69.761 | 3.76 | 0.03 | 1.00x |  |  |
+| Turbulence | ssse3 | 512x512 | 13.730 | 19.09 | 0.15 | **5.08x** | 🟢 |  |
+| Turbulence | scalar | 2048x2048 | 1113.571 | 3.77 | 0.03 | 1.00x |  |  |
+| Turbulence | ssse3 | 2048x2048 | 218.275 | 19.22 | 0.15 | **5.10x** | 🟢 |  |
+| UnLinearize | scalar | 512x512 | 0.927 | 311.55 | 2.49 | 1.00x | 🟢 |  |
+| UnLinearize | ssse3 | 512x512 | 0.281 | 1090.64 | 8.72 | **3.30x** | 🟢 |  |
+| UnLinearize | scalar | 2048x2048 | 13.635 | 309.91 | 2.48 | 1.00x | 🟢 |  |
+| UnLinearize | ssse3 | 2048x2048 | 3.992 | 1057.71 | 8.46 | **3.42x** | 🟢 |  |
 
 The emulator exposes only `scalar`/`sse2`/`ssse3` (AVX is gated out of runtime detection on 32-bit x86 by Android).
 If a kernel row is missing a backend it is not advertised on this ABI. Morphology exposes only scalar/SSE2/AVX2/AVX-512 on x86.
@@ -174,9 +170,9 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBen
 | ConvolveMatrix | scalar | 2048x2048 | 1589.315 | 2.64 | 0.02 | 1.00x |  |
 | ConvolveMatrix | neon64 | 2048x2048 | 83.963 | 49.95 | 0.40 | **18.93x** | 🚀 |
 | DisplacementMap | scalar | 512x512 | 6.765 | 38.75 | 0.31 | 1.00x |  |
-| DisplacementMap | neon64 | 512x512 | 0.476 | 550.73 | 4.41 | **14.21x** | 🚀 | byte-exact NEON64 |
+| DisplacementMap | neon64 | 512x512 | 0.476 | 550.73 | 4.41 | **14.21x** | 🚀 |
 | DisplacementMap | scalar | 2048x2048 | 91.717 | 45.73 | 0.37 | 1.00x |  |
-| DisplacementMap | neon64 | 2048x2048 | 7.502 | 559.08 | 4.47 | **12.23x** | 🚀 | byte-exact NEON64 |
+| DisplacementMap | neon64 | 2048x2048 | 7.502 | 559.08 | 4.47 | **12.23x** | 🚀 |
 | GaussianBlur | scalar | 512x512 | 245.457 | 1.07 | 0.01 | 1.00x |  |
 | GaussianBlur | neon64 | 512x512 | 4.419 | 59.32 | 0.47 | **55.55x** | 🚀 |
 | GaussianBlur | scalar | 2048x2048 | 4012.708 | 1.05 | 0.01 | 1.00x |  |
@@ -220,9 +216,9 @@ Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit) test APK usi
 | ConvolveMatrix | scalar | 2048x2048 | 2949.058 | 1.42 | 0.01 | 1.00x |  |  |
 | ConvolveMatrix | neon32 | 2048x2048 | 166.404 | 25.21 | 0.20 | **17.72x** | 🚀 |  |
 | DisplacementMap | scalar | 512x512 | 10.580 | 24.78 | 0.20 | 1.00x |  |  |
-| DisplacementMap | neon32 | 512x512 | 0.967 | 271.18 | 2.17 | **10.94x** | 🚀 | byte-exact NEON32 |  |
+| DisplacementMap | neon32 | 512x512 | 0.967 | 271.18 | 2.17 | **10.94x** | 🚀 |  |
 | DisplacementMap | scalar | 2048x2048 | 187.798 | 22.33 | 0.18 | 1.00x |  |  |
-| DisplacementMap | neon32 | 2048x2048 | 23.020 | 182.20 | 1.46 | **8.16x** | 🚀 | byte-exact NEON32 |  |
+| DisplacementMap | neon32 | 2048x2048 | 23.020 | 182.20 | 1.46 | **8.16x** | 🚀 |  |
 | GaussianBlur | scalar | 512x512 | 369.019 | 0.71 | 0.01 | 1.00x |  |  |
 | GaussianBlur | neon32 | 512x512 | 8.748 | 29.97 | 0.24 | **42.19x** | 🚀 | UNSTABLE (noisy timing) |
 | GaussianBlur | scalar | 2048x2048 | 5959.443 | 0.70 | 0.01 | 1.00x |  |  |
