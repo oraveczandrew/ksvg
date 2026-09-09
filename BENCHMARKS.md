@@ -158,9 +158,7 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBen
 | ArithmeticComposite (non-linear) | scalar | 2048x2048 | 265.29 | 15.81 | 0.13 | 1.00x |  |  |
 | ArithmeticComposite (non-linear) | neon64 | 2048x2048 | 16.26 | 258.02 | 2.06 | **16.32x** | 🚀 |  |
 | ComponentTransfer | scalar | 512x512 | 1.29 | 203.54 | 1.63 | 1.00x |  |  |
-| ComponentTransfer | neon64 | 512x512 | — | — | — | — | 🔴 | un-advertised (was 0.08x regression) |
 | ComponentTransfer | scalar | 2048x2048 | 21.16 | 198.26 | 1.59 | 1.00x |  |  |
-| ComponentTransfer | neon64 | 2048x2048 | — | — | — | — | 🔴 | un-advertised (was 0.08x regression) |
 | ConvolveMatrix | scalar | 512x512 | 95.24 | 2.75 | 0.02 | 1.00x |  |  |
 | ConvolveMatrix | neon64 | 512x512 | 5.92 | 44.27 | 0.35 | **16.09x** | 🚀 |  |
 | ConvolveMatrix | scalar | 2048x2048 | 1511.95 | 2.77 | 0.02 | 1.00x |  |  |
@@ -204,9 +202,7 @@ Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit) test APK usi
 | ArithmeticComposite (non-linear) | scalar | 2048x2048 | 486.11 | 8.63 | 0.07 | 1.00x |  |  |
 | ArithmeticComposite (non-linear) | neon32 | 2048x2048 | 36.73 | 114.18 | 0.91 | **13.23x** | 🚀 |  |
 | ComponentTransfer | scalar | 512x512 | 1.925 | 136.15 | 1.09 | 1.00x |  |  |
-| ComponentTransfer | neon32 | 512x512 | 95.988 | 2.73 | 0.02 | 0.02x | 🔴 |  |
 | ComponentTransfer | scalar | 2048x2048 | 39.247 | 106.87 | 0.86 | 1.00x |  |  |
-| ComponentTransfer | neon32 | 2048x2048 | 1531.672 | 2.74 | 0.02 | 0.03x | 🔴 |  |
 | ConvolveMatrix | scalar | 512x512 | 201.631 | 1.30 | 0.01 | 1.00x |  |  |
 | ConvolveMatrix | neon32 | 512x512 | 14.543 | 18.03 | 0.14 | **13.87x** | 🚀 |  |
 | ConvolveMatrix | scalar | 2048x2048 | 2949.058 | 1.42 | 0.01 | 1.00x |  |  |

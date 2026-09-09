@@ -88,7 +88,7 @@ class TurbulenceNativeParityTest(
             case.baseFrequencyX, case.baseFrequencyY,
             case.periodX, case.periodY, case.octaves, case.fractalNoise,
             case.invCanvasScaleX, case.invCanvasScaleY,
-            case.userLeft, case.userTop, case.originX, case.originY,
+            case.userLeft, case.userTop,
             case.unitSizeX, case.unitSizeY, case.seed,
             generators(case.seed),
         )

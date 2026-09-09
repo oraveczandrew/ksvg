@@ -60,7 +60,7 @@ public object TurbulenceValidationCorpus {
                 baseFrequencyX, baseFrequencyY,
                 periodX, periodY, octaves, fractalNoise,
                 invCanvasScaleX, invCanvasScaleY,
-                userLeft, userTop, originX, originY,
+                userLeft, userTop,
                 unitSizeX, unitSizeY, seed, generators
             )
             return out

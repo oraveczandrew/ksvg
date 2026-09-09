@@ -44,7 +44,8 @@ public object KotlinKernels {
     private fun clamp255(value: Double): Int =
         value.roundToInt().coerceIn(0, 255)
 
-    private fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
+    @JvmStatic
+    private inline fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
         (alpha shl 24) or (red shl 16) or (green shl 8) or blue
 
 
@@ -119,9 +120,9 @@ public object KotlinKernels {
                 val outR = clamp255(r / divisor + bias * 255f)
                 val outG = clamp255(g / divisor + bias * 255f)
                 val outB = clamp255(b / divisor + bias * 255f)
-                val outA = if (preserveAlpha) (srcPixels[rowOffset + x] shr 24) and 0xFF
+                val outA = if (preserveAlpha) (srcPixels[rowOffset + x] ushr 24)
                 else clamp255(a / divisor + bias * 255f)
-                outPixels[rowOffset + x] = (outA shl 24) or (outR shl 16) or (outG shl 8) or outB
+                outPixels[rowOffset + x] = argb(outA, outR, outG, outB)
             }
         }
     }
@@ -146,42 +147,62 @@ public object KotlinKernels {
         clipRight: Int,
         clipBottom: Int,
     ) {
-        val channelInitialValue = if (erode) 255 else 0
         dst.fill(0)
-
-        for (y in clipTop until clipBottom) {
-            val rowOffset = y * width
-            val top = maxOf(0, y - radiusY)
-            val bottom = minOf(height - 1, y + radiusY)
-            val kernelTouchesTopBottom = y - radiusY < 0 || y + radiusY > height - 1
-            for (x in clipLeft until clipRight) {
-                if (erode && (kernelTouchesTopBottom || x - radiusX < 0 || x + radiusX > width - 1)) {
-                    continue
-                }
-                var a = channelInitialValue
-                var r = channelInitialValue
-                var g = channelInitialValue
-                var b = channelInitialValue
-                val left = maxOf(0, x - radiusX)
-                val right = minOf(width - 1, x + radiusX)
-                for (ky in top..bottom) {
-                    val kRowOffset = ky * width
-                    for (kx in left..right) {
-                        val color = src[kRowOffset + kx]
-                        if (erode) {
-                            a = minOf(a, (color ushr 24) and 0xFF)
-                            r = minOf(r, (color ushr 16) and 0xFF)
-                            g = minOf(g, (color ushr 8) and 0xFF)
+        if (erode) {
+            val rInit = 255 shl 16
+            val gInit = 255 shl 8
+            for (y in clipTop until clipBottom) {
+                val rowOffset = y * width
+                val top = maxOf(0, y - radiusY)
+                val bottom = minOf(height - 1, y + radiusY)
+                val kernelTouchesTopBottom = y - radiusY < 0 || y + radiusY > height - 1
+                for (x in clipLeft until clipRight) {
+                    if (kernelTouchesTopBottom || x - radiusX < 0 || x + radiusX > width - 1) {
+                        continue
+                    }
+                    var a = 255
+                    var r = rInit
+                    var g = gInit
+                    var b = 255
+                    val left = x - radiusX
+                    val right = x + radiusX
+                    for (ky in top..bottom) {
+                        val kRowOffset = ky * width
+                        for (kx in left..right) {
+                            val color = src[kRowOffset + kx]
+                            a = minOf(a, color ushr 24)
+                            r = minOf(r, color and 0xFF0000)
+                            g = minOf(g, color and 0xFF00)
                             b = minOf(b, color and 0xFF)
-                        } else {
-                            a = maxOf(a, (color ushr 24) and 0xFF)
-                            r = maxOf(r, (color ushr 16) and 0xFF)
-                            g = maxOf(g, (color ushr 8) and 0xFF)
+                        }
+                    }
+                    dst[rowOffset + x] = (a shl 24) or r or g or b
+                }
+            }
+        } else {
+            for (y in clipTop until clipBottom) {
+                val rowOffset = y * width
+                val top = maxOf(0, y - radiusY)
+                val bottom = minOf(height - 1, y + radiusY)
+                for (x in clipLeft until clipRight) {
+                    var a = 0
+                    var r = 0
+                    var g = 0
+                    var b = 0
+                    val left = maxOf(0, x - radiusX)
+                    val right = minOf(width - 1, x + radiusX)
+                    for (ky in top..bottom) {
+                        val kRowOffset = ky * width
+                        for (kx in left..right) {
+                            val color = src[kRowOffset + kx]
+                            a = maxOf(a, color ushr 24)
+                            r = maxOf(r, color and 0xFF0000)
+                            g = maxOf(g, color and 0xFF00)
                             b = maxOf(b, color and 0xFF)
                         }
                     }
+                    dst[rowOffset + x] = (a shl 24) or r or g or b
                 }
-                dst[rowOffset + x] = (a shl 24) or (r shl 16) or (g shl 8) or b
             }
         }
     }
@@ -231,14 +252,12 @@ public object KotlinKernels {
      */
     @JvmStatic
     public fun unLinearizeArgb(pixel: Int, table: ByteArray): Int {
-        val a = pixel and -0x1000000
-        val rIdx = (pixel ushr 16) and 0xff
-        val gIdx = (pixel ushr 8) and 0xff
-        val bIdx = pixel and 0xff
-        return a or
-            ((table[rIdx].toInt() and 0xff) shl 16) or
-            ((table[gIdx].toInt() and 0xff) shl 8) or
-            (table[bIdx].toInt() and 0xff)
+        return argb(
+            alpha = pixel ushr 24,
+            red = table[(pixel ushr 16) and 0xFF].toInt() and 0xFF,
+            green = table[(pixel ushr 8) and 0xFF].toInt() and 0xFF,
+            blue = table[pixel and 0xFF].toInt() and 0xFF
+        )
     }
 
     /**
@@ -315,6 +334,10 @@ public object KotlinKernels {
         val linearLightR = if (useLinear) sRgbToLinear(lightR).toFloat() else lightR.toFloat()
         val linearLightG = if (useLinear) sRgbToLinear(lightG).toFloat() else lightG.toFloat()
         val linearLightB = if (useLinear) sRgbToLinear(lightB).toFloat() else lightB.toFloat()
+
+        val shiftedLightR = lightR shl 16
+        val shiftedLightG = lightG shl 8
+        val shiftedLightB = lightB
 
         for (y in clipTop until clipBottom) {
             val userY = userTop + y * invCanvasScaleY
@@ -424,10 +447,9 @@ public object KotlinKernels {
                 out[rowOffset + x] = if (specular && premultipliedOutput) {
                     // Premultiplied (cairo) form: full-strength light color in RGB,
                     // the specular intensity in alpha.
-                    val intensityBits = clamp255(intensity * 255f)
-                    (intensityBits shl 24) or (lightR shl 16) or (lightG shl 8) or lightB
+                    (clamp255(intensity * 255f) shl 24) or shiftedLightR or shiftedLightG or shiftedLightB
                 } else {
-                    (outA shl 24) or (outR shl 16) or (outG shl 8) or outB
+                    argb(outA, outR, outG, outB)
                 }
             }
         }
@@ -449,24 +471,12 @@ public object KotlinKernels {
     }
 
     /** sRGB->linear for one 0..255 component (matches ColorUtils.sRgbToLinear). */
-    private fun sRgbToLinear(c: Int): Int {
-        val a = c / 255f
-        return if (a <= 0.04045f) {
-            clamp255((a / 12.92f) * 255f)
-        } else {
-            clamp255((((a + 0.055f) / 1.055f).pow(2.4f)) * 255f)
-        }
-    }
+    private fun sRgbToLinear(c: Int): Int =
+        ColorLuts.SRGB_TO_LINEAR[c and 0xFF].toInt() and 0xFF
 
     /** linear->sRGB for one 0..255 component (matches ColorUtils.linearToSRgb). */
-    private fun linearToSRgb(c: Int): Int {
-        val a = c / 255f
-        return if (a <= 0.0031308f) {
-            clamp255(a * 12.92f * 255f)
-        } else {
-            clamp255((1.055f * (a.pow(1f / 2.4f)) - 0.055f) * 255f)
-        }
-    }
+    private fun linearToSRgb(c: Int): Int =
+        ColorLuts.LINEAR_TO_SRGB[c and 0xFF].toInt() and 0xFF
 
     /** Surface height at (x, y) for feDiffuse/feSpecular lighting (alpha channel scaled). */
     private fun heightAt(
@@ -509,15 +519,19 @@ public object KotlinKernels {
                 val p = inputPixels[i]
                 val q = in2Pixels[i]
                 if (useLinear) {
-                    outPixels[i] = ((arithmeticChannel(p ushr 24 and 0xFF, q ushr 24 and 0xFF, k1, k2, k3, k4)) shl 24) or
-                            ((linearToSRgb(arithmeticChannel(sRgbToLinear(p ushr 16 and 0xFF), sRgbToLinear(q ushr 16 and 0xFF), k1, k2, k3, k4))) shl 16) or
-                            ((linearToSRgb(arithmeticChannel(sRgbToLinear(p ushr 8 and 0xFF), sRgbToLinear(q ushr 8 and 0xFF), k1, k2, k3, k4))) shl 8) or
-                            linearToSRgb(arithmeticChannel(sRgbToLinear(p and 0xFF), sRgbToLinear(q and 0xFF), k1, k2, k3, k4))
+                    outPixels[i] = argb(
+                        alpha = arithmeticChannel(p ushr 24, q ushr 24, k1, k2, k3, k4),
+                        red = linearToSRgb(arithmeticChannel(sRgbToLinear(p ushr 16 and 0xFF), sRgbToLinear(q ushr 16 and 0xFF), k1, k2, k3, k4)),
+                        green = linearToSRgb(arithmeticChannel(sRgbToLinear(p ushr 8 and 0xFF), sRgbToLinear(q ushr 8 and 0xFF), k1, k2, k3, k4)),
+                        blue = linearToSRgb(arithmeticChannel(sRgbToLinear(p and 0xFF), sRgbToLinear(q and 0xFF), k1, k2, k3, k4))
+                    )
                 } else {
-                    outPixels[i] = ((arithmeticChannel(p ushr 24 and 0xFF, q ushr 24 and 0xFF, k1, k2, k3, k4)) shl 24) or
-                            ((arithmeticChannel(p ushr 16 and 0xFF, q ushr 16 and 0xFF, k1, k2, k3, k4)) shl 16) or
-                            ((arithmeticChannel(p ushr 8 and 0xFF, q ushr 8 and 0xFF, k1, k2, k3, k4)) shl 8) or
-                            arithmeticChannel(p and 0xFF, q and 0xFF, k1, k2, k3, k4)
+                    outPixels[i] = argb(
+                        alpha = arithmeticChannel(p ushr 24, q ushr 24, k1, k2, k3, k4),
+                        red = arithmeticChannel(p ushr 16 and 0xFF, q ushr 16 and 0xFF, k1, k2, k3, k4),
+                        green = arithmeticChannel(p ushr 8 and 0xFF, q ushr 8 and 0xFF, k1, k2, k3, k4),
+                        blue = arithmeticChannel(p and 0xFF, q and 0xFF, k1, k2, k3, k4)
+                    )
                 }
             }
         }
@@ -585,8 +599,6 @@ public object KotlinKernels {
         invCanvasScaleY: Double,
         userLeft: Double,
         userTop: Double,
-        originX: Double,
-        originY: Double,
         unitSizeX: Double,
         unitSizeY: Double,
         @Suppress("UNUSED_PARAMETER") seed: Int,
@@ -594,8 +606,6 @@ public object KotlinKernels {
     ) {
         val startX = userLeft + clipLeft.toDouble() * invCanvasScaleX
         val startY = userTop + clipTop.toDouble() * invCanvasScaleY
-        val startLatticeX = (startX / unitSizeX) * baseFrequencyX
-        val startLatticeY = (startY / unitSizeY) * baseFrequencyY
 
         for (y in clipTop until clipBottom) {
             val userY = userTop + y.toDouble() * invCanvasScaleY

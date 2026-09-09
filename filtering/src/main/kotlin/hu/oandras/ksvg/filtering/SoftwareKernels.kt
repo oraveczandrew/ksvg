@@ -286,7 +286,7 @@ public object SoftwareKernels {
             KotlinKernels.turbulence(
                 pixels, width, height, clipLeft, clipTop, clipRight, clipBottom,
                 baseFrequencyX, baseFrequencyY, periodX, periodY, octaves, fractalNoise,
-                invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
+                invCanvasScaleX, invCanvasScaleY, userLeft, userTop,
                 unitSizeX, unitSizeY, seed, generators,
             )
         }
