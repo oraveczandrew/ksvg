@@ -77,12 +77,6 @@ void ksvgConvolveApplyInteriorAvx512(
         jint targetX, jint targetY,
         jfloat divisor, jfloat bias, jboolean preserveAlpha);
 
-// component_transfer.cpp — full clip-region LUT pass.
-void ksvgComponentTransferApplyAvx2(
-        const jint* src, jint* dst, jint width, jint height,
-        jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
-        const jbyte* tableA, const jbyte* tableR, const jbyte* tableG, const jbyte* tableB);
-
 // arithmetic_composite.cpp — per-channel LUT-based arithmetic
 // (x86-64 only: i386 routes every backend through the scalar reference).
 #if defined(__x86_64__) || defined(_M_X64)

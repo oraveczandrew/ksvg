@@ -3,10 +3,6 @@ project("ksvgblur_host" LANGUAGES C CXX ASM)
 
 set(JAVA_HOME "$ENV{JAVA_HOME}")
 
-set(AVX2_SOURCES
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/component_transfer_x86_avx2.cpp
-)
-
 add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/blur/gaussian_blur.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/blur/blur_x86_64_ssse3.S
@@ -37,7 +33,6 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_x86_64_avx512.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_64_ssse3.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_64_avx2.S
-  ${AVX2_SOURCES}
 )
 
 target_include_directories(ksvgblur PRIVATE
@@ -51,8 +46,6 @@ target_include_directories(ksvgblur PRIVATE
 )
 
 target_compile_options(ksvgblur PRIVATE -ffp-contract=off -mssse3)
-set_source_files_properties(${AVX2_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx2")
-set_source_files_properties(${AVX512_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw")
 
 # Host build only: lets unlinearize.cpp expose the experimental vA..vD SSSE3
 # assembly variants (UnLinearizeNative.applySsse3Variant) for the structural /

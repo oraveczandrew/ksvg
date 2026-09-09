@@ -42,9 +42,7 @@ Measured on macOS (i7-7820X, 64-bit host build); full-suite run 2026-09-08.
 | ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 8.086 | 518.72 | 4.15 | 1.75x | 🟢 |  |
 | ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 5.690 | 737.08 | 5.90 | 2.48x | 🟢 |  |
 | ComponentTransfer | scalar | 512x512 | 0.350 | 749.06 | 5.99 | 1.00x |  |  |
-| ComponentTransfer | avx2 | 512x512 | 0.335 | 782.71 | 6.26 | 1.04x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
 | ComponentTransfer | scalar | 2048x2048 | 6.110 | 686.49 | 5.49 | 1.00x |  |  |
-| ComponentTransfer | avx2 | 2048x2048 | 5.271 | 795.75 | 6.37 | 1.16x | 🟢 | ssse3 un-advertised (was 0.20x regression) |
 | ConvolveMatrix | scalar | 512x512 | 12.710 | 20.63 | 0.17 | 1.00x |  |  |
 | ConvolveMatrix | sse2 | 512x512 | 2.201 | 119.12 | 0.95 | 5.78x | 🟢 |  |
 | ConvolveMatrix | avx2 | 512x512 | 1.201 | 218.32 | 1.75 | **10.58x** | 🚀 |  |
@@ -110,9 +108,7 @@ Measured on an x86 (32-bit) Android 8.0 emulator using the same `nativeBenchmark
 | ArithmeticComposite (non-linear) | scalar | 2048x2048 | 368.756 | 11.37 | 0.09 | 1.00x |  |  |
 | ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 252.538 | 16.61 | 0.13 | 1.46x | 🟢 |  |
 | ComponentTransfer | scalar | 512x512 | 1.369 | 191.46 | 1.53 | 1.00x |  |  |
-| ComponentTransfer | ssse3 | 512x512 | 53.954 | 4.86 | 0.04 | 0.03x | 🔴 | ssse3 pshufb path slower than scalar |
 | ComponentTransfer | scalar | 2048x2048 | 21.847 | 191.99 | 1.54 | 1.00x |  |  |
-| ComponentTransfer | ssse3 | 2048x2048 | 867.596 | 4.83 | 0.04 | 0.03x | 🔴 | ssse3 pshufb path slower than scalar |
 | ConvolveMatrix | scalar | 512x512 | 98.760 | 2.66 | 0.02 | 1.00x |  |  |
 | ConvolveMatrix | sse2 | 512x512 | 4.942 | 53.18 | 0.43 | **19.98x** | 🚀 |  |
 | ConvolveMatrix | ssse3 | 512x512 | 38.345 | 6.84 | 0.05 | 2.60x | 🟢 |  |

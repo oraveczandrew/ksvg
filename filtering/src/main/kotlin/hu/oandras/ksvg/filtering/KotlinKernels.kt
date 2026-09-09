@@ -202,10 +202,10 @@ public object KotlinKernels {
         clipTop: Int,
         clipRight: Int,
         clipBottom: Int,
-        tableA: ByteArray,
-        tableR: ByteArray,
-        tableG: ByteArray,
-        tableB: ByteArray,
+        tableA: IntArray,
+        tableR: IntArray,
+        tableG: IntArray,
+        tableB: IntArray,
     ) {
         dst.fill(0)
         for (y in clipTop until clipBottom) {
@@ -213,10 +213,10 @@ public object KotlinKernels {
             for (x in clipLeft until clipRight) {
                 val c = src[rowOffset + x]
                 dst[rowOffset + x] =
-                    ((tableA[(c shr 24) and 0xFF].toInt() and 0xFF) shl 24) or
-                            ((tableR[(c shr 16) and 0xFF].toInt() and 0xFF) shl 16) or
-                            ((tableG[(c shr 8) and 0xFF].toInt() and 0xFF) shl 8) or
-                            (tableB[c and 0xFF].toInt() and 0xFF)
+                    tableA[(c shr 24) and 0xFF] or
+                            tableR[(c shr 16) and 0xFF] or
+                            tableG[(c shr 8) and 0xFF] or
+                            tableB[c and 0xFF]
             }
         }
     }

@@ -100,10 +100,10 @@ public object SoftwareKernels {
         clipTop: Int,
         clipRight: Int,
         clipBottom: Int,
-        tableA: ByteArray,
-        tableR: ByteArray,
-        tableG: ByteArray,
-        tableB: ByteArray,
+        tableA: IntArray,
+        tableR: IntArray,
+        tableG: IntArray,
+        tableB: IntArray,
     ) {
         if (ComponentTransferNative.isAvailable) {
             ComponentTransferNative.apply(

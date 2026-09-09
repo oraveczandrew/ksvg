@@ -26,10 +26,14 @@ public object ComponentTransferValidationCorpus {
 
     public val identityTable: ByteArray = ByteArray(256) { it.toByte() }
     public val reverseTable: ByteArray = ByteArray(256) { (255 - it).toByte() }
-    public val alphaTable: ByteArray = ByteArray(256) { ((it * 3) and 0xFF).toByte() } // Non-identity alpha
+    public val alphaTable: ByteArray = ByteArray(256) { ((it * 3) and 0xFF).toByte() }
     public val redTable: ByteArray = ByteArray(256) { ((it + 128) and 0xFF).toByte() }
     public val greenTable: ByteArray = ByteArray(256) { (it / 2).toByte() }
     public val blueTable: ByteArray = ByteArray(256) { ((it * it) shr 8).toByte() }
+
+    private fun toIntTable(table: ByteArray, shift: Int): IntArray {
+        return IntArray(256) { (table[it].toInt() and 0xFF) shl shift }
+    }
 
     public class Case(
         public val name: String,
@@ -39,10 +43,10 @@ public object ComponentTransferValidationCorpus {
         public val clipTop: Int,
         public val clipRight: Int,
         public val clipBottom: Int,
-        public val tableA: ByteArray,
-        public val tableR: ByteArray,
-        public val tableG: ByteArray,
-        public val tableB: ByteArray,
+        public val tableA: IntArray,
+        public val tableR: IntArray,
+        public val tableG: IntArray,
+        public val tableB: IntArray,
         public val input: IntArray,
     ) {
         public val size: Int get() = width * height
@@ -60,30 +64,49 @@ public object ComponentTransferValidationCorpus {
         public fun freshInput(): IntArray = input.copyOf()
     }
 
+    private fun createCase(
+        name: String,
+        width: Int,
+        height: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        tableA: ByteArray,
+        tableR: ByteArray,
+        tableG: ByteArray,
+        tableB: ByteArray,
+        input: IntArray
+    ): Case = Case(
+        name, width, height, clipLeft, clipTop, clipRight, clipBottom,
+        toIntTable(tableA, 24), toIntTable(tableR, 16), toIntTable(tableG, 8), toIntTable(tableB, 0),
+        input
+    )
+
     public val cases: List<Case> = buildList {
         // Full clip region
         for ((w, h) in listOf(32 to 8, 33 to 9, 16 to 1)) {
-            add(Case("full $w x $h", w, h, 0, 0, w, h, 
+            add(createCase("full $w x $h", w, h, 0, 0, w, h, 
                 alphaTable, redTable, greenTable, blueTable, 
                 UnLinearizeValidationCorpus.fixedSeedRandom(w * h)))
         }
         // Sub-clip region (crucial for component_transfer)
-        add(Case("subclip 32x32", 32, 32, 4, 4, 28, 28,
+        add(createCase("subclip 32x32", 32, 32, 4, 4, 28, 28,
             identityTable, identityTable, identityTable, identityTable,
             UnLinearizeValidationCorpus.fixedSeedRandom(32 * 32)))
         
         // Edge cases for clip
-        add(Case("clip top-left 16x16", 16, 16, 0, 0, 8, 8,
+        add(createCase("clip top-left 16x16", 16, 16, 0, 0, 8, 8,
             reverseTable, redTable, greenTable, blueTable,
             UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
         
-        add(Case("clip bottom-right 16x16", 16, 16, 8, 8, 16, 16,
+        add(createCase("clip bottom-right 16x16", 16, 16, 8, 8, 16, 16,
             alphaTable, reverseTable, identityTable, blueTable,
             UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
 
         // Non-SIMD boundary sizes
         for (pixels in boundarySizes.filter { it > 0 }) {
-            add(Case("tail $pixels x 1", pixels, 1, 0, 0, pixels, 1,
+            add(createCase("tail $pixels x 1", pixels, 1, 0, 0, pixels, 1,
                 alphaTable, redTable, greenTable, blueTable,
                 UnLinearizeValidationCorpus.fixedSeedRandom(pixels)))
         }

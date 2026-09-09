@@ -92,7 +92,7 @@ class KernelPerformanceBenchmark {
     }
 
     private fun benchmarkComponentTransfer() {
-        val tables = Array(4) { ByteArray(256) { it.toByte() } }
+        val tables = Array(4) { IntArray(256) { it shl it * 8 } }
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)

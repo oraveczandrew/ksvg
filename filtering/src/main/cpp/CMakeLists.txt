@@ -108,10 +108,6 @@ if (ANDROID_ABI STREQUAL "x86")
     )
 endif ()
 
-set(AVX2_SOURCES
-        component_transfer/component_transfer_x86_avx2.cpp
-)
-
 add_library(ksvgblur SHARED
         common/color_luts.S
         blur/gaussian_blur.cpp
@@ -122,7 +118,6 @@ add_library(ksvgblur SHARED
         lighting/lighting.cpp
         turbulence/turbulence.cpp turbulence/turbulence_arm.cpp
         arithmetic_composite/arithmetic_composite.cpp
-        ${AVX2_SOURCES}
         ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES})
 
 # Include path so per-filter headers resolve (convolve.h, turbulence_tables.h, etc.)
@@ -153,7 +148,6 @@ if (ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
     endif ()
     # Per-file flags make <immintrin.h> declare the AVX2/AVX-512 intrinsics
     # (invalid options on ARM ABIs, hence the guard).
-    set_source_files_properties(${AVX2_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx2")
     set_source_files_properties(${AVX512_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw")
 endif ()
 

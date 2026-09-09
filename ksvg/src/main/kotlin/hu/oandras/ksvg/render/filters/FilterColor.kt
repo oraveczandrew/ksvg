@@ -209,21 +209,22 @@ internal fun doFeComponentTransferFilter(
 private fun buildTransferLutTables(
     transferFunctions: ComponentTransferFunctions,
     useLinearRgb: Boolean,
-): Array<ByteArray> = arrayOf(
-    buildChannelLut(transferFunctions.a, useLinearRgb, isAlpha = true),
-    buildChannelLut(transferFunctions.r, useLinearRgb, isAlpha = false),
-    buildChannelLut(transferFunctions.g, useLinearRgb, isAlpha = false),
-    buildChannelLut(transferFunctions.b, useLinearRgb, isAlpha = false),
+): Array<IntArray> = arrayOf(
+    buildChannelLut(transferFunctions.a, useLinearRgb, isAlpha = true, shift = 24),
+    buildChannelLut(transferFunctions.r, useLinearRgb, isAlpha = false, shift = 16),
+    buildChannelLut(transferFunctions.g, useLinearRgb, isAlpha = false, shift = 8),
+    buildChannelLut(transferFunctions.b, useLinearRgb, isAlpha = false, shift = 0),
 )
 
-private fun buildChannelLut(func: FeFunc?, useLinearRgb: Boolean, isAlpha: Boolean): ByteArray {
-    val table = ByteArray(256)
+private fun buildChannelLut(func: FeFunc?, useLinearRgb: Boolean, isAlpha: Boolean, shift: Int): IntArray {
+    val table = IntArray(256)
     for (v in 0..255) {
-        table[v] = (if (useLinearRgb && !isAlpha) {
+        val res = if (useLinearRgb && !isAlpha) {
             linearToSRgb(applyTransferFunction(sRgbToLinear(v), func))
         } else {
             applyTransferFunction(v, func)
-        }).toByte()
+        }
+        table[v] = (res and 0xFF) shl shift
     }
     return table
 }

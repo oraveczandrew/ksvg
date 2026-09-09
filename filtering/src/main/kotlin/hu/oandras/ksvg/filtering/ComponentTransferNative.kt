@@ -43,10 +43,10 @@ internal object ComponentTransferNative {
         clipTop: Int,
         clipRight: Int,
         clipBottom: Int,
-        tableA: ByteArray,
-        tableR: ByteArray,
-        tableG: ByteArray,
-        tableB: ByteArray,
+        tableA: IntArray,
+        tableR: IntArray,
+        tableG: IntArray,
+        tableB: IntArray,
     )
 
     /**
@@ -63,10 +63,10 @@ internal object ComponentTransferNative {
         clipTop: Int,
         clipRight: Int,
         clipBottom: Int,
-        tableA: ByteArray,
-        tableR: ByteArray,
-        tableG: ByteArray,
-        tableB: ByteArray,
+        tableA: IntArray,
+        tableR: IntArray,
+        tableG: IntArray,
+        tableB: IntArray,
         simdBackend: Int,
     )
 

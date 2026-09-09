@@ -723,7 +723,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
     private fun buildComponentTransferShader(node: FeComponentTransferRenderNode): RuntimeShader {
         val shader = RuntimeShader(COMPONENT_TRANSFER_SHADER)
-        val lut = node.lutTables ?: Array(4) { ByteArray(256) { it.toByte() } }
+        val lut = node.lutTables ?: Array(4) { IntArray(256) { i -> i } }
         var bitmap = node.gpuLutBitmap
         if (bitmap == null || bitmap.isRecycled) {
             bitmap = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
@@ -731,11 +731,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         }
         val pixels = IntArray(256)
         for (i in 0 until 256) {
-            val a = lut[0][i].toInt() and 0xFF
-            val r = lut[1][i].toInt() and 0xFF
-            val g = lut[2][i].toInt() and 0xFF
-            val b = lut[3][i].toInt() and 0xFF
-            pixels[i] = a shl 24 or (r shl 16) or (g shl 8) or b
+            pixels[i] = lut[0][i] or lut[1][i] or lut[2][i] or lut[3][i]
         }
         bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 1)
         shader.setInputShader("uLut", BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
