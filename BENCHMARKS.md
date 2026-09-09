@@ -149,50 +149,50 @@ If a kernel row is missing a backend it is not advertised on this ABI. Morpholog
 
 ## Device Results (OnePlus 11)
 
-Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBenchmark { }` harness (medians, fresh 2026-09-08 re-measurement after fixing and verifying ArithmeticComposite linear performance).
+Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2) using the stable `nativeBenchmark { }` harness (medians, fresh 2026-09-09 re-measurement after fixing and verifying ArithmeticComposite clobbering bug).
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
-| ArithmeticComposite (linear) | scalar | 512x512 | 17.50 | 14.98 | 0.12 | 1.00x |  |  |
-| ArithmeticComposite (linear) | neon64 | 512x512 | 1.83 | 143.16 | 1.15 | **9.56x** | 🚀 |  |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 280.36 | 14.96 | 0.12 | 1.00x |  |  |
-| ArithmeticComposite (linear) | neon64 | 2048x2048 | 32.72 | 128.18 | 1.03 | 8.57x | 🟢 |  |
-| ArithmeticComposite (non-linear) | scalar | 512x512 | 16.80 | 15.60 | 0.12 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | neon64 | 512x512 | 1.14 | 229.41 | 1.84 | **14.74x** | 🚀 |  |
-| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 264.05 | 15.88 | 0.13 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | neon64 | 2048x2048 | 18.19 | 230.60 | 1.84 | **14.52x** | 🚀 |  |
-| ComponentTransfer | scalar | 512x512 | 2.164 | 121.15 | 0.97 | 1.00x |  |
-| ComponentTransfer | neon64 | 512x512 | 26.687 | 9.82 | 0.08 | 0.08x | 🔴 |
-| ComponentTransfer | scalar | 2048x2048 | 34.701 | 120.87 | 0.97 | 1.00x |  |
-| ComponentTransfer | neon64 | 2048x2048 | 427.147 | 9.82 | 0.08 | 0.08x | 🔴 |
-| ConvolveMatrix | scalar | 512x512 | 100.919 | 2.60 | 0.02 | 1.00x |  |
-| ConvolveMatrix | neon64 | 512x512 | 5.921 | 44.27 | 0.35 | **17.04x** | 🚀 |
-| ConvolveMatrix | scalar | 2048x2048 | 1589.315 | 2.64 | 0.02 | 1.00x |  |
-| ConvolveMatrix | neon64 | 2048x2048 | 83.963 | 49.95 | 0.40 | **18.93x** | 🚀 |
-| DisplacementMap | scalar | 512x512 | 6.765 | 38.75 | 0.31 | 1.00x |  |
-| DisplacementMap | neon64 | 512x512 | 0.476 | 550.73 | 4.41 | **14.21x** | 🚀 |
-| DisplacementMap | scalar | 2048x2048 | 91.717 | 45.73 | 0.37 | 1.00x |  |
-| DisplacementMap | neon64 | 2048x2048 | 7.502 | 559.08 | 4.47 | **12.23x** | 🚀 |
-| GaussianBlur | scalar | 512x512 | 245.457 | 1.07 | 0.01 | 1.00x |  |
-| GaussianBlur | neon64 | 512x512 | 4.419 | 59.32 | 0.47 | **55.55x** | 🚀 |
-| GaussianBlur | scalar | 2048x2048 | 4012.708 | 1.05 | 0.01 | 1.00x |  |
-| GaussianBlur | neon64 | 2048x2048 | 70.647 | 59.37 | 0.47 | **56.80x** | 🚀 |
-| Lighting | scalar | 512x512 | 73.112 | 3.59 | 0.03 | 1.00x |  |
-| Lighting | neon64 | 512x512 | 75.391 | 3.48 | 0.03 | 0.97x | 🔴 |
-| Lighting | scalar | 2048x2048 | 1162.251 | 3.61 | 0.03 | 1.00x |  |
-| Lighting | neon64 | 2048x2048 | 1190.288 | 3.52 | 0.03 | 0.98x | 🔴 |
-| Morphology | scalar | 512x512 | 198.905 | 1.32 | 0.01 | 1.00x |  |
-| Morphology | neon64 | 512x512 | 1.968 | 133.19 | 1.07 | **101.06x** | 🚀 |
-| Morphology | scalar | 2048x2048 | 3276.225 | 1.28 | 0.01 | 1.00x |  |
-| Morphology | neon64 | 2048x2048 | 27.923 | 150.21 | 1.20 | **117.33x** | 🚀 |
-| Turbulence | scalar | 512x512 | 90.420 | 2.90 | 0.02 | 1.00x |  |
-| Turbulence | neon64 | 512x512 | 4.464 | 58.72 | 0.47 | **20.25x** | 🚀 |
-| Turbulence | scalar | 2048x2048 | 1448.699 | 2.90 | 0.02 | 1.00x |  |
-| Turbulence | neon64 | 2048x2048 | 70.556 | 59.45 | 0.48 | **20.53x** | 🚀 |
-| UnLinearize | scalar | 512x512 | 1.100 | 238.43 | 1.91 | 1.00x |  |
-| UnLinearize | neon64 | 512x512 | 24.242 | 10.81 | 0.09 | 0.05x | 🔴 |
-| UnLinearize | scalar | 2048x2048 | 17.811 | 235.48 | 1.88 | 1.00x |  |
-| UnLinearize | neon64 | 2048x2048 | 387.704 | 10.82 | 0.09 | 0.05x | 🔴 |  |
+| ArithmeticComposite (linear) | scalar | 512x512 | 17.49 | 14.98 | 0.12 | 1.00x |  |  |
+| ArithmeticComposite (linear) | neon64 | 512x512 | 2.16 | 121.34 | 0.97 | 8.10x | 🟢 |  |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 280.11 | 14.97 | 0.12 | 1.00x |  |  |
+| ArithmeticComposite (linear) | neon64 | 2048x2048 | 34.36 | 122.07 | 0.98 | 8.15x | 🟢 |  |
+| ArithmeticComposite (non-linear) | scalar | 512x512 | 17.39 | 15.07 | 0.12 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | neon64 | 512x512 | 1.02 | 256.38 | 2.05 | **17.05x** | 🚀 |  |
+| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 265.29 | 15.81 | 0.13 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | neon64 | 2048x2048 | 16.26 | 258.02 | 2.06 | **16.32x** | 🚀 |  |
+| ComponentTransfer | scalar | 512x512 | 1.29 | 203.54 | 1.63 | 1.00x |  |  |
+| ComponentTransfer | neon64 | 512x512 | — | — | — | — | 🔴 | un-advertised (was 0.08x regression) |
+| ComponentTransfer | scalar | 2048x2048 | 21.16 | 198.26 | 1.59 | 1.00x |  |  |
+| ComponentTransfer | neon64 | 2048x2048 | — | — | — | — | 🔴 | un-advertised (was 0.08x regression) |
+| ConvolveMatrix | scalar | 512x512 | 95.24 | 2.75 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix | neon64 | 512x512 | 5.92 | 44.27 | 0.35 | **16.09x** | 🚀 |  |
+| ConvolveMatrix | scalar | 2048x2048 | 1511.95 | 2.77 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix | neon64 | 2048x2048 | 83.96 | 49.95 | 0.40 | **18.01x** | 🚀 |  |
+| DisplacementMap | scalar | 512x512 | 5.71 | 45.94 | 0.37 | 1.00x |  |  |
+| DisplacementMap | neon64 | 512x512 | 0.46 | 568.78 | 4.55 | **12.41x** | 🚀 |  |
+| DisplacementMap | scalar | 2048x2048 | 91.43 | 45.88 | 0.37 | 1.00x |  |  |
+| DisplacementMap | neon64 | 2048x2048 | 7.44 | 563.48 | 4.51 | **12.29x** | 🚀 |  |
+| GaussianBlur | scalar | 512x512 | 245.67 | 1.07 | 0.01 | 1.00x |  |  |
+| GaussianBlur | neon64 | 512x512 | 4.42 | 59.26 | 0.47 | **55.58x** | 🚀 |  |
+| GaussianBlur | scalar | 2048x2048 | 4352.96 | 0.96 | 0.01 | 1.00x |  |  |
+| GaussianBlur | neon64 | 2048x2048 | 83.81 | 50.05 | 0.40 | **51.94x** | 🚀 |  |
+| Lighting | scalar | 512x512 | 69.78 | 3.76 | 0.03 | 1.00x |  |  |
+| Lighting | neon64 | 512x512 | 71.85 | 3.65 | 0.03 | 0.97x | 🔴 |  |
+| Lighting | scalar | 2048x2048 | 1111.94 | 3.77 | 0.03 | 1.00x |  |  |
+| Lighting | neon64 | 2048x2048 | 1132.80 | 3.70 | 0.03 | 0.98x | 🔴 |  |
+| Morphology | scalar | 512x512 | 198.86 | 1.32 | 0.01 | 1.00x |  |  |
+| Morphology | neon64 | 512x512 | 2.01 | 130.51 | 1.04 | **98.94x** | 🚀 |  |
+| Morphology | scalar | 2048x2048 | 3270.68 | 1.28 | 0.01 | 1.00x |  |  |
+| Morphology | neon64 | 2048x2048 | 28.35 | 147.94 | 1.18 | **115.37x** | 🚀 |  |
+| Turbulence | scalar | 512x512 | 90.34 | 2.90 | 0.02 | 1.00x |  |  |
+| Turbulence | neon64 | 512x512 | 4.46 | 58.76 | 0.47 | **20.25x** | 🚀 |  |
+| Turbulence | scalar | 2048x2048 | 1446.44 | 2.90 | 0.02 | 1.00x |  |  |
+| Turbulence | neon64 | 2048x2048 | 70.88 | 59.18 | 0.47 | **20.41x** | 🚀 |  |
+| UnLinearize | scalar | 512x512 | 1.12 | 234.28 | 1.87 | 1.00x |  |  |
+| UnLinearize | neon64 | 512x512 | — | — | — | — | 🔴 | un-advertised (was 0.05x regression) |
+| UnLinearize | scalar | 2048x2048 | 18.40 | 227.91 | 1.82 | 1.00x |  |  |
+| UnLinearize | neon64 | 2048x2048 | — | — | — | — | 🔴 | un-advertised (was 0.05x regression) |
 ## Device Results (OnePlus 11, 32-bit ARM)
 
 Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit) test APK using the stable `nativeBenchmark { }` harness (medians).
