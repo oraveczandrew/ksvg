@@ -210,6 +210,19 @@ with `llvm-readelf -d` (no `TEXTREL`) and `llvm-readelf -r` (no text-segment
 `R_386_32` relocations), then run the forced native parity test on the x86
 emulator; a successful build alone does not prove that the library will load.
 
+### 4.2 ARMv7 NEON assembly — table lookup and macro gotchas
+
+- **ARMv7 has no wide table lookup.** `vtbl.8 d12, {d10,d11}, d8` covers only 16
+  entries (VTBL2 = two D registers), so a 256-entry LUT is a 16-row scan (row
+  selected by the index high nibble). The scan counter must be explicitly bounded
+  (`movs`/`adds`/`cmp`/`bne`); an unbounded `adds …; bne` loop runs 256 iterations
+  × 16 bytes = 4096 bytes read — a 16× heap over-read of the caller's 256-byte LUT
+  per lookup (hit in `arithmetic_composite_armv7a_neon.S`).
+- **LLVM `.macro` token-paste.** `lsl #\shift` pastes when the argument already
+  carries `#`: `\shift=#24` → `lsl ##24` (`error: invalid immediate shift value`).
+  Pass bare numbers as shift args (`CHANNEL ..., 24, ...`); keep `#` only in the
+  macro body.
+
 ---
 
 ## 5. Performance rules (REVIEW BEFORE HOT-PATH EDITS)
@@ -423,7 +436,7 @@ stats(count=50) min=4.4414 p90=4.4981 median=4.4679 mean=4.4699 p95=4.5042 max=4
 classification=VALID valid=true invalidatedBatches=0 cooldownTimeMs=0
 ```
 
-**Device findings (OnePlus 12 / CPH2449, SDK 36, SM8550, non-root)** — relevant to
+**Device findings (OnePlus 11 / CPH2449, SDK 36, SM8550, non-root)** — relevant to
 trusting long bench runs on this device:
 
 - Sustained performance mode is **unsupported** (`sustainedPerformanceMode=false`);
@@ -520,3 +533,5 @@ trusting long bench runs on this device:
   Integrated hand-written distant-light diffuse lighting assembly kernels for all
   architectures (aarch64, armv7a, x86_64, i386) including SSE2, AVX2 and AVX512
   variants for x86.
+- 2026-09-09 — Documented ARMv7 NEON assembly gotchas in §4.2 (16-entry VTBL2
+  LUT-scan bound; LLVM `.macro` token-paste for shift args).
