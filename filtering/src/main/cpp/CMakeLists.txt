@@ -120,7 +120,7 @@ add_library(ksvgblur SHARED
         displacement_map/displacement_map.cpp
         lighting/lighting.cpp
         turbulence/turbulence.cpp turbulence/turbulence_arm.cpp
-        arithmetic_composite/arithmetic_composite.cpp arithmetic_composite/arithmetic_composite_neon.cpp
+        arithmetic_composite/arithmetic_composite.cpp
         ${AVX2_SOURCES}
         ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES})
 

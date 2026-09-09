@@ -125,7 +125,7 @@ argument marshalling. Requirements:
 
 - Preserve callee-saved GPRs `r4–r11` and VFP `d8–d15` (`vpush {d8-d15}`/`vpop`).
 - `.syntax unified` + `.fpu neon` + `.align 2` (same prologue as the existing
-  `convolve_neon32.S` / `arithmetic_composite_neon32.S`). The project already
+  `convolve_neon32.S` / `arithmetic_composite_armv7a_neon.S`). The project already
   compiles armeabi-v7a with `-mfpu=neon` (`CMakeLists.txt:104-106`,
   `BLUR_NEEDS_NEON`) → VFPv3-D32, i.e. the full `d0–d31` file.
 - **Struct offsets differ from AArch64** (4-byte pointers; `double` stays

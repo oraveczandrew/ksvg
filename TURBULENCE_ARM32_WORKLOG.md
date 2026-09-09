@@ -10,7 +10,7 @@
 
 ### Phase 0 — Groundwork (done)
 - **Toolchain green:** `./gradlew :filtering:assembleDebug -PfilterAbis=armeabi-v7a` succeeds.
-  Existing ARM32 asm (`Blur_advsimd.S`, `convolve_neon32.S`, `arithmetic_composite_neon32.S`)
+  Existing ARM32 asm (`Blur_advsimd.S`, `convolve_neon32.S`, `arithmetic_composite_armv7a_neon.S`)
   assembles; `-mfpu=neon` arrives via `BLUR_NEEDS_NEON`.
 - **Device:** OnePlus CPH2449 (`OP594DL1`), `arm64-v8a` + `armeabi-v7a,armeabi` in abilist →
   `-PfilterAbis=armeabi-v7a` APK runs on it (documented path).
