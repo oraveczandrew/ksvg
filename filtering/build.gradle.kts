@@ -147,15 +147,24 @@ val uninstallBenchmarkApk = tasks.register("uninstallBenchmarkApk") {
     doLast {
         val adb = System.getenv("ANDROID_HOME")?.let { h -> File(h, "platform-tools/adb") }
             ?.takeIf { it.exists() } ?: File("adb")
-        val proc = ProcessBuilder(adb.absolutePath, "uninstall", "hu.oandras.filtering.test")
-            .redirectErrorStream(true)
-            .start()
-        val out = proc.inputStream.readBytes().toString(Charsets.UTF_8).trim()
-        proc.waitFor()
-        if (proc.exitValue() == 0) {
-            logger.lifecycle("runDeviceBenchmark: removed hu.oandras.filtering.test")
-        } else if (out.isNotBlank()) {
-            logger.lifecycle("runDeviceBenchmark: APK was not installed (adb uninstall: $out)")
+        var attempts = 0
+        var success = false
+        while (attempts < 5 && !success) {
+            attempts++
+            val proc = ProcessBuilder(adb.absolutePath, "uninstall", "hu.oandras.filtering.test")
+                .redirectErrorStream(true)
+                .start()
+            val out = proc.inputStream.readBytes().toString(Charsets.UTF_8).trim()
+            val finished = proc.waitFor(5, TimeUnit.SECONDS)
+            if (!finished) {
+                proc.destroyForcibly()
+                logger.lifecycle("runDeviceBenchmark: adb uninstall timed out (attempt $attempts/5)")
+            } else if (proc.exitValue() == 0) {
+                logger.lifecycle("runDeviceBenchmark: removed hu.oandras.filtering.test")
+                success = true
+            } else if (out.isNotBlank()) {
+                logger.lifecycle("runDeviceBenchmark: APK was not installed (adb uninstall: $out)")
+            }
         }
     }
 }
