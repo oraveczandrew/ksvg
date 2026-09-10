@@ -162,6 +162,11 @@ val uninstallBenchmarkApk = tasks.register("uninstallBenchmarkApk") {
 tasks.matching { it.name == "connectedDebugAndroidTest" }
     .configureEach { mustRunAfter(uninstallBenchmarkApk) }
 
+
+// Aggregate all pulled CSV rows by (Kernel, Size) and emit one combined
+// table per group, sorted by MedianMs ascending (fastest backend first).
+data class BenchRow(val header: List<String>, val values: List<String>)
+
 /*
  * Device kernel benchmark wrapper.
  *
@@ -275,16 +280,73 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
 
         pulled.forEach { p -> logger.lifecycle("runDeviceBenchmark: pulled ${p.absolutePath}") }
 
-        // Dump each pulled CSV as a Markdown table, matching the host report format.
-        pulled.forEach { reportFile ->
-            val lines = reportFile.readLines().map { it.trim() }.filter { it.isNotEmpty() }
-            if (lines.isEmpty()) return@forEach
-            logger.lifecycle("\n### ${reportFile.name}")
-            val header = lines.first().split(",")
-            logger.lifecycle("| ${header.joinToString(" | ")} |")
-            logger.lifecycle("| ${header.joinToString(" | ") { ":---" }} |")
-            for (row in lines.drop(1)) {
-                logger.lifecycle("| ${row.split(",").joinToString(" | ")} |")
+        val rows: List<BenchRow> = run {
+            val rows = mutableListOf<BenchRow>()
+            for (reportFile in pulled) {
+                reportFile.bufferedReader().use {
+                    val lines = it.lineSequence().mapNotNull { line ->
+                        line.trim().ifEmpty { null }
+                    }
+
+                    val linesIterator = lines.iterator()
+                    val firstLine = linesIterator.next()
+                    if (!linesIterator.hasNext()) continue
+                    val header = firstLine.split(",")
+                    for (line in linesIterator) {
+                        rows.add(BenchRow(header, line.split(",")))
+                    }
+                }
+            }
+            rows
+        }
+
+        if (rows.isEmpty()) {
+            logger.warn("runDeviceBenchmark: no data rows found in pulled CSVs")
+            return@doLast
+        }
+
+        // Column indices for grouping and sorting.
+        val firstRowHeader = rows.first().header
+        val kernelIdx = firstRowHeader.indexOf("Kernel")
+        val sizeIdx = firstRowHeader.indexOf("Size")
+        val medianIdx = firstRowHeader.indexOf("MedianMs")
+
+        val groups = rows.groupBy { row ->
+            val values = row.values
+            listOf(values[kernelIdx], values[sizeIdx])
+        }
+
+        // Merge headers: keep the unique union in CSV-header order.
+        val mergedHeader = rows.flatMap { it.header }.distinct()
+
+        for ((key, group) in groups.entries.sortedBy { it.key.joinToString("\u0000") }) {
+            val kernel = key[0]
+            val size = key[1]
+            logger.lifecycle("\n### $kernel ($size)")
+            val sorted = group.sortedBy { row ->
+                row.values.getOrNull(medianIdx)?.toDoubleOrNull() ?: Double.MAX_VALUE
+            }
+            // Build a 2-D string grid: header + data rows, then left-pad every
+            // cell to the column's max width so the Markdown table is readable
+            // even in raw form.
+            val grid = mutableListOf(mergedHeader)
+            for ((header, values) in sorted) {
+                val valueMap = header.zip(values).toMap()
+                grid.add(mergedHeader.map { col -> valueMap[col] ?: "" })
+            }
+            val colWidths = IntArray(mergedHeader.size) { col ->
+                grid.maxOf { row -> row[col].length }
+            }
+            for ((i, row) in grid.withIndex()) {
+                val line = row.mapIndexed { col, cell -> cell.padEnd(colWidths[col]) }
+                    .joinToString(" | ")
+                logger.lifecycle("| $line |")
+                if (i == 0) {
+                    val sep = colWidths.indices.joinToString(" | ") { col ->
+                        "-".repeat(colWidths[col])
+                    }
+                    logger.lifecycle("| $sep |")
+                }
             }
         }
     }
@@ -302,7 +364,7 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.activity:activity-ktx:1.13.0")
-    androidTestImplementation("androidx.core:core-ktx:1.17.0")
+    androidTestImplementation("androidx.core:core-ktx:1.19.0")
     androidTestImplementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     androidTestImplementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
