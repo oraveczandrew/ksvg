@@ -1,7 +1,6 @@
+#include "asm_macros.S"
+
 #ifdef __APPLE__
-#define SYM(x) _##x
-#define TYPE(x,y)
-#define SIZE(x)
 #define TEXT_SECTION .section __TEXT,__text,regular,pure_instructions
 #define CONST4_SECTION TEXT_SECTION
 #define CONST8_SECTION TEXT_SECTION
@@ -14,9 +13,6 @@
 #define CALL_SYM(x) calll SYM(x)@PLT
 #endif
 #else
-#define SYM(x) x
-#define TYPE(x,y) .type x,y
-#define SIZE(x) .size x,.-x
 #define TEXT_SECTION .text
 #define CONST4_SECTION TEXT_SECTION
 #define CONST8_SECTION TEXT_SECTION

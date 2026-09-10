@@ -12,15 +12,8 @@
  * S2L4 outputs in xmm0/xmm1, eliminating two register copies before formula
  * evaluation while preserving the scalar arithmetic order.
  */
-#if defined(__APPLE__)
-# define SYM(x) _##x
-# define TYPE(x,y)
-# define SIZE(x)
-#else
-# define SYM(x) x
-# define TYPE(x,y) .type x,y
-# define SIZE(x) .size x,.-x
-#endif
+#include "asm_macros.S"
+
 
 .equ ALPHA_SHIFT, 24
 

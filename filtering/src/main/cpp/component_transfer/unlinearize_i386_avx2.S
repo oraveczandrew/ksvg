@@ -2,15 +2,8 @@
  * Exact 8-bit result using 16-segment integer approximation + correction.
  * V26: PIC/no-text-rel local constants, fused base term; fixed tail table argument offset.
  */
-#ifdef __APPLE__
-#define SYM(x) _##x
-#define TYPE(x,y)
-#define SIZE(x)
-#else
-#define SYM(x) x
-#define TYPE(x,y) .type x,y
-#define SIZE(x) .size x,.-x
-#endif
+#include "asm_macros.S"
+
 
 .text
 .p2align 5

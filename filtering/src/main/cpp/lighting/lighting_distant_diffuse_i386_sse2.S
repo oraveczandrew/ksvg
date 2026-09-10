@@ -15,15 +15,8 @@
  */
 
 /* x86-32 SSE2 distant-light diffuse kernel. cdecl ABI. */
-#ifdef __APPLE__
-#define SYM(x) _##x
-#define TYPE(x,y)
-#define SIZE(x)
-#else
-#define SYM(x) x
-#define TYPE(x,y) .type x,y
-#define SIZE(x) .size x,.-x
-#endif
+#include "asm_macros.S"
+
 
 .text
 .code32

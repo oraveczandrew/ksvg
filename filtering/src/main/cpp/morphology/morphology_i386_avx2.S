@@ -1,14 +1,7 @@
 /* Copyright 2026 András Oravecz. Apache-2.0. */
 /* x86-32 / AVX2, cdecl ABI. Interior-only morphology. */
-#ifdef __APPLE__
-#define SYM(x) _##x
-#define TYPE(x,y)
-#define SIZE(x)
-#else
-#define SYM(x) x
-#define TYPE(x,y) .type x,y
-#define SIZE(x) .size x,.-x
-#endif
+#include "asm_macros.S"
+
 .text
 .code32
 .p2align 5

@@ -3,15 +3,8 @@
  * ABI: SysV x86-64 / x86_64 Android.
  * Row:   rdi=src,rsi=dst,edx=width,ecx=radiusX,r8d=radiusY,r9d=erode,[rsp+8]=y,[rsp+16]=xStart,[rsp+24]=xEnd,[rsp+32]=scratch
  */
-#ifdef __APPLE__
-#define SYM(x) _##x
-#define TYPE(x,y)
-#define SIZE(x)
-#else
-#define SYM(x) x
-#define TYPE(x,y) .type x,y
-#define SIZE(x) .size x,.-x
-#endif
+#include "asm_macros.S"
+
 .text
 .p2align 6
 

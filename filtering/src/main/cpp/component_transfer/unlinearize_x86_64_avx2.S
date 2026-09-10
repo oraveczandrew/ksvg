@@ -18,15 +18,8 @@
  * Alpha is restored unchanged after the RGB lookup.
  */
 
-#ifdef __APPLE__
-#define SYM(x) _##x
-#define TYPE(x,y)
-#define SIZE(x)
-#else
-#define SYM(x) x
-#define TYPE(x,y) .type x,y
-#define SIZE(x) .size x,.-x
-#endif
+#include "asm_macros.S"
+
 
 .text
 .p2align 5

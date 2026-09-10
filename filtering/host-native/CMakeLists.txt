@@ -37,6 +37,7 @@ add_library(ksvgblur SHARED
 
 target_include_directories(ksvgblur PRIVATE
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/common
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite
