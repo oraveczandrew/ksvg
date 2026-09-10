@@ -20,35 +20,33 @@ import android.os.Build
 import java.io.File
 
 /**
- * Best-effort CPU + SoC metadata for the benchmark environment (spec §10, §11;
+ * Best-effort CPU and SoC metadata for the benchmark environment (spec §10, §11;
  * TEST_HARNESS_PLAN Step 6).
  *
  * SoC fields (`SOC_MANUFACTURER`, `SOC_MODEL`) are API 31+; the frequency read is a
  * best-effort file I/O of `cpu0/cpufreq/scaling_cur_freq` that may be absent or denied
- * on some devices/ABIs. [cpuAffinityControlAvailable] is always `false` per spec §11
- * (the baseline does not depend on root; a future optional root-only extension may
- * change this).
+ * on some devices/ABIs.
  */
 internal object CpuInfo {
 
+    @JvmField
     val socManufacturer: String =
         if (Build.VERSION.SDK_INT >= 31) {
-            Build.SOC_MANUFACTURER ?: "unknown"
+            Build.SOC_MANUFACTURER
         } else {
             "unknown"
         }
 
+    @JvmField
     val socModel: String =
         if (Build.VERSION.SDK_INT >= 31) {
-            Build.SOC_MODEL ?: "unknown"
+            Build.SOC_MODEL
         } else {
             "unknown"
         }
 
+    @JvmField
     val hardware: String = Build.HARDWARE
-
-    /** Always false on stock Android (spec §11). */
-    val cpuAffinityControlAvailable: Boolean = false
 
     /**
      * Best-effort current CPU frequency of core 0, in kHz (`scaling_cur_freq`).
@@ -61,7 +59,7 @@ internal object CpuInfo {
                 .readText()
                 .trim()
                 .toInt()
-        } catch (t: Throwable) {
+        } catch (_: Throwable) {
             null
         }
 }

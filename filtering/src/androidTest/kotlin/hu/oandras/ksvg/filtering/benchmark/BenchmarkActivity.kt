@@ -19,16 +19,25 @@ package hu.oandras.ksvg.filtering.benchmark
 import android.app.Activity
 import android.app.KeyguardManager
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
-import android.os.Process
 import android.os.SystemClock
 import android.util.Log
+import android.view.Gravity
 import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.concurrent.thread
 
 /**
  * Minimal opaque foreground Activity that owns the benchmark Window.
@@ -46,32 +55,68 @@ import kotlin.concurrent.thread
  * probing goes through `PowerManager.isSustainedPerformanceModeSupported` and the flag-taking
  * overloads are called directly (guard: `Build.VERSION.SDK_INT >= O_MR1`).
  */
-internal class BenchmarkActivity : Activity() {
+internal class BenchmarkActivity : ComponentActivity() {
 
     private var destroyed = false
+    private val cpuSpinner = BenchmarkCpuSpinner()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        @Suppress("DEPRECATION")
+        window.statusBarColor = Color.BLACK
+        @Suppress("DEPRECATION")
+        window.navigationBarColor = Color.BLACK
+
+        val basePadding = (24f * resources.displayMetrics.density).toInt()
+        val statusText = BenchmarkProgressTextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            gravity = Gravity.TOP or Gravity.START
+            includeFontPadding = false
+            setPadding(basePadding, basePadding, basePadding, basePadding)
+            text = ""
+        }
+
+        setContentView(statusText)
+
+        ViewCompat.setOnApplyWindowInsetsListener(statusText) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                basePadding + systemBars.left,
+                basePadding + systemBars.top,
+                basePadding + systemBars.right,
+                basePadding + systemBars.bottom,
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(statusText)
+
+        val viewModel = ViewModelProvider(this)[BenchmarkViewModel::class.java]
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                combine(viewModel.formattedState, viewModel.progressPercent) { text, percent ->
+                    text to percent
+                }.collect { (text, percent) ->
+                    statusText.text = text
+                    statusText.progressPercent = percent
+                }
+            }
+        }
 
         // Disable launch/close animations that would add noise to measurements.
         @Suppress("Deprecation") overridePendingTransition(0, 0)
 
         if (firstInit) {
-            if (isSustainedPerformanceModeSupported()) {
+            if (sustainedSupportedSnapshot()) {
                 sustainedPerformanceModeInUse = true
             }
             if (sustainedPerformanceModeInUse) {
                 // Keep at least one core busy. Together with the single-threaded benchmark
-                // this makes the process look multi-threaded, which keeps sustained
-                // performance mode at the multi-threaded clock level across runs.
+                // this makes the process look multithreaded, which keeps sustained
+                // performance mode at the multithreaded clock level across runs.
                 // (Thread names are capped at 15 chars in systrace.)
-                @Suppress("RETURN_VALUE_NOT_USED")
-                thread(name = "BenchSpinThread") {
-                    Process.setThreadPriority(Process.THREAD_PRIORITY_LOWEST)
-                    // Intentionally never returns; the process is torn down with it.
-                    while (true) {
-                    }
-                }
+                cpuSpinner.start()
             }
             firstInit = false
         }
@@ -128,6 +173,7 @@ internal class BenchmarkActivity : Activity() {
     override fun finish() {}
 
     internal fun actuallyFinish() {
+        cpuSpinner.stop()
         // Disable close animation.
         @Suppress("Deprecation") overridePendingTransition(0, 0)
         super.finish()
@@ -136,11 +182,6 @@ internal class BenchmarkActivity : Activity() {
     private fun requestDismissKeyguardCompat() {
         val keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         keyguardManager.requestDismissKeyguard(this, null)
-    }
-
-    private fun isSustainedPerformanceModeSupported(): Boolean {
-        val pm = getSystemService(POWER_SERVICE) as? PowerManager ?: return false
-        return pm.isSustainedPerformanceModeSupported
     }
 
     companion object {
@@ -212,32 +253,21 @@ internal class BenchmarkActivity : Activity() {
         }
 
         /** Snapshot of the observable environment for the spike / environment report. */
-        fun report(): String =
-            buildString {
+        fun report(): String {
+            val activity = singleton.get()
+            return buildString {
                 appendLine("manufacturer=${Build.MANUFACTURER}")
                 appendLine("model=${Build.MODEL}")
                 appendLine("sdk=${Build.VERSION.SDK_INT}")
                 appendLine("abis=${Build.SUPPORTED_ABIS.joinToString(",")}")
                 appendLine("cores=${Runtime.getRuntime().availableProcessors()}")
-                appendLine("sustainedSupported=${sustainedSupportedSnapshot()}")
+                appendLine("sustainedSupported=${activity?.sustainedSupportedSnapshot()}")
                 appendLine("sustainedInUse=$sustainedPerformanceModeInUse")
                 appendLine("sustainedSetResult=$sustainedSetResult")
                 appendLine("resumed=$resumeObserved")
-                appendLine("hasWindowFocus=${singleton.get()?.hasWindowFocus()}")
-                appendLine("thermalStatus=${thermalStatus()}")
+                appendLine("hasWindowFocus=${activity?.hasWindowFocus()}")
+                appendLine("thermalStatus=${activity?.thermalStatus()}")
             }
-
-        private fun sustainedSupportedSnapshot(): Boolean {
-            val activity = singleton.get() ?: return false
-            val pm = activity.getSystemService(POWER_SERVICE) as? PowerManager ?: return false
-            return pm.isSustainedPerformanceModeSupported
-        }
-
-        private fun thermalStatus(): Int? {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
-            val activity = singleton.get() ?: return null
-            val pm = activity.getSystemService(POWER_SERVICE) as? PowerManager ?: return null
-            return pm.currentThermalStatus
         }
     }
 }

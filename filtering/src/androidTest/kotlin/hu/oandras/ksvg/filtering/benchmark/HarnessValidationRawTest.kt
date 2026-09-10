@@ -98,7 +98,7 @@ class HarnessValidationRawTest {
 
         val raw = describe(rawSamples)
         val harnessStats = harnessReport.stats
-        val harnessSamples = harnessReport.samples.sumOf { it.size }.toInt()
+        val harnessSamples = harnessReport.samples.sumOf { it.size }
 
         println(
             "Validation raw-vs-harness (Turbulence neon64 512x512):\n" +

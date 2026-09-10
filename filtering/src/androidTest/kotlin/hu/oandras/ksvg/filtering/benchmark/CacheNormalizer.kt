@@ -39,8 +39,7 @@ internal object CacheNormalizer {
         System.arraycopy(a, 0, b, 0, a.size)
         var sink = 0
         for (byte in b) sink += byte.toInt()
-        // Ensure neither copy nor fill is optimised away; sink is read below.
-        @Suppress("UNUSED_VALUE")
-        sink
+        // Ensure neither copy nor fill is optimized away; sink is read below.
+        val _ = sink
     }
 }

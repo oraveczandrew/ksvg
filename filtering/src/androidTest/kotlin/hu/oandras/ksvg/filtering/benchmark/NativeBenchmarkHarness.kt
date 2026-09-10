@@ -68,7 +68,7 @@ fun clearPreviousResults() {
      * measured region is exactly the [run] block (spec §20: no logging, I/O, thermal reads
      * or GC inside it).
      *
-     * Later steps add cache normalization, CPU-frequency info and the validation-vs-raw
+     * Later steps add cache normalization, CPU-frequency info, and the validation-vs-raw
      * comparison.
      */
 fun nativeBenchmark(configure: NativeBenchmarkBuilder.() -> Unit): NativeBenchmarkReport {
@@ -108,7 +108,8 @@ class NativeBenchmarkBuilder {
 
     internal fun execute(): NativeBenchmarkReport {
         val kernel = requireNotNull(body) { "nativeBenchmark { run { ... } } is required" }
-
+        val startedAt = SystemClock.elapsedRealtime()
+        publishProgress(startedAt, BenchmarkUiStatus.RUNNING, "FOCUSING", 0, 1, 0, 0)
         BenchmarkActivity.waitForFocusedWindow()
 
         val thermal = ThermalStateMonitor.create(context())
@@ -120,13 +121,25 @@ class NativeBenchmarkBuilder {
         val cpuFreqBeforeKhz = CpuInfo.cpuFreqKhz()
 
         val validBatches = ArrayList<DoubleArray>(measurementBatches)
-        var threadPriorityApplied = false
+        var threadPriorityApplied: Boolean
         var thermalThrottled = false
         var invalidatedBatches = 0
         var cooldownTimeMs = 0L
         try {
             // Warmup never touches the measured region either.
-            repeat(warmupIterations) { kernel.invoke() }
+            repeat(warmupIterations) { iteration ->
+                BenchmarkViewModel.advanceGlobalProgress()
+                publishProgress(
+                    startedAt,
+                    BenchmarkUiStatus.RUNNING,
+                    "WARMUP",
+                    iteration + 1,
+                    warmupIterations,
+                    invalidatedBatches,
+                    cooldownTimeMs,
+                )
+                kernel.invoke()
+            }
 
             // Batches are gated on thermal state (spec §6/§9): a batch measured while
             // throttled is invalidated (not counted) -> cooldown sleep -> fresh batch.
@@ -137,6 +150,16 @@ class NativeBenchmarkBuilder {
                 if (thermal.isThrottled()) {
                     thermalThrottled = true
                     invalidatedBatches++
+                    publishProgress(
+                        startedAt,
+                        BenchmarkUiStatus.COOLING,
+                        "THERMAL GATE",
+                        validBatches.size,
+                        measurementBatches,
+                        invalidatedBatches,
+                        cooldownTimeMs,
+                        "Thermal gate rejected the next batch",
+                    )
                     cooldownTimeMs += cooldown()
                     continue
                 }
@@ -145,6 +168,16 @@ class NativeBenchmarkBuilder {
                 CacheNormalizer.normalize()
                 val batch = DoubleArray(iterationsPerBatch)
                 for (i in 0 until iterationsPerBatch) {
+                    BenchmarkViewModel.advanceGlobalProgress()
+                    publishProgress(
+                        startedAt,
+                        BenchmarkUiStatus.RUNNING,
+                        "MEASUREMENT BATCH ${validBatches.size + 1}",
+                        i + 1,
+                        iterationsPerBatch,
+                        invalidatedBatches,
+                        cooldownTimeMs,
+                    )
                     val t0 = System.nanoTime()
                     kernel.invoke()
                     val t1 = System.nanoTime()
@@ -154,11 +187,33 @@ class NativeBenchmarkBuilder {
                     // Status rose while the batch was being measured -> invalid (spec §6).
                     thermalThrottled = true
                     invalidatedBatches++
+                    publishProgress(
+                        startedAt,
+                        BenchmarkUiStatus.THERMAL_RECOVERY,
+                        "THERMAL RECOVERY",
+                        validBatches.size,
+                        measurementBatches,
+                        invalidatedBatches,
+                        cooldownTimeMs,
+                        "Measured batch invalidated by thermal throttling",
+                    )
                     cooldownTimeMs += cooldown()
                     continue
                 }
                 validBatches.add(batch)
             }
+        } catch (t: Throwable) {
+            publishProgress(
+                startedAt,
+                BenchmarkUiStatus.FAILED,
+                "FAILED",
+                validBatches.size,
+                measurementBatches,
+                invalidatedBatches,
+                cooldownTimeMs,
+                t.message ?: t::class.java.simpleName,
+            )
+            throw t
         } finally {
             threadPriorityApplied = restorePriority(tid, previousPriority)
         }
@@ -193,7 +248,46 @@ class NativeBenchmarkBuilder {
             )
         report.print()
         report.writeCsv(context())
+        publishProgress(
+            startedAt,
+            BenchmarkUiStatus.COMPLETED,
+            "COMPLETED",
+            measurementBatches,
+            measurementBatches,
+            invalidatedBatches,
+            cooldownTimeMs,
+            "classification=${report.classification}",
+        )
         return report
+    }
+
+    private fun publishProgress(
+        startedAt: Long,
+        status: BenchmarkUiStatus,
+        phase: String,
+        iteration: Int,
+        totalIterations: Int,
+        invalidatedBatches: Int,
+        cooldownMillis: Long,
+        message: String = "",
+    ) {
+        BenchmarkViewModel.publishProgress(
+            BenchmarkUiState(
+                benchmark = name,
+                backend = backend,
+                size = if (width > 0 && height > 0) "${width}x${height}" else "-",
+                phase = phase,
+                iteration = iteration,
+                totalIterations = totalIterations,
+                status = status,
+                invalidatedBatches = invalidatedBatches,
+                cooldownMillis = cooldownMillis,
+                elapsedMillis = SystemClock.elapsedRealtime() - startedAt,
+                globalCurrentRun = BenchmarkViewModel.currentGlobalRun(),
+                globalRun = BenchmarkViewModel.totalGlobalRuns(),
+                message = message,
+            )
+        )
     }
 
     /**
@@ -239,10 +333,10 @@ class NativeBenchmarkReport(
      *
      *  - `INSUFFICIENT_SAMPLES` — no batch collected, or fewer than requested without any
      *    thermal event (attempt cap exhausted).
-     *  - `THERMAL_THROTTLED` — throttling occurred and the run ended with fewer batches than
+     *  - `THERMAL_THROTTLED` — throttling occurred, and the run ended with fewer batches than
      *    requested.
-     *  - `THERMAL_RECOVERY` — throttling occurred but all requested batches were still
-     *    collected afterwards.
+     *  - `THERMAL_RECOVERY` — throttling occurred, but all requested batches were still
+     *    collected afterward.
      *  - `UNSTABLE` — all batches collected, no throttling, but batch averages spread too
      *    widely (CV above [UNSTABLE_CV]).
      *  - `VALID` — otherwise.
@@ -299,7 +393,7 @@ class NativeBenchmarkReport(
      * Writes two CSVs:
      *  - `benchmarks_device_harness_<name>.csv` — one summary row, glob-compatible with the
      *    existing `runDeviceBenchmark` pull task (spec §24 deliverable 4);
-     *  - `benchmarks_harness_detail_<name>.csv` — environment block + per-sample rows.
+     *  - `benchmarks_harness_detail_<name>.csv` — environment block and per-sample rows.
      */
     fun writeCsv(context: Context) {
         val dir = context.externalCacheDir
@@ -359,6 +453,7 @@ class NativeBenchmarkReport(
     private fun sizeLabel(): String =
         if (width > 0 && height > 0) "${width}x${height}" else "-"
 
+    @Suppress("SameParameterValue")
     private fun StringBuilder.appendFormatLn(
         locale: Locale,
         format: String,
@@ -404,7 +499,6 @@ private fun buildEnvironment(
         appendLine("socManufacturer=${CpuInfo.socManufacturer}")
         appendLine("socModel=${CpuInfo.socModel}")
         appendLine("hardware=${CpuInfo.hardware}")
-        appendLine("cpuAffinityControlAvailable=${CpuInfo.cpuAffinityControlAvailable}")
         appendLine("cpuFreqBeforeKhz=${cpuFreqBeforeKhz ?: "unavailable"}")
         appendLine("cpuFreqAfterKhz=${cpuFreqAfterKhz ?: "unavailable"}")
         appendLine(
@@ -447,17 +541,16 @@ private fun capturePriority(tid: Int): Int? {
         val previous = Process.getThreadPriority(tid)
         Process.setThreadPriority(tid, HIGH_PRIORITY)
         previous
-    } catch (t: Throwable) {
+    } catch (_: Throwable) {
         null
     }
 }
 
 private fun restorePriority(tid: Int, previous: Int?): Boolean {
-    if (previous == null) return false
-    return try {
+    return previous != null && try {
         Process.setThreadPriority(tid, previous)
         true
-    } catch (t: Throwable) {
+    } catch (_: Throwable) {
         false
     }
 }

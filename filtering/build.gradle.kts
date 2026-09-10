@@ -301,5 +301,10 @@ dependencies {
 
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.activity:activity-ktx:1.13.0")
+    androidTestImplementation("androidx.core:core-ktx:1.17.0")
+    androidTestImplementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    androidTestImplementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     androidTestImplementation(testFixtures(project(":filtering")))
 }

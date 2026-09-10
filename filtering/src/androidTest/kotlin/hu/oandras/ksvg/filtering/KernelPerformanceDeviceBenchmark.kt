@@ -18,6 +18,7 @@ package hu.oandras.ksvg.filtering
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import hu.oandras.ksvg.filtering.benchmark.BenchmarkViewModel
 import hu.oandras.ksvg.filtering.benchmark.clearPreviousResults
 import hu.oandras.ksvg.filtering.benchmark.nativeBenchmark
 import org.junit.BeforeClass
@@ -31,9 +32,9 @@ import org.junit.runner.RunWith
  *
  * Each (kernel, backend, size) cell is its own harness block, so every cell shares the same
  * stabilizers: foreground window + focus wait, thread-priority bump, warmup, per-batch cache
- * normalisation, thermal gating with cooldown/retry, and the five-way classification
+ * normalization, thermal gating with cooldown/retry, and the five-way classification
  * (VALID / THERMAL_THROTTLED / THERMAL_RECOVERY / UNSTABLE / INSUFFICIENT_SAMPLES). Results
- * are written as summary + detail CSV per cell (matching the `runDeviceBenchmark` pull glob
+ * are written as summary and detail CSV per cell (matching the `runDeviceBenchmark` pull glob
  * `benchmarks_device*.csv`) in addition to the printed environment/stats/classification.
  *
  * Keeps the legacy kernel-selection arguments:
@@ -68,37 +69,36 @@ class KernelPerformanceDeviceBenchmark {
         val quick =
             InstrumentationRegistry.getArguments().getString("benchmark.quick") == "true"
         val target = InstrumentationRegistry.getArguments().getString("benchmark.kernel")
-        if (target.isNullOrEmpty() || target == "UnLinearize") benchmarkUnLinearize(quick)
-        if (target.isNullOrEmpty() || target == "ComponentTransfer") benchmarkComponentTransfer(quick)
-        if (target.isNullOrEmpty() || target == "Morphology") benchmarkMorphology(quick)
+        val benchmarkSizes = sizes(quick)
+        BenchmarkViewModel.beginSuite(totalRuns(target, benchmarkSizes))
+        if (target.isNullOrEmpty() || target == "UnLinearize") benchmarkUnLinearize(benchmarkSizes)
+        if (target.isNullOrEmpty() || target == "ComponentTransfer") benchmarkComponentTransfer(benchmarkSizes)
+        if (target.isNullOrEmpty() || target == "Morphology") benchmarkMorphology(benchmarkSizes)
         if (target.isNullOrEmpty() || target == "ArithmeticComposite") {
-            benchmarkArithmeticCompositeNonLinear(quick)
-            benchmarkArithmeticCompositeLinear(quick)
+            benchmarkArithmeticCompositeNonLinear(benchmarkSizes)
+            benchmarkArithmeticCompositeLinear(benchmarkSizes)
         }
-        if (target.isNullOrEmpty() || target == "ConvolveMatrix") benchmarkConvolveMatrix(quick)
-        if (target.isNullOrEmpty() || target == "DisplacementMap") benchmarkDisplacementMap(quick)
-        if (target.isNullOrEmpty() || target == "Lighting") benchmarkLighting(quick)
-        if (target.isNullOrEmpty() || target == "Turbulence") benchmarkTurbulence(quick)
-        if (target.isNullOrEmpty() || target == "GaussianBlur") benchmarkGaussianBlur(quick)
+        if (target.isNullOrEmpty() || target == "ConvolveMatrix") benchmarkConvolveMatrix(benchmarkSizes)
+        if (target.isNullOrEmpty() || target == "DisplacementMap") benchmarkDisplacementMap(benchmarkSizes)
+        if (target.isNullOrEmpty() || target == "Lighting") benchmarkLighting(benchmarkSizes)
+        if (target.isNullOrEmpty() || target == "Turbulence") benchmarkTurbulence(benchmarkSizes)
+        if (target.isNullOrEmpty() || target == "GaussianBlur") benchmarkGaussianBlur(benchmarkSizes)
     }
 
-    private fun benchmarkUnLinearize(quick: Boolean) {
+    private fun benchmarkUnLinearize(sizes: Array<Pair<Int, Int>>) {
         val table = ByteArray(256) { it.toByte() }
-        for ((w, h) in sizes(quick)) {
+        for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            nativeBenchmark {
-                name = "UnLinearize"
-                backend = "kotlin"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    KotlinKernels.unLinearize(src, dst, w, h, table)
-                }
+            benchmarkKotlin("UnLinearize", w, h) {
+                KotlinKernels.unLinearize(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    table = table
+                )
             }
 
             benchmarkCells(
@@ -119,35 +119,26 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkComponentTransfer(quick: Boolean) {
+    private fun benchmarkComponentTransfer(sizes: Array<Pair<Int, Int>>) {
         val tables = Array(4) { IntArray(256) { it shl it * 8 } }
-        for ((w, h) in sizes(quick)) {
+        for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            nativeBenchmark {
-                name = "ComponentTransfer"
-                backend = "kotlin"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    KotlinKernels.componentTransfer(
-                        src = src,
-                        dst = dst,
-                        width = w,
-                        clipLeft = 0,
-                        clipTop = 0,
-                        clipRight = w,
-                        clipBottom = h,
-                        tableA = tables[0],
-                        tableR = tables[1],
-                        tableG = tables[2],
-                        tableB = tables[3]
-                    )
-                }
+            benchmarkKotlin("ComponentTransfer", w, h) {
+                KotlinKernels.componentTransfer(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    tableA = tables[0],
+                    tableR = tables[1],
+                    tableG = tables[2],
+                    tableB = tables[3]
+                )
             }
 
             benchmarkCells(
@@ -175,34 +166,25 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkMorphology(quick: Boolean) {
-        for ((w, h) in sizes(quick)) {
+    private fun benchmarkMorphology(sizes: Array<Pair<Int, Int>>) {
+        for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            nativeBenchmark {
-                name = "Morphology"
-                backend = "kotlin"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    KotlinKernels.morphology(
-                        src = src,
-                        dst = dst,
-                        width = w,
-                        height = h,
-                        radiusX = 5,
-                        radiusY = 5,
-                        erode = true,
-                        clipLeft = 0,
-                        clipTop = 0,
-                        clipRight = w,
-                        clipBottom = h
-                    )
-                }
+            benchmarkKotlin("Morphology", w, h) {
+                KotlinKernels.morphology(
+                    src = src,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    radiusX = 5,
+                    radiusY = 5,
+                    erode = true,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h
+                )
             }
 
             benchmarkCells(
@@ -229,28 +211,35 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkArithmeticComposite(quick: Boolean, useLinear: Boolean) {
-        for ((w, h) in sizes(quick)) {
+    private fun benchmarkArithmeticComposite(
+        sizes: Array<Pair<Int, Int>>,
+        useLinear: Boolean
+    ) {
+        for ((w, h) in sizes) {
             val src1 = IntArray(w * h)
             val src2 = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            nativeBenchmark {
-                name = if (useLinear) "ArithmeticComposite (linear)" else "ArithmeticComposite (non-linear)"
-                backend = "kotlin"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    KotlinKernels.arithmeticComposite(
-                        src1, src2, dst, w,
-                        0, 0, w, h,
-                        0.5f, 0.5f, 0.5f, 0.1f,
-                        useLinear
-                    )
-                }
+            benchmarkKotlin(
+                if (useLinear) "ArithmeticComposite (linear)" else "ArithmeticComposite (non-linear)",
+                w,
+                h
+            ) {
+                KotlinKernels.arithmeticComposite(
+                    inputPixels = src1,
+                    in2Pixels = src2,
+                    outPixels = dst,
+                    width = w,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    k1 = 0.5f,
+                    k2 = 0.5f,
+                    k3 = 0.5f,
+                    k4 = 0.1f,
+                    useLinear = useLinear
+                )
             }
 
             benchmarkCells(
@@ -279,31 +268,36 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkArithmeticCompositeNonLinear(quick: Boolean) = benchmarkArithmeticComposite(quick, useLinear = false)
+    private fun benchmarkArithmeticCompositeNonLinear(sizes: Array<Pair<Int, Int>>) =
+        benchmarkArithmeticComposite(sizes, useLinear = false)
 
-    private fun benchmarkArithmeticCompositeLinear(quick: Boolean) = benchmarkArithmeticComposite(quick, useLinear = true)
+    private fun benchmarkArithmeticCompositeLinear(sizes: Array<Pair<Int, Int>>) =
+        benchmarkArithmeticComposite(sizes, useLinear = true)
 
-    private fun benchmarkConvolveMatrix(quick: Boolean) {
+    private fun benchmarkConvolveMatrix(sizes: Array<Pair<Int, Int>>) {
         // 5x5 weight matrix (the old 9-float driver passed an order-5 kernel with a 9-element
         // array, an out-of-bounds read; a 25-element kernel fixes it with the same workload).
         val kernel = FloatArray(25) { 0.11f }
-        for ((w, h) in sizes(quick)) {
+        for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            nativeBenchmark {
-                name = "ConvolveMatrix"
-                backend = "kotlin"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    KotlinKernels.convolveMatrix(
-                        src, dst, w, h, kernel, 5, 5, 2, 2, 16f, 0f, true, 0
-                    )
-                }
+            benchmarkKotlin("ConvolveMatrix", w, h) {
+                KotlinKernels.convolveMatrix(
+                    srcPixels = src,
+                    outPixels = dst,
+                    width = w,
+                    height = h,
+                    kernel = kernel,
+                    orderX = 5,
+                    orderY = 5,
+                    targetX = 2,
+                    targetY = 2,
+                    divisor = 16f,
+                    bias = 0f,
+                    preserveAlpha = true,
+                    edgeMode = 0
+                )
             }
 
             benchmarkCells(
@@ -332,25 +326,25 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkDisplacementMap(quick: Boolean) {
-        for ((w, h) in sizes(quick)) {
+    private fun benchmarkDisplacementMap(sizes: Array<Pair<Int, Int>>) {
+        for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val map = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            nativeBenchmark {
-                name = "DisplacementMap"
-                backend = "kotlin"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    KotlinKernels.displacementMap(
-                        src, map, dst, w, h, w, h, 20f, 0, 1
-                    )
-                }
+            benchmarkKotlin("DisplacementMap", w, h) {
+                KotlinKernels.displacementMap(
+                    src = src,
+                    map = map,
+                    dst = dst,
+                    width = w,
+                    height = h,
+                    mapWidth = w,
+                    mapHeight = h,
+                    scale = 20f,
+                    xChannel = 0,
+                    yChannel = 1
+                )
             }
 
             benchmarkCells(
@@ -376,27 +370,44 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkLighting(quick: Boolean) {
+    private fun benchmarkLighting(sizes: Array<Pair<Int, Int>>) {
         val params = DoubleArray(8) { 1.0 }
-        for ((w, h) in sizes(quick)) {
+        for ((w, h) in sizes) {
             val pix = IntArray(w * h)
             val out = IntArray(w * h)
 
-            nativeBenchmark {
-                name = "Lighting"
-                backend = "kotlin"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    KotlinKernels.lighting(
-                        pix, out, w, h, 0, 0, w, h,
-                        1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f,
-                        0, false, 1f, 1f, 255, 255, 255, params, false, false
-                    )
-                }
+            benchmarkKotlin("Lighting", w, h) {
+                KotlinKernels.lighting(
+                    pix = pix,
+                    out = out,
+                    width = w,
+                    height = h,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    surfaceScaleNormalized = 1f,
+                    invCanvasScaleX = 1.0,
+                    invCanvasScaleY = 1.0,
+                    userLeft = 0.0,
+                    userTop = 0.0,
+                    originX = 0.0,
+                    originY = 0.0,
+                    unitSizeX = 1.0,
+                    unitSizeY = 1.0,
+                    canvasScaleX = 1f,
+                    canvasScaleY = 1f,
+                    lightType = 0,
+                    specular = false,
+                    k = 1f,
+                    exponent = 1f,
+                    lightR = 255,
+                    lightG = 255,
+                    lightB = 255,
+                    params = params,
+                    premultipliedOutput = false,
+                    useLinear = false
+                )
             }
 
             benchmarkCells(
@@ -441,8 +452,8 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkTurbulence(quick: Boolean) {
-        for ((w, h) in sizes(quick)) {
+    private fun benchmarkTurbulence(sizes: Array<Pair<Int, Int>>) {
+        for ((w, h) in sizes) {
             val pixels = IntArray(w * h)
             val seed = 123
             val lcg = LcgRandom(seed)
@@ -450,21 +461,30 @@ class KernelPerformanceDeviceBenchmark {
             val generators = Array(4) { SvgPathNoise(lcg, p) }
             SvgPathNoise.buildPermutation(lcg, p)
 
-            nativeBenchmark {
-                name = "Turbulence"
-                backend = "kotlin"
-                width = w
-                height = h
-                warmupIterations = WARMUP_ITERATIONS
-                measurementBatches = MEASUREMENT_BATCHES
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                run {
-                    KotlinKernels.turbulence(
-                        pixels, w, h, 0, 0, w, h,
-                        0.01, 0.01, 0, 0, 1, false,
-                        1.0, 1.0, 0.0, 0.0, 1.0, 1.0, seed, generators
-                    )
-                }
+            benchmarkKotlin("Turbulence", w, h) {
+                KotlinKernels.turbulence(
+                    pixels = pixels,
+                    width = w,
+                    height = h,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    baseFrequencyX = 0.01,
+                    baseFrequencyY = 0.01,
+                    periodX = 0,
+                    periodY = 0,
+                    octaves = 1,
+                    fractalNoise = false,
+                    invCanvasScaleX = 1.0,
+                    invCanvasScaleY = 1.0,
+                    userLeft = 0.0,
+                    userTop = 0.0,
+                    unitSizeX = 1.0,
+                    unitSizeY = 1.0,
+                    seed = seed,
+                    generators = generators
+                )
             }
 
             benchmarkCells(
@@ -502,23 +522,20 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
-    private fun benchmarkGaussianBlur(quick: Boolean) {
+    private fun benchmarkGaussianBlur(sizes: Array<Pair<Int, Int>>) {
         val scratch = NativeGaussianBlur.createScratch()
         try {
-            for ((w, h) in sizes(quick)) {
+            for ((w, h) in sizes) {
                 val pix = IntArray(w * h)
 
-                nativeBenchmark {
-                    name = "GaussianBlur"
-                    backend = "kotlin"
-                    width = w
-                    height = h
-                    warmupIterations = WARMUP_ITERATIONS
-                    measurementBatches = MEASUREMENT_BATCHES
-                    iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
-                    run {
-                        StackBlur.blur(pix, w, h, 5f, 5f)
-                    }
+                benchmarkKotlin("GaussianBlur", w, h) {
+                    StackBlur.blur(
+                        pixels = pix,
+                        width = w,
+                        height = h,
+                        stdDeviationX = 5f,
+                        stdDeviationY = 5f
+                    )
                 }
 
                 benchmarkCells(
@@ -548,6 +565,20 @@ class KernelPerformanceDeviceBenchmark {
      * Buffers are owned by the caller and reused across backends, so the measured region is
      * exactly the kernel call (spec §20).
      */
+    private fun benchmarkKotlin(name: String, width: Int, height: Int, body: () -> Unit) {
+        nativeBenchmark {
+            this.name = name
+            backend = "kotlin"
+            this.width = width
+            this.height = height
+            warmupIterations = WARMUP_ITERATIONS
+            measurementBatches = MEASUREMENT_BATCHES
+            iterationsPerBatch =
+                if (width * height <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+            run(body)
+        }
+    }
+
     private fun benchmarkCells(
         name: String,
         @SimdBackend backendFlags: Int,
@@ -565,7 +596,7 @@ class KernelPerformanceDeviceBenchmark {
                 measurementBatches = MEASUREMENT_BATCHES
                 // Fewer iterations per batch at 2048x2048 so the large-kernel cells stay
                 // bounded (old runner used 20/2); batch-average CV needs only ~3-5 samples.
-                iterationsPerBatch = if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+                iterationsPerBatch = iterationsForSize(w, h)
                 run { body(b) }
             }
         }
@@ -573,4 +604,31 @@ class KernelPerformanceDeviceBenchmark {
 
     private fun sizes(quick: Boolean): Array<Pair<Int, Int>> =
         if (quick) arrayOf(512 to 512) else arrayOf(512 to 512, 2048 to 2048)
+
+    private fun iterationsForSize(w: Int, h: Int): Int {
+        return if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+    }
+
+    private fun totalRuns(target: String?, sizes: Array<Pair<Int, Int>>): Int {
+        val iterationsPerCell = sizes.sumOf { (w, h) ->
+            WARMUP_ITERATIONS + MEASUREMENT_BATCHES * iterationsForSize(w, h)
+        }
+
+        fun count(name: String, backendFlags: Int, modes: Int = 1): Int =
+            if (target.isNullOrEmpty() || target == name) {
+                modes * (1 + getBackendsFor(backendFlags).size) * iterationsPerCell
+            } else {
+                0
+            }
+
+        return count("UnLinearize", UnLinearizeNative.nativeBackend()) +
+            count("ComponentTransfer", ComponentTransferNative.nativeBackend()) +
+            count("Morphology", MorphologyNative.nativeBackend()) +
+            count("ArithmeticComposite", ArithmeticCompositeNative.nativeBackend(), modes = 2) +
+            count("ConvolveMatrix", ConvolveNative.nativeBackend()) +
+            count("DisplacementMap", DisplacementMapNative.nativeBackend()) +
+            count("Lighting", LightingNative.nativeBackend()) +
+            count("Turbulence", TurbulenceNative.nativeBackend()) +
+            count("GaussianBlur", NativeGaussianBlur.nativeBackend(5f, 5f))
+    }
 }

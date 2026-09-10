@@ -41,8 +41,7 @@ internal class ThermalStateMonitor private constructor(
 
     /** Status value above [PowerManager.THERMAL_STATUS_NONE] invalidates the batch. */
     internal fun currentThermalStatus(): Int {
-        val pm = powerManager
-        if (pm == null) return PowerManager.THERMAL_STATUS_NONE
+        val pm = powerManager ?: return PowerManager.THERMAL_STATUS_NONE
         return try {
             pm.currentThermalStatus
         } catch (t: Throwable) {

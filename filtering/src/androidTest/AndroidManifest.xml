@@ -6,7 +6,7 @@
             android:name="hu.oandras.ksvg.filtering.benchmark.BenchmarkActivity"
             android:exported="true"
             android:excludeFromRecents="true"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
+            android:theme="@android:style/Theme.Material.NoActionBar" />
     </application>
 
 </manifest>

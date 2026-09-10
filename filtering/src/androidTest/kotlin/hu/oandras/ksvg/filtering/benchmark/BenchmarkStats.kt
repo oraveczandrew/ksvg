@@ -25,16 +25,25 @@ import kotlin.math.sqrt
  */
 class BenchmarkStats(sortedSamples: DoubleArray) {
 
+    @JvmField
     val count: Int = sortedSamples.size
 
+    @JvmField
     val minMs: Double = sortedSamples.first()
+    @JvmField
     val medianMs: Double = percentile(sortedSamples, 0.5)
+    @JvmField
     val meanMs: Double = sortedSamples.average()
+    @JvmField
     val maxMs: Double = sortedSamples.last()
+    @JvmField
     val p90Ms: Double = percentile(sortedSamples, 0.90)
+    @JvmField
     val p95Ms: Double = percentile(sortedSamples, 0.95)
+    @JvmField
     val p99Ms: Double = percentile(sortedSamples, 0.99)
 
+    @JvmField
     val stdDevMs: Double = run {
         val m = meanMs
         sqrt(sortedSamples.sumOf { (it - m) * (it - m) } / count)
