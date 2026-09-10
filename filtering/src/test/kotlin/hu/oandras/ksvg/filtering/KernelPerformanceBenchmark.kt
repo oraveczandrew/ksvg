@@ -398,7 +398,7 @@ class KernelPerformanceBenchmark {
                 KotlinKernels.lighting(
                     pix, out, w, h, 0, 0, w, h,
                     1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f,
-                    0, false, 1f, 1f, 255, 255, 255, params
+                    0, false, 1f, 1f, 255, 255, 255, params, false, false
                 )
             }
 

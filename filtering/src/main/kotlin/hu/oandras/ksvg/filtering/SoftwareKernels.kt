@@ -158,7 +158,7 @@ public object SoftwareKernels {
         unitSizeY: Double,
         canvasScaleX: Float,
         canvasScaleY: Float,
-        lightType: Int,
+        @LightType lightType: Int,
         specular: Boolean,
         k: Float,
         exponent: Float,

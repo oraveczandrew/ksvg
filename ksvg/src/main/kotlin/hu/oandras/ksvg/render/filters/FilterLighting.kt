@@ -27,6 +27,7 @@ import hu.oandras.ksvg.dom.filter.FeSpotLight
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
 import hu.oandras.ksvg.dom.filter.Lighting
 import hu.oandras.ksvg.dom.style.ColorValue
+import hu.oandras.ksvg.filtering.LightType
 import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
 import hu.oandras.ksvg.render.FeSpecularLightingRenderNode
@@ -103,18 +104,18 @@ private fun doLightingFilter(
     val lightType: Int
     when (lightSource) {
         is FeDistantLight -> {
-            lightType = 0
+            lightType = LightType.DISTANT
             params[0] = lightSource.azimuth.toDouble()
             params[1] = lightSource.elevation.toDouble()
         }
         is FePointLight -> {
-            lightType = 1
+            lightType = LightType.POINT
             params[0] = lightSource.x.toDouble()
             params[1] = lightSource.y.toDouble()
             params[2] = lightSource.z.toDouble()
         }
         is FeSpotLight -> {
-            lightType = 2
+            lightType = LightType.SPOT
             params[0] = lightSource.x.toDouble()
             params[1] = lightSource.y.toDouble()
             params[2] = lightSource.z.toDouble()

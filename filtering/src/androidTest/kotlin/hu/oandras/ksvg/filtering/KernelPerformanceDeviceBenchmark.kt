@@ -20,7 +20,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.benchmark.clearPreviousResults
 import hu.oandras.ksvg.filtering.benchmark.nativeBenchmark
-import hu.oandras.ksvg.filtering.StackBlur
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -395,7 +394,7 @@ class KernelPerformanceDeviceBenchmark {
                     KotlinKernels.lighting(
                         pix, out, w, h, 0, 0, w, h,
                         1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f,
-                        0, false, 1f, 1f, 255, 255, 255, params
+                        0, false, 1f, 1f, 255, 255, 255, params, false, false
                     )
                 }
             }

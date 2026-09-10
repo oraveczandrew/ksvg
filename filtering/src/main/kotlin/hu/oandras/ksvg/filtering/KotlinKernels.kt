@@ -36,6 +36,7 @@ import kotlin.math.sqrt
  * plain parameters so this module has no dependency on SVG/DOM types; mapping
  * DOM attributes to kernel parameters happens in the `:ksvg` module.
  */
+@Suppress("NOTHING_TO_INLINE")
 public object KotlinKernels {
 
     private fun clamp255(value: Float): Int =
@@ -44,15 +45,15 @@ public object KotlinKernels {
     private fun clamp255(value: Double): Int =
         value.roundToInt().coerceIn(0, 255)
 
-    @JvmStatic
-    private inline fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
+    internal inline fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
         (alpha shl 24) or (red shl 16) or (green shl 8) or blue
 
-
-    private fun clamp(v: Float, min: Float, max: Float): Float =
+    @Suppress("SameParameterValue")
+    private inline fun clamp(v: Float, min: Float, max: Float): Float =
         v.coerceIn(min, max)
 
-    private fun clamp(v: Int, min: Int, max: Int): Int =
+    @Suppress("SameParameterValue")
+    private inline fun clamp(v: Int, min: Int, max: Int): Int =
         v.coerceIn(min, max)
 
     private fun sampleCoordinate(coordinate: Int, limit: Int, edgeMode: Int): Int =
@@ -104,16 +105,20 @@ public object KotlinKernels {
                 var a = 0f
 
                 for (ky in 0 until orderY) {
+                    val srcY = sampleCoordinate(y + ky - targetY, height, edgeMode)
+                    val srcRowOffset = if (srcY < 0) 0 else srcY * width
+                    var kernelIndex = ky * orderX
                     for (kx in 0 until orderX) {
                         val srcX = sampleCoordinate(x + kx - targetX, width, edgeMode)
-                        val srcY = sampleCoordinate(y + ky - targetY, height, edgeMode)
-                        val pixel = if (srcX < 0 || srcY < 0) 0 else srcPixels[srcY * width + srcX]
-                        val weight = kernel[ky * orderX + kx]
+                        val pixel = if (srcX < 0 || srcY < 0) 0 else srcPixels[srcRowOffset + srcX]
+                        val weight = kernel[kernelIndex++]
 
                         r += ((pixel shr 16) and 0xFF) * weight
                         g += ((pixel shr 8) and 0xFF) * weight
                         b += (pixel and 0xFF) * weight
-                        a += ((pixel shr 24) and 0xFF) * weight
+                        if (!preserveAlpha) {
+                            a += ((pixel shr 24) and 0xFF) * weight
+                        }
                     }
                 }
 
@@ -151,15 +156,15 @@ public object KotlinKernels {
         if (erode) {
             val rInit = 255 shl 16
             val gInit = 255 shl 8
-            for (y in clipTop until clipBottom) {
+            val firstY = maxOf(clipTop, radiusY)
+            val lastY = minOf(clipBottom, height - radiusY)
+            val firstX = maxOf(clipLeft, radiusX)
+            val lastX = minOf(clipRight, width - radiusX)
+            for (y in firstY until lastY) {
                 val rowOffset = y * width
-                val top = maxOf(0, y - radiusY)
-                val bottom = minOf(height - 1, y + radiusY)
-                val kernelTouchesTopBottom = y - radiusY < 0 || y + radiusY > height - 1
-                for (x in clipLeft until clipRight) {
-                    if (kernelTouchesTopBottom || x - radiusX < 0 || x + radiusX > width - 1) {
-                        continue
-                    }
+                val top = y - radiusY
+                val bottom = y + radiusY
+                for (x in firstX until lastX) {
                     var a = 255
                     var r = rInit
                     var g = gInit
@@ -180,17 +185,23 @@ public object KotlinKernels {
                 }
             }
         } else {
+            val interiorFirstY = maxOf(clipTop, radiusY)
+            val interiorLastY = minOf(clipBottom, height - radiusY)
+            val interiorFirstX = maxOf(clipLeft, radiusX)
+            val interiorLastX = minOf(clipRight, width - radiusX)
             for (y in clipTop until clipBottom) {
                 val rowOffset = y * width
-                val top = maxOf(0, y - radiusY)
-                val bottom = minOf(height - 1, y + radiusY)
+                val interiorY = y in interiorFirstY until interiorLastY
+                val top = if (interiorY) y - radiusY else maxOf(0, y - radiusY)
+                val bottom = if (interiorY) y + radiusY else minOf(height - 1, y + radiusY)
                 for (x in clipLeft until clipRight) {
                     var a = 0
                     var r = 0
                     var g = 0
                     var b = 0
-                    val left = maxOf(0, x - radiusX)
-                    val right = minOf(width - 1, x + radiusX)
+                    val interiorX = x in interiorFirstX until interiorLastX
+                    val left = if (interiorY && interiorX) x - radiusX else maxOf(0, x - radiusX)
+                    val right = if (interiorY && interiorX) x + radiusX else minOf(width - 1, x + radiusX)
                     for (ky in top..bottom) {
                         val kRowOffset = ky * width
                         for (kx in left..right) {
@@ -242,16 +253,15 @@ public object KotlinKernels {
         }
     }
 
-    // --------------------------------------------------------------- unlinearize
+    // --------------------------------------------------------------- unLinearize
 
     /**
      * Converts a single straight (non-premultiplied) linear-RGB pixel to straight
-     * sRGB using [table] (normally [ColorLuts.UN_LINEARIZE]): each colour channel is looked
+     * sRGB using [table] (normally [ColorLuts.UN_LINEARIZE]): each color channel is looked
      * up and alpha is preserved unchanged. Element-wise reference for both
      * [unLinearize] and `unlinearize.cpp`'s scalar loop.
      */
-    @JvmStatic
-    public fun unLinearizeArgb(pixel: Int, table: ByteArray): Int {
+    internal inline fun unLinearizeArgb(pixel: Int, table: ByteArray): Int {
         return argb(
             alpha = pixel ushr 24,
             red = table[(pixel ushr 16) and 0xFF].toInt() and 0xFF,
@@ -261,7 +271,7 @@ public object KotlinKernels {
     }
 
     /**
-     * Linear→sRGB (unlinearize) filter-output transfer over straight ARGB_8888
+     * Linear→sRGB (unLinearize) filter-output transfer over straight ARGB_8888
      * pixels. Each pixel's straight R/G/B channel is looked up in a single shared
      * 256-entry byte [table] and alpha is passed through unchanged (identical to
      * [unLinearizeArgb]). Element-wise byte map, so [src] and [dst] may be the
@@ -308,7 +318,7 @@ public object KotlinKernels {
         unitSizeY: Double,
         canvasScaleX: Float,
         canvasScaleY: Float,
-        lightType: Int,
+        @LightType lightType: Int,
         specular: Boolean,
         k: Float,
         exponent: Float,
@@ -320,13 +330,13 @@ public object KotlinKernels {
         // premultiplied form (lightColor, intensity) to match cairo: full-strength
         // color channels with the intensity in alpha. Intermediate specular output
         // (straight, alpha = max(R,G,B)) is preserved for consumer kernels.
-        premultipliedOutput: Boolean = false,
+        premultipliedOutput: Boolean,
         // When true (color-interpolation-filters: linearRGB, the default per the
         // SVG spec), the straight RGB output is gamma-corrected from linear to sRGB
         // to match cairo/rsvg. The premultiplied specular terminal keeps the raw
         // (linear) intensity in alpha and the full light color in RGB, so it is
         // unaffected.
-        useLinear: Boolean = false,
+        useLinear: Boolean,
     ) {
         // light colors linearized once (only used when `useLinear` is set). For white
         // light sRgbToLinear(255) == 255, so the straight output becomes the sRGB EOTF
@@ -335,9 +345,63 @@ public object KotlinKernels {
         val linearLightG = if (useLinear) sRgbToLinear(lightG).toFloat() else lightG.toFloat()
         val linearLightB = if (useLinear) sRgbToLinear(lightB).toFloat() else lightB.toFloat()
 
-        val shiftedLightR = lightR shl 16
-        val shiftedLightG = lightG shl 8
-        val shiftedLightB = lightB
+        val shiftedLightR: Int = lightR shl 16
+        val shiftedLightG: Int = lightG shl 8
+        val shiftedLightB: Int = lightB
+        val distantLx: Float
+        val distantLy: Float
+        val distantLz: Float
+        if (lightType == LightType.DISTANT) {
+            val az = Math.toRadians(params[0])
+            val el = Math.toRadians(params[1])
+            val cosElevation = cos(el)
+            distantLx = (cos(az) * cosElevation).toFloat()
+            distantLy = (sin(az) * cosElevation).toFloat()
+            distantLz = sin(el).toFloat()
+        } else {
+            distantLx = 0f
+            distantLy = 0f
+            distantLz = 0f
+        }
+        val spotTargetX: Double
+        val spotTargetY: Double
+        val spotTargetZ: Double
+        val spotConeCosine: Double
+        val hasSpotTarget: Boolean
+        if (lightType != LightType.SPOT) {
+            spotTargetX = 0.0
+            spotTargetY = 0.0
+            spotTargetZ = 0.0
+            spotConeCosine = -1.0
+            hasSpotTarget = false
+        } else {
+            val targetX = params[3] - params[0]
+            val targetY = params[4] - params[1]
+            val targetZ = params[5] - params[2]
+            val targetLength =
+                sqrt((targetX * targetX + targetY * targetY + targetZ * targetZ).toFloat()).toDouble()
+            if (targetLength == 0.0) {
+                spotTargetX = 0.0
+                spotTargetY = 0.0
+                spotTargetZ = 0.0
+                hasSpotTarget = false
+            } else {
+                spotTargetX = targetX / targetLength
+                spotTargetY = targetY / targetLength
+                spotTargetZ = targetZ / targetLength
+                hasSpotTarget = true
+            }
+            spotConeCosine = if (params[6].isNaN()) {
+                -1.0
+            } else {
+                cos(params[6] * Math.PI / 180.0)
+            }
+        }
+        val lightX = if (lightType == LightType.DISTANT) 0f else params[0].toFloat()
+        val lightY = if (lightType == LightType.DISTANT) 0f else params[1].toFloat()
+        val lightZ = if (lightType == LightType.DISTANT) 0f else params[2].toFloat()
+        val dzdxScale = canvasScaleX * 0.25f
+        val dzdyScale = canvasScaleY * 0.25f
 
         for (y in clipTop until clipBottom) {
             val userY = userTop + y * invCanvasScaleY
@@ -347,82 +411,70 @@ public object KotlinKernels {
                 val userX = userLeft + x * invCanvasScaleX
                 val ux = ((userX - originX) / unitSizeX).toFloat()
 
-                val surfaceZ = heightAt(pix, width, height, surfaceScaleNormalized, x, y)
+                val surfaceZ = heightAt(pix, width, surfaceScaleNormalized, x, y)
 
-                var lx = 0f;
-                var ly = 0f;
-                var lz = 0f;
+                var lx = 0f
+                var ly = 0f
+                var lz = 0f
                 var factor: Float
                 when (lightType) {
-                    0 -> {
-                        val az = Math.toRadians(params[0])
-                        val el = Math.toRadians(params[1])
-                        lx = (cos(az) * cos(el)).toFloat()
-                        ly = (sin(az) * cos(el)).toFloat()
-                        lz = sin(el).toFloat()
+                    LightType.DISTANT -> {
+                        lx = distantLx
+                        ly = distantLy
+                        lz = distantLz
                         factor = 1f
                     }
 
-                    1 -> {
-                        val vx = params[0].toFloat() - ux
-                        val vy = params[1].toFloat() - uy
-                        val vz = params[2].toFloat() - surfaceZ
-                        val len = sqrt(vx * vx + vy * vy + vz * vz)
-                        if (len == 0f) {
-                            factor = 0f
-                        } else {
-                            lx = vx / len; ly = vy / len; lz = vz / len; factor = 1f
-                        }
-                    }
-
                     else -> {
-                        val vx = params[0].toFloat() - ux
-                        val vy = params[1].toFloat() - uy
-                        val vz = params[2].toFloat() - surfaceZ
+                        val vx = lightX - ux
+                        val vy = lightY - uy
+                        val vz = lightZ - surfaceZ
                         val len = sqrt(vx * vx + vy * vy + vz * vz)
                         if (len == 0f) {
                             factor = 0f
                         } else {
                             lx = vx / len; ly = vy / len; lz = vz / len
-                            val tx = params[3] - params[0]
-                            val ty = params[4] - params[1]
-                            val tz = params[5] - params[2]
-                            val tLen = sqrt((tx * tx + ty * ty + tz * tz).toFloat()).toDouble()
-                            if (tLen == 0.0) {
+                            if (lightType == LightType.POINT || !hasSpotTarget) {
                                 factor = 1f
                             } else {
-                                val sx = tx / tLen;
-                                val sy = ty / tLen;
-                                val sz = tz / tLen
-                                var dot = (sx * -lx + sy * -ly + sz * -lz)
+                                var dot = (spotTargetX * -lx + spotTargetY * -ly + spotTargetZ * -lz)
                                 if (dot < -1.0) dot = -1.0 else if (dot > 1.0) dot = 1.0
                                 var f = dot.toFloat()
-                                if (!params[6].isNaN() && f.toDouble() < cos(params[6] * Math.PI / 180.0)) f =
-                                    0f
+                                if (f.toDouble() < spotConeCosine) f = 0f
                                 factor = f.coerceAtLeast(0f)
                             }
                         }
                     }
                 }
 
-                val dzdx = (heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y - 1) + 2 * heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y) + heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y + 1) -
-                        (heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y - 1) + 2 * heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y) + heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y + 1))) / (4f / canvasScaleX)
-                val dzdy = (heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y + 1) + 2 * heightAt(pix, width, height, surfaceScaleNormalized, x, y + 1) + heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y + 1) -
-                        (heightAt(pix, width, height, surfaceScaleNormalized, x - 1, y - 1) + 2 * heightAt(pix, width, height, surfaceScaleNormalized, x, y - 1) + heightAt(pix, width, height, surfaceScaleNormalized, x + 1, y - 1))) / (4f / canvasScaleY)
+                val leftX = maxOf(0, x - 1)
+                val rightX = minOf(width - 1, x + 1)
+                val topY = maxOf(0, y - 1)
+                val bottomY = minOf(height - 1, y + 1)
+                val leftTop = heightAt(pix, width, surfaceScaleNormalized, leftX, topY)
+                val left = heightAt(pix, width, surfaceScaleNormalized, leftX, y)
+                val leftBottom = heightAt(pix, width, surfaceScaleNormalized, leftX, bottomY)
+                val rightTop = heightAt(pix, width, surfaceScaleNormalized, rightX, topY)
+                val right = heightAt(pix, width, surfaceScaleNormalized, rightX, y)
+                val rightBottom = heightAt(pix, width, surfaceScaleNormalized, rightX, bottomY)
+                val top = heightAt(pix, width, surfaceScaleNormalized, x, topY)
+                val bottom = heightAt(pix, width, surfaceScaleNormalized, x, bottomY)
+                val dzdx = (rightTop + 2 * right + rightBottom -
+                        (leftTop + 2 * left + leftBottom)) * dzdxScale
+                val dzdy = (leftBottom + 2 * bottom + rightBottom -
+                        (leftTop + 2 * top + rightTop)) * dzdyScale
 
-                var nx = -dzdx;
-                var ny = -dzdy;
+                var nx = -dzdx
+                var ny = -dzdy
                 var nz = 1f
                 val nLen = sqrt(nx * nx + ny * ny + nz * nz)
-                if (nLen != 0f) {
-                    nx /= nLen; ny /= nLen; nz /= nLen
-                }
+                nx /= nLen; ny /= nLen; nz /= nLen
 
                 val intensity: Float = if (!specular) {
                     clamp((nx * lx + ny * ly + nz * lz).coerceAtLeast(0f) * k * factor, 0f, 1f)
                 } else {
-                    var hx = lx;
-                    var hy = ly;
+                    var hx = lx
+                    var hy = ly
                     var hz = lz + 1f
                     val hLen = sqrt(hx * hx + hy * hy + hz * hz)
                     if (hLen != 0f) {
@@ -482,15 +534,10 @@ public object KotlinKernels {
     private fun heightAt(
         pix: IntArray,
         width: Int,
-        height: Int,
         surfaceScaleNormalized: Float,
         x: Int,
         y: Int,
-    ): Float {
-        val cx = x.coerceIn(0, width - 1)
-        val cy = y.coerceIn(0, height - 1)
-        return ((pix[cy * width + cx] shr 24) and 0xff) * surfaceScaleNormalized
-    }
+    ): Float = ((pix[y * width + x] ushr 24) and 0xff) * surfaceScaleNormalized
 
     /**
      * feComposite operator="arithmetic". [useLinear] applies the
@@ -560,10 +607,11 @@ public object KotlinKernels {
 
         for (y in 0 until height) {
             val rowOffset = y * width
+            val mapY = if (mapHeight <= 1) 0 else (y.toFloat() / heightDivisor * (mapHeight - 1)).toInt()
+            val mapRowOffset = mapY * mapWidth
             for (x in 0 until width) {
                 val mapX = if (mapWidth <= 1) 0 else (x.toFloat() / widthDivisor * (mapWidth - 1)).toInt()
-                val mapY = if (mapHeight <= 1) 0 else (y.toFloat() / heightDivisor * (mapHeight - 1)).toInt()
-                val mapPixel = map[mapY * mapWidth + mapX]
+                val mapPixel = map[mapRowOffset + mapX]
 
                 val dx = (scale * (channelValue(mapPixel, xChannel) - 0.5f)).toInt()
                 val dy = (scale * (channelValue(mapPixel, yChannel) - 0.5f)).toInt()
@@ -577,7 +625,7 @@ public object KotlinKernels {
 
     /**
      * feTurbulence software fallback. [generators] holds the four per-channel
-     * [SvgPathNoise] lattice samplers (channel order R,G,B,A) pre-built from the
+     * [SvgPathNoise] lattice samplers (channel order R, G, B, A) pre-built from the
      * primitive's seed (see `RenderTreeBuilder` in `:ksvg`). Bit-exact reference
      * for `turbulence_core.h` / `TurbulenceNative.apply`.
      */
@@ -604,12 +652,12 @@ public object KotlinKernels {
         @Suppress("UNUSED_PARAMETER") seed: Int,
         generators: Array<SvgPathNoise>,
     ) {
-        val startX = userLeft + clipLeft.toDouble() * invCanvasScaleX
-        val startY = userTop + clipTop.toDouble() * invCanvasScaleY
+        val stitch = periodX > 0 || periodY > 0
 
         for (y in clipTop until clipBottom) {
             val userY = userTop + y.toDouble() * invCanvasScaleY
             val py0 = (userY / unitSizeY) * baseFrequencyY
+            val rowOffset = y * width
             for (x in clipLeft until clipRight) {
                 val userX = userLeft + x.toDouble() * invCanvasScaleX
                 val px0 = (userX / unitSizeX) * baseFrequencyX
@@ -619,10 +667,8 @@ public object KotlinKernels {
                 var b = 0.0
                 var a = 0.0
 
-                val tileX = (x - clipLeft).toDouble()
-                val tileY = (y - clipTop).toDouble()
-
                 for (channel in 0 until 4) {
+                    val generator = generators[channel]
                     var value = 0.0
                     var ratio = 1.0
                     var px = px0
@@ -634,14 +680,14 @@ public object KotlinKernels {
                     // (tile_x * base_frequency), not a user-space / unitSize-scaled factor:
                     // wrap_x_initial = (tile_x * bf) as usize + PERLIN_N + width.
                     // So curtlx must be tileX * baseFrequencyX (drop invCanvasScale/unitSize).
-                    var curtlx = tileX * baseFrequencyX
-                    var curtly = tileY * baseFrequencyY
+                    var curtlx = (x - clipLeft).toDouble() * baseFrequencyX
+                    var curtly = (y - clipTop).toDouble() * baseFrequencyY
 
                     for (_ in 0 until octaves) {
                         val wrapX = floor(curtlx).toInt() + 4096 + octavePeriodX
                         val wrapY = floor(curtly).toInt() + 4096 + octavePeriodY
 
-                        val n = generators[channel].noise2(
+                        val n = generator.noise2(
                             px,
                             py,
                             octavePeriodX,
@@ -655,7 +701,7 @@ public object KotlinKernels {
                         curtlx *= 2.0
                         curtly *= 2.0
                         ratio *= 2.0
-                        if (periodX > 0 || periodY > 0) {
+                        if (stitch) {
                             octavePeriodX *= 2
                             octavePeriodY *= 2
                         }
@@ -668,7 +714,7 @@ public object KotlinKernels {
                         3 -> a = finalVal
                     }
                 }
-                pixels[y * width + x] = argb(
+                pixels[rowOffset + x] = argb(
                     clamp255(a),
                     clamp255(r),
                     clamp255(g),
