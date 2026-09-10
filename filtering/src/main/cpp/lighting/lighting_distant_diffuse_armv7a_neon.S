@@ -169,9 +169,11 @@ ksvgLightingDistantDiffuseRowNeon32:
     // 1/nLen via vrsqrte + two Newton-Raphson refinements (matches the
     // previous ARMv7 C++ NEON reference's two-step refinement).
     vrsqrte.f32 q3, q2           @ estimate
-    vrsqrts.f32 q15, q2, q3      @ (3 - nLen^2*est^2) / 2
+    vmul.f32 q15, q3, q3         @ est^2 (VRSQRTS = (3 - Vn*Vm)/2)
+    vrsqrts.f32 q15, q2, q15     @ (3 - nLen^2*est^2) / 2
     vmul.f32 q3, q3, q15         @ refinement 1
-    vrsqrts.f32 q15, q2, q3      @ refinement 2
+    vmul.f32 q15, q3, q3         @ est1^2
+    vrsqrts.f32 q15, q2, q15     @ refinement 2
     vmul.f32 q3, q3, q15         @ q3 = 1/nLen
 
     vmul.f32 q0, q0, q3          @ nx' = nx / nLen

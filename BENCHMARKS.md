@@ -209,12 +209,12 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `arm64-v8a`; non-quick har
 | GaussianBlur | kotlin | 2048x2048 | 200.729 | 20.90 | 0.17 | 23.66x | ⬆️ | StackBlur (approx) |
 | GaussianBlur | scalar | 2048x2048 | 4749.843 | 0.88 | 0.01 | 1.00x | |  |
 | GaussianBlur | neon64 | 2048x2048 | 84.117 | 49.86 | 0.40 | 56.47x | 🚀 |  |
-| Lighting | kotlin | 512x512 | 66.877 | 3.92 | 0.03 | 1.23x | ⬆️ |  |
-| Lighting | scalar | 512x512 | 82.113 | 3.19 | 0.03 | 1.00x | |  |
-| Lighting | neon64 | 512x512 | 84.499 | 3.10 | 0.02 | 0.97x | 🔴 |  |
-| Lighting | kotlin | 2048x2048 | 1108.236 | 3.78 | 0.03 | 1.18x | ⬆️ |  |
-| Lighting | scalar | 2048x2048 | 1311.657 | 3.20 | 0.03 | 1.00x | |  |
-| Lighting | neon64 | 2048x2048 | 1337.043 | 3.14 | 0.03 | 0.98x | 🔴 |  |
+| Lighting | kotlin | 512x512 | 57.078 | 4.59 | 0.04 | 0.38x | |  |
+| Lighting | scalar | 512x512 | 21.490 | 12.20 | 0.10 | 1.00x |  |  |
+| Lighting | neon64 | 512x512 | 1.676 | 156.42 | 1.25 | **12.82x** | 🚀 | hand-written NEON distant diffuse |
+| Lighting | kotlin | 2048x2048 | 923.794 | 4.54 | 0.04 | 0.37x | |  |
+| Lighting | scalar | 2048x2048 | 338.715 | 12.38 | 0.10 | 1.00x |  |  |
+| Lighting | neon64 | 2048x2048 | 22.252 | 188.49 | 1.51 | **15.22x** | 🚀 |  |
 | Morphology | kotlin | 512x512 | 348.674 | 0.75 | 0.01 | 0.56x | |  |
 | Morphology | scalar | 512x512 | 195.727 | 1.34 | 0.01 | 1.00x | |  |
 | Morphology | neon64 | 512x512 | 2.013 | 130.25 | 1.04 | 97.25x | 🚀 |  |
@@ -266,11 +266,12 @@ Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit).
 | GaussianBlur | neon32 | 512x512 | 8.823 | 29.71 | 0.24 | **42.12x** | 🚀 |  |
 | GaussianBlur | scalar | 2048x2048 | 5959.443 | 0.70 | 0.01 | 1.00x |  |  |
 | GaussianBlur | neon32 | 2048x2048 | 141.507 | 29.64 | 0.24 | **42.11x** | 🚀 |  |
-| Lighting | kotlin | 512x512 | 120.431 | 2.18 | 0.17 | 0.84x | |  |
-| Lighting | scalar | 512x512 | 101.153 | 2.59 | 0.02 | 1.00x |  |  |
-| Lighting | neon32 | 512x512 | 103.053 | 2.54 | 0.02 | 0.98x | 🔴 |  |
-| Lighting | scalar | 2048x2048 | 1535.380 | 2.73 | 0.02 | 1.00x |  |  |
-| Lighting | neon32 | 2048x2048 | 1554.207 | 2.70 | 0.02 | 0.99x | 🔴 |  |
+| Lighting | kotlin | 512x512 | 121.125 | 2.16 | 0.02 | 0.25x | |  |
+| Lighting | scalar | 512x512 | 30.794 | 8.51 | 0.07 | 1.00x |  |  |
+| Lighting | neon32 | 512x512 | 4.074 | 64.34 | 0.51 | 7.56x | 🟢 | hand-written NEON distant diffuse |
+| Lighting | kotlin | 2048x2048 | 1894.268 | 2.21 | 0.02 | 0.23x | |  |
+| Lighting | scalar | 2048x2048 | 444.190 | 9.44 | 0.08 | 1.00x |  |  |
+| Lighting | neon32 | 2048x2048 | 39.800 | 105.39 | 0.84 | **11.16x** | 🚀 |  |
 | Morphology | kotlin | 512x512 | 799.654 | 0.33 | 0.03 | 0.74x | |  |
 | Morphology | scalar | 512x512 | 588.373 | 0.45 | 0.00 | 1.00x |  |  |
 | Morphology | neon32 | 512x512 | 3.238 | 80.95 | 0.65 | **181.70x** | 🚀 |  |

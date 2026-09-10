@@ -1,18 +1,16 @@
-/*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
- *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
- */
+//    Copyright 2026 András Oravecz <info@oandras.hu>
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
 
 #include <jni.h>
 #include <cmath>
@@ -168,6 +166,127 @@ inline void applyScalarPixel_full(
             : packPixel(outA, outR, outG, outB);
 }
 
+
+inline void applyScalarDistantDiffuse(
+        const jint* pix, jint* out, const jint width, const jint height,
+        const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
+        const float ss, const float invDx, const float invDy,
+        const float k, const float lr, const float lg, const float lb,
+        const jdouble* params) {
+    const double az = params[0] * M_PI / 180.0;
+    const double el = params[1] * M_PI / 180.0;
+    const float lx = static_cast<float>(std::cos(az) * std::cos(el));
+    const float ly = static_cast<float>(std::sin(az) * std::cos(el));
+    const float lz = static_cast<float>(std::sin(el));
+
+    const int lastX = width - 1;
+    const int lastY = height - 1;
+
+    for (jint y = clipTop; y < clipBottom; ++y) {
+        const int ym1 = y > 0 ? y - 1 : 0;
+        const int yp1 = y < lastY ? y + 1 : lastY;
+
+        const jint* rowT = pix + ym1 * width;
+        const jint* rowM = pix + y * width;
+        const jint* rowB = pix + yp1 * width;
+        jint* dst = out + y * width;
+
+        const jint x0 = clipLeft;
+        const jint x1 = clipRight;
+
+        // The interior is the hot path: no per-sample clamp arithmetic.
+        const jint ix0 = std::max(x0, 1);
+        const jint ix1 = std::min(x1, lastX);
+
+        for (jint x = x0; x < ix0; ++x) {
+            const int xm1 = x > 0 ? x - 1 : 0;
+            const int xp1 = x < lastX ? x + 1 : lastX;
+
+            const float tl = static_cast<float>((rowT[xm1] >> 24) & 0xff) * ss;
+            const float tm = static_cast<float>((rowT[x]    >> 24) & 0xff) * ss;
+            const float tr = static_cast<float>((rowT[xp1] >> 24) & 0xff) * ss;
+            const float ml = static_cast<float>((rowM[xm1] >> 24) & 0xff) * ss;
+            const float mr = static_cast<float>((rowM[xp1] >> 24) & 0xff) * ss;
+            const float bl = static_cast<float>((rowB[xm1] >> 24) & 0xff) * ss;
+            const float bm = static_cast<float>((rowB[x]    >> 24) & 0xff) * ss;
+            const float br = static_cast<float>((rowB[xp1] >> 24) & 0xff) * ss;
+
+            const float dzdx = (tr + mr + mr + br - (tl + ml + ml + bl)) / invDx;
+            const float dzdy = (bl + bm + bm + br - (tl + tm + tm + tr)) / invDy;
+
+            const float nx0 = -dzdx;
+            const float ny0 = -dzdy;
+            const float nLen = std::sqrt(nx0 * nx0 + ny0 * ny0 + 1.f);
+            const float invLen = nLen != 0.f ? 1.f / nLen : 1.f;
+            const float dot = (nx0 * lx + ny0 * ly + lz) * invLen;
+            const float intensity = clamp01((dot > 0.f ? dot : 0.f) * k);
+
+            dst[x] = packPixel(255,
+                               ksvg::clamp255(lr * intensity),
+                               ksvg::clamp255(lg * intensity),
+                               ksvg::clamp255(lb * intensity));
+        }
+
+        for (jint x = ix0; x < ix1; ++x) {
+            const jint* t = rowT + x;
+            const jint* m = rowM + x;
+            const jint* b = rowB + x;
+
+            const float tl = static_cast<float>((t[-1] >> 24) & 0xff) * ss;
+            const float tm = static_cast<float>((t[ 0] >> 24) & 0xff) * ss;
+            const float tr = static_cast<float>((t[ 1] >> 24) & 0xff) * ss;
+            const float ml = static_cast<float>((m[-1] >> 24) & 0xff) * ss;
+            const float mr = static_cast<float>((m[ 1] >> 24) & 0xff) * ss;
+            const float bl = static_cast<float>((b[-1] >> 24) & 0xff) * ss;
+            const float bm = static_cast<float>((b[ 0] >> 24) & 0xff) * ss;
+            const float br = static_cast<float>((b[ 1] >> 24) & 0xff) * ss;
+
+            const float dzdx = (tr + mr + mr + br - (tl + ml + ml + bl)) / invDx;
+            const float dzdy = (bl + bm + bm + br - (tl + tm + tm + tr)) / invDy;
+
+            const float nx0 = -dzdx;
+            const float ny0 = -dzdy;
+            const float invLen = 1.f / std::sqrt(nx0 * nx0 + ny0 * ny0 + 1.f);
+            const float dot = (nx0 * lx + ny0 * ly + lz) * invLen;
+            const float intensity = clamp01((dot > 0.f ? dot : 0.f) * k);
+
+            dst[x] = packPixel(255,
+                               ksvg::clamp255(lr * intensity),
+                               ksvg::clamp255(lg * intensity),
+                               ksvg::clamp255(lb * intensity));
+        }
+
+        for (jint x = ix1; x < x1; ++x) {
+            const int xm1 = x > 0 ? x - 1 : 0;
+            const int xp1 = x < lastX ? x + 1 : lastX;
+
+            const float tl = static_cast<float>((rowT[xm1] >> 24) & 0xff) * ss;
+            const float tm = static_cast<float>((rowT[x]    >> 24) & 0xff) * ss;
+            const float tr = static_cast<float>((rowT[xp1] >> 24) & 0xff) * ss;
+            const float ml = static_cast<float>((rowM[xm1] >> 24) & 0xff) * ss;
+            const float mr = static_cast<float>((rowM[xp1] >> 24) & 0xff) * ss;
+            const float bl = static_cast<float>((rowB[xm1] >> 24) & 0xff) * ss;
+            const float bm = static_cast<float>((rowB[x]    >> 24) & 0xff) * ss;
+            const float br = static_cast<float>((rowB[xp1] >> 24) & 0xff) * ss;
+
+            const float dzdx = (tr + mr + mr + br - (tl + ml + ml + bl)) / invDx;
+            const float dzdy = (bl + bm + bm + br - (tl + tm + tm + tr)) / invDy;
+
+            const float nx0 = -dzdx;
+            const float ny0 = -dzdy;
+            const float nLen = std::sqrt(nx0 * nx0 + ny0 * ny0 + 1.f);
+            const float invLen = nLen != 0.f ? 1.f / nLen : 1.f;
+            const float dot = (nx0 * lx + ny0 * ly + lz) * invLen;
+            const float intensity = clamp01((dot > 0.f ? dot : 0.f) * k);
+
+            dst[x] = packPixel(255,
+                               ksvg::clamp255(lr * intensity),
+                               ksvg::clamp255(lg * intensity),
+                               ksvg::clamp255(lb * intensity));
+        }
+    }
+}
+
 void applyScalar(
         const jint* pix, jint* out, const jint width, const jint height,
         const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
@@ -183,6 +302,13 @@ void applyScalar(
     const float lb = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fb))) : fb;
     const float invDx = 4.f / canvasScaleX;
     const float invDy = 4.f / canvasScaleY;
+
+    if (lightType == 0 && !isSpecular && !useLinear) {
+        applyScalarDistantDiffuse(pix, out, width, height,
+                                  clipLeft, clipTop, clipRight, clipBottom,
+                                  ss, invDx, invDy, k, lr, lg, lb, params);
+        return;
+    }
 
     for (jint y = clipTop; y < clipBottom; y++) {
         for (jint x = clipLeft; x < clipRight; x++) {
@@ -263,9 +389,11 @@ void applyVector(
 #if defined(__aarch64__)
                 assert(backend == SIMD_BACKEND_NEON64);
                 ksvgLightingDistantDiffuseRowNeon64(srcT, srcM, srcB, rowOut, count, &lp);
+                x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
 #elif defined(__arm__)
                 assert(backend == SIMD_BACKEND_NEON32);
                 ksvgLightingDistantDiffuseRowNeon32(srcT, srcM, srcB, rowOut, count, &lp);
+                x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
 #elif defined(__i386__) || defined(__x86_64__)
 #if defined(__x86_64__)
                 switch (backend) {
