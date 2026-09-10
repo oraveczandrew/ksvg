@@ -33,6 +33,17 @@ The pipeline has three distinct stages (see also AGENTS.md "Core Architecture"):
 Data-flow rule: a subtree can be rebuilt lazily when its style/content changes
 (`RenderNode` version counters), without rebuilding the whole tree.
 
+### 1.1 Scene updates and filtered composition
+
+`RenderScene` owns viewport application and can update drawable bounds in place;
+viewport-relative text, shapes, filters, and symbols do not require rebuilding
+the render tree. Bounds unions are refreshed bottom-up and the existing scene
+is invalidated accordingly.
+
+Filtered output preserves the source element's opacity and blend mode when it
+is composited back to the target canvas. This is separate from mask
+composition, which requires its own validation.
+
 ---
 
 ## 2. Filters: where they sit and the two pipelines
@@ -181,6 +192,27 @@ linear space, then applies `linearToSRgb` to the straight output when
 > (the default). sRGB is honored by other primitives (`feComponentTransfer`,
 > `feComposite`), so an sRGB-requesting lighting SVG currently renders with the
 > linearRGB straight-RGB EOTF. Out of scope for this fix; tracked separately.
+
+### 3.4 Turbulence parity and terminal color-space conversion
+
+The turbulence kernel is parity-proven against captured librsvg runtime
+inputs: lattice construction, `noise2`, octave sums, and final ARGB bytes
+matched the captured non-stitch and stitch calls. One intermediate wrap-value
+derivation still differs, but it was output-neutral for the captured stitch
+fixture; do not change the kernel solely to reproduce that integer.
+
+The important visual distinction is after the kernel. `feTurbulence` emits
+straight linearRGB channels in KSVG. For a terminal turbulence filter with
+`color-interpolation-filters="linearRGB"`, apply the existing UN_LINEARIZE LUT
+to the straight RGB channels and preserve alpha before source-over compositing.
+Do not apply this as a blanket filter-wide conversion: other primitives have
+different output representations.
+
+For `stitchTiles="stitch"`, tile-frequency quantization must use device-pixel
+primitive extents, not a ceiling of the user-space region. The remaining
+one-pixel bounds difference in the reference fixture comes from librsvg's
+f32-parsed percentage geometry; do not introduce an empirical global geometry
+offset to imitate it.
 
 ---
 
@@ -453,6 +485,34 @@ trusting long bench runs on this device:
 
 ---
 
+### 6.3 Native-kernel decisions that affect rendering correctness
+
+These are implementation invariants, not benchmark-specific optimizations:
+
+- Native kernels are compared against the scalar/Kotlin reference
+  byte-for-byte wherever the parity suite requires it. Keep reference
+  operation order; rewrites such as `x / 255.0f` → `x * (1 / 255.0f)` can
+  change the final rounded byte.
+- Production dispatch may fall back to scalar when a SIMD backend loses on its
+  target. The forced executor is intentionally separate so disabled candidates
+  can still be parity-tested and measured.
+- ARM32 and AArch64 assembly use separate argument layouts and register maps.
+  ARM32 has q0-q15 only and must preserve d8-d15. Keep layout assertions next
+  to the C++ argument structs.
+- Assembly tables and literal pools must be PIC-safe. Absolute local pointers
+  can produce Android text relocations, causing a load failure and an apparent
+  scalar fallback. Validate the linked i386 artifact, not just assembly.
+- Thin edge bands often lose with SIMD coordinate handling and temporary
+  spills. Reserve SIMD for the interior, specialize scalar edge sampling, and
+  route short tails outside full-vector stores.
+- Exact 256-entry LUT transforms are a known exception: 128-bit lookup
+  cascades can lose to scalar even when bit-exact. Keep them scalar on those
+  targets unless a measured wider-vector path wins.
+- Validation corpora must exercise all LUT entries and alpha values, vector
+  boundaries, odd-width tails, in-place and out-of-place buffers, and guarded
+  memory regions through the actual JNI/native entry point. A backend that was
+  only compiled is unverified.
+
 ## 7. Change log (append)
 
 - 2026-08-30 — Document created. Recorded: two-phase render model, software/HW
@@ -535,3 +595,9 @@ trusting long bench runs on this device:
   variants for x86.
 - 2026-09-09 — Documented ARMv7 NEON assembly gotchas in §4.2 (16-entry VTBL2
   LUT-scan bound; LLVM `.macro` token-paste for shift args).
+- 2026-09-10 — Consolidated validated native-kernel guidance: parity-first
+  arithmetic, production-vs-forced dispatch, ARM32 ABI/PIC hazards, scalar
+  thin-edge specialization, and the measured 128-bit LUT exception (§6.3).
+- 2026-09-10 — Added the closed turbulence findings: kernel parity against
+  librsvg, device-pixel stitch tile quantization, and the narrowly scoped
+  straight-linearRGB terminal transfer (§3.4).

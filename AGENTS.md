@@ -15,6 +15,10 @@ KSVG is a high-performance SVG rendering library for Android, written in Kotlin.
 4. **Renderer (`hu.oandras.ksvg.render.SVGAndroidRenderer`)**: Traverses the Render Tree and executes `canvas` operations.
 5. **Animations**: Centralized in `AnimationRenderer.kt` and `AnimationUtils.kt`. Uses a SMIL-based timing model.
 
+`RenderScene` owns viewport application and can update drawable bounds in place;
+viewport-relative text, shapes, filters, and symbols do not require rebuilding
+the render tree. Bounds unions are refreshed bottom-up.
+
 ## Critical Development Conventions
 
 ### 1. Performance & Zero-Allocation Rule
@@ -27,6 +31,9 @@ The rendering loop (`render()` methods) and animation updates (`updateAnimations
 *   **XFerModes**: Never create `PorterDuffXfermode` instances. Use the pre-allocated constants in `hu.oandras.ksvg.utils.XFerModes`.
 *   **Method count**: Use `@JvmField`-s, if possible, to reduce method count.
 *   **Collections** Prefer non-allocating functions in `hu.oandras.ksvg.utils.Collections`, such as `forEachElement`.
+*   Filtered output must preserve the source element's opacity and blend mode
+    when composited back to the target canvas; mask composition is separate and
+    requires dedicated validation.
 
 ### 2. Compatibility & PaintCompat
 The project `minSdk` is 26, but some features (like `wordSpacing` or `BlendMode`) require higher APIs.
@@ -147,9 +154,46 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 - **Caller-owned buffers**: blur state lives in `StackBlurScratch` (sealed interface) — `NativeScratch` (lazy native handle) and `FallbackScratch` (Kotlin stack blur). Never add shared/global mutable state to the native code.
 - **NEVER mark a `@JvmStatic external fun` (JNI entry) `internal`**: Kotlin mangles internal members (`apply` → `apply$...`), so the C++ symbol (`Java_<pkg>_<Class>_<method>`) stops matching → `UnsatisfiedLinkError`. Make the enclosing `object` `internal`.
 
+## Validated native filtering lessons
+
+- **Parity is the gate.** Keep a scalar/Kotlin reference and run the relevant
+  `*NativeParityTest` before trusting any benchmark. Preserve FP operation
+  order: `/255.0f` is not generally bit-equivalent to multiplication by
+  `1/255.0f`, and fused instructions can change output bytes.
+- **Separate production dispatch from characterization.** Production may
+  advertise only backends that are at least as fast as scalar. A disabled
+  backend can remain reachable through `applyForced` for parity and
+  investigation; forced-only rows do not describe production behavior.
+- **Keep ABI-specific assembly separate.** AArch32 has only q0-q15, requires
+  callee-saved d8-d15 preservation, and has different struct/stack offsets from
+  AArch64. Mirror every assembly argument layout with C++ `static_assert`s.
+- **Make assembly position-independent.** Use PC-relative literal/table
+  addressing; absolute local-symbol pointers can create text relocations and
+  make Android silently fall back to the scalar path. For i386, verify the
+  linked library with `llvm-readelf` for `TEXTREL` and text-segment
+  `R_386_32` relocations.
+- **Specialize thin edges instead of forcing SIMD.** Interior regions amortize
+  vector setup; narrow filter borders often run faster with a branch-specialized
+  scalar path. Handle 1-3 pixel tails outside full-vector stores.
+- **Exact LUTs are not automatically SIMD-friendly.** On 128-bit registers, a
+  complete 256-entry byte lookup can cost more than the cache-hot scalar loop.
+  Keep scalar dispatch for measured losers; retain wider-vector paths only when
+  they demonstrate a real win.
+- **Benchmark in one controlled session.** Use the native harness, compare
+  medians, record validity/thermal classification, and do not compare absolute
+  timings from unrelated sessions.
+- **Native validation must be exhaustive and real.** Exercise every LUT byte,
+  alpha values, odd widths, vector boundaries, tails, in-place and separate
+  buffers, and guarded regions. A compile-only ABI result is not runtime
+  validation; report an expected backend as unexecuted rather than passing it.
+- **Keep table mirrors and reference initialization identical.** SIMD
+  turbulence tables must initialize the mirrored tail used by indexed lattice
+  lookups, and native random-seed normalization must match the Kotlin
+  reference for zero and negative seeds.
+
 ## Work Log
 
-- For non-trivial tasks, maintain a problem-specific Markdown work log (for example, SVG_FILTER_RENDERING.md or ISSUE_142_WORKLOG.md).
+- For non-trivial tasks, maintain a problem-specific Markdown work log (for example, SVG_FILTER_RENDERING.md or ISSUE_142_WORKLOG.md) in `tmp/`.
 - Record important findings, attempted approaches, failures, decisions, and next steps. Read it before starting or resuming work, and do not repeat failed approaches unless new evidence justifies them.
 - Update the log after each major investigation step or milestone, so the current state can be recovered after interruption.
 

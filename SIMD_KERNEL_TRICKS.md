@@ -226,6 +226,81 @@ ranges lose; the interior is where SIMD pays.
   `vpush`'d/`vpop`'d; stack-arg offsets shift when the prologue grows. Recheck
   on the 32-bit target even when the 64-bit build is green.
 
+## 11. Correctness and dispatch lessons from failed optimizations
+
+### 11.1 Treat rounding as part of the algorithm
+
+The scalar reference defines the contract. Do not fold a division into a
+reciprocal multiply, change `fmul`/`fadd` ordering, or introduce FMA merely
+because the real-number formula is unchanged. A one-ULP intermediate
+difference can cross the final `+0.5` pack threshold. For every such change,
+run the complete forced parity corpus before benchmarking.
+
+### 11.2 Disable measured losers instead of preserving a bad fast path
+
+The 128-bit exact-LUT experiments established a durable negative result:
+unrolling, keeping LUT rows in registers, and changing the compare/select tree
+did not remove the fixed per-byte gather cost. On those targets the scalar
+loop is the production choice. Keep `applyForced` for characterization, but do
+not advertise a backend that loses to scalar.
+
+### 11.3 ABI, aliasing, and PIC checks belong in the optimization loop
+
+- Capture dimensions and flags before constant materialization can clobber
+  argument registers.
+- Never put live coefficients, divisors, counters, or constants in registers
+  whose lanes are overwritten by pixel loads or row broadcasts.
+- Keep pointer and counter roles distinct; aliasing can turn a tail bug into an
+  out-of-bounds loop.
+- On ARM32, preserve d8-d15 and use the actual post-prologue stack offsets. On
+  i386, recalculate stack arguments after every prologue change.
+- Address literal pools and dispatch tables PC-relatively. A successful
+  assembly is insufficient if the final Android library contains text
+  relocations.
+
+### 11.4 Edges and tails are separate kernels
+
+Thin borders rarely amortize vector setup. Use a branch-specialized scalar
+sampler for edge modes when measurements support it, reserve SIMD for the
+interior, and let the caller handle 1-3 pixel tails. Never use a full-vector
+load/store on a partial block just to avoid a scalar tail.
+
+### 11.5 Benchmark validity is part of the result
+
+Compare scalar and SIMD in the same harness run and prefer medians over
+cross-session averages. Record thermal invalidations, batch CV, and CPU
+frequency where available. A changed absolute time without a controlled
+same-session comparison is not evidence of a kernel improvement.
+
+### 11.6 Turbulence and byte-LUT validation traps
+
+- A 256-entry table is not covered by a 64-byte AArch64 `vqtbl4q_u8` lookup.
+  Use a bounded 16-row scheme (or a wider proven design), and test every
+  index 0..255 on every color channel.
+- When an indexed lattice table has a mirrored tail, initialize the
+  `selector32` and gradient mirrors too. Host scalar/SSSE3 parity can pass
+  while an AVX2-only index range reads uninitialized tail data.
+- Native seed normalization must match the Kotlin RNG for `seed <= 0`; parity
+  cases with only positive seeds do not cover this validation failure.
+- `roundToInt()` parity requires explicit `floor(v + 0.5f)` semantics. Native
+  nearest-even conversion is not an equivalent replacement at half values.
+- AArch64 assembly must save every used AAPCS64 callee-saved register. Also
+  re-establish constants at the point of use when a low D lane aliases a
+  geometry scratch register.
+
+### 11.7 Validated implementation outcomes
+
+- ConvolveMatrix scalar edge specialization is bit-exact and outperforms
+  forcing SIMD across thin borders; keep the vector kernel focused on the
+  interior rectangle.
+- The AArch64 Morphology kernel required explicit separation of tail counters
+  from row cursors and per-column accumulator reset. After those fixes it
+  passed the 108-case corpus and measured about 12.5x at 512² and 14.7x at
+  2048² in one controlled device run.
+- UnLinearize uses a bounded 16-row AArch64 lookup for the full byte domain;
+  the lean SSSE3/AVX2 paths are byte-exact. Do not replace this with a
+  64-entry lookup that silently truncates indices.
+
 ---
 
 ## Quick checklist for a new filter
@@ -243,4 +318,6 @@ ranges lose; the interior is where SIMD pays.
 9. Pure LUT on 128-bit? → keep scalar; only vectorize if real math sits under
    the lookup (§8).
 10. Parity suite + controlled single-session bench before/after every change
-    (§10).
+    (§10, §11).
+11. ABI/PIC audit → verify struct offsets, callee-saved registers, stack args,
+    and final-library relocations before trusting runtime dispatch (§11.3).
