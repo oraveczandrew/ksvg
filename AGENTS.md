@@ -199,6 +199,7 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 
 ## Quick Commands
 - **Do not pass `--no-daemon` to Gradle** — always use the Gradle daemon (omit `--no-daemon`).
+- **Do not sign commits** — create commits without commit signing.
 - Build: `./gradlew :ksvg:compileDebugKotlin -Dorg.gradle.warning.mode=none`
 - Tests: `./gradlew :ksvg:testDebugUnitTest -Dorg.gradle.warning.mode=none`
 - Coverage: `./gradlew :ksvg:jacocoTestReport -Dorg.gradle.warning.mode=none`
