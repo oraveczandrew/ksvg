@@ -28,6 +28,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.sqrt
 
 /**
  * Decisive forensic comparison for `turbulence_seed_stitch.svg`.
@@ -101,8 +102,8 @@ class RawFieldCompareProbe {
                 if (kx < 0.0 || kx >= 269.0) continue
                 val userX = userLeft + kx * invCS
                 val px0 = (userX / unit) * baseFx
-                val tileX = kx
-                val tileY = ky
+                val tileX: Double = kx
+                val tileY: Double = ky
 
                 val sums = DoubleArray(4)
                 for (ch in 0 until 4) {
@@ -112,7 +113,7 @@ class RawFieldCompareProbe {
                     var curtly = tileY * fY
                     var octPeriodX = periodX
                     var octPeriodY = periodY
-                    var ratio = 1.0
+                    val ratio = 1.0
                     var value = 0.0
                     repeat(octaves) {
                         val wrapX = floor(curtlx).toInt() + 4096 + octPeriodX
@@ -176,7 +177,7 @@ class RawFieldCompareProbe {
         if (nAlpha > 0) {
             val mean = alphaSum / nAlpha
             val var_ = (alphaSum2 / nAlpha) - mean * mean
-            println("implied-alpha(golden): n=$nAlpha min=${alphaMin.toString().take(6)} max=${alphaMax.toString().take(6)} mean=${mean.toString().take(6)} std=${Math.sqrt(var_).toString().take(6)}")
+            println("implied-alpha(golden): n=$nAlpha min=${alphaMin.toString().take(6)} max=${alphaMax.toString().take(6)} mean=${mean.toString().take(6)} std=${sqrt(var_).toString().take(6)}")
         }
     }
 

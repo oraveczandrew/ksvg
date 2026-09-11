@@ -26,7 +26,6 @@ import hu.oandras.ksvg.compat.toBlendModeCompat
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.style.CSSBlendMode
-import hu.oandras.ksvg.filtering.KotlinKernels
 import hu.oandras.ksvg.filtering.ColorLuts
 import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeBlendRenderNode

@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg
 
-import android.graphics.Bitmap
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.WritingMode
 import hu.oandras.ksvg.dom.text.BaselineShift
@@ -26,7 +25,6 @@ import hu.oandras.ksvg.dom.text.TextTransform
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.textLayoutStyleCacheVersion
 import hu.oandras.ksvg.test.countPixels
-import hu.oandras.ksvg.test.forEachPixel
 import hu.oandras.ksvg.test.renderWithLibrary
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

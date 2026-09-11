@@ -40,6 +40,7 @@ import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
+import kotlin.math.abs
 import android.graphics.RenderNode as AndroidRenderNode
 
 /**
@@ -124,34 +125,42 @@ internal open class FilterPipelineImpl31 internal constructor(
                 }
                 is FeOffsetRenderNode -> {
                     val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
-                    offsetX += Math.abs(filterPrimitiveLengthX(
-                        length = primitive.sourceElement.dx,
-                        primitiveUnitsAreUser = primitiveUnitsAreUser,
-                        primitiveScaleX = scaleX,
-                        canvasScaleX = sx
-                    ))
-                    offsetY += Math.abs(filterPrimitiveLengthY(
-                        length = primitive.sourceElement.dy,
-                        primitiveUnitsAreUser = primitiveUnitsAreUser,
-                        primitiveScaleY = scaleY,
-                        canvasScaleY = sy
-                    ))
+                    offsetX += abs(
+                        filterPrimitiveLengthX(
+                            length = primitive.sourceElement.dx,
+                            primitiveUnitsAreUser = primitiveUnitsAreUser,
+                            primitiveScaleX = scaleX,
+                            canvasScaleX = sx
+                        )
+                    )
+                    offsetY += abs(
+                        filterPrimitiveLengthY(
+                            length = primitive.sourceElement.dy,
+                            primitiveUnitsAreUser = primitiveUnitsAreUser,
+                            primitiveScaleY = scaleY,
+                            canvasScaleY = sy
+                        )
+                    )
                 }
                 is FeDropShadowRenderNode -> {
                     expandX += primitive.blurNode.stdDeviationX * scaleX * 4f
                     expandY += primitive.blurNode.stdDeviationY * scaleY * 4f
-                    offsetX += Math.abs(filterPrimitiveLengthX(
-                        length = primitive.sourceElement.dx,
-                        primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
-                        primitiveScaleX = scaleX,
-                        canvasScaleX = sx
-                    ))
-                    offsetY += Math.abs(filterPrimitiveLengthY(
-                        length = primitive.sourceElement.dy,
-                        primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
-                        primitiveScaleY = scaleX,
-                        canvasScaleY = sy
-                    ))
+                    offsetX += abs(
+                        filterPrimitiveLengthX(
+                            length = primitive.sourceElement.dx,
+                            primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            primitiveScaleX = scaleX,
+                            canvasScaleX = sx
+                        )
+                    )
+                    offsetY += abs(
+                        filterPrimitiveLengthY(
+                            length = primitive.sourceElement.dy,
+                            primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
+                            primitiveScaleY = scaleX,
+                            canvasScaleY = sy
+                        )
+                    )
                 }
                 else -> {}
             }

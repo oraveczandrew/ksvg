@@ -124,10 +124,10 @@ import javax.xml.parsers.SAXParserFactory
  * SVG parser code. Used by SVG class. Should not be called directly.
  */
 internal class SVGParserImpl(
-    enableInternalEntities: Boolean = true,
-    externalFileResolver: ExternalFileResolver? = null,
-    animationsEnabled: Boolean = false,
-    logger: LoggerContext = AndroidLoggerContext,
+    private val enableInternalEntities: Boolean = true,
+    private val externalFileResolver: ExternalFileResolver? = null,
+    private val animationsEnabled: Boolean = false,
+    private val logger: LoggerContext = AndroidLoggerContext,
 ) : SVGParser {
     // SVG parser
     private var svgDocument: SVGImpl? = null
@@ -138,10 +138,6 @@ internal class SVGParserImpl(
 
     private var currentElement: Container? = null
     private var currentAnimationElement: ElementBase? = null
-    private val enableInternalEntities = enableInternalEntities
-    private val animationsEnabled = animationsEnabled
-    private val externalFileResolver: ExternalFileResolver? = externalFileResolver
-    private val logger: LoggerContext = logger
 
     // For handling elements we don't support
     private var ignoring = false

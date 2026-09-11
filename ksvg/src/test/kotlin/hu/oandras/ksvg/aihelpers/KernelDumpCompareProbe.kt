@@ -90,7 +90,7 @@ class KernelDumpCompareProbe {
                     var curtly = tileY * fY
                     var octPeriodX = periodX
                     var octPeriodY = periodY
-                    var ratio = 1.0
+                    val ratio = 1.0
                     var value = 0.0
                     repeat(octaves) {
                         val wrapX = floor(curtlx).toInt() + 4096 + octPeriodX

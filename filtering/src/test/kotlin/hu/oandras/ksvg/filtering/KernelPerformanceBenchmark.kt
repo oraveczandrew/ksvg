@@ -395,9 +395,35 @@ class KernelPerformanceBenchmark {
                 h = h
             ) {
                 KotlinKernels.lighting(
-                    pix, out, w, h, 0, 0, w, h,
-                    1f, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1f, 1f,
-                    0, false, 1f, 1f, 255, 255, 255, params, false, false
+                    pix = pix,
+                    out = out,
+                    width = w,
+                    height = h,
+                    clipLeft = 0,
+                    clipTop = 0,
+                    clipRight = w,
+                    clipBottom = h,
+                    surfaceScaleNormalized = 1f,
+                    invCanvasScaleX = 1.0,
+                    invCanvasScaleY = 1.0,
+                    userLeft = 0.0,
+                    userTop = 0.0,
+                    originX = 0.0,
+                    originY = 0.0,
+                    unitSizeX = 1.0,
+                    unitSizeY = 1.0,
+                    canvasScaleX = 1f,
+                    canvasScaleY = 1f,
+                    lightType = 0,
+                    specular = false,
+                    k = 1f,
+                    exponent = 1f,
+                    lightR = 255,
+                    lightG = 255,
+                    lightB = 255,
+                    params = params,
+                    premultipliedOutput = false,
+                    useLinear = false
                 )
             }
 

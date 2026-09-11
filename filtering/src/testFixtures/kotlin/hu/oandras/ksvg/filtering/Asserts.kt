@@ -19,7 +19,7 @@ package hu.oandras.ksvg.filtering
 import org.junit.Assert.assertTrue
 
 /** Shared by the host JVM parity tests and the Android instrumented tests. */
-public fun assertNativeBackendAvailable(): Unit {
+public fun assertNativeBackendAvailable() {
     assertTrue(
         "NativeBackend not available on this host JVM",
         NativeBackend.isAvailable,
@@ -31,7 +31,7 @@ public fun assertColorArrayEquals(
     message: String,
     expected: IntArray,
     actual: IntArray,
-): Unit {
+) {
     if (expected.size != actual.size) {
         throw AssertionError(
             "$message: array lengths differ, expected=${expected.size}, actual=${actual.size}",

@@ -110,7 +110,7 @@ class GoldenModelProbe {
         // Model 3: golden = c*255 - ... gamma? golden = (comp/255)^gamma *255
         // Model 4: raw composited with a fixed constant alpha A (golden = raw*A/255 + (1-A/255)*255)
         // We'll solve A per-channel by linear regression.
-        var s1 = 0.0; var s2 = 0.0; var s3 = 0.0; var s4 = 0.0; var s5 = 0.0
+        var s1 = 0.0; var s2 = 0.0
         for (p in pts) {
             val ac = p.aa / 255.0
             val comp = (p.rr * ac + 255 * (1 - ac))
@@ -206,16 +206,15 @@ class GoldenModelProbe {
             println("AltModel $name err=${(e / pts.size / 1.0).toString().take(6)}")
         }
         // model uses only alpha channel (no raw) => report separate
-        report("ac", { ac -> ac })
-        report("sqrt(ac)", { ac -> kotlin.math.sqrt(ac) })
-        report("ac*ac", { ac -> ac * ac })
-        report("ac*(2-ac)", { ac -> ac * (2 - ac) })
-        report("ac^0.4", { ac -> ac.pow(0.4) })
-        report("ac*0.65237", { ac -> ac * 0.6523714044525095 })
+        report("ac") { ac -> ac }
+        report("sqrt(ac)") { ac -> kotlin.math.sqrt(ac) }
+        report("ac*ac") { ac -> ac * ac }
+        report("ac*(2-ac)") { ac -> ac * (2 - ac) }
+        report("ac^0.4") { ac -> ac.pow(0.4) }
+        report("ac*0.65237") { ac -> ac * 0.6523714044525095 }
 
         // Per-pixel effective alpha: a_eff = (255-golden)/(255-raw)  (assumes opaque golden over white).
         // Compare a_eff against 0.65*ac and against ac; look for structure.
-        var aeffNum = 0.0; var aeffDen = 0.0
         var corXY = 0.0; var corX2 = 0.0; var corY2 = 0.0; var corN = 0.0
         var meanAeff = 0.0
         var neq065 = 0.0

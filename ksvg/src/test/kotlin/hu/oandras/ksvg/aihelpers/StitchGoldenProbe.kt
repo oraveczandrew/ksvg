@@ -91,8 +91,8 @@ class StitchGoldenProbe {
 
                     val fX = (invCS / unit) * baseFx
                     val fY = (invCS / unit) * baseFy
-                    val tileX = kx
-                    val tileY = ky
+                    val tileX: Double = kx
+                    val tileY: Double = ky
 
                     val sums = DoubleArray(4)
                     for (ch in 0 until 4) {

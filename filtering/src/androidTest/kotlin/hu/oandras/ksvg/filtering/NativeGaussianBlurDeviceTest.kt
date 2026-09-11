@@ -41,7 +41,7 @@ import kotlin.random.Random
  */
 @NativeParityTest
 @RunWith(AndroidJUnit4::class)
-public class NativeGaussianBlurDeviceTest {
+class NativeGaussianBlurDeviceTest {
 
     private data class Case(val w: Int, val h: Int, val sx: Float, val sy: Float)
 
@@ -111,7 +111,7 @@ public class NativeGaussianBlurDeviceTest {
     }
 
     @Test
-    public fun blurMatchesReference() {
+    fun blurMatchesReference() {
         assertTrue(
             "NativeGaussianBlur not available on this device/ABI (native .so missing?)",
             NativeBackend.isAvailable,
