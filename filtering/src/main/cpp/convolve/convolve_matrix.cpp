@@ -16,6 +16,7 @@
 
 #include <jni.h>
 #include <cmath>
+#include <cassert>
 #include "cpu_dispatch.h"
 #include "convolve.h"
 #include "shared/math_utils.h"
@@ -150,6 +151,10 @@ jint nativeBackendForAbi() {
     backends |= SIMD_BACKEND_SSE2;
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
     if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
+#elif defined(__aarch64__)
+    backends |= SIMD_BACKEND_NEON64;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    backends |= SIMD_BACKEND_NEON32;
 #endif
     return backends;
 }
@@ -162,11 +167,18 @@ namespace {
 extern "C" JNIEXPORT jint JNICALL
 Java_hu_oandras_ksvg_filtering_ConvolveNative_nativeBackend(
         [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz) {
-#if defined(__i386__) || defined(__x86_64__)
-    return Convolve::nativeBackendForAbi();
-#else
-    return SIMD_BACKEND_SCALAR;
+    jint backends = SIMD_BACKEND_SCALAR;
+#if defined(__x86_64__) || defined(__i386__)
+    const SimdLevel level = detectSimdLevel();
+    backends |= SIMD_BACKEND_SSE2;
+    if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
+    if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
+#elif defined(__aarch64__)
+    backends |= SIMD_BACKEND_NEON64;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    backends |= SIMD_BACKEND_NEON32;
 #endif
+    return backends;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -183,6 +195,7 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_applyForced(
         Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
     } else {
 #if defined(__aarch64__) || defined(__arm__)
+        assert(simdBackend == SIMD_BACKEND_NEON64 || simdBackend == SIMD_BACKEND_NEON32);
         Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
 #elif defined(__i386__) || defined(__x86_64__)
         Convolve::applyX86(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, simdBackend);
