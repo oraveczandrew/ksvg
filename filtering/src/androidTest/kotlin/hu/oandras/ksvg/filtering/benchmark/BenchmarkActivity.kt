@@ -35,6 +35,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.test.platform.app.InstrumentationRegistry
+import hu.oandras.ksvg.filtering.getTestTargetContext
+import hu.oandras.ksvg.filtering.sustainedSupportedSnapshot
+import hu.oandras.ksvg.filtering.thermalStatus
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
@@ -239,7 +242,7 @@ internal class BenchmarkActivity : ComponentActivity() {
                 Intent(Intent.ACTION_MAIN).apply {
                     Log.d(TAG, "launching BenchmarkActivity")
                     setClassName(
-                        InstrumentationRegistry.getInstrumentation().targetContext.packageName,
+                        getTestTargetContext().packageName,
                         BenchmarkActivity::class.java.name,
                     )
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

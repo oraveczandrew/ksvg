@@ -20,7 +20,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Process
 import android.os.SystemClock
-import androidx.test.platform.app.InstrumentationRegistry
+import hu.oandras.ksvg.filtering.getTestTargetContext
 import java.io.File
 import java.util.Locale
 
@@ -29,7 +29,7 @@ import java.util.Locale
  * directory (spec §24), so a fresh run is not mixed with stale files on pull.
  */
 fun clearPreviousResults() {
-    val dir = context().externalCacheDir ?: return
+    val dir = getTestTargetContext().externalCacheDir ?: return
     if (!dir.exists()) return
     val summaryFiles = dir.listFiles { _, name -> name.startsWith("benchmarks_device") && name.endsWith(".csv") }
     val detailFiles = dir.listFiles { _, name -> name.startsWith("benchmarks_harness_detail") && name.endsWith(".csv") }
@@ -134,7 +134,7 @@ class NativeBenchmarkBuilder {
         publishProgress(startedAt, BenchmarkUiStatus.RUNNING, "FOCUSING", 0, 1, 0, 0)
         BenchmarkActivity.waitForFocusedWindow()
 
-        val thermal = ThermalStateMonitor.create(context())
+        val thermal = ThermalStateMonitor.create(getTestTargetContext())
         thermal.computeBaselineIfNeeded()
         val thermalStatusBefore = thermal.currentThermalStatus()
 
@@ -288,7 +288,7 @@ class NativeBenchmarkBuilder {
                     ),
             )
         report.print()
-        report.writeCsv(context())
+        report.writeCsv(getTestTargetContext())
         publishProgress(
             startedAt,
             BenchmarkUiStatus.COMPLETED,
@@ -582,8 +582,6 @@ private fun buildEnvironment(
         appendLine("benchThreadPriority=$HIGH_PRIORITY")
         appendLine("threadPriorityApplied=$threadPriorityApplied")
     }
-
-private fun context(): Context = InstrumentationRegistry.getInstrumentation().targetContext
 
 /** Result classifications (spec §15). */
 private const val VALID = "VALID"

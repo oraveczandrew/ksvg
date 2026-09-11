@@ -72,7 +72,7 @@ class KernelPerformanceDeviceBenchmark {
             val args = InstrumentationRegistry.getArguments()
             simpleperfEnabled = args.getString("benchmark.simpleperf") == "true"
             if (simpleperfEnabled) {
-                val profiler = SimpleperfProfiler(InstrumentationRegistry.getInstrumentation().targetContext)
+                val profiler = SimpleperfProfiler(getTestTargetContext())
                 simpleperfProfiler = profiler
                 simpleperfAvailable = profiler.isAvailable()
                 val requested = args.getString("benchmark.simpleperf.events")
