@@ -118,51 +118,120 @@ internal class BenchmarkViewModel : ViewModel() {
 
     private fun formatState(state: BenchmarkUiState): String =
         buildString {
-            appendLine("KSVG benchmark")
-            appendLine("Benchmark: ${state.benchmark.ifBlank { "-" }}")
-            appendLine("Backend: ${state.backend.ifBlank { "-" }} | Size: ${state.size.ifBlank { "-" }}")
-            appendLine("Phase: ${state.phase.ifBlank { "-" }}")
+            val benchName = state.benchmark.ifBlank { "-" }
+            val backendName = state.backend.ifBlank { "-" }
+            val sizeLabel = state.size.ifBlank { "-" }
+            val phaseLabel = state.phase.ifBlank { "-" }
+
+            append("KSVG benchmark\n")
+
+            append("Benchmark: ")
+            append(benchName)
+            append('\n')
+
+            append("Backend: ")
+            append(backendName)
+            append(" | Size: ")
+            append(sizeLabel)
+            append('\n')
+
+            append("Phase: ")
+            append(phaseLabel)
+            append('\n')
+            append('\n')
+
             if (state.phase.startsWith("WARMUP") && state.calibrationActive) {
                 // Adaptive warmup: wall-budget capped, no fixed denominator to trust.
-                appendLine("Warmup: ${state.warmupSamples} samples (wall ${state.warmupWallMs} ms)")
+                append("Warmup: ")
+                append(state.warmupSamples)
+                append(" samples (wall ")
+                append(state.warmupWallMs)
+                append(" ms)")
+                append('\n')
             } else {
-                appendLine(
-                    "Iteration: ${state.iteration}/${state.totalIterations.takeIf { it > 0 } ?: "-"}"
-                )
+                append("Iteration: ")
+                append(state.iteration)
+                append('/')
+                if (state.totalIterations > 0) append(state.totalIterations) else append('-')
+                append('\n')
             }
-            appendLine(
-                "Batches: ${state.validBatches}/${state.requestedBatches.takeIf { it > 0 } ?: "-"} valid" +
-                    " (+${state.invalidatedBatches} invalidated)"
-            )
+
+            append("Batches: ")
+            append(state.validBatches)
+            append('/')
+            if (state.requestedBatches > 0) append(state.requestedBatches) else append('-')
+            append(" valid (+")
+            append(state.invalidatedBatches)
+            append(" invalidated)")
+            append('\n')
+
             if (state.effectiveIterationsPerBatch > 0) {
-                appendLine(
-                    "Per-batch iters: ${state.effectiveIterationsPerBatch}" +
-                        " (requested ${state.requestedIterationsPerBatch}, " +
-                        "max ${state.maxIterationsPerBatch}, target ${state.targetBatchMillis} ms)"
-                )
+                append("Per-batch iters: ")
+                append(state.effectiveIterationsPerBatch)
+                append(" (requested ")
+                append(state.requestedIterationsPerBatch)
+                append(", max ")
+                append(state.maxIterationsPerBatch)
+                append(", target ")
+                append(state.targetBatchMillis)
+                append(" ms)")
+                append('\n')
             } else if (state.requestedIterationsPerBatch > 0) {
-                appendLine("Per-batch iters: ${state.requestedIterationsPerBatch} (not yet calibrated)")
+                append("Per-batch iters: ")
+                append(state.requestedIterationsPerBatch)
+                append(" (not yet calibrated)")
+                append('\n')
             }
-            if (state.calibrationActive) appendLine("Batch calibration: ON")
-            appendLine(
-                "Thermal gate: ${if (state.thermalGatingEnabled) "ON" else "OFF"} | " +
-                    "Status: ${state.status}"
-            )
-            if (state.cooldownMillis > 0L) appendLine("Cooldown: ${state.cooldownMillis} ms")
-            appendLine("Elapsed: ${state.elapsedMillis} ms")
-            if (state.message.isNotBlank()) appendLine("Message: ${state.message}")
+            if (state.calibrationActive) {
+                append("Batch calibration: ON")
+                append('\n')
+            }
+            append('\n')
+
+            append("Thermal gate: ")
+            if (state.thermalGatingEnabled) {
+                append("ON")
+            } else {
+                append("OFF")
+            }
+            append(" | Status: ")
+            append(state.status)
+            append('\n')
+            if (state.cooldownMillis > 0L) {
+                append("Cooldown: ")
+                append(state.cooldownMillis)
+                append(" ms")
+                append('\n')
+            }
+            append("Elapsed: ")
+            append(state.elapsedMillis)
+            append(" ms")
+            append('\n')
+            if (state.message.isNotBlank()) {
+                append("Message: ")
+                append(state.message)
+                append('\n')
+            }
+            append('\n')
+
             val totalRuns = state.globalRun
-            val percent =
-                if (totalRuns > 0) {
-                    (state.globalCurrentRun * 100 / totalRuns).coerceIn(0, 100)
-                } else {
-                    0
-                }
-            appendLine(
-                "Global progress: ${state.globalCurrentRun}/${
-                    totalRuns.takeIf { it > 0 } ?: "-"
-                } ($percent%)"
-            )
+            val percent = if (totalRuns > 0) {
+                (state.globalCurrentRun * 100 / totalRuns).coerceIn(0, 100)
+            } else {
+                0
+            }
+            append("Global progress: ")
+            append(state.globalCurrentRun)
+            append('/')
+            if (totalRuns > 0) {
+                append(totalRuns)
+            } else {
+                append('-')
+            }
+            append(" (")
+            append(percent)
+            append("%)")
+            append('\n')
         }
 
     private fun progressPercent(state: BenchmarkUiState): Int =
