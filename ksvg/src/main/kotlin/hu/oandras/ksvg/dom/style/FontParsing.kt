@@ -88,7 +88,7 @@ internal fun parseFont(builder: Style.Builder, value: String) {
         break
     }
 
-    // Second part: font size (reqd) and line-height (opt)
+    // Second part: font size (required) and line-height (optional)
     val fontSize: CSSLength? = parseFontSize(item)
 
     // Check for line-height (which we don't support)

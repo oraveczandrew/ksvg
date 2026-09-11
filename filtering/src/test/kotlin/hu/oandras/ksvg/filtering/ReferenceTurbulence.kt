@@ -45,7 +45,7 @@ internal object ReferenceTurbulence {
 
     internal enum class WrapRule {
         /** librsvg: keep doubling the previous (already wrapped) value. */
-        LIRSVC_DOUBLE_WRAP,
+        LIBRSVG_DOUBLE_WRAP,
 
         /** KSVG production (KotlinKernels.kt): recompute from doubled tile coord. */
         KSVG_RECOMPUTE_FROM_TILE,
@@ -112,7 +112,7 @@ internal object ReferenceTurbulence {
                 wrapX = 0
                 wrapY = 0
             } else when (wrapRule) {
-                WrapRule.LIRSVC_DOUBLE_WRAP -> {
+                WrapRule.LIBRSVG_DOUBLE_WRAP -> {
                     if (octave == 0) {
                         librsvgWrapX = floor(curtlx0).toInt() + 4096 + octavePeriodX
                         librsvgWrapY = floor(curtly0).toInt() + 4096 + octavePeriodY

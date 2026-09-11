@@ -121,7 +121,7 @@ class TurbulenceKernelParityTest {
             val lrsvgTraces = ReferenceTurbulence.octaveLoop(
                 px0, py0, curtlx0, curtly0, periodX, periodY,
                 rec.octaves.size, dump.noiseType == 1, generators[channel],
-                ReferenceTurbulence.WrapRule.LIRSVC_DOUBLE_WRAP,
+                ReferenceTurbulence.WrapRule.LIBRSVG_DOUBLE_WRAP,
             )
 
             // KSVG production rule (wrap recomputed from doubled tile coord).

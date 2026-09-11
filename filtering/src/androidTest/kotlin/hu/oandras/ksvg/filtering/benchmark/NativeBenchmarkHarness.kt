@@ -189,7 +189,7 @@ class NativeBenchmarkBuilder {
         val startedAt = SystemClock.elapsedRealtime()
 
         // Live task state for the Activity: the static config first, the dynamic fields
-        // (warmup samples, effective per-batch count, batchets) are updated while running.
+        // (warmup samples, effective per-batch count, batch count) are updated while running.
         currentTask.benchmark = name
         currentTask.backend = backend
         currentTask.width = width
