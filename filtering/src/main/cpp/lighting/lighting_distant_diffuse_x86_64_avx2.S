@@ -27,9 +27,6 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     test    %r8d, %r8d
     jz      .Ldone
 
-    push    %rbx
-    push    %rbp
-
     // Load Params
     vbroadcastss .Lone(%rip), %ymm0
     vdivss  0(%r9), %xmm0, %xmm1
@@ -44,80 +41,65 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vbroadcastss 24(%r9), %ymm12         // lr
     vbroadcastss 28(%r9), %ymm13         // lg
     vbroadcastss 32(%r9), %ymm14         // lb
+    // Fold surface scale into derivative scales; ymm15 becomes available.
     vbroadcastss 36(%r9), %ymm15         // ss
+    vmulps  %ymm15, %ymm6, %ymm6         // ss / invDx
+    vmulps  %ymm15, %ymm7, %ymm7         // ss / invDy
+    vbroadcastss .Lone(%rip), %ymm15     // 1.0
 
     mov     %r8d, %r10d
 
 .Lloop:
-    // rowT height
+    // rowT alpha
     vmovups 0(%rdi), %ymm0
-    vpsrld  $24, %ymm0, %ymm0
-    vcvtdq2ps %ymm0, %ymm0
-    vmulps  %ymm15, %ymm0, %ymm0        // hT_l
-
+    vpsrld  $24, %ymm0, %ymm0        // hT_l
     vmovups 4(%rdi), %ymm1
-    vpsrld  $24, %ymm1, %ymm1
-    vcvtdq2ps %ymm1, %ymm1
-    vmulps  %ymm15, %ymm1, %ymm1        // hT_m
-
+    vpsrld  $24, %ymm1, %ymm1        // hT_m
     vmovups 8(%rdi), %ymm2
-    vpsrld  $24, %ymm2, %ymm2
-    vcvtdq2ps %ymm2, %ymm2
-    vmulps  %ymm15, %ymm2, %ymm2        // hT_r
+    vpsrld  $24, %ymm2, %ymm2        // hT_r
 
     // sumT = lT + 2*mT + rT
-    vaddps  %ymm1, %ymm1, %ymm3
-    vaddps  %ymm0, %ymm3, %ymm3
-    vaddps  %ymm2, %ymm3, %ymm3         // xmm3 = sumT
+    vpaddd  %ymm1, %ymm1, %ymm3
+    vpaddd  %ymm0, %ymm3, %ymm3
+    vpaddd  %ymm2, %ymm3, %ymm3
 
     // dx_rel = rT - lT
-    vsubps  %ymm0, %ymm2, %ymm4
+    vpsubd  %ymm0, %ymm2, %ymm4
 
-    // rowM height
+    // rowM alpha
     vmovups 0(%rsi), %ymm0
-    vpsrld  $24, %ymm0, %ymm0
-    vcvtdq2ps %ymm0, %ymm0
-    vmulps  %ymm15, %ymm0, %ymm0        // hM_l
-
+    vpsrld  $24, %ymm0, %ymm0        // hM_l
     vmovups 8(%rsi), %ymm2
-    vpsrld  $24, %ymm2, %ymm2
-    vcvtdq2ps %ymm2, %ymm2
-    vmulps  %ymm15, %ymm2, %ymm2        // hM_r
+    vpsrld  $24, %ymm2, %ymm2        // hM_r
 
     // dx_rel += 2*(rM - lM)
-    vsubps  %ymm0, %ymm2, %ymm5
-    vaddps  %ymm5, %ymm5, %ymm5
-    vaddps  %ymm5, %ymm4, %ymm4
+    vpsubd  %ymm0, %ymm2, %ymm5
+    vpaddd  %ymm5, %ymm5, %ymm5
+    vpaddd  %ymm5, %ymm4, %ymm4
 
-    // rowB height
+    // rowB alpha
     vmovups 0(%rdx), %ymm0
-    vpsrld  $24, %ymm0, %ymm0
-    vcvtdq2ps %ymm0, %ymm0
-    vmulps  %ymm15, %ymm0, %ymm0        // hB_l
-
+    vpsrld  $24, %ymm0, %ymm0        // hB_l
     vmovups 4(%rdx), %ymm1
-    vpsrld  $24, %ymm1, %ymm1
-    vcvtdq2ps %ymm1, %ymm1
-    vmulps  %ymm15, %ymm1, %ymm1        // hB_m
-
+    vpsrld  $24, %ymm1, %ymm1        // hB_m
     vmovups 8(%rdx), %ymm2
-    vpsrld  $24, %ymm2, %ymm2
-    vcvtdq2ps %ymm2, %ymm2
-    vmulps  %ymm15, %ymm2, %ymm2        // hB_r
+    vpsrld  $24, %ymm2, %ymm2        // hB_r
 
     // sumB = lB + 2*mB + rB
-    vaddps  %ymm1, %ymm1, %ymm5
-    vaddps  %ymm0, %ymm5, %ymm5
-    vaddps  %ymm2, %ymm5, %ymm5         // xmm5 = sumB
+    vpaddd  %ymm1, %ymm1, %ymm5
+    vpaddd  %ymm0, %ymm5, %ymm5
+    vpaddd  %ymm2, %ymm5, %ymm5
 
     // final dx_rel += rB - lB
-    vsubps  %ymm0, %ymm2, %ymm0
-    vaddps  %ymm0, %ymm4, %ymm4
+    vpsubd  %ymm0, %ymm2, %ymm0
+    vpaddd  %ymm0, %ymm4, %ymm4
 
-    // dx = dx_rel * scaleX, dy = (sumB - sumT) * scaleY
-    vmulps  %ymm6, %ymm4, %ymm4
-    vsubps  %ymm3, %ymm5, %ymm5
-    vmulps  %ymm7, %ymm5, %ymm5
+    // Convert the final integer derivatives to float and apply scale once.
+    vcvtdq2ps %ymm4, %ymm4
+    vmulps  %ymm6, %ymm4, %ymm4       // dx (includes ss)
+    vpsubd  %ymm3, %ymm5, %ymm5
+    vcvtdq2ps %ymm5, %ymm5
+    vmulps  %ymm7, %ymm5, %ymm5       // dy (includes ss)
 
     // n = (-dx, -dy, 1)
     vxorps  %ymm0, %ymm0, %ymm0
@@ -126,10 +108,8 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vsubps  %ymm5, %ymm1, %ymm1         // ny
 
     vmulps  %ymm0, %ymm0, %ymm2
-    vmulps  %ymm1, %ymm1, %ymm4         // reuse ymm4
-    vaddps  %ymm4, %ymm2, %ymm2
-    vbroadcastss .Lone(%rip), %ymm4
-    vaddps  %ymm4, %ymm2, %ymm2         // nLen^2
+    vfmadd231ps %ymm1, %ymm1, %ymm2       // nx² + ny²
+    vaddps  %ymm15, %ymm2, %ymm2         // nLen^2
 
     vrsqrtps %ymm2, %ymm3
     vmulps  %ymm3, %ymm3, %ymm4
@@ -144,16 +124,13 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vmulps  %ymm3, %ymm1, %ymm1         // ny
 
     vmulps  %ymm9, %ymm0, %ymm0
-    vmulps  %ymm10, %ymm1, %ymm1
-    vaddps  %ymm1, %ymm0, %ymm0
-    vmulps  %ymm11, %ymm3, %ymm3
-    vaddps  %ymm3, %ymm0, %ymm0         // dot
+    vfmadd231ps %ymm10, %ymm1, %ymm0      // nx*lx + ny*ly
+    vfmadd231ps %ymm11, %ymm3, %ymm0      // + lz*invLen (BUGGY placeholder)
 
     vxorps  %ymm4, %ymm4, %ymm4
     vmaxps  %ymm4, %ymm0, %ymm0
     vmulps  %ymm8, %ymm0, %ymm0
-    vbroadcastss .Lone(%rip), %ymm4
-    vminps  %ymm4, %ymm0, %ymm0         // intensity
+    vminps  %ymm15, %ymm0, %ymm0         // intensity
 
     // Pack
     vmulps  %ymm12, %ymm0, %ymm1
@@ -185,8 +162,6 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     jnz     .Lloop
 
     vzeroupper
-    pop     %rbp
-    pop     %rbx
 .Ldone:
     ret
 

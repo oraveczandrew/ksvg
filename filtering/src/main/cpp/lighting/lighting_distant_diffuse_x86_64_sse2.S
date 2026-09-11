@@ -57,83 +57,71 @@ SYM(ksvgLightingDistantDiffuseRowSse2):
     shufps  $0, %xmm14, %xmm14
     movss   36(%r9), %xmm15         // ss
     shufps  $0, %xmm15, %xmm15
+    mulps   %xmm15, %xmm6            // ss / invDx
+    mulps   %xmm15, %xmm7            // ss / invDy
 
     mov     %r8d, %r10d
 
 .Lloop:
-    // rowT height
+    // rowT alpha (keep integer until derivatives are complete)
     movups  0(%rdi), %xmm0
-    psrld   $24, %xmm0
-    cvtdq2ps %xmm0, %xmm0
-    mulps   %xmm15, %xmm0           // hT_l
+    psrld   $24, %xmm0               // hT_l
 
     movups  4(%rdi), %xmm1
-    psrld   $24, %xmm1
-    cvtdq2ps %xmm1, %xmm1
-    mulps   %xmm15, %xmm1           // hT_m
+    psrld   $24, %xmm1               // hT_m
 
     movups  8(%rdi), %xmm2
-    psrld   $24, %xmm2
-    cvtdq2ps %xmm2, %xmm2
-    mulps   %xmm15, %xmm2           // hT_r
+    psrld   $24, %xmm2               // hT_r
 
     // sumT = lT + 2*mT + rT
     movaps  %xmm1, %xmm3
-    addps   %xmm3, %xmm3
-    addps   %xmm0, %xmm3
-    addps   %xmm2, %xmm3            // xmm3 = sumT
+    paddd   %xmm1, %xmm3
+    paddd   %xmm0, %xmm3
+    paddd   %xmm2, %xmm3             // xmm3 = sumT
 
     // dx_rel = rT - lT
     movaps  %xmm2, %xmm4
-    subps   %xmm0, %xmm4
+    psubd   %xmm0, %xmm4
 
-    // rowM height
+    // rowM alpha
     movups  0(%rsi), %xmm0
-    psrld   $24, %xmm0
-    cvtdq2ps %xmm0, %xmm0
-    mulps   %xmm15, %xmm0           // hM_l
+    psrld   $24, %xmm0               // hM_l
 
     movups  8(%rsi), %xmm2
-    psrld   $24, %xmm2
-    cvtdq2ps %xmm2, %xmm2
-    mulps   %xmm15, %xmm2           // hM_r
+    psrld   $24, %xmm2               // hM_r
 
     // dx_rel += 2*(rM - lM)
     movaps  %xmm2, %xmm5
-    subps   %xmm0, %xmm5
-    addps   %xmm5, %xmm5
-    addps   %xmm5, %xmm4
+    psubd   %xmm0, %xmm5
+    paddd   %xmm5, %xmm5
+    paddd   %xmm5, %xmm4
 
-    // rowB height
+    // rowB alpha
     movups  0(%rdx), %xmm0
-    psrld   $24, %xmm0
-    cvtdq2ps %xmm0, %xmm0
-    mulps   %xmm15, %xmm0           // hB_l
+    psrld   $24, %xmm0               // hB_l
 
     movups  4(%rdx), %xmm1
-    psrld   $24, %xmm1
-    cvtdq2ps %xmm1, %xmm1
-    mulps   %xmm15, %xmm1           // hB_m
+    psrld   $24, %xmm1               // hB_m
 
     movups  8(%rdx), %xmm2
-    psrld   $24, %xmm2
-    cvtdq2ps %xmm2, %xmm2
-    mulps   %xmm15, %xmm2           // hB_r
+    psrld   $24, %xmm2               // hB_r
 
     // sumB = lB + 2*mB + rB
     movaps  %xmm1, %xmm5
-    addps   %xmm5, %xmm5
-    addps   %xmm0, %xmm5
-    addps   %xmm2, %xmm5            // xmm5 = sumB
+    paddd   %xmm1, %xmm5
+    paddd   %xmm0, %xmm5
+    paddd   %xmm2, %xmm5             // xmm5 = sumB
 
     // final dx_rel += rB - lB
-    subps   %xmm0, %xmm2
-    addps   %xmm2, %xmm4            // final dx_rel
+    psubd   %xmm0, %xmm2
+    paddd   %xmm2, %xmm4             // final dx_rel
 
-    // dx = dx_rel * scaleX, dy = (sumB - sumT) * scaleY
-    mulps   %xmm6, %xmm4            // xmm4 = dx
-    subps   %xmm3, %xmm5
-    mulps   %xmm7, %xmm5            // xmm5 = dy
+    // Convert final integer derivatives to float and apply scale once.
+    cvtdq2ps %xmm4, %xmm4
+    mulps   %xmm6, %xmm4             // dx (includes ss)
+    psubd   %xmm3, %xmm5
+    cvtdq2ps %xmm5, %xmm5
+    mulps   %xmm7, %xmm5             // dy (includes ss)
 
     // n = (-dx, -dy, 1)
     xorps   %xmm0, %xmm0
