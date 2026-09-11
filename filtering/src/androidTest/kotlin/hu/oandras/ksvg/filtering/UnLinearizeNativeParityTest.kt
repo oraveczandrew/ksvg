@@ -58,15 +58,15 @@ class UnLinearizeNativeParityTest(
         assertNativeBackendAvailable()
 
         val ref = IntArray(case.size)
-        KotlinKernels.unLinearize(case.input, ref, case.width, case.height, case.table)
+        KotlinKernels.unLinearize(case.input, ref, case.width, case.height)
 
         val native = if (case.inPlace) {
             val buf = case.freshInput()
-            UnLinearizeNative.applyForced(buf, buf, case.width, case.height, case.table, backend)
+            UnLinearizeNative.applyForced(buf, buf, case.width, case.height, backend)
             buf
         } else {
             val out = IntArray(case.size)
-            UnLinearizeNative.applyForced(case.freshInput(), out, case.width, case.height, case.table, backend)
+            UnLinearizeNative.applyForced(case.freshInput(), out, case.width, case.height, backend)
             out
         }
 
@@ -88,14 +88,13 @@ class UnLinearizeNativeParityTest(
         val width = 16
         val height = 16
         val src = UnLinearizeValidationCorpus.allAlpha(width * height) // alpha = i & 0xFF covers 0..255
-        val table = UnLinearizeValidationCorpus.realTable
 
         // Force every advertised backend; each must preserve alpha.
         val backends = getBackendsFor(UnLinearizeNative.nativeBackend())
         for (backend in backends) {
             val native = IntArray(width * height)
             UnLinearizeNative.applyForced(
-                src.copyOf(), native, width, height, table, backend,
+                src.copyOf(), native, width, height, backend,
             )
             for (i in src.indices) {
                 assertEquals(

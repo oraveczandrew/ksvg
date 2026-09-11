@@ -169,7 +169,6 @@ class KernelPerformanceDeviceBenchmark {
     }
 
     private fun benchmarkUnLinearize(sizes: Array<Pair<Int, Int>>) {
-        val table = ByteArray(256) { it.toByte() }
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
@@ -185,7 +184,6 @@ class KernelPerformanceDeviceBenchmark {
                     dst = dst,
                     width = w,
                     height = h,
-                    table = table
                 )
             }
 
@@ -201,7 +199,6 @@ class KernelPerformanceDeviceBenchmark {
                     dst = dst,
                     width = w,
                     height = h,
-                    table = table,
                     simdBackend = b
                 )
             }

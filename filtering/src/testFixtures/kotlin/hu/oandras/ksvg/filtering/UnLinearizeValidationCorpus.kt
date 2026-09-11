@@ -113,15 +113,10 @@ public object UnLinearizeValidationCorpus {
         return out
     }
 
-    // ------------------------------------------------------------------ tables
-
-    /** The library's production UNLINEARIZE table (the oracle's own table). */
-    public val realTable: ByteArray get() = ColorLuts.UN_LINEARIZE
-
     // ------------------------------------------------------------------ case
 
     /**
-     * One named validation case: a shape, a table, an input kind, and whether to
+     * One named validation case: a shape, an input kind, and whether to
      * run the JNI in-place (src == dst) path. Byte-exact compare against
      * [KotlinKernels.unLinearize] for every forced backend.
      */
@@ -133,8 +128,6 @@ public object UnLinearizeValidationCorpus {
         @JvmField
         public val height: Int,
         @JvmField
-        public val table: ByteArray,
-        @JvmField
         public val inPlace: Boolean,
         @JvmField
         public val input: IntArray,
@@ -144,7 +137,7 @@ public object UnLinearizeValidationCorpus {
         /** Reference oracle (never calls native). */
         public fun reference(): IntArray {
             val out = IntArray(size)
-            KotlinKernels.unLinearize(input, out, width, height, table)
+            KotlinKernels.unLinearize(input, out, width, height)
             return out
         }
 
@@ -157,24 +150,24 @@ public object UnLinearizeValidationCorpus {
     public val cases: List<Case> = buildList {
         // Exhaustive LUT over SIMD-aligned and odd-tail sizes, separate src/dst.
         for ((w, h) in listOf(32 to 8, 16 to 16, 33 to 9, 65 to 33, 16 to 1)) {
-            add(Case("exhaustive ${w}x$h", w, h, realTable, inPlace = false, exhaustiveLut(w * h)))
+            add(Case("exhaustive ${w}x$h", w, h, inPlace = false, exhaustiveLut(w * h)))
         }
         // Channel-isolated full-domain, out of place.
-        add(Case("perChannel 33x9", 33, 9, realTable, inPlace = false, perChannelDomain(33 * 9)))
+        add(Case("perChannel 33x9", 33, 9, inPlace = false, perChannelDomain(33 * 9)))
         // Alpha passthrough contract over the production LUT.
-        add(Case("allAlpha 16x16", 16, 16, realTable, inPlace = false, allAlpha(16 * 16)))
+        add(Case("allAlpha 16x16", 16, 16, inPlace = false, allAlpha(16 * 16)))
         // Boundaries / tails / random / alternating, out of place.
         for (pixels in boundarySizes) {
-            add(Case("tail random $pixels", pixels, 1, realTable, inPlace = false, fixedSeedRandom(pixels)))
+            add(Case("tail random $pixels", pixels, 1, inPlace = false, fixedSeedRandom(pixels)))
         }
-        add(Case("alternating 7x5", 7, 5, realTable, inPlace = false, alternating(7 * 5)))
+        add(Case("alternating 7x5", 7, 5, inPlace = false, alternating(7 * 5)))
         // Image shapes with odd widths.
         for ((w, h) in shapes) {
-            add(Case("shape ${w}x$h", w, h, realTable, inPlace = false, fixedSeedRandom(w * h)))
+            add(Case("shape ${w}x$h", w, h, inPlace = false, fixedSeedRandom(w * h)))
         }
         // In-place (src == dst) — the path the pipeline uses.
         for ((w, h) in listOf(36 to 10, 13 to 3, 9 to 9, 3 to 5)) {
-            add(Case("inPlace ${w}x$h", w, h, realTable, inPlace = true, fixedSeedRandom(w * h)))
+            add(Case("inPlace ${w}x$h", w, h, inPlace = true, fixedSeedRandom(w * h)))
         }
     }
 }

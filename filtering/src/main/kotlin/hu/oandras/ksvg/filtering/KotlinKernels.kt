@@ -96,38 +96,78 @@ public object KotlinKernels {
         preserveAlpha: Boolean,
         edgeMode: Int,
     ) {
+        val bias255 = bias * 255f
+
+        // Fast interior path: no edge handling is needed because every sampled
+        // coordinate is guaranteed to be inside the image.
+        val interiorLeft = maxOf(0, targetX)
+        val interiorTop = maxOf(0, targetY)
+        val interiorRight = minOf(width, width - (orderX - 1 - targetX))
+        val interiorBottom = minOf(height, height - (orderY - 1 - targetY))
+
         for (y in 0 until height) {
             val rowOffset = y * width
+
+            val interiorY = y >= interiorTop && y < interiorBottom
             for (x in 0 until width) {
+                val interior = interiorY && x >= interiorLeft && x < interiorRight
+
                 var r = 0f
                 var g = 0f
                 var b = 0f
                 var a = 0f
 
-                for (ky in 0 until orderY) {
-                    val srcY = sampleCoordinate(y + ky - targetY, height, edgeMode)
-                    val srcRowOffset = if (srcY < 0) 0 else srcY * width
-                    var kernelIndex = ky * orderX
-                    for (kx in 0 until orderX) {
-                        val srcX = sampleCoordinate(x + kx - targetX, width, edgeMode)
-                        val pixel = if (srcX < 0 || srcY < 0) 0 else srcPixels[srcRowOffset + srcX]
-                        val weight = kernel[kernelIndex++]
+                if (interior) {
+                    for (ky in 0 until orderY) {
+                        val srcRowOffset = (y + ky - targetY) * width
+                        var kernelIndex = ky * orderX
+                        for (kx in 0 until orderX) {
+                            val pixel = srcPixels[srcRowOffset + x + kx - targetX]
+                            val weight = kernel[kernelIndex++]
 
-                        r += ((pixel shr 16) and 0xFF) * weight
-                        g += ((pixel shr 8) and 0xFF) * weight
-                        b += (pixel and 0xFF) * weight
-                        if (!preserveAlpha) {
-                            a += ((pixel shr 24) and 0xFF) * weight
+                            r += ((pixel shr 16) and 0xFF) * weight
+                            g += ((pixel shr 8) and 0xFF) * weight
+                            b += (pixel and 0xFF) * weight
+                            if (!preserveAlpha) {
+                                a += ((pixel shr 24) and 0xFF) * weight
+                            }
+                        }
+                    }
+                } else {
+                    for (ky in 0 until orderY) {
+                        val srcY = sampleCoordinate(y + ky - targetY, height, edgeMode)
+                        val srcRowOffset = if (srcY < 0) 0 else srcY * width
+                        var kernelIndex = ky * orderX
+
+                        for (kx in 0 until orderX) {
+                            val srcX = sampleCoordinate(x + kx - targetX, width, edgeMode)
+                            val pixel = if (srcX < 0 || srcY < 0) 0 else srcPixels[srcRowOffset + srcX]
+                            val weight = kernel[kernelIndex++]
+
+                            r += ((pixel shr 16) and 0xFF) * weight
+                            g += ((pixel shr 8) and 0xFF) * weight
+                            b += (pixel and 0xFF) * weight
+                            if (!preserveAlpha) {
+                                a += ((pixel shr 24) and 0xFF) * weight
+                            }
                         }
                     }
                 }
 
-                val outR = clamp255(r / divisor + bias * 255f)
-                val outG = clamp255(g / divisor + bias * 255f)
-                val outB = clamp255(b / divisor + bias * 255f)
-                val outA = if (preserveAlpha) (srcPixels[rowOffset + x] ushr 24)
-                else clamp255(a / divisor + bias * 255f)
-                outPixels[rowOffset + x] = argb(outA, outR, outG, outB)
+                val outR = clamp255(r / divisor + bias255)
+                val outG = clamp255(g / divisor + bias255)
+                val outB = clamp255(b / divisor + bias255)
+                val outA = if (preserveAlpha) {
+                    srcPixels[rowOffset + x] ushr 24
+                } else {
+                    clamp255(a / divisor + bias255)
+                }
+
+                outPixels[rowOffset + x] =
+                    (outA shl 24) or
+                    (outR shl 16) or
+                    (outG shl 8) or
+                    outB
             }
         }
     }
@@ -257,36 +297,46 @@ public object KotlinKernels {
 
     /**
      * Converts a single straight (non-premultiplied) linear-RGB pixel to straight
-     * sRGB using [table] (normally [ColorLuts.UN_LINEARIZE]): each color channel is looked
+     * sRGB using [linearToSrgb] (normally [ColorLuts.LINEAR_TO_SRGB]): each color channel is looked
      * up and alpha is preserved unchanged. Element-wise reference for both
      * [unLinearize] and `unlinearize.cpp`'s scalar loop.
      */
-    internal inline fun unLinearizeArgb(pixel: Int, table: ByteArray): Int {
-        return argb(
-            alpha = pixel ushr 24,
-            red = table[(pixel ushr 16) and 0xFF].toInt() and 0xFF,
-            green = table[(pixel ushr 8) and 0xFF].toInt() and 0xFF,
-            blue = table[pixel and 0xFF].toInt() and 0xFF
-        )
+    context(linearToSrgb: LinearToSrgb)
+    internal inline fun unLinearizeArgb(pixel: Int): Int {
+        return (pixel and 0xFF000000.toInt()) or
+                (linearToSrgb[pixel ushr 16] shl 16) or
+                (linearToSrgb[pixel ushr 8] shl 8) or
+                linearToSrgb[pixel]
     }
 
     /**
      * Linear→sRGB (unLinearize) filter-output transfer over straight ARGB_8888
-     * pixels. Each pixel's straight R/G/B channel is looked up in a single shared
-     * 256-entry byte [table] and alpha is passed through unchanged (identical to
+     * pixels. Each pixel's straight R/G/B channel is looked up using [linearToSrgb]
+     * and alpha is passed through unchanged (identical to
      * [unLinearizeArgb]). Element-wise byte map, so [src] and [dst] may be the
      * same array (in-place). Bit-exact reference for `unlinearize.cpp`.
      */
+    context(linearToSrgb: LinearToSrgb)
+    private fun unLinearizeImpl(
+        src: IntArray,
+        dst: IntArray,
+        width: Int,
+        height: Int,
+    ) {
+        val total = width * height
+        for (i in 0 until total) {
+            dst[i] = unLinearizeArgb(src[i])
+        }
+    }
+
     public fun unLinearize(
         src: IntArray,
         dst: IntArray,
         width: Int,
         height: Int,
-        table: ByteArray,
     ) {
-        val total = width * height
-        for (i in 0 until total) {
-            dst[i] = unLinearizeArgb(src[i], table)
+        with(ColorLuts.LINEAR_TO_SRGB) {
+            unLinearizeImpl(src, dst, width, height)
         }
     }
 
@@ -298,7 +348,8 @@ public object KotlinKernels {
      * point -> [x, y, z]; spot -> [x, y, z, pointsAtX/Y/Z, coneAngleDeg]
      * (NaN = no cone). Bit-exact reference for `lighting.cpp`.
      */
-    public fun lighting(
+    context(linearToSrgb: LinearToSrgb, sRgbToLinear: SrgbToLinear)
+    private fun lightingImpl(
         pix: IntArray,
         out: IntArray,
         width: Int,
@@ -341,9 +392,9 @@ public object KotlinKernels {
         // light colors linearized once (only used when `useLinear` is set). For white
         // light sRgbToLinear(255) == 255, so the straight output becomes the sRGB EOTF
         // of the intensity, matching cairo/rsvg's linearRGB rendering.
-        val linearLightR = if (useLinear) sRgbToLinear(lightR).toFloat() else lightR.toFloat()
-        val linearLightG = if (useLinear) sRgbToLinear(lightG).toFloat() else lightG.toFloat()
-        val linearLightB = if (useLinear) sRgbToLinear(lightB).toFloat() else lightB.toFloat()
+        val linearLightR = (if (useLinear) sRgbToLinear[lightR] else lightR).toFloat()
+        val linearLightG = (if (useLinear) sRgbToLinear[lightG] else lightG).toFloat()
+        val linearLightB = (if (useLinear) sRgbToLinear[lightB] else lightB).toFloat()
 
         val shiftedLightR: Int = lightR shl 16
         val shiftedLightG: Int = lightG shl 8
@@ -378,8 +429,7 @@ public object KotlinKernels {
             val targetX = params[3] - params[0]
             val targetY = params[4] - params[1]
             val targetZ = params[5] - params[2]
-            val targetLength =
-                sqrt((targetX * targetX + targetY * targetY + targetZ * targetZ).toFloat()).toDouble()
+            val targetLength = sqrt((targetX * targetX + targetY * targetY + targetZ * targetZ))
             if (targetLength == 0.0) {
                 spotTargetX = 0.0
                 spotTargetY = 0.0
@@ -482,18 +532,24 @@ public object KotlinKernels {
                     }
                     val ndoth = (nx * hx + ny * hy + nz * hz).coerceAtLeast(0f)
                     clamp(
-                        (k * ndoth.toDouble().pow(exponent.toDouble()).toFloat() * factor),
+                        (k * ndoth.pow(exponent) * factor),
                         0f,
                         1f
                     )
                 }
 
-                val outR = if (useLinear) linearToSRgb(clamp255(linearLightR * intensity))
-                else clamp255(linearLightR * intensity)
-                val outG = if (useLinear) linearToSRgb(clamp255(linearLightG * intensity))
-                else clamp255(linearLightG * intensity)
-                val outB = if (useLinear) linearToSRgb(clamp255(linearLightB * intensity))
-                else clamp255(linearLightB * intensity)
+                val outR: Int
+                val outG: Int
+                val outB: Int
+                if (useLinear) {
+                    outR = linearToSrgb[clamp255(linearLightR * intensity)]
+                    outG = linearToSrgb[clamp255(linearLightG * intensity)]
+                    outB = linearToSrgb[clamp255(linearLightB * intensity)]
+                } else {
+                    outR = clamp255(linearLightR * intensity)
+                    outG = clamp255(linearLightG * intensity)
+                    outB = clamp255(linearLightB * intensity)
+                }
                 val outA = if (specular) maxOf(outR, outG, outB) else 255
 
                 out[rowOffset + x] = if (specular && premultipliedOutput) {
@@ -503,6 +559,50 @@ public object KotlinKernels {
                 } else {
                     argb(outA, outR, outG, outB)
                 }
+            }
+        }
+    }
+
+    public fun lighting(
+        pix: IntArray,
+        out: IntArray,
+        width: Int,
+        height: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        surfaceScaleNormalized: Float,
+        invCanvasScaleX: Double,
+        invCanvasScaleY: Double,
+        userLeft: Double,
+        userTop: Double,
+        originX: Double,
+        originY: Double,
+        unitSizeX: Double,
+        unitSizeY: Double,
+        canvasScaleX: Float,
+        canvasScaleY: Float,
+        @LightType lightType: Int,
+        specular: Boolean,
+        k: Float,
+        exponent: Float,
+        lightR: Int,
+        lightG: Int,
+        lightB: Int,
+        params: DoubleArray,
+        premultipliedOutput: Boolean,
+        useLinear: Boolean,
+    ) {
+        with(ColorLuts.LINEAR_TO_SRGB) {
+            with(ColorLuts.SRGB_TO_LINEAR) {
+                lightingImpl(
+                    pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
+                    surfaceScaleNormalized, invCanvasScaleX, invCanvasScaleY,
+                    userLeft, userTop, originX, originY, unitSizeX, unitSizeY,
+                    canvasScaleX, canvasScaleY, lightType, specular, k, exponent,
+                    lightR, lightG, lightB, params, premultipliedOutput, useLinear,
+                )
             }
         }
     }
@@ -522,14 +622,6 @@ public object KotlinKernels {
         return clamp255((k1 * a * b + k2 * a + k3 * b + k4) * 255f)
     }
 
-    /** sRGB->linear for one 0..255 component (matches ColorUtils.sRgbToLinear). */
-    private fun sRgbToLinear(c: Int): Int =
-        ColorLuts.SRGB_TO_LINEAR[c and 0xFF].toInt() and 0xFF
-
-    /** linear->sRGB for one 0..255 component (matches ColorUtils.linearToSRgb). */
-    private fun linearToSRgb(c: Int): Int =
-        ColorLuts.LINEAR_TO_SRGB[c and 0xFF].toInt() and 0xFF
-
     /** Surface height at (x, y) for feDiffuse/feSpecular lighting (alpha channel scaled). */
     private inline fun heightAt(
         pix: IntArray,
@@ -537,14 +629,15 @@ public object KotlinKernels {
         surfaceScaleNormalized: Float,
         x: Int,
         y: Int,
-    ): Float = ((pix[y * width + x] ushr 24) and 0xff) * surfaceScaleNormalized
+    ): Float = (pix[y * width + x] ushr 24) * surfaceScaleNormalized
 
     /**
      * feComposite operator="arithmetic". [useLinear] applies the
      * sRGB<->linear folding around each RGB channel exactly like the original
      * implementation in `:ksvg`.
      */
-    public fun arithmeticComposite(
+    context(linearToSrgb: LinearToSrgb, sRgbToLinear: SrgbToLinear)
+    private fun arithmeticCompositeImpl(
         inputPixels: IntArray,
         in2Pixels: IntArray,
         outPixels: IntArray,
@@ -565,21 +658,68 @@ public object KotlinKernels {
                 val i = rowOffset + x
                 val p = inputPixels[i]
                 val q = in2Pixels[i]
+                val outA: Int
+                val outR: Int
+                val outG: Int
+                val outB: Int
+
                 if (useLinear) {
-                    outPixels[i] = argb(
-                        alpha = arithmeticChannel(p ushr 24, q ushr 24, k1, k2, k3, k4),
-                        red = linearToSRgb(arithmeticChannel(sRgbToLinear(p ushr 16 and 0xFF), sRgbToLinear(q ushr 16 and 0xFF), k1, k2, k3, k4)),
-                        green = linearToSRgb(arithmeticChannel(sRgbToLinear(p ushr 8 and 0xFF), sRgbToLinear(q ushr 8 and 0xFF), k1, k2, k3, k4)),
-                        blue = linearToSRgb(arithmeticChannel(sRgbToLinear(p and 0xFF), sRgbToLinear(q and 0xFF), k1, k2, k3, k4))
-                    )
+                    outA = arithmeticChannel(p ushr 24, q ushr 24, k1, k2, k3, k4)
+                    outR = linearToSrgb[
+                        arithmeticChannel(
+                            sRgbToLinear[p ushr 16 and 0xFF],
+                            sRgbToLinear[q ushr 16 and 0xFF],
+                            k1, k2, k3, k4
+                        )
+                    ]
+                    outG = linearToSrgb[
+                        arithmeticChannel(
+                            sRgbToLinear[p ushr 8 and 0xFF],
+                            sRgbToLinear[q ushr 8 and 0xFF],
+                            k1, k2, k3, k4
+                        )
+                    ]
+                    outB = linearToSrgb[
+                        arithmeticChannel(
+                            sRgbToLinear[p and 0xFF],
+                            sRgbToLinear[q and 0xFF],
+                            k1, k2, k3, k4
+                        )
+                    ]
                 } else {
-                    outPixels[i] = argb(
-                        alpha = arithmeticChannel(p ushr 24, q ushr 24, k1, k2, k3, k4),
-                        red = arithmeticChannel(p ushr 16 and 0xFF, q ushr 16 and 0xFF, k1, k2, k3, k4),
-                        green = arithmeticChannel(p ushr 8 and 0xFF, q ushr 8 and 0xFF, k1, k2, k3, k4),
-                        blue = arithmeticChannel(p and 0xFF, q and 0xFF, k1, k2, k3, k4)
-                    )
+                    outA = arithmeticChannel(p ushr 24, q ushr 24, k1, k2, k3, k4)
+                    outR = arithmeticChannel(p ushr 16 and 0xFF, q ushr 16 and 0xFF, k1, k2, k3, k4)
+                    outG = arithmeticChannel(p ushr 8 and 0xFF, q ushr 8 and 0xFF, k1, k2, k3, k4)
+                    outB = arithmeticChannel(p and 0xFF, q and 0xFF, k1, k2, k3, k4)
                 }
+
+                outPixels[i] = (outA shl 24) or (outR shl 16) or (outG shl 8) or outB
+            }
+        }
+    }
+
+    public fun arithmeticComposite(
+        inputPixels: IntArray,
+        in2Pixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        k1: Float,
+        k2: Float,
+        k3: Float,
+        k4: Float,
+        useLinear: Boolean,
+    ) {
+        with(ColorLuts.LINEAR_TO_SRGB) {
+            with(ColorLuts.SRGB_TO_LINEAR) {
+                arithmeticCompositeImpl(
+                    inputPixels, in2Pixels, outPixels, width,
+                    clipLeft, clipTop, clipRight, clipBottom,
+                    k1, k2, k3, k4, useLinear,
+                )
             }
         }
     }

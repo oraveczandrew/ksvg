@@ -287,7 +287,7 @@ internal class SoftwareFilterBackend internal constructor(
         val pixels = pixelBuffer.getWithSize(size)
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
-        SoftwareKernels.unLinearize(pixels, pixels, width, height, ColorLuts.UN_LINEARIZE)
+        SoftwareKernels.unLinearize(pixels, pixels, width, height)
 
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
     }

@@ -58,8 +58,6 @@ internal object ArithmeticCompositeNative {
             k3 = k3,
             k4 = k4,
             useLinear = useLinear,
-            srgbToLinear = ColorLuts.SRGB_TO_LINEAR,
-            linearToSrgb = ColorLuts.LINEAR_TO_SRGB
         )
     }
 
@@ -78,8 +76,6 @@ internal object ArithmeticCompositeNative {
         k3: Float,
         k4: Float,
         useLinear: Boolean,
-        srgbToLinear: ByteArray,
-        linearToSrgb: ByteArray,
     )
 
     /**
@@ -117,9 +113,7 @@ internal object ArithmeticCompositeNative {
             k3 = k3,
             k4 = k4,
             useLinear = useLinear,
-            srgbToLinear = ColorLuts.SRGB_TO_LINEAR,
-            linearToSrgb = ColorLuts.LINEAR_TO_SRGB,
-            simdBackend = simdBackend
+            simdBackend = simdBackend,
         )
     }
 
@@ -138,8 +132,6 @@ internal object ArithmeticCompositeNative {
         k3: Float,
         k4: Float,
         useLinear: Boolean,
-        srgbToLinear: ByteArray,
-        linearToSrgb: ByteArray,
         simdBackend: Int,
     )
 

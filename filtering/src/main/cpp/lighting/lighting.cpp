@@ -18,6 +18,7 @@
 #include <algorithm>
 #include "cpu_dispatch.h"
 #include "shared/math_utils.h"
+#include "color_luts.h"
 
 #if defined(__aarch64__)
 // Hand-written AArch64/AdvSIMD distant-light diffuse kernel (lighting_distant_diffuse_aarch64_neon.S).
@@ -35,26 +36,20 @@ extern "C" void ksvgLightingDistantDiffuseRowNeon32(
 
 namespace {
 
- float heightAt(const jint* pix, const jint width, const jint height, const jint x, const jint y, const float ss) {
+float heightAt(const jint* pix, const jint width, const jint height, const jint x, const jint y, const float ss) {
     const jint cx = x < 0 ? 0 : x > width - 1 ? width - 1 : x;
     const jint cy = y < 0 ? 0 : y > height - 1 ? height - 1 : y;
     return static_cast<float>((pix[cy * width + cx] >> 24) & 0xff) * ss;
 }
 
- float clamp01(const float v) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; }
+float clamp01(const float v) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; }
 
- jint sRgbToLight(const jint c) {
-    const float a = static_cast<float>(c) / 255.f;
-    const float v = a <= 0.04045f ? a / 12.92f * 255.f
-                                    : std::pow((a + 0.055f) / 1.055f, 2.4f) * 255.f;
-    return ksvg::clamp255(v);
+inline jint sRgbToLight(const jint c) {
+    return ksvg_srgb_to_linear_lut[c & 0xFF];
 }
 
- jint linearToLightSRgb(const jint c) {
-    const float a = static_cast<float>(c) / 255.f;
-    const float v = a <= 0.0031308f ? a * 12.92f * 255.f
-                                      : (1.055f * std::pow(a, 1.f / 2.4f) - 0.055f) * 255.f;
-    return ksvg::clamp255(v);
+inline jint linearToLightSRgb(const jint c) {
+    return ksvg_linear_to_srgb_lut[c & 0xFF];
 }
 
 inline jint packPixel(const jint outA, const jint outR, const jint outG, const jint outB) {

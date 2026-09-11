@@ -18,6 +18,7 @@
 #include <cassert>
 #include "cpu_dispatch.h"
 #include "arithmetic_composite.h"
+#include "color_luts.h"
 #include "shared/math_utils.h"
 
 namespace {
@@ -32,8 +33,7 @@ template <bool kUseLinear>
 void applyArithmeticScalarImpl(
         const jint* src1, const jint* src2, jint* dst,
         const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
-        const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4,
-        const jbyte* srgbToLinear, const jbyte* linearToSrgb) {
+        const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4) {
     for (jint y = clipTop; y < clipBottom; y++) {
         const jint rowOffset = y * width;
         for (jint x = clipLeft; x < clipRight; x++) {
@@ -55,9 +55,9 @@ void applyArithmeticScalarImpl(
             uint8_t outR, outG, outB;
 
             if constexpr (kUseLinear) {
-                outR = static_cast<uint8_t>(linearToSrgb[arithmeticChannel(static_cast<uint8_t>(srgbToLinear[r1]), static_cast<uint8_t>(srgbToLinear[r2]), k1, k2, k3, k4)]);
-                outG = static_cast<uint8_t>(linearToSrgb[arithmeticChannel(static_cast<uint8_t>(srgbToLinear[g1]), static_cast<uint8_t>(srgbToLinear[g2]), k1, k2, k3, k4)]);
-                outB = static_cast<uint8_t>(linearToSrgb[arithmeticChannel(static_cast<uint8_t>(srgbToLinear[b1]), static_cast<uint8_t>(srgbToLinear[b2]), k1, k2, k3, k4)]);
+                outR = ksvg_linear_to_srgb_lut[arithmeticChannel(ksvg_srgb_to_linear_lut[r1], ksvg_srgb_to_linear_lut[r2], k1, k2, k3, k4)];
+                outG = ksvg_linear_to_srgb_lut[arithmeticChannel(ksvg_srgb_to_linear_lut[g1], ksvg_srgb_to_linear_lut[g2], k1, k2, k3, k4)];
+                outB = ksvg_linear_to_srgb_lut[arithmeticChannel(ksvg_srgb_to_linear_lut[b1], ksvg_srgb_to_linear_lut[b2], k1, k2, k3, k4)];
             } else {
                 outR = arithmeticChannel(r1, r2, k1, k2, k3, k4);
                 outG = arithmeticChannel(g1, g2, k1, k2, k3, k4);
@@ -77,11 +77,11 @@ void applyArithmeticScalar(
         const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4,
         const jboolean useLinear,
-        const jbyte* srgbToLinear, const jbyte* linearToSrgb) {
+        [[maybe_unused]] const jbyte* srgbToLinear, [[maybe_unused]] const jbyte* linearToSrgb) {
     if (useLinear == JNI_TRUE) {
-        applyArithmeticScalarImpl<true>(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom, k1, k2, k3, k4, srgbToLinear, linearToSrgb);
+        applyArithmeticScalarImpl<true>(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom, k1, k2, k3, k4);
     } else {
-        applyArithmeticScalarImpl<false>(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom, k1, k2, k3, k4, srgbToLinear, linearToSrgb);
+        applyArithmeticScalarImpl<false>(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom, k1, k2, k3, k4);
     }
 }
 }
@@ -109,8 +109,9 @@ jint nativeBackendForAbi() {
 void runForced(const jint* src1, const jint* src2, jint* dst,
                const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
                const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear,
-               const jbyte* srgbToLinear, const jbyte* linearToSrgb,
                const jint backend) {
+    const auto* srgbToLinear = reinterpret_cast<const jbyte*>(ksvg_srgb_to_linear_lut);
+    const auto* linearToSrgb = reinterpret_cast<const jbyte*>(ksvg_linear_to_srgb_lut);
 #if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
     if (backend == SIMD_BACKEND_SCALAR) {
         applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
@@ -157,24 +158,19 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyForcedNative(
         const jintArray jSrc1, const jintArray jSrc2, const jintArray jDst,
         const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
         const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear,
-        const jbyteArray jSrgbToLinear, const jbyteArray jLinearToSrgb,
         const jint simdBackend) {
-    auto* srgbToLinear = env->GetByteArrayElements(jSrgbToLinear, nullptr);
-    auto* linearToSrgb = env->GetByteArrayElements(jLinearToSrgb, nullptr);
     jint* src1 = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc1, nullptr));
     jint* src2 = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc2, nullptr));
     jint* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
 
-    if (src1 && src2 && dst && srgbToLinear && linearToSrgb) {
+    if (src1 && src2 && dst) {
         runForced(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
-                  k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb, simdBackend);
+                  k1, k2, k3, k4, useLinear, simdBackend);
     }
 
     if (dst) env->ReleasePrimitiveArrayCritical(jDst, dst, 0);
     if (src2) env->ReleasePrimitiveArrayCritical(jSrc2, src2, JNI_ABORT);
     if (src1) env->ReleasePrimitiveArrayCritical(jSrc1, src1, JNI_ABORT);
-    if (linearToSrgb) env->ReleaseByteArrayElements(jLinearToSrgb, linearToSrgb, JNI_ABORT);
-    if (srgbToLinear) env->ReleaseByteArrayElements(jSrgbToLinear, srgbToLinear, JNI_ABORT);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -182,18 +178,17 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyNative(
         JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jSrc1, const jintArray jSrc2, const jintArray jDst,
         const jint width, const jint clipLeft, const jint clipTop, const jint clipRight, const jint clipBottom,
-        const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear,
-        const jbyteArray jSrgbToLinear, const jbyteArray jLinearToSrgb) {
-    auto* srgbToLinear = env->GetByteArrayElements(jSrgbToLinear, nullptr);
-    auto* linearToSrgb = env->GetByteArrayElements(jLinearToSrgb, nullptr);
+        const jfloat k1, const jfloat k2, const jfloat k3, const jfloat k4, const jboolean useLinear) {
+    const auto* srgbToLinear = reinterpret_cast<const jbyte*>(ksvg_srgb_to_linear_lut);
+    const auto* linearToSrgb = reinterpret_cast<const jbyte*>(ksvg_linear_to_srgb_lut);
     jint* src1 = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc1, nullptr));
     jint* src2 = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc2, nullptr));
     jint* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
 
-    if (src1 && src2 && dst && srgbToLinear && linearToSrgb) {
+    if (src1 && src2 && dst) {
 #if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
         applyArithmeticNeon(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
-                                k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+                            k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
 #elif defined(__x86_64__) || defined(_M_X64)
         if (useLinear == JNI_TRUE) {
             applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
@@ -214,6 +209,4 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyNative(
     if (dst) env->ReleasePrimitiveArrayCritical(jDst, dst, 0);
     if (src2) env->ReleasePrimitiveArrayCritical(jSrc2, src2, JNI_ABORT);
     if (src1) env->ReleasePrimitiveArrayCritical(jSrc1, src1, JNI_ABORT);
-    if (linearToSrgb) env->ReleaseByteArrayElements(jLinearToSrgb, linearToSrgb, JNI_ABORT);
-    if (srgbToLinear) env->ReleaseByteArrayElements(jSrgbToLinear, srgbToLinear, JNI_ABORT);
 }

@@ -41,7 +41,6 @@ internal object UnLinearizeNative {
         dst: IntArray,
         width: Int,
         height: Int,
-        table: ByteArray,
     )
 
     /**
@@ -57,7 +56,6 @@ internal object UnLinearizeNative {
         dst: IntArray,
         width: Int,
         height: Int,
-        table: ByteArray,
         simdBackend: Int,
     )
 

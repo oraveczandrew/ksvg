@@ -126,12 +126,11 @@ public object SoftwareKernels {
         dst: IntArray,
         width: Int,
         height: Int,
-        table: ByteArray,
     ) {
         if (UnLinearizeNative.isAvailable) {
-            UnLinearizeNative.apply(src, dst, width, height, table)
+            UnLinearizeNative.apply(src, dst, width, height)
         } else {
-            KotlinKernels.unLinearize(src, dst, width, height, table)
+            KotlinKernels.unLinearize(src, dst, width, height)
         }
     }
 

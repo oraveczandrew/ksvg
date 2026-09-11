@@ -52,9 +52,9 @@ internal fun renderWithLibrary(input: InputStream, outBitmap: Bitmap, softwareFi
 }
 
 @VisibleForTesting
-internal fun renderWithLibrary(input: String, outBitmap: Bitmap): Bitmap {
+internal fun renderWithLibrary(input: String, outBitmap: Bitmap, softwareFiltering: Boolean = false): Bitmap {
     val svg = SVG.getFromString(input)
-    return renderSvgTo(svg, outBitmap)
+    return renderSvgTo(svg, outBitmap, softwareFiltering)
 }
 
 private fun renderSvgTo(svg: SVG, outBitmap: Bitmap): Bitmap {

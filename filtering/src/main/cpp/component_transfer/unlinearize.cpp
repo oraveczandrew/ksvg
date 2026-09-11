@@ -19,6 +19,7 @@
 #include <cassert>
 #include "cpu_dispatch.h"
 #include "simd_x86.h"
+#include "color_luts.h"
 
 // Linear→sRGB (unlinearize) filter-output transfer over straight ARGB_8888
 // IntArrays. This is the KSVG equivalent of librsvg's `FilterContext::into_output`
@@ -51,15 +52,14 @@
 
 namespace {
 
-void applyScalar(const jint* src, jint* dst, const jint width, const jint height,
-                 const jbyte* table) {
+void applyScalar(const jint* src, jint* dst, const jint width, const jint height) {
     const jint total = width * height;
     for (jint i = 0; i < total; i++) {
         const jint c = src[i];
         dst[i] = (c & 0xFF000000) /* alpha passthrough */ |
-                (static_cast<jint>(static_cast<uint8_t>(table[(c >> 16) & 0xFF])) << 16) |
-                (static_cast<jint>(static_cast<uint8_t>(table[(c >> 8) & 0xFF])) << 8) |
-                static_cast<jint>(static_cast<uint8_t>(table[c & 0xFF]));
+                (static_cast<jint>(ksvg_linear_to_srgb_lut[(c >> 16) & 0xFF]) << 16) |
+                (static_cast<jint>(ksvg_linear_to_srgb_lut[(c >> 8) & 0xFF]) << 8) |
+                static_cast<jint>(ksvg_linear_to_srgb_lut[c & 0xFF]);
     }
 }
 
@@ -192,25 +192,25 @@ void applyNeon32(jint* src, jint* dst, jint width, jint height, const jbyte* tab
 // failure (debug builds) rather than a silent wrong path.
 namespace {
 
-void runForced(jint* src, jint* dst, jint width, jint height,
-               const jbyte* table, const jint backend) {
+void runForced(jint* src, jint* dst, jint width, jint height, const jint backend) {
+    const auto* table = reinterpret_cast<const jbyte*>(ksvg_linear_to_srgb_lut);
 #if defined(__aarch64__)
     if (backend == SIMD_BACKEND_SCALAR) {
-        applyScalar(src, dst, width, height, table);
+        applyScalar(src, dst, width, height);
     } else {
         assert(backend == SIMD_BACKEND_NEON64);
         applyNeon64(src, dst, width, height, table);
     }
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     if (backend == SIMD_BACKEND_SCALAR) {
-        applyScalar(src, dst, width, height, table);
+        applyScalar(src, dst, width, height);
     } else {
         assert(backend == SIMD_BACKEND_NEON32);
         applyNeon32(src, dst, width, height, table);
     }
 #elif defined(__SSSE3__)
     switch (backend) {
-        case SIMD_BACKEND_SCALAR: applyScalar(src, dst, width, height, table); break;
+        case SIMD_BACKEND_SCALAR: applyScalar(src, dst, width, height); break;
         case SIMD_BACKEND_SSSE3:
 #if defined(__x86_64__)
             ksvgUnlinearizeApplySsse3(src, dst, width, height, table);
@@ -229,7 +229,7 @@ void runForced(jint* src, jint* dst, jint width, jint height,
     }
 #else
     (void)backend;
-    applyScalar(src, dst, width, height, table);
+    applyScalar(src, dst, width, height);
 #endif
 }
 
@@ -260,59 +260,43 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_applyForced(
         JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jSrc, const jintArray jDst,
         const jint width, const jint height,
-        const jbyteArray jTable, const jint simdBackend) {
-    auto* table = env->GetByteArrayElements(jTable, nullptr);
-    if (table == nullptr) {
-        return;
-    }
+        const jint simdBackend) {
     const bool inPlace = env->IsSameObject(jSrc, jDst) == JNI_TRUE;
     if (inPlace) {
         auto* buf = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
         if (buf == nullptr) {
-            env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
             return;
         }
-        runForced(buf, buf, width, height, table, simdBackend);
-        env->ReleasePrimitiveArrayCritical(jSrc, buf, JNI_ABORT);
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
+        runForced(buf, buf, width, height, simdBackend);
+        env->ReleasePrimitiveArrayCritical(jSrc, buf, 0);
         return;
     }
 
     auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
     if (src == nullptr) {
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
         return;
     }
     auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
     if (dst == nullptr) {
         env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
         return;
     }
 
-    runForced(src, dst, width, height, table, simdBackend);
+    runForced(src, dst, width, height, simdBackend);
 
-    env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jDst, dst, 0);
     env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
-    env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
         JNIEnv* env, [[maybe_unused]] jclass clazz,
         const jintArray jSrc, const jintArray jDst,
-        const jint width, const jint height,
-        const jbyteArray jTable) {
-    // The byte table must be fetched BEFORE entering any critical section (no
-    // JNI call may occur between a GetPrimitiveArrayCritical pair).
-    auto* table = env->GetByteArrayElements(jTable, nullptr);
-    if (table == nullptr) {
-        return;
-    }
+        const jint width, const jint height) {
+    const auto* table = reinterpret_cast<const jbyte*>(ksvg_linear_to_srgb_lut);
     if (env->IsSameObject(jSrc, jDst) == JNI_TRUE) {
         auto* buf = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
         if (buf == nullptr) {
-            env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
             return;
         }
 #if defined(__SSSE3__)
@@ -330,25 +314,22 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
             ksvgUnlinearizeApplySsse3ApproxV31(buf, buf, width, height, table);
 #endif
         } else {
-            applyScalar(buf, buf, width, height, table);
+            applyScalar(buf, buf, width, height);
         }
 #else
-        applyScalar(buf, buf, width, height, table);
+        applyScalar(buf, buf, width, height);
 #endif
-        env->ReleasePrimitiveArrayCritical(jSrc, buf, JNI_ABORT);
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
+        env->ReleasePrimitiveArrayCritical(jSrc, buf, 0);
         return;
     }
 
     auto* src = static_cast<jint*>(env->GetPrimitiveArrayCritical(jSrc, nullptr));
     if (src == nullptr) {
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
         return;
     }
     auto* dst = static_cast<jint*>(env->GetPrimitiveArrayCritical(jDst, nullptr));
     if (dst == nullptr) {
         env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
-        env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
         return;
     }
 
@@ -367,15 +348,12 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
         ksvgUnlinearizeApplySsse3ApproxV31(src, dst, width, height, table);
 #endif
     } else {
-        applyScalar(src, dst, width, height, table);
+        applyScalar(src, dst, width, height);
     }
 #else
-    applyScalar(src, dst, width, height, table);
+    applyScalar(src, dst, width, height);
 #endif
 
-    // Release the critical sections FIRST: every Release* call is a JNI call and
-    // is forbidden while a critical get is still active.
-    env->ReleasePrimitiveArrayCritical(jDst, dst, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jDst, dst, 0);
     env->ReleasePrimitiveArrayCritical(jSrc, src, JNI_ABORT);
-    env->ReleaseByteArrayElements(jTable, table, JNI_ABORT);
 }

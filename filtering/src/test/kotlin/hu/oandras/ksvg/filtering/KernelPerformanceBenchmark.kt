@@ -69,7 +69,6 @@ class KernelPerformanceBenchmark {
     }
 
     private fun benchmarkUnLinearize() {
-        val table = ByteArray(256) { it.toByte() }
         for ((w, h) in sizes) {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
@@ -80,7 +79,7 @@ class KernelPerformanceBenchmark {
                 w = w,
                 h = h
             ) {
-                KotlinKernels.unLinearize(src, dst, w, h, table)
+                KotlinKernels.unLinearize(src, dst, w, h)
             }
 
             benchmarkSingle(
@@ -94,7 +93,6 @@ class KernelPerformanceBenchmark {
                     dst = dst,
                     width = w,
                     height = h,
-                    table = table,
                     simdBackend = b
                 )
             }
