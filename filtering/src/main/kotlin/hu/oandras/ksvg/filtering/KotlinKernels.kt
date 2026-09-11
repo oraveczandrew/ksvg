@@ -531,7 +531,7 @@ public object KotlinKernels {
         ColorLuts.LINEAR_TO_SRGB[c and 0xFF].toInt() and 0xFF
 
     /** Surface height at (x, y) for feDiffuse/feSpecular lighting (alpha channel scaled). */
-    private fun heightAt(
+    private inline fun heightAt(
         pix: IntArray,
         width: Int,
         surfaceScaleNormalized: Float,
