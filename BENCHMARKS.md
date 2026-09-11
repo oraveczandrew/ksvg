@@ -310,57 +310,61 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `arm64-v8a`; non-quick har
 
 ## Device Results (OnePlus 11, 32-bit ARM)
 
-Measured on OnePlus 11 (CPH2449) running the `armeabi-v7a` (32-bit).
+Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `armeabi-v7a`; non-quick harness run (512x512 and 2048x2048, median timings).
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
-| ArithmeticComposite (linear) | kotlin | 512x512 | 88.968 | 2.95 | 0.24 | 0.36x | |  |
-| ArithmeticComposite (linear) | scalar | 512x512 | 32.329 | 8.11 | 0.06 | 1.00x |  |  |
-| ArithmeticComposite (linear) | neon32 | 512x512 | 9.600 | 27.31 | 0.22 | 3.37x | 🟢 |  |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 518.90 | 8.08 | 0.06 | 1.00x |  |  |
-| ArithmeticComposite (linear) | neon32 | 2048x2048 | 154.46 | 27.16 | 0.22 | 3.36x | 🟢 |  |
-| ArithmeticComposite (non-linear) | kotlin | 512x512 | 73.502 | 3.57 | 0.29 | 0.42x | |  |
-| ArithmeticComposite (non-linear) | scalar | 512x512 | 30.587 | 8.57 | 0.07 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | neon32 | 512x512 | 2.277 | 115.13 | 0.92 | **13.43x** | 🚀 |  |
-| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 486.11 | 8.63 | 0.07 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | neon32 | 2048x2048 | 36.73 | 114.18 | 0.91 | **13.23x** | 🚀 |  |
-| ComponentTransfer | kotlin | 512x512 | 1.992 | 131.62 | 1.05 | 0.75x | |  |
-| ComponentTransfer | scalar | 512x512 | 1.491 | 175.85 | 1.41 | 1.00x |  |  |
-| ComponentTransfer | scalar | 2048x2048 | 24.300 | 172.61 | 1.38 | 1.00x |  |  |
-| ConvolveMatrix | kotlin | 512x512 | 181.108 | 1.45 | 0.12 | 1.06x | ⬆️ |  |
-| ConvolveMatrix | scalar | 512x512 | 191.308 | 1.37 | 0.01 | 1.00x |  |  |
-| ConvolveMatrix | neon32 | 512x512 | 14.543 | 18.03 | 0.14 | **13.87x** | 🚀 |  |
-| ConvolveMatrix | scalar | 2048x2048 | 2949.058 | 1.42 | 0.01 | 1.00x |  |  |
-| ConvolveMatrix | neon32 | 2048x2048 | 166.404 | 25.21 | 0.20 | **17.72x** | 🚀 |  |
-| DisplacementMap | kotlin | 512x512 | 10.167 | 25.78 | 0.21 | 1.03x | ⬆️ |  |
-| DisplacementMap | scalar | 512x512 | 10.495 | 24.98 | 0.20 | 1.00x |  |  |
-| DisplacementMap | neon32 | 512x512 | 0.966 | 271.43 | 2.17 | 10.87x | 🚀 |  |
-| DisplacementMap | scalar | 2048x2048 | 187.304 | 22.39 | 0.18 | 1.00x |  |  |
-| DisplacementMap | neon32 | 2048x2048 | 23.148 | 181.19 | 1.45 | **8.09x** | 🟢 |  |
-| GaussianBlur | kotlin | 512x512 | 26.915 | 9.74 | 0.78 | 13.81x | ⬆️ | StackBlur (approx) |
-| GaussianBlur | scalar | 512x512 | 371.589 | 0.71 | 0.01 | 1.00x |  |  |
-| GaussianBlur | neon32 | 512x512 | 8.823 | 29.71 | 0.24 | **42.12x** | 🚀 |  |
-| GaussianBlur | scalar | 2048x2048 | 5959.443 | 0.70 | 0.01 | 1.00x |  |  |
-| GaussianBlur | neon32 | 2048x2048 | 141.507 | 29.64 | 0.24 | **42.11x** | 🚀 |  |
-| Lighting | kotlin | 512x512 | 121.125 | 2.16 | 0.02 | 0.25x | |  |
-| Lighting | scalar | 512x512 | 30.794 | 8.51 | 0.07 | 1.00x |  |  |
-| Lighting | neon32 | 512x512 | 4.074 | 64.34 | 0.51 | 7.56x | 🟢 | hand-written NEON distant diffuse |
-| Lighting | kotlin | 2048x2048 | 1894.268 | 2.21 | 0.02 | 0.23x | |  |
-| Lighting | scalar | 2048x2048 | 444.190 | 9.44 | 0.08 | 1.00x |  |  |
-| Lighting | neon32 | 2048x2048 | 39.800 | 105.39 | 0.84 | **11.16x** | 🚀 |  |
-| Morphology | kotlin | 512x512 | 799.654 | 0.33 | 0.03 | 0.74x | |  |
-| Morphology | scalar | 512x512 | 588.373 | 0.45 | 0.00 | 1.00x |  |  |
-| Morphology | neon32 | 512x512 | 3.238 | 80.95 | 0.65 | **181.70x** | 🚀 |  |
-| Morphology | scalar | 2048x2048 | 6065.464 | 0.69 | 0.01 | 1.00x |  |  |
-| Morphology | neon32 | 2048x2048 | 42.495 | 98.70 | 0.79 | **142.73x** | 🚀 |  |
-| Turbulence | kotlin | 512x512 | 804.240 | 0.33 | 0.03 | 0.17x | |  |
-| Turbulence | scalar | 512x512 | 135.210 | 1.94 | 0.02 | 1.00x |  |  |
-| Turbulence | neon32 | 512x512 | 19.912 | 13.16 | 0.11 | 6.79x | 🟢 |  |
-| Turbulence | scalar | 2048x2048 | 2123.620 | 1.98 | 0.02 | 1.00x |  |  |
-| Turbulence | neon32 | 2048x2048 | 317.419 | 13.21 | 0.11 | 6.69x | 🟢 |  |
-| UnLinearize | kotlin | 512x512 | 1.217 | 215.44 | 1.72 | 0.96x | |  |
-| UnLinearize | scalar | 512x512 | 1.162 | 225.52 | 1.80 | 1.00x |  |  |
-| UnLinearize | neon32 | 512x512 | — | — | — | — | 🔴 | un-advertised in this run |
-| UnLinearize | kotlin | 2048x2048 | 19.774 | 212.12 | 1.70 | 0.97x | |  |
-| UnLinearize | scalar | 2048x2048 | 19.092 | 219.69 | 1.76 | 1.00x |  |  |
-| UnLinearize | neon32 | 2048x2048 | — | — | — | — | 🔴 | un-advertised in this run |
+| ArithmeticComposite (linear) | kotlin | 512x512 | 88.451 | 2.96 | 0.04 | 0.36x |  |  |
+| ArithmeticComposite (linear) | scalar | 512x512 | 32.090 | 8.17 | 0.10 | 1.00x |  |  |
+| ArithmeticComposite (linear) | neon32 | 512x512 | 9.564 | 27.41 | 0.33 | 3.36x | 🟢 |  |
+| ArithmeticComposite (linear) | kotlin | 2048x2048 | 1419.548 | 2.95 | 0.04 | 0.36x |  |  |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 512.997 | 8.18 | 0.10 | 1.00x |  |  |
+| ArithmeticComposite (linear) | neon32 | 2048x2048 | 154.459 | 27.15 | 0.33 | 3.32x | 🟢 |  |
+| ArithmeticComposite (non-linear) | kotlin | 512x512 | 73.587 | 3.56 | 0.04 | 0.42x |  |  |
+| ArithmeticComposite (non-linear) | scalar | 512x512 | 30.693 | 8.54 | 0.10 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | neon32 | 512x512 | 2.282 | 114.90 | 1.38 | **13.45x** | 🚀 |  |
+| ArithmeticComposite (non-linear) | kotlin | 2048x2048 | 1179.419 | 3.56 | 0.04 | 0.42x |  |  |
+| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 490.773 | 8.55 | 0.10 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | neon32 | 2048x2048 | 36.597 | 114.61 | 1.38 | **13.41x** | 🚀 |  |
+| ComponentTransfer | kotlin | 512x512 | 1.989 | 131.81 | 1.05 | 0.74x |  |  |
+| ComponentTransfer | scalar | 512x512 | 1.478 | 177.33 | 1.42 | 1.00x |  |  |
+| ComponentTransfer | kotlin | 2048x2048 | 31.822 | 131.81 | 1.05 | 0.76x |  |  |
+| ComponentTransfer | scalar | 2048x2048 | 24.316 | 172.49 | 1.38 | 1.00x |  |  |
+| ConvolveMatrix | kotlin | 512x512 | 181.112 | 1.45 | 0.01 | 1.06x | ⬆️ |  |
+| ConvolveMatrix | scalar | 512x512 | 191.301 | 1.37 | 0.01 | 1.00x |  |  |
+| ConvolveMatrix | kotlin | 2048x2048 | 2851.253 | 1.47 | 0.01 | 0.98x |  |  |
+| ConvolveMatrix | scalar | 2048x2048 | 2799.770 | 1.50 | 0.01 | 1.00x |  |  |
+| DisplacementMap | kotlin | 512x512 | 10.025 | 26.15 | 0.31 | 1.05x | ⬆️ |  |
+| DisplacementMap | scalar | 512x512 | 10.481 | 25.01 | 0.30 | 1.00x |  |  |
+| DisplacementMap | neon32 | 512x512 | 0.966 | 271.40 | 3.26 | **10.85x** | 🚀 |  |
+| DisplacementMap | kotlin | 2048x2048 | 180.692 | 23.21 | 0.28 | 1.03x | ⬆️ |  |
+| DisplacementMap | scalar | 2048x2048 | 186.921 | 22.44 | 0.27 | 1.00x |  |  |
+| DisplacementMap | neon32 | 2048x2048 | 23.084 | 181.70 | 2.18 | 8.10x | 🟢 |  |
+| GaussianBlur | kotlin | 512x512 | 27.400 | 9.57 | 0.08 | 13.63x | ⬆️ | StackBlur (approx) |
+| GaussianBlur | scalar | 512x512 | 373.322 | 0.70 | 0.01 | 1.00x |  |  |
+| GaussianBlur | neon32 | 512x512 | 8.751 | 29.96 | 0.24 | **42.66x** | 🚀 |  |
+| GaussianBlur | kotlin | 2048x2048 | 501.422 | 8.36 | 0.07 | 12.00x | ⬆️ | StackBlur (approx) |
+| GaussianBlur | scalar | 2048x2048 | 6018.733 | 0.70 | 0.01 | 1.00x |  |  |
+| GaussianBlur | neon32 | 2048x2048 | 138.898 | 30.20 | 0.24 | **43.33x** | 🚀 |  |
+| Lighting | kotlin | 512x512 | 123.008 | 2.13 | 0.02 | 0.25x |  |  |
+| Lighting | scalar | 512x512 | 31.008 | 8.45 | 0.07 | 1.00x |  |  |
+| Lighting | neon32 | 512x512 | 4.020 | 65.20 | 0.52 | 7.71x | 🟢 | hand-written NEON distant diffuse |
+| Lighting | kotlin | 2048x2048 | 1956.286 | 2.14 | 0.02 | 0.23x |  |  |
+| Lighting | scalar | 2048x2048 | 445.750 | 9.41 | 0.08 | 1.00x |  |  |
+| Lighting | neon32 | 2048x2048 | 39.709 | 105.63 | 0.85 | **11.23x** | 🚀 | hand-written NEON distant diffuse |
+| Morphology | kotlin | 512x512 | 798.700 | 0.33 | 0.00 | 0.74x |  |  |
+| Morphology | scalar | 512x512 | 588.604 | 0.45 | 0.00 | 1.00x |  |  |
+| Morphology | neon32 | 512x512 | 3.226 | 81.27 | 0.65 | **182.48x** | 🚀 |  |
+| Morphology | kotlin | 2048x2048 | 13146.189 | 0.32 | 0.00 | 0.73x |  |  |
+| Morphology | scalar | 2048x2048 | 9608.014 | 0.44 | 0.00 | 1.00x |  |  |
+| Morphology | neon32 | 2048x2048 | 38.421 | 109.17 | 0.87 | **250.07x** | 🚀 |  |
+| Turbulence | kotlin | 512x512 | 814.613 | 0.32 | 0.00 | 0.16x |  |  |
+| Turbulence | scalar | 512x512 | 133.616 | 1.96 | 0.01 | 1.00x |  |  |
+| Turbulence | neon32 | 512x512 | 19.859 | 13.20 | 0.05 | 6.73x | 🟢 |  |
+| Turbulence | kotlin | 2048x2048 | 12926.138 | 0.32 | 0.00 | 0.16x |  |  |
+| Turbulence | scalar | 2048x2048 | 2132.623 | 1.97 | 0.01 | 1.00x |  |  |
+| Turbulence | neon32 | 2048x2048 | 316.337 | 13.26 | 0.05 | 6.74x | 🟢 |  |
+| UnLinearize | kotlin | 512x512 | 1.217 | 215.43 | 1.72 | 0.92x |  |  |
+| UnLinearize | scalar | 512x512 | 1.119 | 234.25 | 1.87 | 1.00x |  |  |
+| UnLinearize | kotlin | 2048x2048 | 19.844 | 211.37 | 1.69 | 0.92x |  |  |
+| UnLinearize | scalar | 2048x2048 | 18.206 | 230.38 | 1.84 | 1.00x |  |  |
