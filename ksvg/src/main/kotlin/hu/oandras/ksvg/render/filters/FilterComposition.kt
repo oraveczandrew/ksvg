@@ -19,7 +19,6 @@ package hu.oandras.ksvg.render.filters
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.RectF
-import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.compat.BlendModeCompat
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.compat.setBlendModeCompat
@@ -27,6 +26,7 @@ import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.filter.FeBlendMode
 import hu.oandras.ksvg.dom.filter.FeComposite
 import hu.oandras.ksvg.dom.filter.FeCompositeOperator
+import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeBlendRenderNode
 import hu.oandras.ksvg.render.FeCompositeRenderNode
 import hu.oandras.ksvg.render.FeMergeRenderNode
@@ -47,13 +47,11 @@ internal fun doFeCompositeFilter(
     lastResult: Bitmap?,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap? {
     val primitive = primitiveNode.sourceElement
     val in2 = getFilterInput(primitive.in2, results, lastResult) ?: return null
     return when (primitive.operator) {
-        FeCompositeOperator.arithmetic -> applyArithmeticComposite(inputBitmap, in2, primitive, primitiveNode, primitiveRegion, filterRegion, canvasScaleX, canvasScaleY)
+        FeCompositeOperator.arithmetic -> applyArithmeticComposite(inputBitmap, in2, primitive, primitiveNode, primitiveRegion, filterRegion)
         FeCompositeOperator.over if isBitmapTransparent(in2) -> inputBitmap
         else -> {
             val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
@@ -80,8 +78,6 @@ internal fun doFeBlendFilter(
     lastResult: Bitmap?,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap? {
     val in2 = getFilterInput(primitiveNode.in2, results, lastResult) ?: return null
     val mode = primitiveNode.mode
@@ -113,8 +109,6 @@ private fun applyArithmeticComposite(
     primitiveNode: FeCompositeRenderNode,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     val width = input.width
     val height = input.height

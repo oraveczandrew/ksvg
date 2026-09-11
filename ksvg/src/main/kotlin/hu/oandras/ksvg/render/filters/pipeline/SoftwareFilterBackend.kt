@@ -558,8 +558,6 @@ internal class SoftwareFilterBackend internal constructor(
                     inputBitmap = inputBitmap,
                     primitiveRegion = primitiveRegion,
                     filterRegion = filterRegionPx,
-                    canvasScaleX = canvasScaleX,
-                    canvasScaleY = canvasScaleY,
                 )
             }
 
@@ -571,8 +569,6 @@ internal class SoftwareFilterBackend internal constructor(
                     lastResult = lastResult,
                     primitiveRegion = primitiveRegion,
                     filterRegion = filterRegionPx,
-                    canvasScaleX = canvasScaleX,
-                    canvasScaleY = canvasScaleY,
                 )
             }
 
@@ -626,8 +622,6 @@ internal class SoftwareFilterBackend internal constructor(
                     inputBitmap = inputBitmap,
                     primitiveRegion = primitiveRegion,
                     filterRegion = filterRegionPx,
-                    canvasScaleX = canvasScaleX,
-                    canvasScaleY = canvasScaleY,
                 )
             }
 
@@ -669,8 +663,6 @@ internal class SoftwareFilterBackend internal constructor(
                     lastResult = lastResult,
                     primitiveRegion = primitiveRegion,
                     filterRegion = filterRegionPx,
-                    canvasScaleX = canvasScaleX,
-                    canvasScaleY = canvasScaleY,
                 )
             }
 

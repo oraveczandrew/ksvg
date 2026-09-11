@@ -26,9 +26,9 @@ import hu.oandras.ksvg.dom.filter.FeColorMatrixType
 import hu.oandras.ksvg.dom.filter.FeFunc
 import hu.oandras.ksvg.dom.filter.FeFuncType
 import hu.oandras.ksvg.filtering.SoftwareKernels
+import hu.oandras.ksvg.render.ComponentTransferFunctions
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeComponentTransferRenderNode
-import hu.oandras.ksvg.render.ComponentTransferFunctions
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_BLUE
 import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_GREEN
@@ -36,10 +36,10 @@ import hu.oandras.ksvg.render.Renderer.Companion.LUMINANCE_TO_ALPHA_RED
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.clamp255
+import hu.oandras.ksvg.utils.floorToInt
 import hu.oandras.ksvg.utils.linearToSRgb
 import hu.oandras.ksvg.utils.sRgbToLinear
 import hu.oandras.ksvg.utils.toRadians
-import hu.oandras.ksvg.utils.floorToInt
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
@@ -64,8 +64,6 @@ internal fun doFeColorMatrixFilter(
     inputBitmap: Bitmap,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     val paint = primitiveNode.paint
         ?: createFilterPaint(
@@ -158,8 +156,6 @@ internal fun doFeComponentTransferFilter(
     primitiveNode: FeComponentTransferRenderNode,
     primitiveRegion: RectF,
     filterRegion: RectF,
-    canvasScaleX: Float,
-    canvasScaleY: Float,
 ): Bitmap {
     val transferFunctions = primitiveNode.transferFunctions
 

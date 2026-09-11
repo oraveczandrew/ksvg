@@ -89,7 +89,7 @@ internal fun doFeTurbulenceFilter(
         val tileHeightPx = height.toDouble()
 
         if (tileWidthPx > 0.0 && baseX != 0.0) {
-            val freq = baseX
+            val freq: Double = baseX
             val fLo = floor(tileWidthPx * freq) / tileWidthPx
             val fHi = ceil(tileWidthPx * freq) / tileWidthPx
             val adjustedFreq = if (freq / fLo < fHi / freq) fLo else fHi
@@ -97,7 +97,7 @@ internal fun doFeTurbulenceFilter(
             periodX = (tileWidthPx * adjustedFreq + 0.5).toInt()
         }
         if (tileHeightPx > 0.0 && baseY != 0.0) {
-            val freq = baseY
+            val freq: Double = baseY
             val fLo = floor(tileHeightPx * freq) / tileHeightPx
             val fHi = ceil(tileHeightPx * freq) / tileHeightPx
             val adjustedFreq = if (freq / fLo < fHi / freq) fLo else fHi
