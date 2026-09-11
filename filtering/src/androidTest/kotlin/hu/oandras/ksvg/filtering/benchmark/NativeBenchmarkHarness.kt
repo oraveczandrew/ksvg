@@ -25,18 +25,22 @@ import java.io.File
 import java.util.Locale
 
 /**
- * Clears every benchmark CSV from the device's external cache directory (spec §24).
+ * Clears every benchmark CSV and simpleperf profile dump from the device's external cache
+ * directory (spec §24), so a fresh run is not mixed with stale files on pull.
  */
 fun clearPreviousResults() {
     val dir = context().externalCacheDir ?: return
     if (!dir.exists()) return
     val summaryFiles = dir.listFiles { _, name -> name.startsWith("benchmarks_device") && name.endsWith(".csv") }
     val detailFiles = dir.listFiles { _, name -> name.startsWith("benchmarks_harness_detail") && name.endsWith(".csv") }
-    
-    val totalDeleted = (summaryFiles?.size ?: 0) + (detailFiles?.size ?: 0)
+    val simpleperfFiles = dir.listFiles { _, name -> name.startsWith("simpleperf_") }
+
+    val totalDeleted =
+        (summaryFiles?.size ?: 0) + (detailFiles?.size ?: 0) + (simpleperfFiles?.size ?: 0)
     if (totalDeleted > 0) {
         summaryFiles?.forEach { it.delete() }
         detailFiles?.forEach { it.delete() }
+        simpleperfFiles?.forEach { it.delete() }
         println("Benchmark harness: cleared $totalDeleted previous result files from ${dir.absolutePath}")
     }
 }
@@ -79,24 +83,42 @@ fun nativeBenchmark(configure: NativeBenchmarkBuilder.() -> Unit): NativeBenchma
 
 class NativeBenchmarkBuilder {
 
+    @JvmField
     var name: String = "benchmark"
 
+    @JvmField
     var backend: String = ""
 
+    @JvmField
     var width: Int = 0
 
+    @JvmField
     var height: Int = 0
 
+    @JvmField
     var warmupIterations: Int = 20
 
+    @JvmField
     var measurementBatches: Int = 5
 
+    @JvmField
     var iterationsPerBatch: Int = 10
+
+    /**
+     * If set, pins the benchmark thread to this concrete Linux CPU for warmup + all
+     * measurement batches (diagnostic runs only, e.g. Lighting scalar-vs-NEON). The
+     * chosen core is reported as `benchmarkCpu=<N>` in the environment block.
+     * `sched_setaffinity` may be denied without root; the pin then fails quietly and
+     * `affinityApplied=false` is reported so the run is not mistaken for pinned.
+     */
+    @JvmField
+    var cpuCore: Int? = null
 
     /**
      * Sleep before retrying a batch invalidated by thermal throttling (spec §9). Actual
      * sleep duration accumulates into the report's `cooldownTimeMs`.
      */
+    @JvmField
     var cooldownMillis: Long = 5_000
 
     private var body: (() -> Unit)? = null
@@ -118,13 +140,25 @@ class NativeBenchmarkBuilder {
 
         val tid = Process.myTid()
         val previousPriority = capturePriority(tid)
-        val cpuFreqBeforeKhz = CpuInfo.cpuFreqKhz()
+        val pinnedCore = cpuCore
+        var affinityApplied = false
+        if (pinnedCore != null) {
+            affinityApplied = CpuAffinity.pinToCore(pinnedCore)
+            if (!affinityApplied) {
+                println(
+                    "Benchmark harness: WARNING sched_setaffinity(cpu$pinnedCore) failed; " +
+                        "this run is NOT pinned to the requested core"
+                )
+            }
+        }
+        val cpuFreqBeforeKhz = CpuInfo.cpuFreqKhz(pinnedCore ?: 0)
 
         val validBatches = ArrayList<DoubleArray>(measurementBatches)
         var threadPriorityApplied: Boolean
         var thermalThrottled = false
         var invalidatedBatches = 0
         var cooldownTimeMs = 0L
+        var benchCpuAfter = -1
         try {
             // Warmup never touches the measured region either.
             repeat(warmupIterations) { iteration ->
@@ -215,11 +249,15 @@ class NativeBenchmarkBuilder {
             )
             throw t
         } finally {
+            benchCpuAfter = CpuAffinity.currentCpu()
             threadPriorityApplied = restorePriority(tid, previousPriority)
+            if (affinityApplied) {
+                CpuAffinity.resetAffinity()
+            }
         }
 
         val thermalStatusAfter = thermal.currentThermalStatus()
-        val cpuFreqAfterKhz = CpuInfo.cpuFreqKhz()
+        val cpuFreqAfterKhz = CpuInfo.cpuFreqKhz(pinnedCore ?: 0)
 
         val report =
             NativeBenchmarkReport(
@@ -244,6 +282,9 @@ class NativeBenchmarkBuilder {
                         cooldownTimeMs = cooldownTimeMs,
                         cpuFreqBeforeKhz = cpuFreqBeforeKhz,
                         cpuFreqAfterKhz = cpuFreqAfterKhz,
+                        pinnedCore = pinnedCore,
+                        affinityApplied = affinityApplied,
+                        benchCpuAfter = benchCpuAfter,
                     ),
             )
         report.print()
@@ -303,23 +344,36 @@ class NativeBenchmarkBuilder {
 }
 
 class NativeBenchmarkReport(
+    @JvmField
     val name: String,
+    @JvmField
     val backend: String,
+    @JvmField
     val width: Int,
+    @JvmField
     val height: Int,
+    @JvmField
     val samples: Array<DoubleArray>,
+    @JvmField
     val requestedBatches: Int,
+    @JvmField
     val thermalThrottled: Boolean,
+    @JvmField
     val invalidatedBatches: Int,
+    @JvmField
     val cooldownTimeMs: Long,
+    @JvmField
     val environment: String,
 ) {
 
+    @JvmField
     val batchAveragesMs: List<Double> = samples.map { batch -> batch.average() }
 
+    @JvmField
     val stats: BenchmarkStats = BenchmarkStats(sortedSamples(flatten(samples)))
 
     /** Pixels/s at the median, for parity with the old runner's MPix/s column. */
+    @JvmField
     val medianMPixSec: Double =
         if (width > 0 && height > 0) {
             (width.toDouble() * height / (stats.medianMs / 1_000.0)) / 1_000_000.0
@@ -341,6 +395,7 @@ class NativeBenchmarkReport(
      *    widely (CV above [UNSTABLE_CV]).
      *  - `VALID` — otherwise.
      */
+    @JvmField
     val classification: String =
         when {
             samples.isEmpty() -> INSUFFICIENT_SAMPLES
@@ -489,6 +544,9 @@ private fun buildEnvironment(
     cooldownTimeMs: Long,
     cpuFreqBeforeKhz: Int?,
     cpuFreqAfterKhz: Int?,
+    pinnedCore: Int?,
+    affinityApplied: Boolean,
+    benchCpuAfter: Int,
 ): String =
     buildString {
         appendLine("device=${Build.DEVICE}")
@@ -499,8 +557,12 @@ private fun buildEnvironment(
         appendLine("socManufacturer=${CpuInfo.socManufacturer}")
         appendLine("socModel=${CpuInfo.socModel}")
         appendLine("hardware=${CpuInfo.hardware}")
+        appendLine("benchmarkCpu=${pinnedCore?.toString() ?: "unspecified"}")
+        appendLine("affinityApplied=$affinityApplied")
+        appendLine("benchThreadCpuAfter=$benchCpuAfter")
         appendLine("cpuFreqBeforeKhz=${cpuFreqBeforeKhz ?: "unavailable"}")
         appendLine("cpuFreqAfterKhz=${cpuFreqAfterKhz ?: "unavailable"}")
+        appendLine("cpuTopology=${CpuTopology.summarize(CpuTopology.discoverTopology())}")
         appendLine(
             "sustainedPerformanceMode=" +
                 (BenchmarkActivity.sustainedPerformanceModeInUse && BenchmarkActivity.sustainedSetResult != false)

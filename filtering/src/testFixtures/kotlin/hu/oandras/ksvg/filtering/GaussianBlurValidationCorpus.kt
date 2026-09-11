@@ -27,11 +27,17 @@ import kotlin.math.sqrt
 public object GaussianBlurValidationCorpus {
 
     public class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val stdDeviationX: Float,
+        @JvmField
         public val stdDeviationY: Float,
+        @JvmField
         public val input: IntArray,
     ) {
         public val size: Int get() = width * height

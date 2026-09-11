@@ -147,23 +147,51 @@ val uninstallBenchmarkApk = tasks.register("uninstallBenchmarkApk") {
     doLast {
         val adb = System.getenv("ANDROID_HOME")?.let { h -> File(h, "platform-tools/adb") }
             ?.takeIf { it.exists() } ?: File("adb")
+
+        // The previous instrumentation run can leave the adb server in a stale state where a
+        // fresh adb client HANGS instead of returning. Restart the server and wait for the
+        // device before touching it (same workaround as runDeviceBenchmark's pull step).
+        var adbOut = ""
+        fun adbWait(timeoutSec: Long, vararg args: String): Int? {
+            val proc = ProcessBuilder(listOf(adb.absolutePath) + args.toList())
+                .redirectErrorStream(true)
+                .start()
+            if (!proc.waitFor(timeoutSec, TimeUnit.SECONDS)) {
+                proc.destroyForcibly()
+                return null
+            }
+            adbOut = proc.inputStream.readBytes().toString(Charsets.UTF_8).trim()
+            return proc.exitValue()
+        }
+
+        adbWait(10, "kill-server")
+        adbWait(10, "start-server")
+        var deviceReady = false
+        for (attempt in 1..10) {
+            if (adbWait(10, "devices") == 0 &&
+                adbOut.lineSequence().any { it.trim().endsWith("\tdevice") }) {
+                deviceReady = true
+                break
+            }
+            Thread.sleep(1000L)
+        }
+        if (!deviceReady) {
+            logger.lifecycle("runDeviceBenchmark: no adb device available after restart; skipping uninstall")
+            return@doLast
+        }
+
         var attempts = 0
         var success = false
         while (attempts < 5 && !success) {
             attempts++
-            val proc = ProcessBuilder(adb.absolutePath, "uninstall", "hu.oandras.filtering.test")
-                .redirectErrorStream(true)
-                .start()
-            val out = proc.inputStream.readBytes().toString(Charsets.UTF_8).trim()
-            val finished = proc.waitFor(5, TimeUnit.SECONDS)
-            if (!finished) {
-                proc.destroyForcibly()
+            val rc = adbWait(5, "uninstall", "hu.oandras.filtering.test")
+            if (rc == null) {
                 logger.lifecycle("runDeviceBenchmark: adb uninstall timed out (attempt $attempts/5)")
-            } else if (proc.exitValue() == 0) {
+            } else if (rc == 0) {
                 logger.lifecycle("runDeviceBenchmark: removed hu.oandras.filtering.test")
                 success = true
-            } else if (out.isNotBlank()) {
-                logger.lifecycle("runDeviceBenchmark: APK was not installed (adb uninstall: $out)")
+            } else if (adbOut.isNotBlank()) {
+                logger.lifecycle("runDeviceBenchmark: APK was not installed (adb uninstall: $adbOut)")
             }
         }
     }
@@ -191,12 +219,28 @@ data class BenchRow(val header: List<String>, val values: List<String>)
  * (a couple of minutes on a phone).
  *
  *   ./gradlew :filtering:runDeviceBenchmark \
- *       -Pbenchmark.kernel=Turbulence -Pbenchmark.quick=true
+ *       -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.kernel=Turbulence \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
  *
  * Results are pulled with `adb pull` once the instrumentation run finishes.
  * `android.injected.androidTest.leaveApksInstalledAfterRun=true` keeps the
  * test APK (and its cache dir) on the device so the file survives the run
  * window long enough to be pulled.
+ *
+ * Optional simpleperf profiling (see KernelPerformanceDeviceBenchmark):
+ * the run then also pulls and prints the per-cell `simpleperf_benchmark_*.txt|.csv`
+ * profile dumps from the same cache dir.
+ *
+ *   ./gradlew :filtering:runDeviceBenchmark \
+ *       -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.kernel=Lighting \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.simpleperf=true \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.simpleperf.events=cpu-cycles+instructions
+ * (Note: AGP coerces a comma-separated instrumentation value down to its first element, so
+ *  through `runDeviceBenchmark` the events must be joined with `+`; commas are accepted only
+ *  when invoking `am instrument` directly.)
  */
 val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
     group = "verification"
@@ -221,8 +265,9 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
         // report only reflects the current run.
         if (tmpDir.exists()) {
             tmpDir.listFiles { _, name ->
-                (name.startsWith("benchmarks_device") || name.startsWith("benchmarks_harness_detail")) &&
-                    name.endsWith(".csv")
+                ((name.startsWith("benchmarks_device") || name.startsWith("benchmarks_harness_detail")) &&
+                    name.endsWith(".csv")) ||
+                    name.startsWith("simpleperf_benchmark")
             }?.forEach { it.delete() }
         }
         tmpDir.mkdirs()
@@ -288,6 +333,39 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
         }
 
         pulled.forEach { p -> logger.lifecycle("runDeviceBenchmark: pulled ${p.absolutePath}") }
+
+        // Pull + print the per-cell simpleperf profiles when the run used profiling.
+        // Cell names are simpleperf_benchmark_<Kernel>_<Backend>_<W>x<H>; both the raw
+        // simpleperf text dump (.txt) and the parsed CSV are fetched.
+        val profileRemote = adbRun(
+            "-s", serial, "shell", "find", "/storage/emulated/0/Android/data",
+            "-name", "simpleperf_benchmark_*.csv", "-type", "f",
+        )
+        val pulledProfiles = mutableListOf<File>()
+        profileRemote.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("/storage/emulated/0/Android/data/") && it.endsWith(".csv") }
+            .distinctBy { it.substringAfterLast('/') }
+            .forEach { path ->
+                val csvPath = path.trim()
+                val txtPath = csvPath.removeSuffix(".csv") + ".txt"
+                val base = csvPath.substringAfterLast('/').removeSuffix(".csv")
+                val destTxt = tmpDir.resolve("$base.txt")
+                adbRun("-s", serial, "pull", txtPath, destTxt.absolutePath)
+                adbRun("-s", serial, "pull", csvPath, tmpDir.resolve("$base.csv").absolutePath)
+                logger.lifecycle("== Simpleperf profile: $base ==")
+                if (destTxt.exists() && destTxt.length() > 0L) {
+                    logger.lifecycle(destTxt.readText().trim())
+                } else {
+                    logger.lifecycle("(no raw profile text pulled)")
+                }
+                pulledProfiles.add(tmpDir.resolve("$base.csv"))
+            }
+        if (pulledProfiles.isNotEmpty()) {
+            pulledProfiles.forEach { p ->
+                logger.lifecycle("runDeviceBenchmark: pulled profile ${p.absolutePath}")
+            }
+        }
 
         val rows: List<BenchRow> = run {
             val rows = mutableListOf<BenchRow>()
@@ -361,7 +439,6 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
     }
 }
 
-//noinspection UseTomlInstead
 dependencies {
     implementation("androidx.annotation:annotation:1.10.0")
 

@@ -116,6 +116,7 @@ add_library(ksvgblur SHARED
         component_transfer/component_transfer.cpp component_transfer/unlinearize.cpp
         displacement_map/displacement_map.cpp
         lighting/lighting.cpp
+        benchmark/cpu_affinity.cpp
         turbulence/turbulence.cpp turbulence/turbulence_arm.cpp
         arithmetic_composite/arithmetic_composite.cpp
         ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES})

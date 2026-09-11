@@ -22,15 +22,25 @@ package hu.oandras.ksvg.filtering
 public object DisplacementMapValidationCorpus {
 
     public class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val mapWidth: Int,
+        @JvmField
         public val mapHeight: Int,
+        @JvmField
         public val scale: Float,
+        @JvmField
         public val xChannel: Int,
+        @JvmField
         public val yChannel: Int,
+        @JvmField
         public val src: IntArray,
+        @JvmField
         public val map: IntArray,
     ) {
         public val size: Int get() = width * height

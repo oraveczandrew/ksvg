@@ -22,34 +22,62 @@ package hu.oandras.ksvg.filtering
 public object LightingValidationCorpus {
 
     public class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val clipLeft: Int,
+        @JvmField
         public val clipTop: Int,
+        @JvmField
         public val clipRight: Int,
+        @JvmField
         public val clipBottom: Int,
+        @JvmField
         public val surfaceScale: Float,
+        @JvmField
         public val invCanvasScaleX: Double,
+        @JvmField
         public val invCanvasScaleY: Double,
+        @JvmField
         public val userLeft: Double,
+        @JvmField
         public val userTop: Double,
+        @JvmField
         public val originX: Double,
+        @JvmField
         public val originY: Double,
+        @JvmField
         public val unitSizeX: Double,
+        @JvmField
         public val unitSizeY: Double,
+        @JvmField
         public val canvasScaleX: Float,
+        @JvmField
         public val canvasScaleY: Float,
+        @JvmField
         public val lightType: Int,
+        @JvmField
         public val specular: Boolean,
         public val k: Float,
+        @JvmField
         public val exponent: Float,
+        @JvmField
         public val lightR: Int,
+        @JvmField
         public val lightG: Int,
+        @JvmField
         public val lightB: Int,
+        @JvmField
         public val params: DoubleArray,
+        @JvmField
         public val premultiplied: Boolean,
+        @JvmField
         public val useLinear: Boolean,
+        @JvmField
         public val input: IntArray,
     ) {
         public val size: Int get() = width * height
@@ -71,6 +99,7 @@ public object LightingValidationCorpus {
         }
     }
 
+    @JvmField
     public val cases: List<Case> = buildList {
         // Distant light, diffuse
         add(Case(

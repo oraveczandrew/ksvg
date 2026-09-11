@@ -22,18 +22,31 @@ package hu.oandras.ksvg.filtering
 public object ConvolveValidationCorpus {
 
     public class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val kernel: FloatArray,
+        @JvmField
         public val orderX: Int,
+        @JvmField
         public val orderY: Int,
+        @JvmField
         public val targetX: Int,
+        @JvmField
         public val targetY: Int,
+        @JvmField
         public val divisor: Float,
+        @JvmField
         public val bias: Float,
+        @JvmField
         public val preserveAlpha: Boolean,
+        @JvmField
         public val edgeMode: Int,
+        @JvmField
         public val input: IntArray,
     ) {
         public val size: Int get() = width * height

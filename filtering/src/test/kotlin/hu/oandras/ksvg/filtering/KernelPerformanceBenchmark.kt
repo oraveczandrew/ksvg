@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg.filtering
 
-import hu.oandras.ksvg.filtering.StackBlur
 import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File

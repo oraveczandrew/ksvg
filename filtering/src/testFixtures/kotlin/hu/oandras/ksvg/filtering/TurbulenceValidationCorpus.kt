@@ -22,27 +22,49 @@ package hu.oandras.ksvg.filtering
 public object TurbulenceValidationCorpus {
 
     public data class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val clipLeft: Int,
+        @JvmField
         public val clipTop: Int,
+        @JvmField
         public val clipRight: Int,
+        @JvmField
         public val clipBottom: Int,
+        @JvmField
         public val baseFrequencyX: Double,
+        @JvmField
         public val baseFrequencyY: Double,
+        @JvmField
         public val periodX: Int,
+        @JvmField
         public val periodY: Int,
+        @JvmField
         public val octaves: Int,
+        @JvmField
         public val fractalNoise: Boolean,
+        @JvmField
         public val invCanvasScaleX: Double,
+        @JvmField
         public val invCanvasScaleY: Double,
+        @JvmField
         public val userLeft: Double,
+        @JvmField
         public val userTop: Double,
+        @JvmField
         public val originX: Double,
+        @JvmField
         public val originY: Double,
+        @JvmField
         public val unitSizeX: Double,
+        @JvmField
         public val unitSizeY: Double,
+        @JvmField
         public val seed: Int,
     ) {
         public val size: Int get() = width * height
@@ -67,6 +89,7 @@ public object TurbulenceValidationCorpus {
         }
     }
 
+    @JvmField
     public val cases: List<Case> = buildList {
         // Basic noise
         add(Case("noise 16x16", 16, 16, 0, 0, 16, 16, 0.05, 0.05, 0, 0, 1, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0))

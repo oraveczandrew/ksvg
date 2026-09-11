@@ -21,20 +21,34 @@ package hu.oandras.ksvg.filtering
  */
 public object MorphologyValidationCorpus {
 
+    @JvmField
     public val boundarySizes: IntArray = UnLinearizeValidationCorpus.boundarySizes
+
+    @JvmField
     public val shapes: Array<Pair<Int, Int>> = UnLinearizeValidationCorpus.shapes
 
     public class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val radiusX: Int,
+        @JvmField
         public val radiusY: Int,
+        @JvmField
         public val erode: Boolean,
+        @JvmField
         public val clipLeft: Int,
+        @JvmField
         public val clipTop: Int,
+        @JvmField
         public val clipRight: Int,
+        @JvmField
         public val clipBottom: Int,
+        @JvmField
         public val input: IntArray,
     ) {
         public val size: Int get() = width * height
@@ -52,6 +66,7 @@ public object MorphologyValidationCorpus {
         public fun freshInput(): IntArray = input.copyOf()
     }
 
+    @JvmField
     public val cases: List<Case> = buildList {
         // Erode and Dilate over various shapes
         for (erode in listOf(true, false)) {

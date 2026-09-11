@@ -34,12 +34,14 @@ public object UnLinearizeValidationCorpus {
     // ------------------------------------------------------------------ shapes
 
     /** Flat pixel-count buffers around every vector width (4/8/16 px) and its scalar tail. */
+    @JvmField
     public val boundarySizes: IntArray = intArrayOf(
         0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17,
         31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 257,
     )
 
     /** Image-shaped buffers: odd/non-multiple widths, single/multiple rows. */
+    @JvmField
     public val shapes: Array<Pair<Int, Int>> = arrayOf(
         1 to 1, 1 to 5, 2 to 3, 3 to 3, 5 to 7, 7 to 5, 9 to 9,
         16 to 1, 1 to 16, 33 to 9, 8 to 17, 64 to 1, 65 to 33,
@@ -124,11 +126,17 @@ public object UnLinearizeValidationCorpus {
      * [KotlinKernels.unLinearize] for every forced backend.
      */
     public class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val table: ByteArray,
+        @JvmField
         public val inPlace: Boolean,
+        @JvmField
         public val input: IntArray,
     ) {
         public val size: Int get() = width * height
@@ -145,6 +153,7 @@ public object UnLinearizeValidationCorpus {
     }
 
     /** The full corpus of cases for unlinearize validation. */
+    @JvmField
     public val cases: List<Case> = buildList {
         // Exhaustive LUT over SIMD-aligned and odd-tail sizes, separate src/dst.
         for ((w, h) in listOf(32 to 8, 16 to 16, 33 to 9, 65 to 33, 16 to 1)) {

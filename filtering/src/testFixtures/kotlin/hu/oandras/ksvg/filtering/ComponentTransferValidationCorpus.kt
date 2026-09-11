@@ -36,17 +36,29 @@ public object ComponentTransferValidationCorpus {
     }
 
     public class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val clipLeft: Int,
+        @JvmField
         public val clipTop: Int,
+        @JvmField
         public val clipRight: Int,
+        @JvmField
         public val clipBottom: Int,
+        @JvmField
         public val tableA: IntArray,
+        @JvmField
         public val tableR: IntArray,
+        @JvmField
         public val tableG: IntArray,
+        @JvmField
         public val tableB: IntArray,
+        @JvmField
         public val input: IntArray,
     ) {
         public val size: Int get() = width * height

@@ -29,13 +29,21 @@ import java.util.*
 public object KernelBenchmarkRunner {
 
     public data class Result(
+        @JvmField
         public val kernel: String,
+        @JvmField
         public val backend: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val avgMs: Double,
+        @JvmField
         public val mPixSec: Double,
+        @JvmField
         public val gbSec: Double,
+        @JvmField
         public val speedup: Double = 1.0
     )
 

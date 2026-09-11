@@ -22,19 +22,33 @@ package hu.oandras.ksvg.filtering
 public object ArithmeticCompositeValidationCorpus {
 
     public class Case(
+        @JvmField
         public val name: String,
+        @JvmField
         public val width: Int,
+        @JvmField
         public val height: Int,
+        @JvmField
         public val clipLeft: Int,
+        @JvmField
         public val clipTop: Int,
+        @JvmField
         public val clipRight: Int,
+        @JvmField
         public val clipBottom: Int,
+        @JvmField
         public val k1: Float,
+        @JvmField
         public val k2: Float,
+        @JvmField
         public val k3: Float,
+        @JvmField
         public val k4: Float,
+        @JvmField
         public val useLinear: Boolean,
+        @JvmField
         public val input1: IntArray,
+        @JvmField
         public val input2: IntArray,
     ) {
         public val size: Int get() = width * height

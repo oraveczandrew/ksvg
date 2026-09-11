@@ -49,13 +49,12 @@ internal object CpuInfo {
     val hardware: String = Build.HARDWARE
 
     /**
-     * Best-effort current CPU frequency of core 0, in kHz (`scaling_cur_freq`).
-     * Returns `null` if the sysfs file is absent, unreadable, or contains unparseable
-     * content.
+     * Best-effort current CPU frequency of the given [cpu], in kHz. Returns `null` if
+     * the sysfs file is absent, unreadable, or contains unparseable content.
      */
-    fun cpuFreqKhz(): Int? =
+    fun cpuFreqKhz(cpu: Int): Int? =
         try {
-            File("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
+            File("/sys/devices/system/cpu/cpu$cpu/cpufreq/scaling_cur_freq")
                 .readText()
                 .trim()
                 .toInt()

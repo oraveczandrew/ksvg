@@ -19,6 +19,7 @@ package hu.oandras.ksvg.filtering
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.benchmark.BenchmarkViewModel
+import hu.oandras.ksvg.filtering.benchmark.SimpleperfProfiler
 import hu.oandras.ksvg.filtering.benchmark.clearPreviousResults
 import hu.oandras.ksvg.filtering.benchmark.nativeBenchmark
 import org.junit.BeforeClass
@@ -42,6 +43,21 @@ import org.junit.runner.RunWith
  *    ArithmeticComposite (both modes), ConvolveMatrix, DisplacementMap, Lighting,
  *    Turbulence, GaussianBlur; empty runs the full suite.
  *  - `benchmark.quick` = true runs 512x512 only (else 512x512 + 2048x2048).
+ *
+ * Optional per-cell simpleperf profiling (opt-in; the default run is byte-identical to a
+ * run without profiling):
+ *  - `benchmark.simpleperf` = `true` profiles every measured cell (native backends + the
+ *    Kotlin reference) in its own thread-scoped window AFTER the timing cell — simpleperf
+ *    overhead never enters the reported MPix/s.
+ *  - `benchmark.simpleperf.events` = comma- or plus-separated events (validated against
+ *    `simpleperf list` on the device; default `cpu-cycles,instructions`). When the value is
+ *    forwarded through AGP's `-Pandroid.testInstrumentationRunnerArguments.*`, use `+` as the
+ *    separator — AGP coerces a comma-separated instrumentation value down to its first element.
+ *  - `benchmark.simpleperf.durationMs` = profile window in ms (default 2000).
+ *  - `benchmark.simpleperf.pinCore` = optional CPU index for the profile window
+ *    (default: unpinned, like the timing harness).
+ * Profiles land in the external cache as `simpleperf_benchmark_<Kernel>_<Backend>_<W>x<H>`
+ * `.txt`/`.csv` and are pulled+printed by `runDeviceBenchmark`.
  */
 @RunWith(AndroidJUnit4::class)
 class KernelPerformanceDeviceBenchmark {
@@ -53,6 +69,29 @@ class KernelPerformanceDeviceBenchmark {
         fun setup() {
             assertNativeBackendAvailable()
             clearPreviousResults()
+            val args = InstrumentationRegistry.getArguments()
+            simpleperfEnabled = args.getString("benchmark.simpleperf") == "true"
+            if (simpleperfEnabled) {
+                val profiler = SimpleperfProfiler(InstrumentationRegistry.getInstrumentation().targetContext)
+                simpleperfProfiler = profiler
+                simpleperfAvailable = profiler.isAvailable()
+                val requested = args.getString("benchmark.simpleperf.events")
+                        ?.split(",", "+")
+                        ?.map { it.trim() }
+                        ?.filter { it.isNotEmpty() }
+                        ?.takeIf { it.isNotEmpty() }
+                        ?: DEFAULT_SIMPLEPERF_EVENTS.split(",")
+                supportedEvents =
+                    if (simpleperfAvailable) profiler.supportedEvents(requested) else emptyList()
+                if (supportedEvents.isEmpty()) {
+                    println("Simpleperf: profiling requested but no supported events resolved; skipping all profiles")
+                } else {
+                    println("Simpleperf: resolved events -> ${supportedEvents.joinToString(",")}")
+                }
+                val duration = args.getString("benchmark.simpleperf.durationMs")?.toLongOrNull()
+                simpleperfDurationMs = if (duration != null && duration > 0) duration else DEFAULT_SIMPLEPERF_DURATION_MS
+                simpleperfPinCore = args.getString("benchmark.simpleperf.pinCore")?.toIntOrNull()
+            }
         }
 
         const val WARMUP_ITERATIONS = 10
@@ -62,13 +101,31 @@ class KernelPerformanceDeviceBenchmark {
         const val ITERATIONS_512 = 10
 
         const val ITERATIONS_2048 = 3
+
+        private const val DEFAULT_SIMPLEPERF_EVENTS = "cpu-cycles,instructions"
+
+        private const val DEFAULT_SIMPLEPERF_DURATION_MS = 2000L
+
+        private val SANITIZE_NAME_REGEX = Regex("[^A-Za-z0-9_.-]")
+
+        private var simpleperfEnabled: Boolean = false
+
+        private var simpleperfAvailable: Boolean = false
+
+        private var simpleperfProfiler: SimpleperfProfiler? = null
+
+        private var supportedEvents: List<String> = emptyList()
+
+        private var simpleperfDurationMs: Long = DEFAULT_SIMPLEPERF_DURATION_MS
+
+        private var simpleperfPinCore: Int? = null
     }
 
     @Test
     fun benchmarkAll() {
-        val quick =
-            InstrumentationRegistry.getArguments().getString("benchmark.quick") == "true"
-        val target = InstrumentationRegistry.getArguments().getString("benchmark.kernel")
+        val instrumentationArguments = InstrumentationRegistry.getArguments()
+        val quick = instrumentationArguments.getString("benchmark.quick") == "true"
+        val target = instrumentationArguments.getString("benchmark.kernel")
         val benchmarkSizes = sizes(quick)
         BenchmarkViewModel.beginSuite(totalRuns(target, benchmarkSizes))
         if (target.isNullOrEmpty() || target == "UnLinearize") benchmarkUnLinearize(benchmarkSizes)
@@ -577,6 +634,7 @@ class KernelPerformanceDeviceBenchmark {
                 if (width * height <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
             run(body)
         }
+        profileCell(name, "kotlin", width, height, body)
     }
 
     private fun benchmarkCells(
@@ -599,8 +657,32 @@ class KernelPerformanceDeviceBenchmark {
                 iterationsPerBatch = iterationsForSize(w, h)
                 run { body(b) }
             }
+            profileCell(name, backendName(b), w, h) { body(b) }
         }
     }
+
+    /**
+     * Profiles one cell in its own simpleperf window on the SAME thread as the timing cell
+     * (thread-scoped counters, GC/alloc threads excluded). Runs only when profiling was
+     * requested and the device exposes `simpleperf`. The profile window shares the cell's
+     * work but is entirely separate from the timing iterations, so profiling never
+     * changes the reported MPix/s.
+     */
+    private fun profileCell(name: String, backend: String, w: Int, h: Int, work: () -> Unit) {
+        val profiler = simpleperfProfiler ?: return
+        if (!simpleperfAvailable) return
+        val events = supportedEvents
+        if (events.isEmpty()) return
+        profiler.profile(
+            name = "benchmark_${sanitizeName(name)}_${sanitizeName(backend)}_${w}x${h}",
+            events = events,
+            durationMs = simpleperfDurationMs,
+            cpuCore = simpleperfPinCore,
+            work = work,
+        )
+    }
+
+    private fun sanitizeName(raw: String): String = raw.replace(SANITIZE_NAME_REGEX, "_")
 
     private fun sizes(quick: Boolean): Array<Pair<Int, Int>> =
         if (quick) arrayOf(512 to 512) else arrayOf(512 to 512, 2048 to 2048)
