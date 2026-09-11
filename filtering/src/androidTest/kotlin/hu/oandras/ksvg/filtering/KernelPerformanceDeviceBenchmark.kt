@@ -70,6 +70,7 @@ class KernelPerformanceDeviceBenchmark {
             assertNativeBackendAvailable()
             clearPreviousResults()
             val args = InstrumentationRegistry.getArguments()
+            thermalGatingEnabled = args.getString("benchmark.thermalGating") != "false"
             simpleperfEnabled = args.getString("benchmark.simpleperf") == "true"
             if (simpleperfEnabled) {
                 val profiler = SimpleperfProfiler(getTestTargetContext())
@@ -102,6 +103,28 @@ class KernelPerformanceDeviceBenchmark {
 
         const val ITERATIONS_2048 = 3
 
+        /**
+         * Warmup-calibrated target batch duration (ms): short kernels (sub-ms at 512²) get
+         * more iterations per batch so the batch-average-CV classifier averages out
+         * per-iteration timer/GC noise instead of flagging the cell UNSTABLE.
+         */
+        const val TARGET_BATCH_MILLIS = 100L
+
+        /**
+         * Upper cap on calibration, so very fast kernels cannot stretch one batch beyond
+         * the target duration.
+         */
+        const val MAX_ITERATIONS_PER_BATCH = 200
+
+        /** GB/s byte counts: ARGB read + ARGB write per pixel. */
+        private const val BYTES_PER_PIXEL_RW = 8
+
+        /** Two-source kernels also read a second input buffer per pixel. */
+        private const val BYTES_PER_PIXEL_TWO_SOURCES = 12
+
+        /** Pure generators only write the output buffer. */
+        private const val BYTES_PER_PIXEL_GENERATE = 4
+
         private const val DEFAULT_SIMPLEPERF_EVENTS = "cpu-cycles,instructions"
 
         private const val DEFAULT_SIMPLEPERF_DURATION_MS = 2000L
@@ -119,6 +142,9 @@ class KernelPerformanceDeviceBenchmark {
         private var simpleperfDurationMs: Long = DEFAULT_SIMPLEPERF_DURATION_MS
 
         private var simpleperfPinCore: Int? = null
+
+        /** Thermal gate on/off for the whole suite; `benchmark.thermalGating=false` disables it. */
+        private var thermalGatingEnabled: Boolean = true
     }
 
     @Test
@@ -148,7 +174,12 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            benchmarkKotlin("UnLinearize", w, h) {
+            benchmarkKotlin(
+                name = "UnLinearize",
+                width = w,
+                height = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
+            ) {
                 KotlinKernels.unLinearize(
                     src = src,
                     dst = dst,
@@ -162,7 +193,8 @@ class KernelPerformanceDeviceBenchmark {
                 name = "UnLinearize",
                 backendFlags = UnLinearizeNative.nativeBackend(),
                 w = w,
-                h = h
+                h = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
             ) { b ->
                 UnLinearizeNative.applyForced(
                     src = src,
@@ -182,7 +214,12 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            benchmarkKotlin("ComponentTransfer", w, h) {
+            benchmarkKotlin(
+                name = "ComponentTransfer",
+                width = w,
+                height = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
+            ) {
                 KotlinKernels.componentTransfer(
                     src = src,
                     dst = dst,
@@ -202,7 +239,8 @@ class KernelPerformanceDeviceBenchmark {
                 name = "ComponentTransfer",
                 backendFlags = ComponentTransferNative.nativeBackend(),
                 w = w,
-                h = h
+                h = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
             ) { b ->
                 ComponentTransferNative.applyForced(
                     src = src,
@@ -228,7 +266,12 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            benchmarkKotlin("Morphology", w, h) {
+            benchmarkKotlin(
+                name = "Morphology",
+                width = w,
+                height = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
+            ) {
                 KotlinKernels.morphology(
                     src = src,
                     dst = dst,
@@ -248,7 +291,8 @@ class KernelPerformanceDeviceBenchmark {
                 name = "Morphology",
                 backendFlags = MorphologyNative.nativeBackend(),
                 w = w,
-                h = h
+                h = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
             ) { b ->
                 MorphologyNative.applyForced(
                     src = src,
@@ -278,9 +322,10 @@ class KernelPerformanceDeviceBenchmark {
             val dst = IntArray(w * h)
 
             benchmarkKotlin(
-                if (useLinear) "ArithmeticComposite (linear)" else "ArithmeticComposite (non-linear)",
-                w,
-                h
+                name = if (useLinear) "ArithmeticComposite (linear)" else "ArithmeticComposite (non-linear)",
+                width = w,
+                height = h,
+                bytesPerPixel = BYTES_PER_PIXEL_TWO_SOURCES
             ) {
                 KotlinKernels.arithmeticComposite(
                     inputPixels = src1,
@@ -303,7 +348,8 @@ class KernelPerformanceDeviceBenchmark {
                 name = if (useLinear) "ArithmeticComposite (linear)" else "ArithmeticComposite (non-linear)",
                 backendFlags = ArithmeticCompositeNative.nativeBackend(),
                 w = w,
-                h = h
+                h = h,
+                bytesPerPixel = BYTES_PER_PIXEL_TWO_SOURCES
             ) { b ->
                 ArithmeticCompositeNative.applyForced(
                     src1 = src1,
@@ -339,7 +385,12 @@ class KernelPerformanceDeviceBenchmark {
             val src = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            benchmarkKotlin("ConvolveMatrix", w, h) {
+            benchmarkKotlin(
+                name = "ConvolveMatrix",
+                width = w,
+                height = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
+            ) {
                 KotlinKernels.convolveMatrix(
                     srcPixels = src,
                     outPixels = dst,
@@ -361,7 +412,8 @@ class KernelPerformanceDeviceBenchmark {
                 name = "ConvolveMatrix",
                 backendFlags = ConvolveNative.nativeBackend(),
                 w = w,
-                h = h
+                h = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
             ) { b ->
                 ConvolveNative.applyForced(
                     src = src,
@@ -389,7 +441,12 @@ class KernelPerformanceDeviceBenchmark {
             val map = IntArray(w * h)
             val dst = IntArray(w * h)
 
-            benchmarkKotlin("DisplacementMap", w, h) {
+            benchmarkKotlin(
+                name = "DisplacementMap",
+                width = w,
+                height = h,
+                bytesPerPixel = BYTES_PER_PIXEL_TWO_SOURCES
+            ) {
                 KotlinKernels.displacementMap(
                     src = src,
                     map = map,
@@ -408,7 +465,8 @@ class KernelPerformanceDeviceBenchmark {
                 name = "DisplacementMap",
                 backendFlags = DisplacementMapNative.nativeBackend(),
                 w = w,
-                h = h
+                h = h,
+                bytesPerPixel = BYTES_PER_PIXEL_TWO_SOURCES
             ) { b ->
                 DisplacementMapNative.applyForced(
                     src = src,
@@ -433,7 +491,12 @@ class KernelPerformanceDeviceBenchmark {
             val pix = IntArray(w * h)
             val out = IntArray(w * h)
 
-            benchmarkKotlin("Lighting", w, h) {
+            benchmarkKotlin(
+                name = "Lighting",
+                width = w,
+                height = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
+            ) {
                 KotlinKernels.lighting(
                     pix = pix,
                     out = out,
@@ -471,7 +534,8 @@ class KernelPerformanceDeviceBenchmark {
                 name = "Lighting",
                 backendFlags = LightingNative.nativeBackend(),
                 w = w,
-                h = h
+                h = h,
+                bytesPerPixel = BYTES_PER_PIXEL_RW
             ) { b ->
                 LightingNative.applyForced(
                     pix = pix,
@@ -518,7 +582,7 @@ class KernelPerformanceDeviceBenchmark {
             val generators = Array(4) { SvgPathNoise(lcg, p) }
             SvgPathNoise.buildPermutation(lcg, p)
 
-            benchmarkKotlin("Turbulence", w, h) {
+            benchmarkKotlin("Turbulence", w, h, BYTES_PER_PIXEL_GENERATE) {
                 KotlinKernels.turbulence(
                     pixels = pixels,
                     width = w,
@@ -548,7 +612,8 @@ class KernelPerformanceDeviceBenchmark {
                 name = "Turbulence",
                 backendFlags = TurbulenceNative.nativeBackend(),
                 w = w,
-                h = h
+                h = h,
+                bytesPerPixel = BYTES_PER_PIXEL_GENERATE
             ) { b ->
                 TurbulenceNative.applyForced(
                     pixels = pixels,
@@ -585,7 +650,7 @@ class KernelPerformanceDeviceBenchmark {
             for ((w, h) in sizes) {
                 val pix = IntArray(w * h)
 
-                benchmarkKotlin("GaussianBlur", w, h) {
+                benchmarkKotlin("GaussianBlur", w, h, BYTES_PER_PIXEL_RW) {
                     StackBlur.blur(
                         pixels = pix,
                         width = w,
@@ -599,7 +664,8 @@ class KernelPerformanceDeviceBenchmark {
                     name = "GaussianBlur",
                     backendFlags = NativeGaussianBlur.nativeBackend(5f, 5f),
                     w = w,
-                    h = h
+                    h = h,
+                    bytesPerPixel = BYTES_PER_PIXEL_RW
                 ) { b ->
                     NativeGaussianBlur.applyForced(
                         scratch = scratch,
@@ -622,7 +688,14 @@ class KernelPerformanceDeviceBenchmark {
      * Buffers are owned by the caller and reused across backends, so the measured region is
      * exactly the kernel call (spec §20).
      */
-    private fun benchmarkKotlin(name: String, width: Int, height: Int, body: () -> Unit) {
+    private fun benchmarkKotlin(
+        name: String,
+        width: Int,
+        height: Int,
+        bytesPerPixel: Int,
+        body: () -> Unit
+    ) {
+        val runWithThermalGating = thermalGatingEnabled
         nativeBenchmark {
             this.name = name
             backend = "kotlin"
@@ -632,6 +705,10 @@ class KernelPerformanceDeviceBenchmark {
             measurementBatches = MEASUREMENT_BATCHES
             iterationsPerBatch =
                 if (width * height <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
+            targetBatchMillis = TARGET_BATCH_MILLIS
+            maxIterationsPerBatch = MAX_ITERATIONS_PER_BATCH
+            this.bytesPerPixel = bytesPerPixel
+            thermalGatingEnabled = runWithThermalGating
             run(body)
         }
         profileCell(name, "kotlin", width, height, body)
@@ -642,8 +719,10 @@ class KernelPerformanceDeviceBenchmark {
         @SimdBackend backendFlags: Int,
         w: Int,
         h: Int,
+        bytesPerPixel: Int,
         body: (simdBackend: Int) -> Unit
     ) {
+        val runWithThermalGating = thermalGatingEnabled
         for (b in getBackendsFor(backendFlags)) {
             nativeBenchmark {
                 this.name = name
@@ -655,6 +734,10 @@ class KernelPerformanceDeviceBenchmark {
                 // Fewer iterations per batch at 2048x2048 so the large-kernel cells stay
                 // bounded (old runner used 20/2); batch-average CV needs only ~3-5 samples.
                 iterationsPerBatch = iterationsForSize(w, h)
+                targetBatchMillis = TARGET_BATCH_MILLIS
+                maxIterationsPerBatch = MAX_ITERATIONS_PER_BATCH
+                this.bytesPerPixel = bytesPerPixel
+                thermalGatingEnabled = runWithThermalGating
                 run { body(b) }
             }
             profileCell(name, backendName(b), w, h) { body(b) }

@@ -72,6 +72,39 @@ internal class BenchmarkViewModel : ViewModel() {
             globalRun.set(totalRuns.coerceAtLeast(0))
         }
 
+        /**
+         * Withdraws one measured cell's *static* iteration estimate from the global total.
+         * Calibration changes the real per-batch count, so [commitCellPlan] re-adds the true
+         * plan for the cell once it is known; this keeps the live global total (= sum of the
+         * real per-cell plans) honest for the progress bar without precomputing calibration.
+         */
+        internal fun enterCell(estimatedForCell: Int) {
+            var done = false
+            while (!done) {
+                val current = globalRun.get()
+                done = globalRun.compareAndSet(
+                    current,
+                    (current - estimatedForCell.coerceAtLeast(0)).coerceAtLeast(0),
+                )
+            }
+        }
+
+        /**
+         * Re-adds the real per-cell plan (actual warmup samples + batches x effective
+         * per-batch count) after calibration fixed it; see [enterCell].
+         */
+        internal fun commitCellPlan(actualForCell: Int) {
+            globalRun.addAndGet(actualForCell.coerceAtLeast(0))
+        }
+
+        /**
+         * Adds iterations a thermal-invalidated batch will re-run, so the global total keeps
+         * counting them while the batch is retried.
+         */
+        internal fun addInvalidatedIterations(count: Int) {
+            globalRun.addAndGet(count.coerceAtLeast(0))
+        }
+
         internal fun advanceGlobalProgress(): Int = globalCurrentRun.incrementAndGet()
 
         internal fun currentGlobalRun(): Int = globalCurrentRun.get()
@@ -87,15 +120,35 @@ internal class BenchmarkViewModel : ViewModel() {
         buildString {
             appendLine("KSVG benchmark")
             appendLine("Benchmark: ${state.benchmark.ifBlank { "-" }}")
-            appendLine("Backend: ${state.backend.ifBlank { "-" }}")
-            appendLine("Size: ${state.size.ifBlank { "-" }}")
+            appendLine("Backend: ${state.backend.ifBlank { "-" }} | Size: ${state.size.ifBlank { "-" }}")
             appendLine("Phase: ${state.phase.ifBlank { "-" }}")
+            if (state.phase.startsWith("WARMUP") && state.calibrationActive) {
+                // Adaptive warmup: wall-budget capped, no fixed denominator to trust.
+                appendLine("Warmup: ${state.warmupSamples} samples (wall ${state.warmupWallMs} ms)")
+            } else {
+                appendLine(
+                    "Iteration: ${state.iteration}/${state.totalIterations.takeIf { it > 0 } ?: "-"}"
+                )
+            }
             appendLine(
-                "Iteration: ${state.iteration}/${state.totalIterations.takeIf { it > 0 } ?: "-"}"
+                "Batches: ${state.validBatches}/${state.requestedBatches.takeIf { it > 0 } ?: "-"} valid" +
+                    " (+${state.invalidatedBatches} invalidated)"
             )
-            appendLine("Status: ${state.status}")
-            appendLine("Invalidated batches: ${state.invalidatedBatches}")
-            appendLine("Cooldown: ${state.cooldownMillis} ms")
+            if (state.effectiveIterationsPerBatch > 0) {
+                appendLine(
+                    "Per-batch iters: ${state.effectiveIterationsPerBatch}" +
+                        " (requested ${state.requestedIterationsPerBatch}, " +
+                        "max ${state.maxIterationsPerBatch}, target ${state.targetBatchMillis} ms)"
+                )
+            } else if (state.requestedIterationsPerBatch > 0) {
+                appendLine("Per-batch iters: ${state.requestedIterationsPerBatch} (not yet calibrated)")
+            }
+            if (state.calibrationActive) appendLine("Batch calibration: ON")
+            appendLine(
+                "Thermal gate: ${if (state.thermalGatingEnabled) "ON" else "OFF"} | " +
+                    "Status: ${state.status}"
+            )
+            if (state.cooldownMillis > 0L) appendLine("Cooldown: ${state.cooldownMillis} ms")
             appendLine("Elapsed: ${state.elapsedMillis} ms")
             if (state.message.isNotBlank()) appendLine("Message: ${state.message}")
             val totalRuns = state.globalRun

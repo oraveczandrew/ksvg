@@ -14,6 +14,8 @@
  *    limitations under the License.
  */
 
+@file:OptIn(ExperimentalContracts::class)
+
 package hu.oandras.ksvg.filtering.benchmark
 
 import android.content.Context
@@ -22,7 +24,10 @@ import android.os.Process
 import android.os.SystemClock
 import hu.oandras.ksvg.filtering.getTestTargetContext
 import java.io.File
-import java.util.Locale
+import java.util.*
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 
 /**
  * Clears every benchmark CSV and simpleperf profile dump from the device's external cache
@@ -68,7 +73,10 @@ fun clearPreviousResults() {
      * ([BenchmarkActivity]), benchmark-thread priority raise/restore, warmup, a batch
      * measurement loop with per-iteration `System.nanoTime()` sampling, thermal gating
      * ([ThermalStateMonitor], spec §6/§7: batches measured while throttled are dropped),
-     * per-sample statistics ([BenchmarkStats], spec §14), and an environment report. The
+     * optional warmup-based batch calibration — set [NativeBenchmarkBuilder.targetBatchMillis]
+     * to time the warmup and scale the per-batch iteration count toward a target batch
+     * duration, so sub-ms kernels average out per-iteration timer/GC noise — per-sample
+     * statistics ([BenchmarkStats], spec §14), and an environment report. The
      * measured region is exactly the [run] block (spec §20: no logging, I/O, thermal reads
      * or GC inside it).
      *
@@ -76,6 +84,10 @@ fun clearPreviousResults() {
      * comparison.
      */
 fun nativeBenchmark(configure: NativeBenchmarkBuilder.() -> Unit): NativeBenchmarkReport {
+    contract {
+        callsInPlace(configure, InvocationKind.EXACTLY_ONCE)
+    }
+
     val builder = NativeBenchmarkBuilder()
     builder.configure()
     return builder.execute()
@@ -105,6 +117,44 @@ class NativeBenchmarkBuilder {
     var iterationsPerBatch: Int = 10
 
     /**
+     * Warmup-based batch calibration (short-kernel fix): when `> 0`, every warmup iteration
+     * is timed with the same `System.nanoTime()` sampling, the median warmup time becomes
+     * the per-iteration estimate, and the batch count is derived from [targetBatchMillis]
+     * (clamped to `iterationsPerBatch..max(iterationsPerBatch, maxIterationsPerBatch)`).
+     * Sub-ms cells then gather enough samples per batch for the batch-average CV rule to
+     * average out per-iteration timer/GC noise (~1/√n). `0` disables calibration and keeps
+     * the legacy exact-`iterationsPerBatch` behavior.
+     */
+    @JvmField
+    var targetBatchMillis: Long = 0L
+
+    /**
+     * Upper cap for the [targetBatchMillis] calibration so a very fast kernel cannot stretch
+     * one batch far beyond the target duration.
+     */
+    @JvmField
+    var maxIterationsPerBatch: Int = 200
+
+    /**
+     * Bytes read+written per pixel by the measured kernel (4 bytes/pixel × buffer count),
+     * used to derive the GB/s throughput column (`GB/s = MPix/s × bytesPerPixel / 1000`,
+     * matching the host runner's `4 × numBuffers` convention). Defaults to 8 (ARGB in +
+     * ARGB out). Two-source composite kernels (DisplacementMap, ArithmeticComposite) use 12;
+     * pure generators that only write output (Turbulence) use 4.
+     */
+    @JvmField
+    var bytesPerPixel: Int = 8
+
+    /**
+     * When `false`, the thermal gate is disabled: batches are never invalidated by the
+     * thermal monitor. Intended for deterministic environments (emulators, CI) where the
+     * API<29 fallback compute-probe is noisy without representing real throttling; real
+     * devices keep this enabled.
+     */
+    @JvmField
+    var thermalGatingEnabled: Boolean = true
+
+    /**
      * If set, pins the benchmark thread to this concrete Linux CPU for warmup + all
      * measurement batches (diagnostic runs only, e.g. Lighting scalar-vs-NEON). The
      * chosen core is reported as `benchmarkCpu=<N>` in the environment block.
@@ -123,6 +173,12 @@ class NativeBenchmarkBuilder {
 
     private var body: (() -> Unit)? = null
 
+    /** Last wall-clock timestamp a progress state was pushed (rate-limit for the UI). */
+    private var lastProgressPushMs = -1L
+
+    /** Live per-cell technical state; mutated by [execute] and snapshotted by [publishProgress]. */
+    private var currentTask = BenchmarkTask()
+
     /** The measured region: the native kernel call and nothing else. */
     fun run(runBody: () -> Unit) {
         body = runBody
@@ -131,7 +187,27 @@ class NativeBenchmarkBuilder {
     internal fun execute(): NativeBenchmarkReport {
         val kernel = requireNotNull(body) { "nativeBenchmark { run { ... } } is required" }
         val startedAt = SystemClock.elapsedRealtime()
-        publishProgress(startedAt, BenchmarkUiStatus.RUNNING, "FOCUSING", 0, 1, 0, 0)
+
+        // Live task state for the Activity: the static config first, the dynamic fields
+        // (warmup samples, effective per-batch count, batchets) are updated while running.
+        currentTask.benchmark = name
+        currentTask.backend = backend
+        currentTask.width = width
+        currentTask.height = height
+        currentTask.calibrationActive = targetBatchMillis > 0L
+        currentTask.thermalGatingEnabled = thermalGatingEnabled
+        currentTask.targetBatchMillis = targetBatchMillis
+        currentTask.requestedIterationsPerBatch = iterationsPerBatch
+        currentTask.maxIterationsPerBatch = maxIterationsPerBatch
+        currentTask.requestedBatches = measurementBatches
+        currentTask.phase = "FOCUSING"
+        currentTask.iteration = 0
+        currentTask.iterationTotal = 1
+        // Live global total: withdraw this cell's static iteration estimate now; it is
+        // replaced by the real plan in `commitCellPlan` once calibration fixed the
+        // per-batch count (so the global bar reflects post-calibration reality).
+        BenchmarkViewModel.enterCell(warmupIterations + measurementBatches * iterationsPerBatch)
+        publishProgress(startedAt, BenchmarkUiStatus.RUNNING)
         BenchmarkActivity.waitForFocusedWindow()
 
         val thermal = ThermalStateMonitor.create(getTestTargetContext())
@@ -158,22 +234,79 @@ class NativeBenchmarkBuilder {
         var thermalThrottled = false
         var invalidatedBatches = 0
         var cooldownTimeMs = 0L
-        var benchCpuAfter = -1
+        var benchCpuAfter: Int
+        var calibratedPerIterationMs = 0.0
+        val effectiveIterationsPerBatch: Int
         try {
-            // Warmup never touches the measured region either.
-            repeat(warmupIterations) { iteration ->
-                BenchmarkViewModel.advanceGlobalProgress()
-                publishProgress(
-                    startedAt,
-                    BenchmarkUiStatus.RUNNING,
-                    "WARMUP",
-                    iteration + 1,
-                    warmupIterations,
-                    invalidatedBatches,
-                    cooldownTimeMs,
-                )
-                kernel.invoke()
+            val calibrationActive = targetBatchMillis > 0L
+            currentTask.calibrationActive = calibrationActive
+            val warmupActualIterations: Int
+            if (!calibrationActive) {
+                // Legacy path: untimed warmup, fixed iterationsPerBatch per batch.
+                var iteration = 0
+                currentTask.phase = "WARMUP"
+                while (iteration < warmupIterations) {
+                    iteration++
+                    currentTask.iteration = iteration
+                    currentTask.iterationTotal = warmupIterations
+                    BenchmarkViewModel.advanceGlobalProgress()
+                    publishProgress(startedAt, BenchmarkUiStatus.RUNNING)
+                    kernel.invoke()
+                }
+                warmupActualIterations = warmupIterations
+                effectiveIterationsPerBatch = iterationsPerBatch
+                currentTask.effectiveIterationsPerBatch = effectiveIterationsPerBatch
+            } else {
+                // Calibration path: time the warmup iterations with the same nanoTime
+                // sampling. The 25th percentile is robust even when a GC/JIT storm inflates a
+                // large share of the samples; it calibrates the batch so short kernels gather
+                // enough samples to average out per-iteration timer/GC noise. Multi-second
+                // cells stop early at [MAX_WARMUP_WALL_MS] — for them the precise estimate is
+                // irrelevant because the derived batch count already floors to the minimum.
+                val warmupTimes = DoubleArray(MIN_CALIBRATION_SAMPLES)
+                var iteration = 0
+                var warmupWallMs = 0L
+                currentTask.phase = "WARMUP"
+                while (
+                    iteration < MIN_CALIBRATION_SAMPLES &&
+                    warmupWallMs < MAX_WARMUP_WALL_MS
+                ) {
+                    iteration++
+                    currentTask.iteration = iteration
+                    currentTask.iterationTotal = MIN_CALIBRATION_SAMPLES
+                    currentTask.warmupSamples = iteration
+                    currentTask.warmupWallMs = warmupWallMs
+                    BenchmarkViewModel.advanceGlobalProgress()
+                    publishProgress(startedAt, BenchmarkUiStatus.RUNNING)
+                    val t0 = System.nanoTime()
+                    kernel.invoke()
+                    val t1 = System.nanoTime()
+                    val sampleMs = (t1 - t0) / 1_000_000.0
+                    warmupWallMs += sampleMs.toLong()
+                    warmupTimes[iteration - 1] = sampleMs
+                }
+                warmupActualIterations = iteration
+                currentTask.warmupSamples = warmupActualIterations
+                currentTask.warmupWallMs = warmupWallMs
+                warmupTimes.sort(0, warmupActualIterations)
+                calibratedPerIterationMs =
+                    robustShortIterationMs(warmupTimes, warmupActualIterations)
+                effectiveIterationsPerBatch =
+                    if (calibratedPerIterationMs > 0.0) {
+                        val cap = maxOf(iterationsPerBatch, maxIterationsPerBatch)
+                        (targetBatchMillis.toDouble() / calibratedPerIterationMs).toInt()
+                            .coerceIn(iterationsPerBatch, cap)
+                    } else {
+                        maxOf(iterationsPerBatch, maxIterationsPerBatch)
+                    }
+                currentTask.effectiveIterationsPerBatch = effectiveIterationsPerBatch
             }
+            // The real per-cell plan is known once calibration fixed the per-batch count
+            // (warmup + batches x effective per batch). Thermal invalidation re-runs a batch
+            // later and adds its iterations to the global total on the fly.
+            BenchmarkViewModel.commitCellPlan(
+                warmupActualIterations + measurementBatches * effectiveIterationsPerBatch
+            )
 
             // Batches are gated on thermal state (spec §6/§9): a batch measured while
             // throttled is invalidated (not counted) -> cooldown sleep -> fresh batch.
@@ -181,70 +314,67 @@ class NativeBenchmarkBuilder {
             val maxAttempts = maxOf(measurementBatches * 3, measurementBatches + 8)
             while (validBatches.size < measurementBatches && attempted < maxAttempts) {
                 attempted++
-                if (thermal.isThrottled()) {
+                if (thermalGatingEnabled && thermal.isThrottled()) {
                     thermalThrottled = true
-                    invalidatedBatches++
+                    currentTask.invalidatedBatches = ++invalidatedBatches
+                    currentTask.phase = "THERMAL GATE"
+                    currentTask.iteration = validBatches.size
+                    currentTask.iterationTotal = measurementBatches
+                    // The rejected batch would have run `effective` iterations; keep the
+                    // live global total honest across the retry.
+                    BenchmarkViewModel.addInvalidatedIterations(effectiveIterationsPerBatch)
                     publishProgress(
                         startedAt,
                         BenchmarkUiStatus.COOLING,
-                        "THERMAL GATE",
-                        validBatches.size,
-                        measurementBatches,
-                        invalidatedBatches,
-                        cooldownTimeMs,
                         "Thermal gate rejected the next batch",
                     )
                     cooldownTimeMs += cooldown()
+                    currentTask.cooldownMillis = cooldownTimeMs
                     continue
                 }
                 // Flush CPU-cache state left by the previous batch (spec §8; outside
                 // the measured region — no kernel call, no timing here).
                 CacheNormalizer.normalize()
-                val batch = DoubleArray(iterationsPerBatch)
-                for (i in 0 until iterationsPerBatch) {
+                val batch = DoubleArray(effectiveIterationsPerBatch)
+                val batchIndex = validBatches.size + 1
+                currentTask.phase = "MEASUREMENT BATCH $batchIndex"
+                currentTask.iterationTotal = effectiveIterationsPerBatch
+                for (i in 0 until effectiveIterationsPerBatch) {
+                    currentTask.iteration = i + 1
                     BenchmarkViewModel.advanceGlobalProgress()
-                    publishProgress(
-                        startedAt,
-                        BenchmarkUiStatus.RUNNING,
-                        "MEASUREMENT BATCH ${validBatches.size + 1}",
-                        i + 1,
-                        iterationsPerBatch,
-                        invalidatedBatches,
-                        cooldownTimeMs,
-                    )
+                    publishProgress(startedAt, BenchmarkUiStatus.RUNNING)
                     val t0 = System.nanoTime()
                     kernel.invoke()
                     val t1 = System.nanoTime()
                     batch[i] = (t1 - t0) / 1_000_000.0
                 }
-                if (thermal.isThrottled()) {
+                if (thermalGatingEnabled && thermal.isThrottled()) {
                     // Status rose while the batch was being measured -> invalid (spec §6).
                     thermalThrottled = true
-                    invalidatedBatches++
+                    currentTask.invalidatedBatches = ++invalidatedBatches
+                    currentTask.phase = "THERMAL RECOVERY"
+                    currentTask.iteration = validBatches.size
+                    currentTask.iterationTotal = measurementBatches
+                    BenchmarkViewModel.addInvalidatedIterations(effectiveIterationsPerBatch)
                     publishProgress(
                         startedAt,
                         BenchmarkUiStatus.THERMAL_RECOVERY,
-                        "THERMAL RECOVERY",
-                        validBatches.size,
-                        measurementBatches,
-                        invalidatedBatches,
-                        cooldownTimeMs,
                         "Measured batch invalidated by thermal throttling",
                     )
                     cooldownTimeMs += cooldown()
+                    currentTask.cooldownMillis = cooldownTimeMs
                     continue
                 }
                 validBatches.add(batch)
+                currentTask.validBatches = validBatches.size
             }
         } catch (t: Throwable) {
+            currentTask.phase = "FAILED"
+            currentTask.iteration = validBatches.size
+            currentTask.iterationTotal = measurementBatches
             publishProgress(
                 startedAt,
                 BenchmarkUiStatus.FAILED,
-                "FAILED",
-                validBatches.size,
-                measurementBatches,
-                invalidatedBatches,
-                cooldownTimeMs,
                 t.message ?: t::class.java.simpleName,
             )
             throw t
@@ -270,6 +400,7 @@ class NativeBenchmarkBuilder {
                 thermalThrottled = thermalThrottled,
                 invalidatedBatches = invalidatedBatches,
                 cooldownTimeMs = cooldownTimeMs,
+                bytesPerPixel = bytesPerPixel,
                 environment =
                     buildEnvironment(
                         frontend = this,
@@ -285,18 +416,20 @@ class NativeBenchmarkBuilder {
                         pinnedCore = pinnedCore,
                         affinityApplied = affinityApplied,
                         benchCpuAfter = benchCpuAfter,
+                        calibratedPerIterationMs = calibratedPerIterationMs,
+                        effectiveIterationsPerBatch = effectiveIterationsPerBatch,
                     ),
             )
         report.print()
         report.writeCsv(getTestTargetContext())
+        currentTask.phase = "COMPLETED"
+        currentTask.iteration = measurementBatches
+        currentTask.iterationTotal = measurementBatches
+        currentTask.validBatches = validBatches.size
+        currentTask.cooldownMillis = cooldownTimeMs
         publishProgress(
             startedAt,
             BenchmarkUiStatus.COMPLETED,
-            "COMPLETED",
-            measurementBatches,
-            measurementBatches,
-            invalidatedBatches,
-            cooldownTimeMs,
             "classification=${report.classification}",
         )
         return report
@@ -305,28 +438,51 @@ class NativeBenchmarkBuilder {
     private fun publishProgress(
         startedAt: Long,
         status: BenchmarkUiStatus,
-        phase: String,
-        iteration: Int,
-        totalIterations: Int,
-        invalidatedBatches: Int,
-        cooldownMillis: Long,
         message: String = "",
     ) {
+        currentTask.status = status
+        currentTask.message = message
+        // Rate-limited: pushing a fresh BenchmarkUiState per iteration allocates enough to
+        // park the GC in the middle of measured batches. Always push on phase/batch start and
+        // on terminal states; otherwise at ~PROGRESS_PUSH_INTERVAL_MS granularity only.
+        val now = SystemClock.elapsedRealtime()
+        val mustPush =
+            currentTask.iteration <= 1 ||
+                status == BenchmarkUiStatus.COMPLETED ||
+                status == BenchmarkUiStatus.FAILED ||
+                now - lastProgressPushMs >= PROGRESS_PUSH_INTERVAL_MS
+        if (!mustPush) return
+        lastProgressPushMs = now
         BenchmarkViewModel.publishProgress(
             BenchmarkUiState(
-                benchmark = name,
-                backend = backend,
-                size = if (width > 0 && height > 0) "${width}x${height}" else "-",
-                phase = phase,
-                iteration = iteration,
-                totalIterations = totalIterations,
+                benchmark = currentTask.benchmark,
+                backend = currentTask.backend,
+                size =
+                    if (currentTask.width > 0 && currentTask.height > 0) {
+                        "${currentTask.width}x${currentTask.height}"
+                    } else {
+                        "-"
+                    },
+                phase = currentTask.phase,
+                iteration = currentTask.iteration,
+                totalIterations = currentTask.iterationTotal,
                 status = status,
-                invalidatedBatches = invalidatedBatches,
-                cooldownMillis = cooldownMillis,
+                invalidatedBatches = currentTask.invalidatedBatches,
+                cooldownMillis = currentTask.cooldownMillis,
                 elapsedMillis = SystemClock.elapsedRealtime() - startedAt,
                 globalCurrentRun = BenchmarkViewModel.currentGlobalRun(),
                 globalRun = BenchmarkViewModel.totalGlobalRuns(),
                 message = message,
+                calibrationActive = currentTask.calibrationActive,
+                thermalGatingEnabled = currentTask.thermalGatingEnabled,
+                targetBatchMillis = currentTask.targetBatchMillis,
+                requestedIterationsPerBatch = currentTask.requestedIterationsPerBatch,
+                maxIterationsPerBatch = currentTask.maxIterationsPerBatch,
+                requestedBatches = currentTask.requestedBatches,
+                validBatches = currentTask.validBatches,
+                warmupSamples = currentTask.warmupSamples,
+                warmupWallMs = currentTask.warmupWallMs,
+                effectiveIterationsPerBatch = currentTask.effectiveIterationsPerBatch,
             )
         )
     }
@@ -363,6 +519,8 @@ class NativeBenchmarkReport(
     @JvmField
     val cooldownTimeMs: Long,
     @JvmField
+    val bytesPerPixel: Int,
+    @JvmField
     val environment: String,
 ) {
 
@@ -377,6 +535,18 @@ class NativeBenchmarkReport(
     val medianMPixSec: Double =
         if (width > 0 && height > 0) {
             (width.toDouble() * height / (stats.medianMs / 1_000.0)) / 1_000_000.0
+        } else {
+            0.0
+        }
+
+    /**
+     * GB/s at the median: `medianMPixSec × bytesPerPixel / 1000` (bytes per pixel ×
+     * megapixels per second ÷ 1000). Matches the host runner's `4 × numBuffers` convention.
+     */
+    @JvmField
+    val medianGBsSec: Double =
+        if (medianMPixSec > 0.0) {
+            medianMPixSec * bytesPerPixel / 1000.0
         } else {
             0.0
         }
@@ -440,6 +610,15 @@ class NativeBenchmarkReport(
                     "classification=$classification valid=$isValid " +
                         "invalidatedBatches=$invalidatedBatches cooldownTimeMs=$cooldownTimeMs"
                 )
+                appendLine(
+                    String.format(
+                        Locale.US,
+                        "throughput medianMPixSec=%.2f medianGBsSec=%.2f bytesPerPixel=%d",
+                        medianMPixSec,
+                        medianGBsSec,
+                        bytesPerPixel,
+                    )
+                )
             }
         )
     }
@@ -461,11 +640,11 @@ class NativeBenchmarkReport(
             buildString {
                 append(
                     "Kernel,Backend,Size,MinMs,MedianMs,MeanMs,MaxMs,P90,P95,P99,StdDevMs," +
-                        "MPix/s,InvalidatedBatches,CooldownMs,Classification,VALID\n"
+                        "MPix/s,GB/s,InvalidatedBatches,CooldownMs,Classification,VALID\n"
                 )
                 appendFormatLn(
                     Locale.US,
-                    "%s,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.2f,%d,%d,%s,%b",
+                    "%s,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.2f,%.2f,%d,%d,%s,%b",
                     name,
                     backend.ifBlank { "-" },
                     sizeLabel(),
@@ -478,6 +657,7 @@ class NativeBenchmarkReport(
                     stats.p99Ms,
                     stats.stdDevMs,
                     medianMPixSec,
+                    medianGBsSec,
                     invalidatedBatches,
                     cooldownTimeMs,
                     classification,
@@ -547,6 +727,8 @@ private fun buildEnvironment(
     pinnedCore: Int?,
     affinityApplied: Boolean,
     benchCpuAfter: Int,
+    calibratedPerIterationMs: Double,
+    effectiveIterationsPerBatch: Int,
 ): String =
     buildString {
         appendLine("device=${Build.DEVICE}")
@@ -572,12 +754,21 @@ private fun buildEnvironment(
         appendLine("thermalStatusBefore=$thermalStatusBefore")
         appendLine("thermalStatusAfter=$thermalStatusAfter")
         appendLine("thermalThrottled=$thermalThrottled")
+        appendLine("thermalGatingEnabled=${frontend.thermalGatingEnabled}")
         appendLine("invalidatedBatches=$invalidatedBatches")
         appendLine("cooldownTimeMs=$cooldownTimeMs")
         appendLine("windowFocused=${BenchmarkActivity.isWindowFocused}")
         appendLine("warmupIterations=${frontend.warmupIterations}")
         appendLine("measurementBatches=${frontend.measurementBatches}")
         appendLine("iterationsPerBatch=${frontend.iterationsPerBatch}")
+        appendLine("bytesPerPixel=${frontend.bytesPerPixel}")
+        appendLine("requestedIterationsPerBatch=${frontend.iterationsPerBatch}")
+        appendLine("effectiveIterationsPerBatch=$effectiveIterationsPerBatch")
+        appendLine("targetBatchMillis=${frontend.targetBatchMillis}")
+        appendLine("maxIterationsPerBatch=${frontend.maxIterationsPerBatch}")
+        appendLine(
+            "calibratedPerIterationMs=${String.format(Locale.US, "%.4f", calibratedPerIterationMs)}"
+        )
         appendLine("cooldownMillis=${frontend.cooldownMillis}")
         appendLine("benchThreadPriority=$HIGH_PRIORITY")
         appendLine("threadPriorityApplied=$threadPriorityApplied")
@@ -593,6 +784,22 @@ private const val INSUFFICIENT_SAMPLES = "INSUFFICIENT_SAMPLES"
 /** Batch-average CV above which an otherwise clean run is classified UNSTABLE (spec §15). */
 private const val UNSTABLE_CV = 0.05
 
+/**
+ * Minimum warmup samples timed for batch calibration, so the robust per-iteration estimate
+ * stays meaningful even when a GC/JIT storm inflates a large share of them.
+ */
+private const val MIN_CALIBRATION_SAMPLES = 32
+
+/**
+ * Wall-clock budget for the timed warmup (calibration path). Fast kernels still collect the
+ * full [MIN_CALIBRATION_SAMPLES]; multi-second cells (e.g. 2048x2048 scalar/kotlin) stop well
+ * below it, so one cell cannot burn 32 x wall-time warmup samples.
+ */
+private const val MAX_WARMUP_WALL_MS = 10_000L
+
+/** Minimum wall-clock interval between per-iteration UI progress pushes. */
+private const val PROGRESS_PUSH_INTERVAL_MS = 100L
+
 /** Highest Linux nice priority (best-effort like the platform docs; needs no root). */
 private const val HIGH_PRIORITY = -20
 
@@ -604,6 +811,18 @@ private fun capturePriority(tid: Int): Int? {
     } catch (_: Throwable) {
         null
     }
+}
+
+/**
+ * Robust per-iteration estimate from the first `count` sorted warmup times: the 25th
+ * percentile. Survives a GC/JIT storm inflating most of the samples — a plain median already
+ * fails when >= half of a run's warmup iterations are swallowed by a pause. `sorted` may hold
+ * up to [MIN_CALIBRATION_SAMPLES] entries but only the first `count` are filled (the warmup is
+ * wall-budget capped, see [MAX_WARMUP_WALL_MS]).
+ */
+private fun robustShortIterationMs(sorted: DoubleArray, count: Int): Double {
+    val idx = (count * 0.25).toInt().coerceAtMost(count - 1)
+    return sorted[idx]
 }
 
 private fun restorePriority(tid: Int, previous: Int?): Boolean {

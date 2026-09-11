@@ -43,4 +43,24 @@ internal data class BenchmarkUiState(
     val globalRun: Int = 0,
     @JvmField
     val message: String = "",
+    @JvmField
+    val calibrationActive: Boolean = false,
+    @JvmField
+    val thermalGatingEnabled: Boolean = true,
+    @JvmField
+    val targetBatchMillis: Long = 0L,
+    @JvmField
+    val requestedIterationsPerBatch: Int = 0,
+    @JvmField
+    val maxIterationsPerBatch: Int = 0,
+    @JvmField
+    val requestedBatches: Int = 0,
+    @JvmField
+    val validBatches: Int = 0,
+    @JvmField
+    val warmupSamples: Int = 0,
+    @JvmField
+    val warmupWallMs: Long = 0L,
+    @JvmField
+    val effectiveIterationsPerBatch: Int = 0,
 )

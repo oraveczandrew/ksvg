@@ -413,7 +413,16 @@ It provides, per benchmark block (measured region = **only the JNI call**, spec 
   that loads `libksvgblur`),
 - benchmark-thread priority key: bump `setThreadPriority(myTid(), -20)`, restored at end,
 - `warmup` → repeated `measurementBatches` × `iterationsPerBatch`, per-iteration
-  `System.nanoTime()` sampling,
+  `System.nanoTime()` sampling, with **warmup-based batch calibration**: when
+  `targetBatchMillis > 0` (driver: 100 ms), the warmup iterations are timed (≥
+  `MIN_CALIBRATION_SAMPLES` = 32 samples) and the **P25 of the sorted times** (robust against
+  GC/JIT storms inflating most samples) calibrates `effectiveIterationsPerBatch =
+  clamp(targetBatchMillis / p25ms, iterationsPerBatch, max(IterationsPerBatch,
+  maxIterationsPerBatch=200))`. Sub-ms kernels thus gather enough samples per batch for the
+  batch-average-CV rule to average out per-iteration timer/GC noise (~1/√n) instead of being
+  flagged `UNSTABLE`; `targetBatchMillis=0` keeps the legacy exact-count behavior. Per-iteration
+  UI progress pushes are rate-limited (~10/s) so the measured loop stays ~allocation-free —
+  a `BenchmarkUiState` push per iteration parked the GC mid-batch and was the noise source,
 - one `CacheNormalizer.normalize()` (deterministic 1 MB×2 copy/touch) before each batch,
   outside the measurement,
 - thermal gating (`ThermalStateMonitor`): API 29+ `PowerManager.currentThermalStatus`;
@@ -429,7 +438,9 @@ It provides, per benchmark block (measured region = **only the JNI call**, spec 
   QTI SM8550 on the test device), sustained-mode result, `thermalStatusBefore/After`,
   `invalidatedBatches`/`cooldownTimeMs`, best-effort sysfs CPU frequency
   `cpuFreqBeforeKhz`/`cpuFreqAfterKhz`, `cpuAffinityControlAvailable` (always `false`,
-  no root).
+  no root), plus the calibration keys `requestedIterationsPerBatch`/
+  `effectiveIterationsPerBatch`/`calibratedPerIterationMs`/`targetBatchMillis`/
+  `maxIterationsPerBatch`.
 
 CSV (pull-compatible with `runDeviceBenchmark`'s `benchmarks_device*.csv` glob):
 
