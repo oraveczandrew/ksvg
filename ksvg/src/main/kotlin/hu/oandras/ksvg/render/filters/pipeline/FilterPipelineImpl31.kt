@@ -61,6 +61,7 @@ import android.graphics.RenderNode as AndroidRenderNode
  */
 @RequiresApi(Build.VERSION_CODES.S)
 internal open class FilterPipelineImpl31 internal constructor(
+    @JvmField
     protected val renderContext: RenderContext,
 ) : FilterBackend {
 

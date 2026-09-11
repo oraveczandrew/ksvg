@@ -21,14 +21,22 @@ package hu.oandras.ksvg.filtering
  */
 public object ComponentTransferValidationCorpus {
 
+    @JvmField
     public val boundarySizes: IntArray = UnLinearizeValidationCorpus.boundarySizes
+    @JvmField
     public val shapes: Array<Pair<Int, Int>> = UnLinearizeValidationCorpus.shapes
 
+    @JvmField
     public val identityTable: ByteArray = ByteArray(256) { it.toByte() }
+    @JvmField
     public val reverseTable: ByteArray = ByteArray(256) { (255 - it).toByte() }
+    @JvmField
     public val alphaTable: ByteArray = ByteArray(256) { ((it * 3) and 0xFF).toByte() }
+    @JvmField
     public val redTable: ByteArray = ByteArray(256) { ((it + 128) and 0xFF).toByte() }
+    @JvmField
     public val greenTable: ByteArray = ByteArray(256) { (it / 2).toByte() }
+    @JvmField
     public val blueTable: ByteArray = ByteArray(256) { ((it * it) shr 8).toByte() }
 
     private fun toIntTable(table: ByteArray, shift: Int): IntArray {
@@ -95,6 +103,7 @@ public object ComponentTransferValidationCorpus {
         input
     )
 
+    @JvmField
     public val cases: List<Case> = buildList {
         // Full clip region
         for ((w, h) in listOf(32 to 8, 33 to 9, 16 to 1)) {

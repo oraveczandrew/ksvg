@@ -30,6 +30,7 @@ internal value class FilterPrimitiveSet private constructor(@JvmField internal v
             FilterPrimitiveSet(bits or other.bits)
 
     internal companion object {
+        @JvmStatic
         internal val EMPTY: FilterPrimitiveSet = FilterPrimitiveSet(0)
 
         internal const val FLAG_COLOR_MATRIX: Int = 1 shl 0

@@ -186,21 +186,21 @@ class TurbulenceKernelParityTest {
     }
 
     private inner class Result {
-        var librsvgWrapMismatch = 0L
-        var ksvgWrapMismatch = 0L
-        var noiseMismatch = 0L
-        var sumMismatch = 0L
-        var ksvgNoiseMismatch = 0L
-        var ksvgSumMismatch = 0L
-        var baseFreqMismatch = 0L
-        var expectedBaseFx = 0.0
-        var expectedBaseFy = 0.0
+        @JvmField var librsvgWrapMismatch = 0L
+        @JvmField var ksvgWrapMismatch = 0L
+        @JvmField var noiseMismatch = 0L
+        @JvmField var sumMismatch = 0L
+        @JvmField var ksvgNoiseMismatch = 0L
+        @JvmField var ksvgSumMismatch = 0L
+        @JvmField var baseFreqMismatch = 0L
+        @JvmField var expectedBaseFx = 0.0
+        @JvmField var expectedBaseFy = 0.0
 
-        var firstNoisePixel: String? = null
-        var firstSumPixel: String? = null
-        var firstWrapPixel: String? = null
-        var firstKsvgWrapPixel: String? = null
-        var firstLibrsvgRuleBreak: String? = null
+        @JvmField var firstNoisePixel: String? = null
+        @JvmField var firstSumPixel: String? = null
+        @JvmField var firstWrapPixel: String? = null
+        @JvmField var firstKsvgWrapPixel: String? = null
+        @JvmField var firstLibrsvgRuleBreak: String? = null
 
         fun recordFirstWrapMismatch(rec: TurbulenceRecord, oct: Int, cap: TurbulenceRecord.Octave, got: ReferenceTurbulence.OctaveTrace) {
             if (firstWrapPixel == null) {
@@ -238,11 +238,11 @@ class TurbulenceKernelParityTest {
             }
         }
 
-        var firstKsvgNoise: String? = null
-        var records = 0L
-        var pixelsChecked = 0L
-        var librsvgRuleByteMismatch = 0L
-        var ksvgRuleByteMismatch = 0L
+        @JvmField var firstKsvgNoise: String? = null
+        @JvmField var records = 0L
+        @JvmField var pixelsChecked = 0L
+        @JvmField var librsvgRuleByteMismatch = 0L
+        @JvmField var ksvgRuleByteMismatch = 0L
 
         fun render(): String {
             @Suppress("IntroduceWhenSubject")

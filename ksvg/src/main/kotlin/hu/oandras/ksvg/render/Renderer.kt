@@ -92,7 +92,7 @@ import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.withAlpha
-import java.util.*
+import java.util.Stack
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -109,6 +109,7 @@ private val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean  = Build.VERSION.SDK_IN
 @SuppressLint("UseKtx")
 @Suppress("LocalVariableName")
 internal class Renderer internal constructor(
+    @JvmField
     internal val document: SVGImpl,
     // dots per inch. Needed for accurate conversion of length values that have real world units, such as "cm".
     override val dPI: Float,

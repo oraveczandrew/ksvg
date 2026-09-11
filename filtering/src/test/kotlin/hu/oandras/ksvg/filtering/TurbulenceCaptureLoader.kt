@@ -48,23 +48,41 @@ import java.nio.ByteOrder
  * index = ((y - y0) * width + (x - x0)) * 4 + channel.
  */
 internal class TurbulenceCaptureLoader private constructor(
+    @JvmField
     val canvasWidth: Int,
+    @JvmField
     val canvasHeight: Int,
+    @JvmField
     val boundsX0: Int,
+    @JvmField
     val boundsY0: Int,
+    @JvmField
     val boundsX1: Int,
+    @JvmField
     val boundsY1: Int,
+    @JvmField
     val seed: Int,
+    @JvmField
     val baseFreqX: Double,
+    @JvmField
     val baseFreqY: Double,
+    @JvmField
     val numOctaves: Int,
+    @JvmField
     val noiseType: Int,
+    @JvmField
     val stitch: Boolean,
+    @JvmField
     val tileWidth: Double,
+    @JvmField
     val tileHeight: Double,
+    @JvmField
     val affine: DoubleArray,
+    @JvmField
     val gradient: DoubleArray,
+    @JvmField
     val latticeSelector: IntArray,
+    @JvmField
     val records: List<TurbulenceRecord>,
 ) {
     val boundsWidth: Int get() = boundsX1 - boundsX0
@@ -218,24 +236,40 @@ internal class TurbulenceCaptureLoader private constructor(
 }
 
 internal class TurbulenceRecord(
+    @JvmField
     val pointX: Double,
+    @JvmField
     val pointY: Double,
+    @JvmField
     val tileX: Double,
+    @JvmField
     val tileY: Double,
+    @JvmField
     val baseFx: Double,
+    @JvmField
     val baseFy: Double,
+    @JvmField
     val colorChannel: Int,
+    @JvmField
     val octaves: Array<Octave>,
 ) {
     /** Per-octave captured kernel state, mirroring librsvg's `turbulence()` loop. */
     class Octave(
+        @JvmField
         val vecX: Double,
+        @JvmField
         val vecY: Double,
+        @JvmField
         val stW: Int,
+        @JvmField
         val stH: Int,
+        @JvmField
         val wrapX: Long,
+        @JvmField
         val wrapY: Long,
+        @JvmField
         val noise: Double,
+        @JvmField
         val sum: Double,
     )
 }

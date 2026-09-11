@@ -112,6 +112,7 @@ public object GaussianBlurValidationCorpus {
         return out
     }
 
+    @JvmField
     public val cases: List<Case> = buildList {
         // Small isotropic
         add(Case("isotropic 1.5 16x16", 16, 16, 1.5f, 1.5f, 

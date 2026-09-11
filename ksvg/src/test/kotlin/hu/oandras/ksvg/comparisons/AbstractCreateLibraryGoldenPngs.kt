@@ -32,7 +32,9 @@ import java.io.File
  * and the parameter list (each parameter is a `(svgFile, targetSubFolder)` pair).
  */
 abstract class AbstractCreateLibraryGoldenPngs(
+    @JvmField
     protected val svgFile: File,
+    @JvmField
     protected val targetSubFolder: File,
 ) {
 

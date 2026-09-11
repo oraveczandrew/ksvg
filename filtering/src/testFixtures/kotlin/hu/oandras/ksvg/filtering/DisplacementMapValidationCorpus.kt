@@ -55,6 +55,7 @@ public object DisplacementMapValidationCorpus {
         }
     }
 
+    @JvmField
     public val cases: List<Case> = buildList {
         // Full size match
         add(Case("match 16x16", 16, 16, 16, 16, 10f, 0, 1, 

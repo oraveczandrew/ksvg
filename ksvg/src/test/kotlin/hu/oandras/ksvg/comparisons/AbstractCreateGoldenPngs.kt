@@ -27,7 +27,9 @@ import java.io.File
  * parameter is a `(svgFile, targetSubFolder)` pair).
  */
 abstract class AbstractCreateGoldenPngs(
+    @JvmField
     protected val svgFile: File,
+    @JvmField
     protected val targetSubFolder: File,
 ) {
 

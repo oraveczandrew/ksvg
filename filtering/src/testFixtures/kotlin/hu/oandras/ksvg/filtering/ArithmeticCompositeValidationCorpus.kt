@@ -64,6 +64,7 @@ public object ArithmeticCompositeValidationCorpus {
         }
     }
 
+    @JvmField
     public val cases: List<Case> = buildList {
         // Various coefficients and sRGB/linear settings
         for (useLinear in listOf(false, true)) {

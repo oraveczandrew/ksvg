@@ -62,6 +62,7 @@ public object ConvolveValidationCorpus {
         }
     }
 
+    @JvmField
     public val cases: List<Case> = buildList {
         // Simple 3x3 sharpen
         val sharpen = floatArrayOf(

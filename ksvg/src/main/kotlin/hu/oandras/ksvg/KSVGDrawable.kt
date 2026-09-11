@@ -35,6 +35,7 @@ import hu.oandras.ksvg.utils.forEachElement
  * A [Drawable] backed by an [SVG] document.
  */
 public open class KSVGDrawable @JvmOverloads public constructor(
+    @JvmField
     protected val svg: SVG,
     renderOptions: RenderOptions? = null
 ) : Drawable() {

@@ -24,6 +24,8 @@ import android.graphics.RectF
  * @property bounds The bounding rectangle of the clickable region in screen (canvas) coordinates.
  */
 public data class HitRegion(
+    @JvmField
     public val href: String,
+    @JvmField
     public val bounds: RectF,
 )

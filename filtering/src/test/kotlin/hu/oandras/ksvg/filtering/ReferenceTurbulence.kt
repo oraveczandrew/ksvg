@@ -53,13 +53,21 @@ internal object ReferenceTurbulence {
 
     /** Per-octave intermediate state, mirroring librsvg's captured per-octave data. */
     internal class OctaveTrace(
+        @JvmField
         val vecX: Double,
+        @JvmField
         val vecY: Double,
+        @JvmField
         val stW: Int,
+        @JvmField
         val stH: Int,
+        @JvmField
         val wrapX: Int,
+        @JvmField
         val wrapY: Int,
+        @JvmField
         val noise: Double,
+        @JvmField
         val runningValue: Double,
     )
 

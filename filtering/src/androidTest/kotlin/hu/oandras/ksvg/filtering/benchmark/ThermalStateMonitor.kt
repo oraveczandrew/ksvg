@@ -19,6 +19,7 @@ package hu.oandras.ksvg.filtering.benchmark
 import android.content.Context
 import android.os.Build
 import android.os.PowerManager
+import hu.oandras.ksvg.filtering.benchmark.ThermalStateMonitor.Companion.THROTTLE_RATIO
 
 /**
  * Thermal state source for the benchmark harness (spec §6, §7; TEST_HARNESS_PLAN Step 3).
@@ -34,6 +35,7 @@ import android.os.PowerManager
  */
 internal class ThermalStateMonitor private constructor(
     private val powerManager: PowerManager?,
+    @JvmField
     internal val source: String,
 ) {
 
