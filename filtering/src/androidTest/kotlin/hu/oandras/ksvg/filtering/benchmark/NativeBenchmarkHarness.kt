@@ -635,6 +635,7 @@ class NativeBenchmarkReport(
         val fileBase =
             cleanName(name) + "_" + cleanName(backend.ifBlank { "all" }) + "_" + sizeLabel()
 
+        val escapedName = if (name.contains(",") || name.contains("\"")) "\"${name.replace("\"", "\"\"")}\"" else name
         val summary = File(dir, "benchmarks_device_harness_$fileBase.csv")
         summary.writeText(
             buildString {
@@ -645,7 +646,7 @@ class NativeBenchmarkReport(
                 appendFormatLn(
                     Locale.US,
                     "%s,%s,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.2f,%.2f,%d,%d,%s,%b",
-                    name,
+                    escapedName,
                     backend.ifBlank { "-" },
                     sizeLabel(),
                     stats.minMs,

@@ -316,6 +316,28 @@ The host parity run depends on `buildHostNativeLib` (compiles `libksvgblur` for
 the host CPU); the `benchmark.*` JVM system props are forwarded to the test fork
 by `testOptions.unitTests` in `filtering/build.gradle.kts`.
 
+**Exporting CSV to Markdown Tables (`exportBenchmarkTable`)** — convert benchmark
+CSV outputs (both host and device formats) to formatted Markdown tables adhering to
+the strict ISA superset ordering (`kotlin → scalar → sse2 → ssse3 → avx2 → avx512`
+/ `neon32 → neon64`):
+
+```bash
+# Convert host or device benchmark CSV into a Markdown table:
+./gradlew :filtering:exportBenchmarkTable \
+  -Pcsv=tmp/benchmarks_host.csv \
+  -Dorg.gradle.warning.mode=none
+
+# Optionally specify a custom output path (defaults to matching .md next to .csv):
+./gradlew :filtering:exportBenchmarkTable \
+  -Pcsv=tmp/benchmarks_host.csv \
+  -Poutput=tmp/custom_table.md \
+  -Dorg.gradle.warning.mode=none
+```
+
+The task groups measurements by `(Kernel, Size)`, sorts backend rows into standard
+ISA progression, calculates speedup metrics vs scalar/Kotlin, and decorates rows with
+status indicators (🚀, 🟢, 🔴, ⬆️) ready for pasting into `BENCHMARKS.md`.
+
 **Device (ARM64)** — `runDeviceBenchmark` wrapper (runs `connectedDebugAndroidTest`,
 auto-`adb pull`s the CSVs from the device's `externalCacheDir` into `tmp/`, then
 prints them as a Markdown table). The device benchmark

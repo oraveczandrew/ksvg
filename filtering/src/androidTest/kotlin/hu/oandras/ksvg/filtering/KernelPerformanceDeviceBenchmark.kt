@@ -17,7 +17,6 @@
 package hu.oandras.ksvg.filtering
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.benchmark.BenchmarkViewModel
 import hu.oandras.ksvg.filtering.benchmark.SimpleperfProfiler
 import hu.oandras.ksvg.filtering.benchmark.clearPreviousResults
@@ -64,34 +63,28 @@ class KernelPerformanceDeviceBenchmark {
 
     companion object {
 
+        private val benchmarkArguments = BenchmarkArguments.fromInstrumentationRegistry()
+
         @BeforeClass
         @JvmStatic
         fun setup() {
             assertNativeBackendAvailable()
             clearPreviousResults()
-            val args = InstrumentationRegistry.getArguments()
-            thermalGatingEnabled = args.getString("benchmark.thermalGating") != "false"
-            simpleperfEnabled = args.getString("benchmark.simpleperf") == "true"
-            if (simpleperfEnabled) {
+            if (benchmarkArguments.simpleperfEnabled) {
                 val profiler = SimpleperfProfiler(getTestTargetContext())
                 simpleperfProfiler = profiler
                 simpleperfAvailable = profiler.isAvailable()
-                val requested = args.getString("benchmark.simpleperf.events")
-                        ?.split(",", "+")
-                        ?.map { it.trim() }
-                        ?.filter { it.isNotEmpty() }
-                        ?.takeIf { it.isNotEmpty() }
-                        ?: DEFAULT_SIMPLEPERF_EVENTS.split(",")
-                supportedEvents =
-                    if (simpleperfAvailable) profiler.supportedEvents(requested) else emptyList()
+                val requested = benchmarkArguments.requestedSimplePerfEvents
+                supportedEvents = if (simpleperfAvailable) {
+                    profiler.supportedEvents(requested)
+                } else {
+                    emptyList()
+                }
                 if (supportedEvents.isEmpty()) {
                     println("Simpleperf: profiling requested but no supported events resolved; skipping all profiles")
                 } else {
                     println("Simpleperf: resolved events -> ${supportedEvents.joinToString(",")}")
                 }
-                val duration = args.getString("benchmark.simpleperf.durationMs")?.toLongOrNull()
-                simpleperfDurationMs = if (duration != null && duration > 0) duration else DEFAULT_SIMPLEPERF_DURATION_MS
-                simpleperfPinCore = args.getString("benchmark.simpleperf.pinCore")?.toIntOrNull()
             }
         }
 
@@ -125,47 +118,35 @@ class KernelPerformanceDeviceBenchmark {
         /** Pure generators only write the output buffer. */
         private const val BYTES_PER_PIXEL_GENERATE = 4
 
-        private const val DEFAULT_SIMPLEPERF_EVENTS = "cpu-cycles,instructions"
-
-        private const val DEFAULT_SIMPLEPERF_DURATION_MS = 2000L
-
         private val SANITIZE_NAME_REGEX = Regex("[^A-Za-z0-9_.-]")
-
-        private var simpleperfEnabled: Boolean = false
 
         private var simpleperfAvailable: Boolean = false
 
         private var simpleperfProfiler: SimpleperfProfiler? = null
 
         private var supportedEvents: List<String> = emptyList()
-
-        private var simpleperfDurationMs: Long = DEFAULT_SIMPLEPERF_DURATION_MS
-
-        private var simpleperfPinCore: Int? = null
-
-        /** Thermal gate on/off for the whole suite; `benchmark.thermalGating=false` disables it. */
-        private var thermalGatingEnabled: Boolean = true
     }
 
     @Test
     fun benchmarkAll() {
-        val instrumentationArguments = InstrumentationRegistry.getArguments()
-        val quick = instrumentationArguments.getString("benchmark.quick") == "true"
-        val target = instrumentationArguments.getString("benchmark.kernel")
-        val benchmarkSizes = sizes(quick)
+        val target = benchmarkArguments.kernels
+        val targetSet = benchmarkArguments.kernels
+        fun isSelected(name: String) = targetSet.isNullOrEmpty() || targetSet.contains(name)
+
+        val benchmarkSizes = sizes(benchmarkArguments.isQuick)
         BenchmarkViewModel.beginSuite(totalRuns(target, benchmarkSizes))
-        if (target.isNullOrEmpty() || target == "UnLinearize") benchmarkUnLinearize(benchmarkSizes)
-        if (target.isNullOrEmpty() || target == "ComponentTransfer") benchmarkComponentTransfer(benchmarkSizes)
-        if (target.isNullOrEmpty() || target == "Morphology") benchmarkMorphology(benchmarkSizes)
-        if (target.isNullOrEmpty() || target == "ArithmeticComposite") {
+        if (isSelected("UnLinearize")) benchmarkUnLinearize(benchmarkSizes)
+        if (isSelected("ComponentTransfer")) benchmarkComponentTransfer(benchmarkSizes)
+        if (isSelected("Morphology")) benchmarkMorphology(benchmarkSizes)
+        if (isSelected("ArithmeticComposite")) {
             benchmarkArithmeticCompositeNonLinear(benchmarkSizes)
             benchmarkArithmeticCompositeLinear(benchmarkSizes)
         }
-        if (target.isNullOrEmpty() || target == "ConvolveMatrix") benchmarkConvolveMatrix(benchmarkSizes)
-        if (target.isNullOrEmpty() || target == "DisplacementMap") benchmarkDisplacementMap(benchmarkSizes)
-        if (target.isNullOrEmpty() || target == "Lighting") benchmarkLighting(benchmarkSizes)
-        if (target.isNullOrEmpty() || target == "Turbulence") benchmarkTurbulence(benchmarkSizes)
-        if (target.isNullOrEmpty() || target == "GaussianBlur") benchmarkGaussianBlur(benchmarkSizes)
+        if (isSelected("ConvolveMatrix")) benchmarkConvolveMatrix(benchmarkSizes)
+        if (isSelected("DisplacementMap")) benchmarkDisplacementMap(benchmarkSizes)
+        if (isSelected("Lighting")) benchmarkLighting(benchmarkSizes)
+        if (isSelected("Turbulence")) benchmarkTurbulence(benchmarkSizes)
+        if (isSelected("GaussianBlur")) benchmarkGaussianBlur(benchmarkSizes)
     }
 
     private fun benchmarkUnLinearize(sizes: Array<Pair<Int, Int>>) {
@@ -258,53 +239,72 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
+    private data class MorphologyBenchmarkConfig(
+        @JvmField
+        val name: String,
+        @JvmField
+        val radiusX: Int,
+        @JvmField
+        val radiusY: Int,
+        @JvmField
+        val erode: Boolean
+    )
+
+    private val morphologyConfigs = listOf(
+        MorphologyBenchmarkConfig("Morphology (erode, r=1)", 1, 1, erode = true),
+        MorphologyBenchmarkConfig("Morphology (erode, r=5)", 5, 5, erode = true),
+        MorphologyBenchmarkConfig("Morphology (dilate, r=5)", 5, 5, erode = false),
+    )
+
     private fun benchmarkMorphology(sizes: Array<Pair<Int, Int>>) {
-        for ((w, h) in sizes) {
-            val src = IntArray(w * h)
-            val dst = IntArray(w * h)
+        for (cfg in morphologyConfigs) {
+            for ((w, h) in sizes) {
+                val src = IntArray(w * h)
+                val dst = IntArray(w * h)
 
-            benchmarkKotlin(
-                name = "Morphology",
-                width = w,
-                height = h,
-                bytesPerPixel = BYTES_PER_PIXEL_RW
-            ) {
-                KotlinKernels.morphology(
-                    src = src,
-                    dst = dst,
+                benchmarkKotlin(
+                    name = cfg.name,
                     width = w,
                     height = h,
-                    radiusX = 5,
-                    radiusY = 5,
-                    erode = true,
-                    clipLeft = 0,
-                    clipTop = 0,
-                    clipRight = w,
-                    clipBottom = h
-                )
-            }
+                    bytesPerPixel = BYTES_PER_PIXEL_RW
+                ) {
+                    KotlinKernels.morphology(
+                        src = src,
+                        dst = dst,
+                        width = w,
+                        height = h,
+                        radiusX = cfg.radiusX,
+                        radiusY = cfg.radiusY,
+                        erode = cfg.erode,
+                        clipLeft = 0,
+                        clipTop = 0,
+                        clipRight = w,
+                        clipBottom = h
+                    )
+                }
 
-            benchmarkCells(
-                name = "Morphology",
-                backendFlags = MorphologyNative.nativeBackend(),
-                w = w,
-                h = h,
-                bytesPerPixel = BYTES_PER_PIXEL_RW
-            ) { b ->
-                MorphologyNative.applyForced(
-                    src = src,
-                    dst = dst,
-                    width = w,
-                    height = h,
-                    radiusX = 5,
-                    radiusY = 5,
-                    erode = true,
-                    clipLeft = 0,
-                    clipTop = 0,
-                    clipRight = w,
-                    clipBottom = h,
-                    simdBackend = b
-                )
+                benchmarkCells(
+                    name = cfg.name,
+                    backendFlags = MorphologyNative.nativeBackend(),
+                    w = w,
+                    h = h,
+                    bytesPerPixel = BYTES_PER_PIXEL_RW
+                ) { b ->
+                    MorphologyNative.applyForced(
+                        src = src,
+                        dst = dst,
+                        width = w,
+                        height = h,
+                        radiusX = cfg.radiusX,
+                        radiusY = cfg.radiusY,
+                        erode = cfg.erode,
+                        clipLeft = 0,
+                        clipTop = 0,
+                        clipRight = w,
+                        clipBottom = h,
+                        simdBackend = b
+                    )
+                }
             }
         }
     }
@@ -374,60 +374,79 @@ class KernelPerformanceDeviceBenchmark {
     private fun benchmarkArithmeticCompositeLinear(sizes: Array<Pair<Int, Int>>) =
         benchmarkArithmeticComposite(sizes, useLinear = true)
 
+    private class ConvolveBenchmarkConfig(
+        @JvmField
+        val name: String,
+        @JvmField
+        val orderX: Int,
+        @JvmField
+        val orderY: Int,
+        @JvmField
+        val preserveAlpha: Boolean,
+        @JvmField
+        val edgeMode: Int,
+        @JvmField
+        val kernel: FloatArray
+    )
+
+    private val convolveConfigs = listOf(
+        ConvolveBenchmarkConfig("ConvolveMatrix (duplicate, alpha)", 5, 5, preserveAlpha = true, edgeMode = 0, FloatArray(25) { 0.11f }),
+        ConvolveBenchmarkConfig("ConvolveMatrix (duplicate, no-alpha)", 5, 5, preserveAlpha = false, edgeMode = 0, FloatArray(25) { 0.11f }),
+    )
+
     private fun benchmarkConvolveMatrix(sizes: Array<Pair<Int, Int>>) {
-        // 5x5 weight matrix (the old 9-float driver passed an order-5 kernel with a 9-element
-        // array, an out-of-bounds read; a 25-element kernel fixes it with the same workload).
-        val kernel = FloatArray(25) { 0.11f }
-        for ((w, h) in sizes) {
-            val src = IntArray(w * h)
-            val dst = IntArray(w * h)
+        for (cfg in convolveConfigs) {
+            for ((w, h) in sizes) {
+                val src = IntArray(w * h)
+                val dst = IntArray(w * h)
 
-            benchmarkKotlin(
-                name = "ConvolveMatrix",
-                width = w,
-                height = h,
-                bytesPerPixel = BYTES_PER_PIXEL_RW
-            ) {
-                KotlinKernels.convolveMatrix(
-                    srcPixels = src,
-                    outPixels = dst,
+                benchmarkKotlin(
+                    name = cfg.name,
                     width = w,
                     height = h,
-                    kernel = kernel,
-                    orderX = 5,
-                    orderY = 5,
-                    targetX = 2,
-                    targetY = 2,
-                    divisor = 16f,
-                    bias = 0f,
-                    preserveAlpha = true,
-                    edgeMode = 0
-                )
-            }
+                    bytesPerPixel = BYTES_PER_PIXEL_RW
+                ) {
+                    KotlinKernels.convolveMatrix(
+                        srcPixels = src,
+                        outPixels = dst,
+                        width = w,
+                        height = h,
+                        kernel = cfg.kernel,
+                        orderX = cfg.orderX,
+                        orderY = cfg.orderY,
+                        targetX = cfg.orderX / 2,
+                        targetY = cfg.orderY / 2,
+                        divisor = 16f,
+                        bias = 0f,
+                        preserveAlpha = cfg.preserveAlpha,
+                        edgeMode = cfg.edgeMode
+                    )
+                }
 
-            benchmarkCells(
-                name = "ConvolveMatrix",
-                backendFlags = ConvolveNative.nativeBackend(),
-                w = w,
-                h = h,
-                bytesPerPixel = BYTES_PER_PIXEL_RW
-            ) { b ->
-                ConvolveNative.applyForced(
-                    src = src,
-                    dst = dst,
-                    width = w,
-                    height = h,
-                    kernel = kernel,
-                    orderX = 5,
-                    orderY = 5,
-                    targetX = 2,
-                    targetY = 2,
-                    divisor = 16f,
-                    bias = 0f,
-                    preserveAlpha = true,
-                    edgeMode = 0,
-                    simdBackend = b
-                )
+                benchmarkCells(
+                    name = cfg.name,
+                    backendFlags = ConvolveNative.nativeBackend(),
+                    w = w,
+                    h = h,
+                    bytesPerPixel = BYTES_PER_PIXEL_RW
+                ) { b ->
+                    ConvolveNative.applyForced(
+                        src = src,
+                        dst = dst,
+                        width = w,
+                        height = h,
+                        kernel = cfg.kernel,
+                        orderX = cfg.orderX,
+                        orderY = cfg.orderY,
+                        targetX = cfg.orderX / 2,
+                        targetY = cfg.orderY / 2,
+                        divisor = 16f,
+                        bias = 0f,
+                        preserveAlpha = cfg.preserveAlpha,
+                        edgeMode = cfg.edgeMode,
+                        simdBackend = b
+                    )
+                }
             }
         }
     }
@@ -482,161 +501,204 @@ class KernelPerformanceDeviceBenchmark {
         }
     }
 
+    private data class LightingBenchmarkConfig(
+        @JvmField
+        val name: String,
+        @JvmField
+        val lightType: Int,
+        @JvmField
+        val specular: Boolean,
+        @JvmField
+        val k: Float = 1f,
+        @JvmField
+        val exponent: Float = 1f,
+        @JvmField
+        val useLinear: Boolean = false,
+        @JvmField
+        val params: (w: Int, h: Int) -> DoubleArray
+    )
+
+    private val lightingConfigs = listOf(
+        LightingBenchmarkConfig("Lighting (diffuse, distant)", LightType.DISTANT, specular = false, useLinear = false) { _, _ -> doubleArrayOf(45.0, 45.0) },
+        LightingBenchmarkConfig("Lighting (specular, distant)", LightType.DISTANT, specular = true, exponent = 20f, useLinear = false) { _, _ -> doubleArrayOf(45.0, 45.0) },
+    )
+
     private fun benchmarkLighting(sizes: Array<Pair<Int, Int>>) {
-        val params = DoubleArray(8) { 1.0 }
-        for ((w, h) in sizes) {
-            val pix = IntArray(w * h)
-            val out = IntArray(w * h)
+        for (cfg in lightingConfigs) {
+            for ((w, h) in sizes) {
+                val pix = IntArray(w * h)
+                val out = IntArray(w * h)
+                val params = cfg.params(w, h)
 
-            benchmarkKotlin(
-                name = "Lighting",
-                width = w,
-                height = h,
-                bytesPerPixel = BYTES_PER_PIXEL_RW
-            ) {
-                KotlinKernels.lighting(
-                    pix = pix,
-                    out = out,
+                benchmarkKotlin(
+                    name = cfg.name,
                     width = w,
                     height = h,
-                    clipLeft = 0,
-                    clipTop = 0,
-                    clipRight = w,
-                    clipBottom = h,
-                    surfaceScaleNormalized = 1f,
-                    invCanvasScaleX = 1.0,
-                    invCanvasScaleY = 1.0,
-                    userLeft = 0.0,
-                    userTop = 0.0,
-                    originX = 0.0,
-                    originY = 0.0,
-                    unitSizeX = 1.0,
-                    unitSizeY = 1.0,
-                    canvasScaleX = 1f,
-                    canvasScaleY = 1f,
-                    lightType = 0,
-                    specular = false,
-                    k = 1f,
-                    exponent = 1f,
-                    lightR = 255,
-                    lightG = 255,
-                    lightB = 255,
-                    params = params,
-                    premultipliedOutput = false,
-                    useLinear = false
-                )
-            }
+                    bytesPerPixel = BYTES_PER_PIXEL_RW
+                ) {
+                    KotlinKernels.lighting(
+                        pix = pix,
+                        out = out,
+                        width = w,
+                        height = h,
+                        clipLeft = 0,
+                        clipTop = 0,
+                        clipRight = w,
+                        clipBottom = h,
+                        surfaceScaleNormalized = 1f,
+                        invCanvasScaleX = 1.0,
+                        invCanvasScaleY = 1.0,
+                        userLeft = 0.0,
+                        userTop = 0.0,
+                        originX = 0.0,
+                        originY = 0.0,
+                        unitSizeX = 1.0,
+                        unitSizeY = 1.0,
+                        canvasScaleX = 1f,
+                        canvasScaleY = 1f,
+                        lightType = cfg.lightType,
+                        specular = cfg.specular,
+                        k = cfg.k,
+                        exponent = cfg.exponent,
+                        lightR = 255,
+                        lightG = 255,
+                        lightB = 255,
+                        params = params,
+                        premultipliedOutput = false,
+                        useLinear = cfg.useLinear
+                    )
+                }
 
-            benchmarkCells(
-                name = "Lighting",
-                backendFlags = LightingNative.nativeBackend(),
-                w = w,
-                h = h,
-                bytesPerPixel = BYTES_PER_PIXEL_RW
-            ) { b ->
-                LightingNative.applyForced(
-                    pix = pix,
-                    out = out,
-                    width = w,
-                    height = h,
-                    clipLeft = 0,
-                    clipTop = 0,
-                    clipRight = w,
-                    clipBottom = h,
-                    surfaceScaleNormalized = 1f,
-                    invCanvasScaleX = 1.0,
-                    invCanvasScaleY = 1.0,
-                    userLeft = 0.0,
-                    userTop = 0.0,
-                    originX = 0.0,
-                    originY = 0.0,
-                    unitSizeX = 1.0,
-                    unitSizeY = 1.0,
-                    canvasScaleX = 1f,
-                    canvasScaleY = 1f,
-                    lightType = 0,
-                    specular = false,
-                    k = 1f,
-                    exponent = 1f,
-                    lightR = 255,
-                    lightG = 255,
-                    lightB = 255,
-                    params = params,
-                    premultipliedOutput = false,
-                    useLinear = false,
-                    simdBackend = b
-                )
+                benchmarkCells(
+                    name = cfg.name,
+                    backendFlags = LightingNative.nativeBackend(),
+                    w = w,
+                    h = h,
+                    bytesPerPixel = BYTES_PER_PIXEL_RW
+                ) { b ->
+                    LightingNative.applyForced(
+                        pix = pix,
+                        out = out,
+                        width = w,
+                        height = h,
+                        clipLeft = 0,
+                        clipTop = 0,
+                        clipRight = w,
+                        clipBottom = h,
+                        surfaceScaleNormalized = 1f,
+                        invCanvasScaleX = 1.0,
+                        invCanvasScaleY = 1.0,
+                        userLeft = 0.0,
+                        userTop = 0.0,
+                        originX = 0.0,
+                        originY = 0.0,
+                        unitSizeX = 1.0,
+                        unitSizeY = 1.0,
+                        canvasScaleX = 1f,
+                        canvasScaleY = 1f,
+                        lightType = cfg.lightType,
+                        specular = cfg.specular,
+                        k = cfg.k,
+                        exponent = cfg.exponent,
+                        lightR = 255,
+                        lightG = 255,
+                        lightB = 255,
+                        params = params,
+                        premultipliedOutput = false,
+                        useLinear = cfg.useLinear,
+                        simdBackend = b
+                    )
+                }
             }
         }
     }
 
+    private data class TurbulenceBenchmarkConfig(
+        @JvmField
+        val name: String,
+        @JvmField
+        val octaves: Int,
+        @JvmField
+        val fractalNoise: Boolean,
+        @JvmField
+        val periodX: Int,
+        @JvmField
+        val periodY: Int
+    )
+
+    private val turbulenceConfigs = listOf(
+        TurbulenceBenchmarkConfig("Turbulence (turbulence, 1 oct)", octaves = 1, fractalNoise = false, periodX = 0, periodY = 0),
+    )
+
     private fun benchmarkTurbulence(sizes: Array<Pair<Int, Int>>) {
-        for ((w, h) in sizes) {
-            val pixels = IntArray(w * h)
-            val seed = 123
-            val lcg = LcgRandom(seed)
-            val p = IntArray(SvgPathNoise.LATTICE_SIZE)
-            val generators = Array(4) { SvgPathNoise(lcg, p) }
-            SvgPathNoise.buildPermutation(lcg, p)
+        for (cfg in turbulenceConfigs) {
+            for ((w, h) in sizes) {
+                val pixels = IntArray(w * h)
+                val seed = 123
+                val lcg = LcgRandom(seed)
+                val p = IntArray(SvgPathNoise.LATTICE_SIZE)
+                val generators = Array(4) { SvgPathNoise(lcg, p) }
+                SvgPathNoise.buildPermutation(lcg, p)
 
-            benchmarkKotlin("Turbulence", w, h, BYTES_PER_PIXEL_GENERATE) {
-                KotlinKernels.turbulence(
-                    pixels = pixels,
-                    width = w,
-                    height = h,
-                    clipLeft = 0,
-                    clipTop = 0,
-                    clipRight = w,
-                    clipBottom = h,
-                    baseFrequencyX = 0.01,
-                    baseFrequencyY = 0.01,
-                    periodX = 0,
-                    periodY = 0,
-                    octaves = 1,
-                    fractalNoise = false,
-                    invCanvasScaleX = 1.0,
-                    invCanvasScaleY = 1.0,
-                    userLeft = 0.0,
-                    userTop = 0.0,
-                    unitSizeX = 1.0,
-                    unitSizeY = 1.0,
-                    seed = seed,
-                    generators = generators
-                )
-            }
+                benchmarkKotlin(cfg.name, w, h, BYTES_PER_PIXEL_GENERATE) {
+                    KotlinKernels.turbulence(
+                        pixels = pixels,
+                        width = w,
+                        height = h,
+                        clipLeft = 0,
+                        clipTop = 0,
+                        clipRight = w,
+                        clipBottom = h,
+                        baseFrequencyX = 0.01,
+                        baseFrequencyY = 0.01,
+                        periodX = cfg.periodX,
+                        periodY = cfg.periodY,
+                        octaves = cfg.octaves,
+                        fractalNoise = cfg.fractalNoise,
+                        invCanvasScaleX = 1.0,
+                        invCanvasScaleY = 1.0,
+                        userLeft = 0.0,
+                        userTop = 0.0,
+                        unitSizeX = 1.0,
+                        unitSizeY = 1.0,
+                        seed = seed,
+                        generators = generators
+                    )
+                }
 
-            benchmarkCells(
-                name = "Turbulence",
-                backendFlags = TurbulenceNative.nativeBackend(),
-                w = w,
-                h = h,
-                bytesPerPixel = BYTES_PER_PIXEL_GENERATE
-            ) { b ->
-                TurbulenceNative.applyForced(
-                    pixels = pixels,
-                    width = w,
-                    height = h,
-                    clipLeft = 0,
-                    clipTop = 0,
-                    clipRight = w,
-                    clipBottom = h,
-                    baseFrequencyX = 0.01,
-                    baseFrequencyY = 0.01,
-                    periodX = 0,
-                    periodY = 0,
-                    octaves = 1,
-                    fractalNoise = false,
-                    invCanvasScaleX = 1.0,
-                    invCanvasScaleY = 1.0,
-                    userLeft = 0.0,
-                    userTop = 0.0,
-                    originX = 0.0,
-                    originY = 0.0,
-                    unitSizeX = 1.0,
-                    unitSizeY = 1.0,
-                    seed = seed,
-                    simdBackend = b
-                )
+                benchmarkCells(
+                    name = cfg.name,
+                    backendFlags = TurbulenceNative.nativeBackend(),
+                    w = w,
+                    h = h,
+                    bytesPerPixel = BYTES_PER_PIXEL_GENERATE
+                ) { b ->
+                    TurbulenceNative.applyForced(
+                        pixels = pixels,
+                        width = w,
+                        height = h,
+                        clipLeft = 0,
+                        clipTop = 0,
+                        clipRight = w,
+                        clipBottom = h,
+                        baseFrequencyX = 0.01,
+                        baseFrequencyY = 0.01,
+                        periodX = cfg.periodX,
+                        periodY = cfg.periodY,
+                        octaves = cfg.octaves,
+                        fractalNoise = cfg.fractalNoise,
+                        invCanvasScaleX = 1.0,
+                        invCanvasScaleY = 1.0,
+                        userLeft = 0.0,
+                        userTop = 0.0,
+                        originX = 0.0,
+                        originY = 0.0,
+                        unitSizeX = 1.0,
+                        unitSizeY = 1.0,
+                        seed = seed,
+                        simdBackend = b
+                    )
+                }
             }
         }
     }
@@ -692,7 +754,7 @@ class KernelPerformanceDeviceBenchmark {
         bytesPerPixel: Int,
         body: () -> Unit
     ) {
-        val runWithThermalGating = thermalGatingEnabled
+        val runWithThermalGating = benchmarkArguments.thermalGatingEnabled
         nativeBenchmark {
             this.name = name
             backend = "kotlin"
@@ -719,7 +781,7 @@ class KernelPerformanceDeviceBenchmark {
         bytesPerPixel: Int,
         body: (simdBackend: Int) -> Unit
     ) {
-        val runWithThermalGating = thermalGatingEnabled
+        val runWithThermalGating = benchmarkArguments.thermalGatingEnabled
         for (b in getBackendsFor(backendFlags)) {
             nativeBenchmark {
                 this.name = name
@@ -756,8 +818,8 @@ class KernelPerformanceDeviceBenchmark {
         profiler.profile(
             name = "benchmark_${sanitizeName(name)}_${sanitizeName(backend)}_${w}x${h}",
             events = events,
-            durationMs = simpleperfDurationMs,
-            cpuCore = simpleperfPinCore,
+            durationMs = benchmarkArguments.simpleperfDurationMs,
+            cpuCore = benchmarkArguments.simplePerfPinCore,
             work = work,
         )
     }
@@ -771,13 +833,13 @@ class KernelPerformanceDeviceBenchmark {
         return if (w * h <= 512 * 512) ITERATIONS_512 else ITERATIONS_2048
     }
 
-    private fun totalRuns(target: String?, sizes: Array<Pair<Int, Int>>): Int {
+    private fun totalRuns(kernels: Set<String>?, sizes: Array<Pair<Int, Int>>): Int {
         val iterationsPerCell = sizes.sumOf { (w, h) ->
             WARMUP_ITERATIONS + MEASUREMENT_BATCHES * iterationsForSize(w, h)
         }
 
         fun count(name: String, backendFlags: Int, modes: Int = 1): Int =
-            if (target.isNullOrEmpty() || target == name) {
+            if (kernels.isNullOrEmpty() || kernels.contains(name)) {
                 modes * (1 + getBackendsFor(backendFlags).size) * iterationsPerCell
             } else {
                 0

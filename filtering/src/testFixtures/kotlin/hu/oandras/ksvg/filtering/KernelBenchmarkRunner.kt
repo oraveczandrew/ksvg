@@ -49,6 +49,8 @@ public object KernelBenchmarkRunner {
 
     private val results: MutableList<Result> = mutableListOf()
 
+    private val LOCALE: Locale = Locale.US
+
     public fun runBenchmark(
         kernel: String,
         backendName: String,
@@ -95,7 +97,7 @@ public object KernelBenchmarkRunner {
 
         println(
             String.format(
-                Locale.US,
+                LOCALE,
                 "[%s] %s %dx%d: %.3f ms, %.2f MPix/s, %.2f GB/s (x%.2f)",
                 kernel, backendName, width, height, avgMs, mPixSec, gbSec, speedup,
             ),
@@ -116,14 +118,19 @@ public object KernelBenchmarkRunner {
             }?.avgMs
             val relSpeedup = if (scalarMs != null) scalarMs / r.avgMs else 1.0
 
+            val escapedKernel = if (r.kernel.contains(",") || r.kernel.contains("\"")) {
+                "\"${r.kernel.replace("\"", "\"\"")}\""
+            } else {
+                r.kernel
+            }
             val line = String.format(
-                Locale.US, "%s,%s,%dx%d,%.3f,%.2f,%.2f,%.2f",
-                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup,
+                LOCALE, "%s,%s,%dx%d,%.3f,%.2f,%.2f,%.2f",
+                escapedKernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup,
             )
             csv.append(line + "\n")
 
             val mdLine = String.format(
-                Locale.US, "| %s | %s | %dx%d | %.3f | %.2f | %.2f | %.2fx |",
+                LOCALE, "| %s | %s | %dx%d | %.3f | %.2f | %.2f | %.2fx |",
                 r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup,
             )
             md.append(mdLine + "\n")
