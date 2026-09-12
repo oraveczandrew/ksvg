@@ -63,7 +63,7 @@ internal class BenchmarkViewModel : ViewModel() {
     }
 
     companion object {
-        private val progressFlow = MutableStateFlow(BenchmarkUiState())
+        private val progressFlow: MutableStateFlow<BenchmarkUiState> = MutableStateFlow(BenchmarkUiState())
         private val globalCurrentRun = AtomicInteger()
         private val globalRun = AtomicInteger()
 
@@ -73,28 +73,15 @@ internal class BenchmarkViewModel : ViewModel() {
         }
 
         /**
-         * Withdraws one measured cell's *static* iteration estimate from the global total.
-         * Calibration changes the real per-batch count, so [commitCellPlan] re-adds the true
-         * plan for the cell once it is known; this keeps the live global total (= sum of the
-         * real per-cell plans) honest for the progress bar without precomputing calibration.
+         * Replaces one cell's static iteration estimate with its real post-calibration plan
+         * (actual warmup samples + batches x effective per-batch count). The static estimate
+         * seeded by [beginSuite] stays in the total while the cell runs — the denominator
+         * therefore always covers the iterations already executed — and only here converges
+         * to the sum of the real per-cell plans. The delta can be negative for slow cells
+         * whose warmup hit the wall budget (real plan < static estimate).
          */
-        internal fun enterCell(estimatedForCell: Int) {
-            var done = false
-            while (!done) {
-                val current = globalRun.get()
-                done = globalRun.compareAndSet(
-                    current,
-                    (current - estimatedForCell.coerceAtLeast(0)).coerceAtLeast(0),
-                )
-            }
-        }
-
-        /**
-         * Re-adds the real per-cell plan (actual warmup samples + batches x effective
-         * per-batch count) after calibration fixed it; see [enterCell].
-         */
-        internal fun commitCellPlan(actualForCell: Int) {
-            globalRun.addAndGet(actualForCell.coerceAtLeast(0))
+        internal fun commitCellPlan(staticEstimate: Int, actualForCell: Int) {
+            globalRun.addAndGet(actualForCell.coerceAtLeast(0) - staticEstimate.coerceAtLeast(0))
         }
 
         /**

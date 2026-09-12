@@ -203,10 +203,17 @@ class NativeBenchmarkBuilder {
         currentTask.phase = "FOCUSING"
         currentTask.iteration = 0
         currentTask.iterationTotal = 1
-        // Live global total: withdraw this cell's static iteration estimate now; it is
-        // replaced by the real plan in `commitCellPlan` once calibration fixed the
-        // per-batch count (so the global bar reflects post-calibration reality).
-        BenchmarkViewModel.enterCell(warmupIterations + measurementBatches * iterationsPerBatch)
+        // The cell's static iteration estimate stays in the global total until
+        // `commitCellPlan` swaps it for the real post-calibration plan. Keeping the estimate
+        // in the denominator while the cell runs means the total always covers the
+        // iterations already executed (no current/total overshoot during warmup). When
+        // calibration is active the warmup loop may run up to [MIN_CALIBRATION_SAMPLES]
+        // samples (not `warmupIterations`), so the estimate must use that bound.
+        val staticEstimate =
+            (
+                if (targetBatchMillis > 0L) MIN_CALIBRATION_SAMPLES else warmupIterations
+                ) +
+                measurementBatches * iterationsPerBatch
         publishProgress(startedAt, BenchmarkUiStatus.RUNNING)
         BenchmarkActivity.waitForFocusedWindow()
 
@@ -302,9 +309,11 @@ class NativeBenchmarkBuilder {
                 currentTask.effectiveIterationsPerBatch = effectiveIterationsPerBatch
             }
             // The real per-cell plan is known once calibration fixed the per-batch count
-            // (warmup + batches x effective per batch). Thermal invalidation re-runs a batch
-            // later and adds its iterations to the global total on the fly.
+            // (warmup + batches x effective per batch). Swap the static estimate for the
+            // real plan (the delta is negative for slow cells whose warmup hit the wall
+            // budget). Thermal invalidation re-runs a batch later and adds its iterations.
             BenchmarkViewModel.commitCellPlan(
+                staticEstimate,
                 warmupActualIterations + measurementBatches * effectiveIterationsPerBatch
             )
 
@@ -789,7 +798,7 @@ private const val UNSTABLE_CV = 0.05
  * Minimum warmup samples timed for batch calibration, so the robust per-iteration estimate
  * stays meaningful even when a GC/JIT storm inflates a large share of them.
  */
-private const val MIN_CALIBRATION_SAMPLES = 32
+internal const val MIN_CALIBRATION_SAMPLES = 32
 
 /**
  * Wall-clock budget for the timed warmup (calibration path). Fast kernels still collect the

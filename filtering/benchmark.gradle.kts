@@ -363,17 +363,17 @@ val exportBenchmarkTable = tasks.register("exportBenchmarkTable") {
             return if (idx >= 0) idx else 999
         }
 
-        val groups = rows.groupBy { listOf(it.values[kernelIdx], it.values[sizeIdx]) }
         val outMd = StringBuilder()
 
-        for ((key, group) in groups.entries.sortedBy { it.key.joinToString(" ") }) {
-            val kernel = key[0]
-            val size = key[1]
-            outMd.append("### $kernel ($size)\n\n")
+        if (isDeviceFormat) {
+            val groups = rows.groupBy { listOf(it.values[kernelIdx], it.values[sizeIdx]) }
+            for ((key, group) in groups.entries.sortedBy { it.key.joinToString(" ") }) {
+                val kernel = key[0]
+                val size = key[1]
+                outMd.append("### $kernel ($size)\n\n")
 
-            val sorted = group.sortedBy { backendRank(it.values[backendIdx]) }
+                val sorted = group.sortedBy { backendRank(it.values[backendIdx]) }
 
-            if (isDeviceFormat) {
                 outMd.append("| Backend | Median (ms) | Min (ms) | Max (ms) | Speedup (vs Scalar) | Speedup (vs Kotlin) | Status |\n")
                 outMd.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n")
 
@@ -411,30 +411,70 @@ val exportBenchmarkTable = tasks.register("exportBenchmarkTable") {
 
                     outMd.append("| $b | $medStr | $minStr | $maxStr | $spScalar | $spKotlin | $status |\n")
                 }
-            } else {
-                // Host benchmark CSV format (AvgMs, MPix/s, GB/s, Speedup)
-                outMd.append("| Backend | Avg Time (ms) | Throughput (MPix/s) | Bandwidth (GB/s) | Speedup (vs Scalar) | Status |\n")
-                outMd.append("| :--- | :--- | :--- | :--- | :--- | :--- |\n")
-                for (row in sorted) {
-                    val map = row.header.zip(row.values).toMap()
-                    val b = map["Backend"] ?: ""
-                    val avgMs = map["AvgMs"] ?: ""
-                    val mpix = map["MPix/s"] ?: ""
-                    val gbs = map["GB/s"] ?: ""
-                    val sp = map["Speedup"] ?: ""
-                    val speedupNum = sp.removeSuffix("x").toDoubleOrNull() ?: 1.0
+                outMd.append("\n")
+            }
+        } else {
+            // Host benchmark CSV format (AvgMs, MPix/s, GB/s, Speedup) -> BENCHMARKS.md-style
+            // flat table: kernels alphabetical, sizes ascending, backends in ISA superset
+            // order (`kotlin -> scalar -> sse2 -> ssse3 -> avx2 -> avx512 -> neon32 -> neon64`).
+            // Status conventions match BENCHMARKS.md: >9x -> 🚀 (speedup bolded),
+            // >1x -> 🟢, <1x -> 🔴, scalar -> no icon; faster-than-scalar Kotlin -> ⬆️.
+            outMd.append("| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status | Note |\n")
+            outMd.append("| :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |\n")
 
-                    val status = when {
-                        b.equals("Kotlin", ignoreCase = true) -> "—"
-                        b.equals("scalar", ignoreCase = true) -> "🟢 baseline"
-                        speedupNum >= 2.0 -> "🚀 ${sp}x"
-                        speedupNum > 1.05 -> "🟢 ${sp}x"
-                        speedupNum < 0.95 -> "🔴 regression"
-                        else -> "—"
+            fun sizeRank(s: String): Int {
+                val parts = s.lowercase().split("x")
+                val w = parts.getOrNull(0)?.toIntOrNull() ?: Int.MAX_VALUE
+                val h = parts.getOrNull(1)?.toIntOrNull() ?: Int.MAX_VALUE
+                return if (w == Int.MAX_VALUE || h == Int.MAX_VALUE) Int.MAX_VALUE else w * h
+            }
+
+            val sorted = rows.sortedWith(
+                compareBy<BenchRow>(
+                    { it.values[kernelIdx] },
+                    { sizeRank(it.values[sizeIdx]) },
+                    { backendRank(it.values[backendIdx]) },
+                )
+            )
+
+            for (row in sorted) {
+                val map = row.header.zip(row.values).toMap()
+                val name = map["Kernel"] ?: ""
+                val b = map["Backend"] ?: ""
+                val size = map["Size"] ?: ""
+                val avgMs = map["AvgMs"] ?: ""
+                val mpix = map["MPix/s"] ?: ""
+                val gbs = map["GB/s"] ?: ""
+                val spRaw = map["Speedup"] ?: ""
+                val spNum = spRaw.removeSuffix("x").toDoubleOrNull()
+                val spText = if (spRaw.endsWith("x")) spRaw else "${spRaw}x"
+
+                val isKotlin = b.equals("kotlin", ignoreCase = true)
+                val isScalar = b.equals("scalar", ignoreCase = true)
+                val status: String
+                val bold: Boolean
+                when {
+                    isScalar -> {
+                        status = ""
+                        bold = false
                     }
-
-                    outMd.append("| $b | $avgMs | $mpix | $gbs | ${sp}x | $status |\n")
+                    isKotlin -> {
+                        bold = false
+                        status = if (spNum != null && spNum > 1.0) "⬆️" else ""
+                    }
+                    else -> {
+                        val rocket = spNum != null && spNum > 9.0
+                        bold = rocket
+                        status = when {
+                            rocket -> "🚀"
+                            spNum != null && spNum > 1.0 -> "🟢"
+                            spNum != null && spNum < 1.0 -> "🔴"
+                            else -> ""
+                        }
+                    }
                 }
+                val spCell = if (bold) "**${spText}**" else spText
+                outMd.append("| $name | $b | $size | $avgMs | $mpix | $gbs | $spCell | $status |  |\n")
             }
             outMd.append("\n")
         }
