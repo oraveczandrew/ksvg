@@ -36,6 +36,12 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_64_avx2.S
 )
 
+if(APPLE)
+  target_sources(ksvgblur PRIVATE profiler_macos.cpp)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_sources(ksvgblur PRIVATE profiler_linux.cpp)
+endif()
+
 target_include_directories(ksvgblur PRIVATE
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/common

@@ -17,7 +17,7 @@
 package hu.oandras.ksvg.filtering
 
 import java.io.File
-import java.util.*
+import java.util.Locale
 
 /**
  * Legacy raw performance benchmark runner for filter kernels. Used only by the
@@ -26,32 +26,26 @@ import java.util.*
  * longer uses this: it runs through the stable `nativeBenchmark { }` harness
  * (`benchmark` package, spec `tmp/TEST_HARNESS.md`).
  */
-public object KernelBenchmarkRunner {
+object KernelBenchmarkRunner {
 
-    public data class Result(
-        @JvmField
-        public val kernel: String,
-        @JvmField
-        public val backend: String,
-        @JvmField
-        public val width: Int,
-        @JvmField
-        public val height: Int,
-        @JvmField
-        public val avgMs: Double,
-        @JvmField
-        public val mPixSec: Double,
-        @JvmField
-        public val gbSec: Double,
-        @JvmField
-        public val speedup: Double = 1.0
+    data class Result(
+        @JvmField val kernel: String,
+        @JvmField val backend: String,
+        @JvmField val width: Int,
+        @JvmField val height: Int,
+        @JvmField val avgMs: Double,
+        @JvmField val mPixSec: Double,
+        @JvmField val gbSec: Double,
+        @JvmField val speedup: Double = 1.0,
+        @JvmField val ipc: Double = 0.0,
+        @JvmField val cyclesPerIter: Long = 0
     )
 
     private val results: MutableList<Result> = mutableListOf()
 
     private val LOCALE: Locale = Locale.US
 
-    public fun runBenchmark(
+    fun runBenchmark(
         kernel: String,
         backendName: String,
         width: Int,
@@ -59,6 +53,7 @@ public object KernelBenchmarkRunner {
         warmup: Int = 10,
         iterations: Int = 100,
         numBuffers: Int = 2, // src + dst usually
+        profiler: HostProfiler = HostProfiler.NoOp,
         runKernel: () -> Unit,
         verify: (() -> Unit)? = null
     ) {
@@ -70,12 +65,14 @@ public object KernelBenchmarkRunner {
             runKernel()
         }
 
-        // Timing
+        // Timing + Profiling
+        profiler.start("${kernel}_${backendName}")
         val start = System.nanoTime()
         repeat(iterations) {
             runKernel()
         }
         val end = System.nanoTime()
+        val metrics = profiler.stop()
 
         val totalNs = (end - start).toDouble()
         val avgNs = totalNs / iterations
@@ -93,23 +90,43 @@ public object KernelBenchmarkRunner {
         }?.avgMs
         val speedup = if (scalarMs != null) scalarMs / avgMs else 1.0
 
-        results.add(Result(kernel, backendName, width, height, avgMs, mPixSec, gbSec, speedup))
+        val cycles = metrics?.get("cycles") ?: 0L
+        val instructions = metrics?.get("instructions") ?: 0L
+        val ipc = if (cycles > 0) instructions.toDouble() / cycles else 0.0
+        val cyclesPerIter = if (iterations > 0) cycles / iterations else 0L
+
+        results.add(Result(
+            kernel = kernel,
+            backend = backendName,
+            width = width,
+            height = height,
+            avgMs = avgMs,
+            mPixSec = mPixSec,
+            gbSec = gbSec,
+            speedup = speedup,
+            ipc = ipc,
+            cyclesPerIter = cyclesPerIter
+        ))
+
+        val diag = if (ipc > 0) {
+            String.format(LOCALE, ", IPC: %.2f, Cycles/Iter: %d", ipc, cyclesPerIter)
+        } else ""
 
         println(
             String.format(
                 LOCALE,
-                "[%s] %s %dx%d: %.3f ms, %.2f MPix/s, %.2f GB/s (x%.2f)",
-                kernel, backendName, width, height, avgMs, mPixSec, gbSec, speedup,
+                "[%s] %s %dx%d: %.3f ms, %.2f MPix/s, %.2f GB/s (x%.2f)%s",
+                kernel, backendName, width, height, avgMs, mPixSec, gbSec, speedup, diag
             ),
         )
     }
 
-    public fun report(outputFile: File) {
-        val header = "Kernel,Backend,Size,AvgMs,MPix/s,GB/s,Speedup"
+    fun report(outputFile: File) {
+        val header = "Kernel,Backend,Size,AvgMs,MPix/s,GB/s,Speedup,IPC,CyclesPerIter"
         val csv = StringBuilder(header + "\n")
 
-        val mdHeader = "| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup |"
-        val mdSep = "| :--- | :--- | :---: | ---: | ---: | ---: | ---: |"
+        val mdHeader = "| Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | IPC | Cycles/Iter |"
+        val mdSep = "| :--- | :--- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |"
         val md = StringBuilder("$mdHeader\n$mdSep\n")
 
         for (r in results) {
@@ -124,14 +141,14 @@ public object KernelBenchmarkRunner {
                 r.kernel
             }
             val line = String.format(
-                LOCALE, "%s,%s,%dx%d,%.3f,%.2f,%.2f,%.2f",
-                escapedKernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup,
+                LOCALE, "%s,%s,%dx%d,%.3f,%.2f,%.2f,%.2f,%.2f,%d",
+                escapedKernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup, r.ipc, r.cyclesPerIter
             )
             csv.append(line + "\n")
 
             val mdLine = String.format(
-                LOCALE, "| %s | %s | %dx%d | %.3f | %.2f | %.2f | %.2fx |",
-                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup,
+                LOCALE, "| %s | %s | %dx%d | %.3f | %.2f | %.2f | %.2fx | %.2f | %d |",
+                r.kernel, r.backend, r.width, r.height, r.avgMs, r.mPixSec, r.gbSec, relSpeedup, r.ipc, r.cyclesPerIter
             )
             md.append(mdLine + "\n")
         }
@@ -158,7 +175,7 @@ public object KernelBenchmarkRunner {
         }
     }
 
-    public fun clear() {
+    fun clear() {
         results.clear()
     }
 }

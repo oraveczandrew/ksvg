@@ -49,6 +49,7 @@ class KernelPerformanceBenchmark {
 
     @Test
     fun benchmarkAll() {
+        // Forcing a re-run of the benchmark
         val benchmarkArguments = BenchmarkArguments.fromSystemProperties()
         val sizes = if (benchmarkArguments.isQuick) listOf(512 to 512) else listOf(512 to 512, 2048 to 2048)
 
@@ -57,7 +58,16 @@ class KernelPerformanceBenchmark {
             configs = benchmarkArguments.configs,
             sizes = sizes.toTypedArray()
         )
-        val sink = HostBenchmarkSink(benchmarkArguments)
+
+        val profileEnabled = System.getProperty("benchmark.host.profile") == "true"
+        val profiler = when {
+            profileEnabled && IntelMacOSProfiler.isSupported -> IntelMacOSProfiler()
+            profileEnabled && Arm64MacOSProfiler.isSupported -> Arm64MacOSProfiler()
+            profileEnabled && LinuxHardwareProfiler.isSupported -> LinuxHardwareProfiler()
+            else -> HostProfiler.NoOp
+        }
+
+        val sink = HostBenchmarkSink(benchmarkArguments, profiler)
 
         for (case in matrix) {
             runBenchmarkCase(case, sink)
@@ -75,7 +85,8 @@ class KernelPerformanceBenchmark {
      * [KernelBenchmarkRunner] with deterministic iteration/warmup counts per size.
      */
     private class HostBenchmarkSink(
-        private val arguments: BenchmarkArguments
+        private val arguments: BenchmarkArguments,
+        private val profiler: HostProfiler
     ) : KernelBenchmarkSink {
 
         override fun runKotlin(case: BenchmarkCase, work: () -> Unit) {
@@ -100,6 +111,7 @@ class KernelPerformanceBenchmark {
                 warmup = warmup,
                 iterations = iterations,
                 numBuffers = case.numBuffers,
+                profiler = profiler,
                 runKernel = run
             )
         }

@@ -1,6 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import java.io.File
 import ksvg.bench.Adb
 import ksvg.bench.BenchmarkTableWriter
 import ksvg.bench.readBenchmarkRows
@@ -110,6 +109,7 @@ android {
                 it.systemProperty("benchmark.quick", System.getProperty("benchmark.quick"))
                 it.systemProperty("benchmark.kernel", System.getProperty("benchmark.kernel"))
                 it.systemProperty("benchmark.config", System.getProperty("benchmark.config"))
+                it.systemProperty("benchmark.host.profile", System.getProperty("benchmark.host.profile"))
             }
         }
     }
