@@ -29,6 +29,8 @@ public data class BenchmarkArguments private constructor(
     @JvmField
     val kernels: Set<String>?,
     @JvmField
+    val configs: Set<String>?,
+    @JvmField
     val thermalGatingEnabled: Boolean,
     @JvmField
     val simpleperfEnabled: Boolean,
@@ -48,11 +50,25 @@ public data class BenchmarkArguments private constructor(
                 .toSet()
         }
 
+        /**
+         * Config-name filters use `+` as the only separator: the cell display names contain
+         * commas ("Lighting (diffuse, distant, linear)"), and AGP coerces a comma-separated
+         * instrumentation value down to its first element when it is forwarded through
+         * `-Pandroid.testInstrumentationRunnerArguments.*`.
+         */
+        private fun String.configsArgToSet(): Set<String> {
+            return split("+")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toSet()
+        }
+
         public fun fromInstrumentationRegistry(): BenchmarkArguments {
             val args = InstrumentationRegistry.getArguments()
             return BenchmarkArguments(
                 isQuick = args.getString("benchmark.quick") == "true",
                 kernels = args.getString("benchmark.kernel")?.kernelsArgToSet(),
+                configs = args.getString("benchmark.config")?.configsArgToSet(),
                 thermalGatingEnabled = args.getString("benchmark.thermalGating") != "false",
                 simpleperfEnabled = args.getString("benchmark.simpleperf") == "true",
                 requestedSimplePerfEvents = args.getString("benchmark.simpleperf.events")
@@ -73,6 +89,7 @@ public data class BenchmarkArguments private constructor(
             return BenchmarkArguments(
                 isQuick = System.getProperty("benchmark.quick") == "true",
                 kernels = System.getProperty("benchmark.kernel")?.kernelsArgToSet(),
+                configs = System.getProperty("benchmark.config")?.configsArgToSet(),
                 thermalGatingEnabled = false,
                 simpleperfEnabled = false,
                 requestedSimplePerfEvents = emptyList(),

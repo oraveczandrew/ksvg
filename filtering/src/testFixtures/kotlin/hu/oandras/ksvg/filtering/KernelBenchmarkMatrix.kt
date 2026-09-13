@@ -236,11 +236,19 @@ public object KernelBenchmarkMatrix {
 
     /**
      * Builds the kernel/config/size matrix: one [BenchmarkCase] per (kernel, variant, size)
-     * triple, optionally restricted to [kernels] and sorted alphabetically by case name.
+     * triple, optionally restricted to [kernels] and/or [configs] and sorted alphabetically by
+     * case name.
+     *
+     * [kernels] is an exact kernel-family name filter ("Lighting"). [configs] is a set of
+     * case-insensitive substrings matched against the cell display name
+     * ([BenchmarkConfig.name], e.g. "Lighting (diffuse, distant, linear)"); a config is kept
+     * when any of its filters is a substring of the name, which makes both partial ("linear")
+     * and full-name selectors work. When both filters are given they are ANDed.
      */
     public fun cases(
         kernels: Set<String>?,
-        sizes: Array<Pair<Int, Int>>
+        sizes: Array<Pair<Int, Int>>,
+        configs: Set<String>? = null
     ): List<BenchmarkCase> {
         val families: List<Pair<String, BenchmarkConfig>> = buildList {
             for ((kernel, name) in singleCaseKernels) {
@@ -269,7 +277,10 @@ public object KernelBenchmarkMatrix {
                 }
             }
         }
-        val selected = if (kernels.isNullOrEmpty()) all else all.filter { kernels.contains(it.kernel) }
+        val selected = all.filter { case ->
+            (kernels.isNullOrEmpty() || kernels.contains(case.kernel)) &&
+                (configs.isNullOrEmpty() || configs.any { case.config.name.contains(it, ignoreCase = true) })
+        }
         return selected.sortedBy { it.config.name }
     }
 }

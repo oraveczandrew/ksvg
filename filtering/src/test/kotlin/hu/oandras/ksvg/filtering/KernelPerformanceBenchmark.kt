@@ -54,6 +54,7 @@ class KernelPerformanceBenchmark {
 
         val matrix = KernelBenchmarkMatrix.cases(
             kernels = benchmarkArguments.kernels,
+            configs = benchmarkArguments.configs,
             sizes = sizes.toTypedArray()
         )
         val sink = HostBenchmarkSink(benchmarkArguments)
@@ -62,7 +63,7 @@ class KernelPerformanceBenchmark {
             runBenchmarkCase(case, sink)
         }
 
-        val target = benchmarkArguments.kernels?.joinToString("_")
+        val target = (benchmarkArguments.kernels.orEmpty() + benchmarkArguments.configs.orEmpty()).joinToString("_")
         val suffix = if (!target.isNullOrEmpty()) "_$target" else ""
         val output = File(resolveTmpDir(), "benchmarks_host$suffix.csv")
         output.parentFile?.mkdirs()

@@ -109,6 +109,7 @@ android {
                 it.jvmArgs("-Djava.library.path=${layout.buildDirectory.get().asFile.resolve("host-native").absolutePath}")
                 it.systemProperty("benchmark.quick", System.getProperty("benchmark.quick"))
                 it.systemProperty("benchmark.kernel", System.getProperty("benchmark.kernel"))
+                it.systemProperty("benchmark.config", System.getProperty("benchmark.config"))
             }
         }
     }
@@ -158,16 +159,27 @@ tasks.matching { it.name == "connectedDebugAndroidTest" }
  * device, pulls the generated CSV files into `<repo>/tmp/`, and dumps them as
  * a Markdown table to the terminal.
  *
- * The benchmark reads a `kernel` (kernel name filter) and `quick` (boolean)
- * instrumentation argument. Both are forwarded from the optional project
- * properties `benchmark.kernel` and `benchmark.quick` so the invocation stays
- * consistent with the host benchmark (`KernelPerformanceBenchmark`, which reads
- * the same `benchmark.*` system properties). Without them the whole suite runs
- * (a couple of minutes on a phone).
+ * The benchmark reads a `kernel` (kernel name filter), `config` (config-name
+ * substring filter) and `quick` (boolean) instrumentation argument. All three
+ * are forwarded from the optional project properties `benchmark.kernel`,
+ * `benchmark.config` and `benchmark.quick` so the invocation stays consistent
+ * with the host benchmark (`KernelPerformanceBenchmark`, which reads the same
+ * `benchmark.*` system properties). Without them the whole suite runs (a couple
+ * of minutes on a phone).
+ *
+ * `benchmark.config` is `+`-separated, case-insensitive substrings matched
+ * against the cell display name (e.g. "Lighting (diffuse, distant, linear)");
+ * `benchmark.kernel` and `benchmark.config` are ANDed when both are given.
  *
  *   ./gradlew :filtering:runDeviceBenchmark \
  *       -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
  *       -Pandroid.testInstrumentationRunnerArguments.benchmark.kernel=Turbulence \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
+ *
+ *   ./gradlew :filtering:runDeviceBenchmark \
+ *       -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.kernel=Lighting \
+ *       -Pandroid.testInstrumentationRunnerArguments.benchmark.config=diffuse+distant+linear \
  *       -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
  *
  * Results are pulled with `adb pull` once the instrumentation run finishes and
