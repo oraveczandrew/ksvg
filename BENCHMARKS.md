@@ -248,6 +248,15 @@ Where a kernel row is missing a backend, that backend is not advertised on this 
 The emulator reports only `scalar`/`sse2`/`ssse3`: AVX2/AVX-512 are not matched by runtime detection
 (`detectSimdLevel()` stays below `SIMD_AVX2`) although the emulated CPU advertises `avx2`.
 
+Root cause (Android emulator 37.2.8.0 on macOS, HVF): the guest CPUID is served from a fixed mask
+regardless of `-qemu -cpu model` (`max`, `Skylake-Server`, forced `osxsave=on,avx512f=on,...` all give
+identical results) and `-cpu host` does not exist in this QEMU fork. The mask sets
+`CPUID.1:ECX.OSXSAVE=0` (with `AVX=1`) and clears every `CPUID.7:EBX` AVX-512 bit, so
+`__builtin_cpu_supports("avx"/"avx2"/"avx512*")` always returns 0 — 32-bit and 64-bit images alike.
+Under HVF the AVX/AVX2/AVX-512 backends can therefore never be advertised by runtime detection;
+only TCG software emulation would report them (slow). Use desktop/host native validation or forced
+backend dispatch instead.
+
 ## Host Results (x86-32, Android emulator)
 
 Measured on the x86 (32-bit) Android emulator, API 26, on the same hardware. ConvolveMatrix measures
@@ -334,7 +343,9 @@ the unified 5×5 kernel; ArithmeticComposite uses 3 buffers (12 B/px).
 | UnLinearize | scalar | 2048x2048 | 13.98 | 300.04 | 2.40 | 1.00x |  |  |
 | UnLinearize | ssse3 | 2048x2048 | 4.14 | 1012.00 | 8.10 | 3.37x | 🟢 |  |
 
-The emulator exposes only `scalar`/`sse2`/`ssse3` (AVX is gated out of runtime detection on 32-bit x86 by Android).
+The emulator exposes only `scalar`/`sse2`/`ssse3`. This is not a 32-bit x86/Android gating quirk: the
+emulator's HVF layer hard-masks guest CPUID (`OSXSAVE=0`, all AVX-512 bits cleared) on 64-bit images
+too, so `__builtin_cpu_supports` never advertises AVX. See the note in the x86-64 emulator section.
 If a kernel row is missing a backend it is not advertised on this ABI.
 
 ## Device Results (OnePlus 11)

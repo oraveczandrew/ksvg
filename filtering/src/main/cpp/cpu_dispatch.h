@@ -17,6 +17,8 @@
 #ifndef KSVG_CPU_DISPATCH_H
 #define KSVG_CPU_DISPATCH_H
 
+#include <cstdint>
+
 // One-time x86 SIMD level detection shared by the filter kernels.
 //
 // The kernels ship multiple code paths compiled with `target(...)` attributes;
@@ -30,13 +32,66 @@ enum SimdLevel {
     SIMD_AVX512 = 3,
 };
 
+#if defined(__x86_64__) || defined(__i386__)
+// Raw-CPUID AVX2 gate.
+//
+// __builtin_cpu_supports("avx2") additionally relies on CPUID.1:ECX.OSXSAVE,
+// which the Android emulator's HVF CPUID mask may clear even though the guest
+// kernel has enabled CR4.OSXSAVE and XCR0.YMM, and the AVX2 kernels provably
+// execute correctly there. So the OSXSAVE *report* is used neither as evidence
+// of AVX2 nor as a gate: the actual XCR0 state is read directly instead.
+//
+// XCR0.YMM proves the OS saves/restores the YMM register state AVX requires;
+// on real silicon this produces the same result as normal AVX2 detection, it
+// is just robust against the emulator's masked OSXSAVE bit.
+inline bool cpuHasAvx2Raw() {
+    uint32_t a, b, c, d;
+
+    // CPUID.1:ECX.XSAVE - sanity precondition: XCR0/XGETBV only exist
+    // when the XSAVE feature set is present.
+    __asm__ volatile(
+        "mov $1, %%eax; cpuid"
+        : "=a"(a), "=b"(b), "=c"(c), "=d"(d)
+        :
+        : "cc");
+    if ((c & (1u << 26)) == 0) {
+        return false;
+    }
+
+    // XCR0[2] = YMM state enabled by the OS.
+    uint32_t xlo, xhi;
+    __asm__ volatile(
+        "xgetbv"
+        : "=a"(xlo), "=d"(xhi)
+        : "c"(0));
+    const uint64_t xcr0 = (static_cast<uint64_t>(xhi) << 32) | xlo;
+    if ((xcr0 & (1ull << 2)) == 0) {
+        return false;
+    }
+
+    // CPUID.7.0:EBX[5] = AVX2
+    __asm__ volatile(
+        "mov $7, %%eax; xor %%ecx, %%ecx; cpuid"
+        : "=a"(a), "=b"(b), "=c"(c), "=d"(d)
+        :
+        : "cc");
+    return (b & (1u << 5)) != 0;
+}
+#endif
+
 inline SimdLevel detectSimdLevel() {
 #if defined(__x86_64__) || defined(__i386__)
     static const SimdLevel level = []() {
+        // AVX-512 stays on __builtin_cpu_supports: the emulator masks the
+        // AVX-512 CPUID bits and never enables the ZMM XCR0 state, so raw
+        // detection must NOT unlock a backend that would #UD there.
         if (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw")) {
             return SIMD_AVX512;
         }
-        if (__builtin_cpu_supports("avx2")) {
+        // OR short-circuit: on real silicon the one-time builtin flag is the
+        // fast path and the raw CPUID sequence never runs; only in environments
+        // that clear OSXSAVE (Android emulator HVF) does the raw fallback run.
+        if (__builtin_cpu_supports("avx2") || cpuHasAvx2Raw()) {
             return SIMD_AVX2;
         }
         if (__builtin_cpu_supports("ssse3")) {

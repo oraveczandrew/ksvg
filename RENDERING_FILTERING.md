@@ -634,3 +634,27 @@ These are implementation invariants, not benchmark-specific optimizations:
 - 2026-09-10 — Added the closed turbulence findings: kernel parity against
   librsvg, device-pixel stitch tile quantization, and the narrowly scoped
   straight-linearRGB terminal transfer (§3.4).
+- 2026-09-13 — Removed the i386 AVX-512 assembly rows
+  (`morphology_i386_avx512.S`, `lighting_distant_specular_i386_avx512.S`, and the
+  never-built WIP `lighting_distant_diffuse_i386_avx512.S`). They were untestable
+  everywhere: the Android emulator's HVF guest masks every AVX-512 CPUID bit on
+  both x86 and x86_64 (verified on API 26/30/37), 32-bit x86 images end at
+  API 30, and there is no host i386 toolchain to validate against. The x86_64
+  AVX-512 rows stay (host-native build + host benchmarks validate them). i386
+  morphology now dispatches SSE2/AVX2 only; i386 specular lighting SSE2/AVX2;
+  `nativeBackendForAbi` on i386 never advertises `SIMD_BACKEND_AVX512` (lighting,
+  convolve report functions fixed to match: AVX512 gated on x86_64 only).
+- 2026-09-13 — Fixed sibling AVX2-detection bug uncovered by the same emulator
+  CPUID audit: `detectSimdLevel()` keyed AVX2 on `__builtin_cpu_supports("avx2")`,
+  which in the emulator guest additionally demands `CPUID.1:ECX.OSXSAVE`; the
+  HVF mask clears that bit even though `XCR0.YMM` is provably enabled and the
+  AVX-256 kernels execute correctly (execution probe verified on API 37). New
+  `cpuHasAvx2Raw()` in `cpu_dispatch.h` reads the real state instead of the
+  OSXSAVE *report*: CPUID leaf1 XSAVE (a sanity precondition for XCR0/XGETBV)
+  → actual `XCR0.YMM` via `xgetbv` (proves the OS saves/restores the YMM state
+  AVX requires) → CPUID leaf7 EBX bit5. On real silicon the result equals
+  normal detection (host probe: level=AVX512), because XCR0.YMM and the
+  OSXSAVE bit are always set together there. AVX-512 detection deliberately
+  stays on `__builtin_cpu_supports` — raw detection must never unlock a backend
+  that would `#UD` in the emulator. Emulator now detects **AVX2** instead of
+  SSSE3.

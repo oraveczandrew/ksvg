@@ -489,9 +489,9 @@ jint nativeBackendForAbi() {
     backends |= SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
     backends |= SIMD_BACKEND_SSE2;
-#if defined(__x86_64__)
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
+#if defined(__x86_64__)
     if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
 #endif
 #endif

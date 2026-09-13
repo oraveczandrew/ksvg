@@ -115,8 +115,11 @@ void applyX86(
         jint backend = forcedBackend;
         if (backend == -1) {
             const SimdLevel level = detectSimdLevel();
+#if defined(__x86_64__)
             if (level >= SIMD_AVX512) backend = SIMD_BACKEND_AVX512;
-            else if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
+            else
+#endif
+            if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
             else backend = SIMD_BACKEND_SSE2;
         }
 
@@ -150,7 +153,9 @@ jint nativeBackendForAbi() {
     const SimdLevel level = detectSimdLevel();
     backends |= SIMD_BACKEND_SSE2;
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
+#if defined(__x86_64__)
     if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
+#endif
 #elif defined(__aarch64__)
     backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
@@ -172,7 +177,9 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_nativeBackend(
     const SimdLevel level = detectSimdLevel();
     backends |= SIMD_BACKEND_SSE2;
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
+#if defined(__x86_64__)
     if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
+#endif
 #elif defined(__aarch64__)
     backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)

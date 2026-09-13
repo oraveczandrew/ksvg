@@ -46,11 +46,13 @@ extern "C" void ksvgMorphologyApplyRowAvx2(
     jint radiusX, jint radiusY, jboolean erode,
     jint y, jint xStart, jint xEnd, jint *scratch);
 
-// AVX-512 kernels.
+// AVX-512 kernels (x86_64 only; i386 ships no AVX-512 row).
+#if defined(__x86_64__)
 extern "C" void ksvgMorphologyApplyRowAvx512(
     const jint *src, jint *dst, jint width,
     jint radiusX, jint radiusY, jboolean erode,
     jint y, jint xStart, jint xEnd, jint *scratch);
+#endif
 #endif
 
 // feMorphology (erode/dilate) over unpremultiplied ARGB_8888 IntArrays.
@@ -198,7 +200,7 @@ namespace {
 #elif defined(__arm__)
                 assert(backend == SIMD_BACKEND_NEON32);
                 ksvgMorphologyApplyRowNeon32(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
-#elif defined(__i386__) || defined(__x86_64__)
+#elif defined(__x86_64__)
                 switch (backend) {
                     case SIMD_BACKEND_SSE2:
                         ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
@@ -210,7 +212,18 @@ namespace {
                         ksvgMorphologyApplyRowAvx512(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
                         break;
                     default:
-                        assert(false && "unsupported forced morphology backend on x86");
+                        assert(false && "unsupported forced morphology backend on x86-64");
+                }
+#elif defined(__i386__)
+                switch (backend) {
+                    case SIMD_BACKEND_SSE2:
+                        ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                        break;
+                    case SIMD_BACKEND_AVX2:
+                        ksvgMorphologyApplyRowAvx2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                        break;
+                    default:
+                        assert(false && "unsupported forced morphology backend on i386");
                 }
 #else
                 for (jint x = vxLo; x < vxHi; x++) {
@@ -243,7 +256,9 @@ namespace {
         backends |= SIMD_BACKEND_SSE2;
         const SimdLevel level = detectSimdLevel();
         if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
+#if defined(__x86_64__)
         if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
+#endif
 #endif
         return backends;
     }
@@ -345,6 +360,7 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             const SimdLevel level = detectSimdLevel();
             const jint span = vxHi - vxLo + 2 * radiusX;
             jint *spanBuf = new jint[span];
+#if defined(__x86_64__)
             switch (level) {
                 case SIMD_AVX512:
                     ksvgMorphologyApplyRowAvx512(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
@@ -355,6 +371,15 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
                 default:
                     ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
             }
+#else
+            switch (level) {
+                case SIMD_AVX2:
+                    ksvgMorphologyApplyRowAvx2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+                    break;
+                default:
+                    ksvgMorphologyApplyRowSse2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
+            }
+#endif
             delete[] spanBuf;
 #else
             for (jint x = vxLo; x < vxHi; x++) {
