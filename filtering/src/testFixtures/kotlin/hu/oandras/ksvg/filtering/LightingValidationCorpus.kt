@@ -472,5 +472,71 @@ public object LightingValidationCorpus {
             useLinear = false,
             input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
+
+        // Point light, specular, linear output
+        add(Case(
+            name = "point specular linear 32x8",
+            width = 32,
+            height = 8,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = 32,
+            clipBottom = 8,
+            surfaceScale = 5f,
+            invCanvasScaleX = 1.0,
+            invCanvasScaleY = 1.0,
+            userLeft = 0.0,
+            userTop = 0.0,
+            originX = 0.0,
+            originY = 0.0,
+            unitSizeX = 1.0,
+            unitSizeY = 1.0,
+            canvasScaleX = 1f,
+            canvasScaleY = 1f,
+            lightType = 1,
+            specular = true,
+            k = 1f,
+            exponent = 20f,
+            lightR = 255,
+            lightG = 255,
+            lightB = 255,
+            params = doubleArrayOf(16.0, 4.0, 50.0),
+            premultiplied = false,
+            useLinear = true,
+            input = UnLinearizeValidationCorpus.fixedSeedRandom(32 * 8)
+        ))
+
+        // Spot light, diffuse, sRGB / non-linear output
+        add(Case(
+            name = "spot diffuse 16x16",
+            width = 16,
+            height = 16,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = 16,
+            clipBottom = 16,
+            surfaceScale = 1f,
+            invCanvasScaleX = 1.0,
+            invCanvasScaleY = 1.0,
+            userLeft = 0.0,
+            userTop = 0.0,
+            originX = 0.0,
+            originY = 0.0,
+            unitSizeX = 1.0,
+            unitSizeY = 1.0,
+            canvasScaleX = 1f,
+            canvasScaleY = 1f,
+            lightType = 2,
+            specular = false,
+            k = 1f,
+            exponent = 1f,
+            lightR = 255,
+            lightG = 255,
+            lightB = 255,
+            params = doubleArrayOf(8.0, 8.0, 100.0, 8.0, 8.0, 0.0, 30.0),
+            premultiplied = false,
+            useLinear = false,
+            input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
+        ))
     }
 }

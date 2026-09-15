@@ -208,6 +208,60 @@ public object KernelBenchmarkMatrix {
             exponent = 20f,
             useLinear = false
         ) { _, _ -> doubleArrayOf(45.0, 45.0) },
+
+        LightingBenchmarkConfig(
+            "Lighting (diffuse, point, linear)",
+            LightType.POINT,
+            specular = false,
+            useLinear = true
+        ) { w, h -> doubleArrayOf(w / 2.0, h / 2.0, 50.0) },
+        LightingBenchmarkConfig(
+            "Lighting (diffuse, point)",
+            LightType.POINT,
+            specular = false,
+            useLinear = false
+        ) { w, h -> doubleArrayOf(w / 2.0, h / 2.0, 50.0) },
+        LightingBenchmarkConfig(
+            "Lighting (specular, point, linear)",
+            LightType.POINT,
+            specular = true,
+            exponent = 20f,
+            useLinear = true
+        ) { w, h -> doubleArrayOf(w / 2.0, h / 2.0, 50.0) },
+        LightingBenchmarkConfig(
+            "Lighting (specular, point)",
+            LightType.POINT,
+            specular = true,
+            exponent = 20f,
+            useLinear = false
+        ) { w, h -> doubleArrayOf(w / 2.0, h / 2.0, 50.0) },
+
+        LightingBenchmarkConfig(
+            "Lighting (diffuse, spot, linear)",
+            LightType.SPOT,
+            specular = false,
+            useLinear = true
+        ) { w, h -> doubleArrayOf(w / 2.0, h / 2.0, 100.0, w / 2.0, h / 2.0, 0.0, 30.0) },
+        LightingBenchmarkConfig(
+            "Lighting (diffuse, spot)",
+            LightType.SPOT,
+            specular = false,
+            useLinear = false
+        ) { w, h -> doubleArrayOf(w / 2.0, h / 2.0, 100.0, w / 2.0, h / 2.0, 0.0, 30.0) },
+        LightingBenchmarkConfig(
+            "Lighting (specular, spot, linear)",
+            LightType.SPOT,
+            specular = true,
+            exponent = 20f,
+            useLinear = true
+        ) { w, h -> doubleArrayOf(w / 2.0, h / 2.0, 50.0, w / 2.0, h / 2.0, 0.0, 30.0) },
+        LightingBenchmarkConfig(
+            "Lighting (specular, spot)",
+            LightType.SPOT,
+            specular = true,
+            exponent = 20f,
+            useLinear = false
+        ) { w, h -> doubleArrayOf(w / 2.0, h / 2.0, 50.0, w / 2.0, h / 2.0, 0.0, 30.0) },
     )
 
     public val turbulenceConfigs: List<TurbulenceBenchmarkConfig> = listOf(
