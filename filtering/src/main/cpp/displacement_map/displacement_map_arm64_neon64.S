@@ -3,13 +3,21 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "asm_macros.S"
 
-
-    .text
-    .align  2
+.text
+.align 2
 
 /*
  * void ksvgDisplacementMapApplyNeon64(
@@ -26,29 +34,29 @@
  * compile-time constants, matching the C++ template specialization.
  */
 
-    .global SYM(ksvgDisplacementMapApplyNeon64)
-    TYPE(SYM(ksvgDisplacementMapApplyNeon64), %function)
-SYM(ksvgDisplacementMapApplyNeon64):
+.global SYM(ksvgDisplacementMapApplyNeon64)
+TYPE(SYM(ksvgDisplacementMapApplyNeon64), %function)
+    SYM(ksvgDisplacementMapApplyNeon64):
     and     w7, w5, #3
     lsl     w7, w7, #2
     and     w6, w6, #3
     orr     w7, w7, w6
     /* 32-bit PC-relative offsets keep the table PIC-safe (a shared lib may
-       not carry R_AARCH64_ABS64). Slot byte offset = (xc&3)<<2 | (yc&3). */
+    not     carry R_AARCH64_ABS64). Slot byte offset = (xc&3)<<2 | (yc&3). */
     adr     x8, .Ldispatch
     ldr     w9, [x8, w7, uxtw #2]
     add     x8, x8, w9, sxtw
     br      x8
    // SIZE(SYM(ksvgDisplacementMapApplyNeon64))
 
-    .macro DEFINE_KERNEL name, xshift, yshift
+.macro DEFINE_KERNEL name, xshift, yshift
     .global SYM(\name)
     TYPE(SYM(\name), %function)
-SYM(\name):
+    SYM(\name):
     cbz     w3, .Lret_\name
     cbz     w4, .Lret_\name
     /* Constants / invariants. */
-    dup     v0.4s, v0.s[0]          // scale
+    dup     v0.4s, v0.s[0]  // scale
     fmov    v1.4s, #0.5
     ldr     q2, .Lfloat255
     movi    v3.4s, #255
@@ -57,21 +65,21 @@ SYM(\name):
 
     sub     w21, w3, #1
     sub     w22, w4, #1
-    dup     v17.4s, w21            // width - 1
-    dup     v18.4s, w22            // height - 1
+    dup     v17.4s, w21  // width - 1
+    dup     v18.4s, w22  // height - 1
     movi    v19.4s, #0
 
-    and     w20, w3, #~3           // largest multiple of 4
-    mov     w11, w4                // rows remaining
-    mov     w12, wzr               // y
-    mov     x9, x1                 // current map row pointer
-    mov     x10, x2                // current dst row pointer
+    and     w20, w3, #~3  // largest multiple of 4
+    mov     w11, w4  // rows remaining
+    mov     w12, wzr  // y
+    mov     x9, x1  // current map row pointer
+    mov     x10, x2  // current dst row pointer
 
 .Lrow_\name:
-    mov     w13, wzr               // x
-    dup     v6.4s, w12             // y, y, y, y
-    dup     v7.4s, w13             // x, x, x, x
-    add     v7.4s, v7.4s, v4.4s    // x..x+3
+    mov     w13, wzr  // x
+    dup     v6.4s, w12  // y, y, y, y
+    dup     v7.4s, w13  // x, x, x, x
+    add     v7.4s, v7.4s, v4.4s  // x..x+3
 
 .Lvec_\name:
     cmp     w13, w20
@@ -198,7 +206,7 @@ SYM(\name):
 .Lret_\name:
     ret
    // SIZE(SYM(\name))
-    .endm
+.endm
 
     DEFINE_KERNEL ksvgDisplacementMapApplyNeon64_RR, 16, 16
     DEFINE_KERNEL ksvgDisplacementMapApplyNeon64_RG, 16, 8
@@ -220,29 +228,29 @@ SYM(\name):
     DEFINE_KERNEL ksvgDisplacementMapApplyNeon64_AB, 24, 0
     DEFINE_KERNEL ksvgDisplacementMapApplyNeon64_AA, 24, 24
 
-    .align  2
+.align 2
 .Ldispatch:
-    .word   SYM(ksvgDisplacementMapApplyNeon64_RR) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_RG) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_RB) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_RA) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_GR) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_GG) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_GB) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_GA) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_BR) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_BG) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_BB) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_BA) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_AR) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_AG) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_AB) - .Ldispatch
-    .word   SYM(ksvgDisplacementMapApplyNeon64_AA) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_RR) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_RG) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_RB) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_RA) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_GR) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_GG) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_GB) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_GA) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_BR) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_BG) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_BB) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_BA) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_AR) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_AG) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_AB) - .Ldispatch
+.word SYM(ksvgDisplacementMapApplyNeon64_AA) - .Ldispatch
 
-    .align  2
+.align 2
 .Lfloat255:
-    .word 0x437f0000, 0x437f0000, 0x437f0000, 0x437f0000
+.word 0x437f0000, 0x437f0000, 0x437f0000, 0x437f0000
 
-    .align  2
+.align 2
 .Lincrements:
-    .word 0, 1, 2, 3
+.word 0, 1, 2, 3

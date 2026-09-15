@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 András Oravecz <info@oandras.hu>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "asm_macros.S"
 #include "lighting_x86_64_avx2_macros.S"
 
@@ -27,18 +43,18 @@
  *   flags
  */
 .macro SPOT_PACK r, g, b, dst_reg, dst_off, tmp
-    movl \r, \tmp
-    cmpl \g, \tmp
-    cmovl \g, \tmp
-    cmpl \b, \tmp
-    cmovl \b, \tmp
-    shll $24, \tmp
-    shll $16, \r
-    shll $8, \g
-    orl \g, \r
-    orl \b, \r
-    orl \tmp, \r
-    movl \r, \dst_off(\dst_reg)
+    movl         \r, \tmp
+    cmpl         \g, \tmp
+    cmovl        \g, \tmp
+    cmpl         \b, \tmp
+    cmovl        \b, \tmp
+    shll         $24, \tmp
+    shll         $16, \r
+    shll         $8, \g
+    orl          \g, \r
+    orl          \b, \r
+    orl          \tmp, \r
+    movl         \r, \dst_off(\dst_reg)
 .endm
 
 /*
@@ -75,36 +91,36 @@
  * literals in the caller's RODATA.
  */
 .macro SPOT_SPEC_PIXEL intens_off, spot_off, out_off, dst_reg, params_reg, exp_reg, l2s
-    vmovss \intens_off(%rsp), %xmm0
-    vmovd \exp_reg, %xmm1
+    vmovss       \intens_off(%rsp), %xmm0
+    vmovd        \exp_reg, %xmm1
     CALL(powf)
-    vmulss 8(\params_reg), %xmm0, %xmm0
-    vmulss \spot_off(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(\params_reg), %xmm0, %xmm1
-    vmulss 28(\params_reg), %xmm0, %xmm2
-    vmulss 32(\params_reg), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    .if \l2s
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    .endif
+    vmulss       8(\params_reg), %xmm0, %xmm0
+    vmulss       \spot_off(%rsp), %xmm0, %xmm0
+    vmaxss       .Lspot_zero(%rip), %xmm0, %xmm0
+    vminss       .Lspot_one(%rip), %xmm0, %xmm0
+    vmulss       24(\params_reg), %xmm0, %xmm1
+    vmulss       28(\params_reg), %xmm0, %xmm2
+    vmulss       32(\params_reg), %xmm0, %xmm3
+    vmaxss       .Lspot_zero(%rip), %xmm1, %xmm1
+    vmaxss       .Lspot_zero(%rip), %xmm2, %xmm2
+    vmaxss       .Lspot_zero(%rip), %xmm3, %xmm3
+    vminss       .Lspot_255(%rip), %xmm1, %xmm1
+    vminss       .Lspot_255(%rip), %xmm2, %xmm2
+    vminss       .Lspot_255(%rip), %xmm3, %xmm3
+    vaddss       .Lspot_half(%rip), %xmm1, %xmm1
+    vroundss     $11, %xmm1, %xmm1, %xmm1
+    vaddss       .Lspot_half(%rip), %xmm2, %xmm2
+    vroundss     $11, %xmm2, %xmm2, %xmm2
+    vaddss       .Lspot_half(%rip), %xmm3, %xmm3
+    vroundss     $11, %xmm3, %xmm3, %xmm3
+    vcvttss2si   %xmm1, %eax
+    vcvttss2si   %xmm2, %ecx
+    vcvttss2si   %xmm3, %edx
+.if \l2s
+    L2S_SPOT     %eax
+    L2S_SPOT     %ecx
+    L2S_SPOT     %edx
+.endif
     SPOT_PACK %eax, %ecx, %edx, \dst_reg, \out_off, %edi
 .endm
 
@@ -132,9 +148,9 @@
  *   \dst, \scratch
  */
 .macro SUM121F v0, v1, v2, dst, scratch
-    vaddps  \v0, \v2, \dst
-    vaddps  \v1, \v1, \scratch
-    vaddps  \scratch, \dst, \dst
+    vaddps       \v0, \v2, \dst
+    vaddps       \v1, \v1, \scratch
+    vaddps       \scratch, \dst, \dst
 .endm
 
 /*
@@ -164,17 +180,17 @@
  *   the (7, 1, 2) vector, using ymm0 for the guard mask and ymm8 for r.
  */
 .macro NORM_INV l2, x, y, z, guard, recip
-    vsqrtps \l2, \l2                        // len
-    vxorps  \guard, \guard, \guard
-    vcmpps  $4, \guard, \l2, \guard         // guard = (len != 0)
+    vsqrtps      \l2, \l2  // len
+    vxorps       \guard, \guard, \guard
+    vcmpps       $4, \guard, \l2, \guard  // guard = (len != 0)
     vbroadcastss .Lspot_one(%rip), \recip
-    vdivps  \l2, \recip, \recip             // r = 1/len
-    vmulps  \recip, \x, \x
-    vmulps  \recip, \y, \y
-    vmulps  \recip, \z, \z
-    vandps  \guard, \x, \x
-    vandps  \guard, \y, \y
-    vandps  \guard, \z, \z
+    vdivps       \l2, \recip, \recip  // r = 1/len
+    vmulps       \recip, \x, \x
+    vmulps       \recip, \y, \y
+    vmulps       \recip, \z, \z
+    vandps       \guard, \x, \x
+    vandps       \guard, \y, \y
+    vandps       \guard, \z, \z
 .endm
 
 /* Spot-light + specular Intel SIMD kernels.
@@ -204,8 +220,8 @@ RODATA
 POINT_LIT4
 .p2align 2
 .Lspot_zero: .long 0x00000000
-.Lspot_one:  .long 0x3f800000
-.Lspot_255:  .long 0x437f0000
+.Lspot_one: .long 0x3f800000
+.Lspot_255: .long 0x437f0000
 .Lspot_half: .long 0x3f000000
 
 TEXT_SECTION
@@ -213,201 +229,204 @@ TEXT_SECTION
 .globl SYM(ksvgLightingSpotSpecularRowAvx2)
 .p2align 4
 SYM(ksvgLightingSpotSpecularRowAvx2):
-    testl %r8d, %r8d
-    jle .Lspot_avx2_ret
-    pushq %rbp
-    pushq %rbx
-    pushq %r12
-    pushq %r13
-    pushq %r14
-    pushq %r15
-    movq %r9, %rbp
-    movq %rdi, %r12
-    movq %rsi, %r13
-    movq %rdx, %r14
-    movq %rcx, %r15
-    movl %r8d, %ebx
-    subq $72, %rsp
-    movss %xmm0, 68(%rsp)
-    movups 0(%rbp), %xmm0
-    movups %xmm0, 0(%rsp)
-    movups 16(%rbp), %xmm0
-    movups %xmm0, 16(%rsp)
-    movups 32(%rbp), %xmm0
-    movups %xmm0, 32(%rsp)
-    movups 48(%rbp), %xmm0
-    movups %xmm0, 48(%rsp)
-    movss 64(%rbp), %xmm0
-    movss %xmm0, 64(%rsp)
+    // Wrapper: spills params/rows, then issues 4-pixel core calls until done.
+    // Both entry points share the core below (linear differs only in L2S).
+    testl        %r8d, %r8d
+    jle          .Lspot_avx2_ret
+    pushq        %rbp
+    pushq        %rbx
+    pushq        %r12
+    pushq        %r13
+    pushq        %r14
+    pushq        %r15
+    movq         %r9, %rbp
+    movq         %rdi, %r12
+    movq         %rsi, %r13
+    movq         %rdx, %r14
+    movq         %rcx, %r15
+    movl         %r8d, %ebx
+    subq         $72, %rsp
+    movss        %xmm0, 68(%rsp)
+    movups       0(%rbp), %xmm0
+    movups       %xmm0, 0(%rsp)
+    movups       16(%rbp), %xmm0
+    movups       %xmm0, 16(%rsp)
+    movups       32(%rbp), %xmm0
+    movups       %xmm0, 32(%rsp)
+    movups       48(%rbp), %xmm0
+    movups       %xmm0, 48(%rsp)
+    movss        64(%rbp), %xmm0
+    movss        %xmm0, 64(%rsp)
 .Lspot_avx2_loop:
-    movss 68(%rsp), %xmm0
-    leaq 0(%rsp), %r9
-    movq %r12, %rdi
-    movq %r13, %rsi
-    movq %r14, %rdx
-    movq %r15, %rcx
-    movl $8, %r8d
-    callq .Lspot_avx2_core
-    movss 48(%rsp), %xmm0
-    addss %xmm0, %xmm0
-    addss %xmm0, %xmm0
-    addss %xmm0, %xmm0
-    movss %xmm0, %xmm1
-    movss 40(%rsp), %xmm0
-    addss %xmm1, %xmm0
-    movss %xmm0, 40(%rsp)
-    addq $32, %r12
-    addq $32, %r13
-    addq $32, %r14
-    addq $32, %r15
-    subl $8, %ebx
-    jg .Lspot_avx2_loop
-    addq $72, %rsp
-    popq %r15
-    popq %r14
-    popq %r13
-    popq %r12
-    popq %rbx
-    popq %rbp
+    movss        68(%rsp), %xmm0
+    leaq         0(%rsp), %r9
+    movq         %r12, %rdi
+    movq         %r13, %rsi
+    movq         %r14, %rdx
+    movq         %r15, %rcx
+    movl         $8, %r8d
+    callq        .Lspot_avx2_core
+    movss        48(%rsp), %xmm0
+    addss        %xmm0, %xmm0
+    addss        %xmm0, %xmm0
+    addss        %xmm0, %xmm0
+    movss        %xmm0, %xmm1
+    movss        40(%rsp), %xmm0
+    addss        %xmm1, %xmm0
+    movss        %xmm0, 40(%rsp)
+    addq         $32, %r12
+    addq         $32, %r13
+    addq         $32, %r14
+    addq         $32, %r15
+    subl         $8, %ebx
+    jg           .Lspot_avx2_loop
+    addq         $72, %rsp
+    popq         %r15
+    popq         %r14
+    popq         %r13
+    popq         %r12
+    popq         %rbx
+    popq         %rbp
 .Lspot_avx2_ret:
     retq
 
 .p2align 4
 .Lspot_avx2_core:
-    pushq %rbp
-    pushq %r12
-    pushq %r13
-    pushq %r14
-    pushq %r15
-    subq $80, %rsp
-    movq %r9, %rbp
-    movq %rcx, %r14
-    movd %xmm0, %r13d
+    pushq        %rbp
+    pushq        %r12
+    pushq        %r13
+    pushq        %r14
+    pushq        %r15
+    subq         $80, %rsp
+    movq         %r9, %rbp
+    movq         %rcx, %r14
+    movd         %xmm0, %r13d
 
-    vmovdqu 0(%rdi), %ymm0
-    vmovdqu 4(%rdi), %ymm1
-    vmovdqu 8(%rdi), %ymm2
-    vmovdqu 0(%rsi), %ymm3
-    vmovdqu 4(%rsi), %ymm4
-    vmovdqu 8(%rsi), %ymm5
-    vmovdqu 0(%rdx), %ymm6
-    vmovdqu 4(%rdx), %ymm7
-    vmovdqu 8(%rdx), %ymm8
-    vpsrld $24, %ymm0, %ymm0
-    vpsrld $24, %ymm1, %ymm1
-    vpsrld $24, %ymm2, %ymm2
-    vpsrld $24, %ymm3, %ymm3
-    vpsrld $24, %ymm4, %ymm4
-    vpsrld $24, %ymm5, %ymm5
-    vpsrld $24, %ymm6, %ymm6
-    vpsrld $24, %ymm7, %ymm7
-    vpsrld $24, %ymm8, %ymm8
-    vcvtdq2ps %ymm0, %ymm0
-    vcvtdq2ps %ymm1, %ymm1
-    vcvtdq2ps %ymm2, %ymm2
-    vcvtdq2ps %ymm3, %ymm3
-    vcvtdq2ps %ymm4, %ymm4
-    vcvtdq2ps %ymm5, %ymm5
-    vcvtdq2ps %ymm6, %ymm6
-    vcvtdq2ps %ymm7, %ymm7
-    vcvtdq2ps %ymm8, %ymm8
+    vmovdqu      0(%rdi), %ymm0
+    vmovdqu      4(%rdi), %ymm1
+    vmovdqu      8(%rdi), %ymm2
+    vmovdqu      0(%rsi), %ymm3
+    vmovdqu      4(%rsi), %ymm4
+    vmovdqu      8(%rsi), %ymm5
+    vmovdqu      0(%rdx), %ymm6
+    vmovdqu      4(%rdx), %ymm7
+    vmovdqu      8(%rdx), %ymm8
+    vpsrld       $24, %ymm0, %ymm0
+    vpsrld       $24, %ymm1, %ymm1
+    vpsrld       $24, %ymm2, %ymm2
+    vpsrld       $24, %ymm3, %ymm3
+    vpsrld       $24, %ymm4, %ymm4
+    vpsrld       $24, %ymm5, %ymm5
+    vpsrld       $24, %ymm6, %ymm6
+    vpsrld       $24, %ymm7, %ymm7
+    vpsrld       $24, %ymm8, %ymm8
+    vcvtdq2ps    %ymm0, %ymm0
+    vcvtdq2ps    %ymm1, %ymm1
+    vcvtdq2ps    %ymm2, %ymm2
+    vcvtdq2ps    %ymm3, %ymm3
+    vcvtdq2ps    %ymm4, %ymm4
+    vcvtdq2ps    %ymm5, %ymm5
+    vcvtdq2ps    %ymm6, %ymm6
+    vcvtdq2ps    %ymm7, %ymm7
+    vcvtdq2ps    %ymm8, %ymm8
     vbroadcastss 36(%rbp), %ymm11
-    vmulps %ymm11, %ymm0, %ymm0
-    vmulps %ymm11, %ymm1, %ymm1
-    vmulps %ymm11, %ymm2, %ymm2
-    vmulps %ymm11, %ymm3, %ymm3
-    vmulps %ymm11, %ymm4, %ymm4
-    vmulps %ymm11, %ymm5, %ymm5
-    vmulps %ymm11, %ymm6, %ymm6
-    vmulps %ymm11, %ymm7, %ymm7
-    vmulps %ymm11, %ymm8, %ymm8
+    vmulps       %ymm11, %ymm0, %ymm0
+    vmulps       %ymm11, %ymm1, %ymm1
+    vmulps       %ymm11, %ymm2, %ymm2
+    vmulps       %ymm11, %ymm3, %ymm3
+    vmulps       %ymm11, %ymm4, %ymm4
+    vmulps       %ymm11, %ymm5, %ymm5
+    vmulps       %ymm11, %ymm6, %ymm6
+    vmulps       %ymm11, %ymm7, %ymm7
+    vmulps       %ymm11, %ymm8, %ymm8
     SUM121F %ymm2, %ymm5, %ymm8, %ymm9, %ymm11
     SUM121F %ymm0, %ymm3, %ymm6, %ymm10, %ymm11
-    vsubps %ymm10, %ymm9, %ymm9
+    vsubps       %ymm10, %ymm9, %ymm9
     SUM121F %ymm6, %ymm7, %ymm8, %ymm10, %ymm11
     SUM121F %ymm0, %ymm1, %ymm2, %ymm11, %ymm0
-    vsubps %ymm11, %ymm10, %ymm10
+    vsubps       %ymm11, %ymm10, %ymm10
     vbroadcastss 0(%rbp), %ymm0
-    vdivps %ymm0, %ymm9, %ymm9
+    vdivps       %ymm0, %ymm9, %ymm9
     vbroadcastss 4(%rbp), %ymm0
-    vdivps %ymm0, %ymm10, %ymm10
-    vxorps %ymm0, %ymm0, %ymm0
-    vsubps %ymm9, %ymm0, %ymm9
-    vsubps %ymm10, %ymm0, %ymm10
-    vmulps %ymm9, %ymm9, %ymm11
-    vmulps %ymm10, %ymm10, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
+    vdivps       %ymm0, %ymm10, %ymm10
+    vxorps       %ymm0, %ymm0, %ymm0
+    vsubps       %ymm9, %ymm0, %ymm9
+    vsubps       %ymm10, %ymm0, %ymm10
+    vmulps       %ymm9, %ymm9, %ymm11
+    vmulps       %ymm10, %ymm10, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
     vbroadcastss .Lspot_one(%rip), %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
-    vsqrtps %ymm11, %ymm11
-    vdivps %ymm11, %ymm0, %ymm12
-    vmulps %ymm12, %ymm9, %ymm9
-    vmulps %ymm12, %ymm10, %ymm10
-    vmovdqu 4(%rsi), %ymm13
-    vpsrld $24, %ymm13, %ymm13
-    vcvtdq2ps %ymm13, %ymm13
+    vaddps       %ymm0, %ymm11, %ymm11
+    vsqrtps      %ymm11, %ymm11
+    vdivps       %ymm11, %ymm0, %ymm12
+    vmulps       %ymm12, %ymm9, %ymm9
+    vmulps       %ymm12, %ymm10, %ymm10
+    vmovdqu      4(%rsi), %ymm13
+    vpsrld       $24, %ymm13, %ymm13
+    vcvtdq2ps    %ymm13, %ymm13
     vbroadcastss 36(%rbp), %ymm0
-    vmulps %ymm0, %ymm13, %ymm13
+    vmulps       %ymm0, %ymm13, %ymm13
     vbroadcastss 40(%rbp), %ymm11
     vbroadcastss 48(%rbp), %ymm0
-    vmulps .Lspot_idx8(%rip), %ymm0, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
+    vmulps       .Lspot_idx8(%rip), %ymm0, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
     vbroadcastss 12(%rbp), %ymm14
-    vsubps %ymm11, %ymm14, %ymm14
+    vsubps       %ymm11, %ymm14, %ymm14
     vbroadcastss 16(%rbp), %ymm15
     vbroadcastss 44(%rbp), %ymm0
-    vsubps %ymm0, %ymm15, %ymm15
+    vsubps       %ymm0, %ymm15, %ymm15
     vbroadcastss 20(%rbp), %ymm1
-    vsubps %ymm13, %ymm1, %ymm13
-    vmulps %ymm14, %ymm14, %ymm0
-    vmulps %ymm15, %ymm15, %ymm1
-    vaddps %ymm1, %ymm0, %ymm0
-    vmulps %ymm13, %ymm13, %ymm1
-    vaddps %ymm1, %ymm0, %ymm0
+    vsubps       %ymm13, %ymm1, %ymm13
+    vmulps       %ymm14, %ymm14, %ymm0
+    vmulps       %ymm15, %ymm15, %ymm1
+    vaddps       %ymm1, %ymm0, %ymm0
+    vmulps       %ymm13, %ymm13, %ymm1
+    vaddps       %ymm1, %ymm0, %ymm0
     NORM_INV %ymm0, %ymm14, %ymm15, %ymm13, %ymm6, %ymm7
-    vxorps %ymm0, %ymm0, %ymm0
-    vsubps %ymm14, %ymm0, %ymm6
+    vxorps       %ymm0, %ymm0, %ymm0
+    vsubps       %ymm14, %ymm0, %ymm6
     vbroadcastss 52(%rbp), %ymm1
-    vmulps %ymm1, %ymm6, %ymm6
-    vsubps %ymm15, %ymm0, %ymm1
+    vmulps       %ymm1, %ymm6, %ymm6
+    vsubps       %ymm15, %ymm0, %ymm1
     vbroadcastss 56(%rbp), %ymm2
-    vmulps %ymm2, %ymm1, %ymm1
-    vaddps %ymm1, %ymm6, %ymm6
-    vsubps %ymm13, %ymm0, %ymm1
+    vmulps       %ymm2, %ymm1, %ymm1
+    vaddps       %ymm1, %ymm6, %ymm6
+    vsubps       %ymm13, %ymm0, %ymm1
     vbroadcastss 60(%rbp), %ymm2
-    vmulps %ymm2, %ymm1, %ymm1
-    vaddps %ymm1, %ymm6, %ymm6
-    vmaxps %ymm0, %ymm6, %ymm6
+    vmulps       %ymm2, %ymm1, %ymm1
+    vaddps       %ymm1, %ymm6, %ymm6
+    vmaxps       %ymm0, %ymm6, %ymm6
     vbroadcastss .Lspot_one(%rip), %ymm7
-    vminps %ymm7, %ymm6, %ymm6
+    vminps       %ymm7, %ymm6, %ymm6
     vbroadcastss 64(%rbp), %ymm7
-    vmovaps %ymm7, %ymm1
-    vcmpps $2, %ymm6, %ymm7, %ymm7
-    vcmpps $3, %ymm1, %ymm1, %ymm1
-    vorps %ymm1, %ymm7, %ymm7
-    vandps %ymm7, %ymm6, %ymm6
-    vmovaps %ymm14, %ymm7
-    vmovaps %ymm15, %ymm1
-    vmovaps %ymm13, %ymm2
+    vmovaps      %ymm7, %ymm1
+    vcmpps       $2, %ymm6, %ymm7, %ymm7
+    vcmpps       $3, %ymm1, %ymm1, %ymm1
+    vorps        %ymm1, %ymm7, %ymm7
+    vandps       %ymm7, %ymm6, %ymm6
+    vmovaps      %ymm14, %ymm7
+    vmovaps      %ymm15, %ymm1
+    vmovaps      %ymm13, %ymm2
     vbroadcastss .Lspot_one(%rip), %ymm0
-    vaddps %ymm0, %ymm2, %ymm2
-    vmulps %ymm7, %ymm7, %ymm11
-    vmulps %ymm1, %ymm1, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
-    vmulps %ymm2, %ymm2, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
+    vaddps       %ymm0, %ymm2, %ymm2
+    vmulps       %ymm7, %ymm7, %ymm11
+    vmulps       %ymm1, %ymm1, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
+    vmulps       %ymm2, %ymm2, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
     NORM_INV %ymm11, %ymm7, %ymm1, %ymm2, %ymm0, %ymm8
-    vmulps %ymm7, %ymm9, %ymm11
-    vmulps %ymm1, %ymm10, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
-    vmulps %ymm2, %ymm12, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
-    vxorps %ymm0, %ymm0, %ymm0
-    vmaxps %ymm0, %ymm11, %ymm11
-    vmovups %ymm11, 0(%rsp)
-    vmovups %ymm6, 32(%rsp)
-    leaq .Lspot_l2s_data(%rip), %r15
+    vmulps       %ymm7, %ymm9, %ymm11
+    vmulps       %ymm1, %ymm10, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
+    vmulps       %ymm2, %ymm12, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
+    vxorps       %ymm0, %ymm0, %ymm0
+    vmaxps       %ymm0, %ymm11, %ymm11
+    vmovups      %ymm11, 0(%rsp)
+    vmovups      %ymm6, 32(%rsp)
+    leaq         .Lspot_l2s_data(%rip), %r15
     vzeroupper
+    // Per-pixel specular blocks below (powf + intensity + RGB + pack).
     SPOT_SPEC_PIXEL 0, 32, 0, %r14, %rbp, %r13d, 0
     SPOT_SPEC_PIXEL 4, 36, 4, %r14, %rbp, %r13d, 0
     SPOT_SPEC_PIXEL 8, 40, 8, %r14, %rbp, %r13d, 0
@@ -416,212 +435,213 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     SPOT_SPEC_PIXEL 20, 52, 20, %r14, %rbp, %r13d, 0
     SPOT_SPEC_PIXEL 24, 56, 24, %r14, %rbp, %r13d, 0
     SPOT_SPEC_PIXEL 28, 60, 28, %r14, %rbp, %r13d, 0
-    vmovd %r13d, %xmm0
-    addq $80, %rsp
-    popq %r15
-    popq %r14
-    popq %r13
-    popq %r12
-    popq %rbp
+    vmovd        %r13d, %xmm0
+    addq         $80, %rsp
+    popq         %r15
+    popq         %r14
+    popq         %r13
+    popq         %r12
+    popq         %rbp
     retq
 .globl SYM(ksvgLightingSpotSpecularRowAvx2Linear)
 .p2align 4
 SYM(ksvgLightingSpotSpecularRowAvx2Linear):
-    testl %r8d, %r8d
-    jle .Lspot_avx2_retLinear
-    pushq %rbp
-    pushq %rbx
-    pushq %r12
-    pushq %r13
-    pushq %r14
-    pushq %r15
-    movq %r9, %rbp
-    movq %rdi, %r12
-    movq %rsi, %r13
-    movq %rdx, %r14
-    movq %rcx, %r15
-    movl %r8d, %ebx
-    subq $72, %rsp
-    movss %xmm0, 68(%rsp)
-    movups 0(%rbp), %xmm0
-    movups %xmm0, 0(%rsp)
-    movups 16(%rbp), %xmm0
-    movups %xmm0, 16(%rsp)
-    movups 32(%rbp), %xmm0
-    movups %xmm0, 32(%rsp)
-    movups 48(%rbp), %xmm0
-    movups %xmm0, 48(%rsp)
-    movss 64(%rbp), %xmm0
-    movss %xmm0, 64(%rsp)
-    .Lspot_avx2_loopLinear:
-    movss 68(%rsp), %xmm0
-    leaq 0(%rsp), %r9
-    movq %r12, %rdi
-    movq %r13, %rsi
-    movq %r14, %rdx
-    movq %r15, %rcx
-    movl $8, %r8d
-    callq .Lspot_avx2_coreLinear
-    movss 48(%rsp), %xmm0
-    addss %xmm0, %xmm0
-    addss %xmm0, %xmm0
-    addss %xmm0, %xmm0
-    movss %xmm0, %xmm1
-    movss 40(%rsp), %xmm0
-    addss %xmm1, %xmm0
-    movss %xmm0, 40(%rsp)
-    addq $32, %r12
-    addq $32, %r13
-    addq $32, %r14
-    addq $32, %r15
-    subl $8, %ebx
-    jg .Lspot_avx2_loopLinear
-    addq $72, %rsp
-    popq %r15
-    popq %r14
-    popq %r13
-    popq %r12
-    popq %rbx
-    popq %rbp
+    testl        %r8d, %r8d
+    jle          .Lspot_avx2_retLinear
+    pushq        %rbp
+    pushq        %rbx
+    pushq        %r12
+    pushq        %r13
+    pushq        %r14
+    pushq        %r15
+    movq         %r9, %rbp
+    movq         %rdi, %r12
+    movq         %rsi, %r13
+    movq         %rdx, %r14
+    movq         %rcx, %r15
+    movl         %r8d, %ebx
+    subq         $72, %rsp
+    movss        %xmm0, 68(%rsp)
+    movups       0(%rbp), %xmm0
+    movups       %xmm0, 0(%rsp)
+    movups       16(%rbp), %xmm0
+    movups       %xmm0, 16(%rsp)
+    movups       32(%rbp), %xmm0
+    movups       %xmm0, 32(%rsp)
+    movups       48(%rbp), %xmm0
+    movups       %xmm0, 48(%rsp)
+    movss        64(%rbp), %xmm0
+    movss        %xmm0, 64(%rsp)
+.Lspot_avx2_loopLinear:
+    movss        68(%rsp), %xmm0
+    leaq         0(%rsp), %r9
+    movq         %r12, %rdi
+    movq         %r13, %rsi
+    movq         %r14, %rdx
+    movq         %r15, %rcx
+    movl         $8, %r8d
+    callq        .Lspot_avx2_coreLinear
+    movss        48(%rsp), %xmm0
+    addss        %xmm0, %xmm0
+    addss        %xmm0, %xmm0
+    addss        %xmm0, %xmm0
+    movss        %xmm0, %xmm1
+    movss        40(%rsp), %xmm0
+    addss        %xmm1, %xmm0
+    movss        %xmm0, 40(%rsp)
+    addq         $32, %r12
+    addq         $32, %r13
+    addq         $32, %r14
+    addq         $32, %r15
+    subl         $8, %ebx
+    jg           .Lspot_avx2_loopLinear
+    addq         $72, %rsp
+    popq         %r15
+    popq         %r14
+    popq         %r13
+    popq         %r12
+    popq         %rbx
+    popq         %rbp
 .Lspot_avx2_retLinear:
     retq
 
 .p2align 4
 .Lspot_avx2_coreLinear:
-    pushq %rbp
-    pushq %r12
-    pushq %r13
-    pushq %r14
-    pushq %r15
-    subq $80, %rsp
-    movq %r9, %rbp
-    movq %rcx, %r14
-    movd %xmm0, %r13d
+    pushq        %rbp
+    pushq        %r12
+    pushq        %r13
+    pushq        %r14
+    pushq        %r15
+    subq         $80, %rsp
+    movq         %r9, %rbp
+    movq         %rcx, %r14
+    movd         %xmm0, %r13d
 
-    vmovdqu 0(%rdi), %ymm0
-    vmovdqu 4(%rdi), %ymm1
-    vmovdqu 8(%rdi), %ymm2
-    vmovdqu 0(%rsi), %ymm3
-    vmovdqu 4(%rsi), %ymm4
-    vmovdqu 8(%rsi), %ymm5
-    vmovdqu 0(%rdx), %ymm6
-    vmovdqu 4(%rdx), %ymm7
-    vmovdqu 8(%rdx), %ymm8
-    vpsrld $24, %ymm0, %ymm0
-    vpsrld $24, %ymm1, %ymm1
-    vpsrld $24, %ymm2, %ymm2
-    vpsrld $24, %ymm3, %ymm3
-    vpsrld $24, %ymm4, %ymm4
-    vpsrld $24, %ymm5, %ymm5
-    vpsrld $24, %ymm6, %ymm6
-    vpsrld $24, %ymm7, %ymm7
-    vpsrld $24, %ymm8, %ymm8
-    vcvtdq2ps %ymm0, %ymm0
-    vcvtdq2ps %ymm1, %ymm1
-    vcvtdq2ps %ymm2, %ymm2
-    vcvtdq2ps %ymm3, %ymm3
-    vcvtdq2ps %ymm4, %ymm4
-    vcvtdq2ps %ymm5, %ymm5
-    vcvtdq2ps %ymm6, %ymm6
-    vcvtdq2ps %ymm7, %ymm7
-    vcvtdq2ps %ymm8, %ymm8
+    vmovdqu      0(%rdi), %ymm0
+    vmovdqu      4(%rdi), %ymm1
+    vmovdqu      8(%rdi), %ymm2
+    vmovdqu      0(%rsi), %ymm3
+    vmovdqu      4(%rsi), %ymm4
+    vmovdqu      8(%rsi), %ymm5
+    vmovdqu      0(%rdx), %ymm6
+    vmovdqu      4(%rdx), %ymm7
+    vmovdqu      8(%rdx), %ymm8
+    vpsrld       $24, %ymm0, %ymm0
+    vpsrld       $24, %ymm1, %ymm1
+    vpsrld       $24, %ymm2, %ymm2
+    vpsrld       $24, %ymm3, %ymm3
+    vpsrld       $24, %ymm4, %ymm4
+    vpsrld       $24, %ymm5, %ymm5
+    vpsrld       $24, %ymm6, %ymm6
+    vpsrld       $24, %ymm7, %ymm7
+    vpsrld       $24, %ymm8, %ymm8
+    vcvtdq2ps    %ymm0, %ymm0
+    vcvtdq2ps    %ymm1, %ymm1
+    vcvtdq2ps    %ymm2, %ymm2
+    vcvtdq2ps    %ymm3, %ymm3
+    vcvtdq2ps    %ymm4, %ymm4
+    vcvtdq2ps    %ymm5, %ymm5
+    vcvtdq2ps    %ymm6, %ymm6
+    vcvtdq2ps    %ymm7, %ymm7
+    vcvtdq2ps    %ymm8, %ymm8
     vbroadcastss 36(%rbp), %ymm11
-    vmulps %ymm11, %ymm0, %ymm0
-    vmulps %ymm11, %ymm1, %ymm1
-    vmulps %ymm11, %ymm2, %ymm2
-    vmulps %ymm11, %ymm3, %ymm3
-    vmulps %ymm11, %ymm4, %ymm4
-    vmulps %ymm11, %ymm5, %ymm5
-    vmulps %ymm11, %ymm6, %ymm6
-    vmulps %ymm11, %ymm7, %ymm7
-    vmulps %ymm11, %ymm8, %ymm8
+    vmulps       %ymm11, %ymm0, %ymm0
+    vmulps       %ymm11, %ymm1, %ymm1
+    vmulps       %ymm11, %ymm2, %ymm2
+    vmulps       %ymm11, %ymm3, %ymm3
+    vmulps       %ymm11, %ymm4, %ymm4
+    vmulps       %ymm11, %ymm5, %ymm5
+    vmulps       %ymm11, %ymm6, %ymm6
+    vmulps       %ymm11, %ymm7, %ymm7
+    vmulps       %ymm11, %ymm8, %ymm8
     SUM121F %ymm2, %ymm5, %ymm8, %ymm9, %ymm11
     SUM121F %ymm0, %ymm3, %ymm6, %ymm10, %ymm11
-    vsubps %ymm10, %ymm9, %ymm9
+    vsubps       %ymm10, %ymm9, %ymm9
     SUM121F %ymm6, %ymm7, %ymm8, %ymm10, %ymm11
     SUM121F %ymm0, %ymm1, %ymm2, %ymm11, %ymm0
-    vsubps %ymm11, %ymm10, %ymm10
+    vsubps       %ymm11, %ymm10, %ymm10
     vbroadcastss 0(%rbp), %ymm0
-    vdivps %ymm0, %ymm9, %ymm9
+    vdivps       %ymm0, %ymm9, %ymm9
     vbroadcastss 4(%rbp), %ymm0
-    vdivps %ymm0, %ymm10, %ymm10
-    vxorps %ymm0, %ymm0, %ymm0
-    vsubps %ymm9, %ymm0, %ymm9
-    vsubps %ymm10, %ymm0, %ymm10
-    vmulps %ymm9, %ymm9, %ymm11
-    vmulps %ymm10, %ymm10, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
+    vdivps       %ymm0, %ymm10, %ymm10
+    vxorps       %ymm0, %ymm0, %ymm0
+    vsubps       %ymm9, %ymm0, %ymm9
+    vsubps       %ymm10, %ymm0, %ymm10
+    vmulps       %ymm9, %ymm9, %ymm11
+    vmulps       %ymm10, %ymm10, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
     vbroadcastss .Lspot_one(%rip), %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
-    vsqrtps %ymm11, %ymm11
-    vdivps %ymm11, %ymm0, %ymm12
-    vmulps %ymm12, %ymm9, %ymm9
-    vmulps %ymm12, %ymm10, %ymm10
-    vmovdqu 4(%rsi), %ymm13
-    vpsrld $24, %ymm13, %ymm13
-    vcvtdq2ps %ymm13, %ymm13
+    vaddps       %ymm0, %ymm11, %ymm11
+    vsqrtps      %ymm11, %ymm11
+    vdivps       %ymm11, %ymm0, %ymm12
+    vmulps       %ymm12, %ymm9, %ymm9
+    vmulps       %ymm12, %ymm10, %ymm10
+    vmovdqu      4(%rsi), %ymm13
+    vpsrld       $24, %ymm13, %ymm13
+    vcvtdq2ps    %ymm13, %ymm13
     vbroadcastss 36(%rbp), %ymm0
-    vmulps %ymm0, %ymm13, %ymm13
+    vmulps       %ymm0, %ymm13, %ymm13
     vbroadcastss 40(%rbp), %ymm11
     vbroadcastss 48(%rbp), %ymm0
-    vmulps .Lspot_idx8(%rip), %ymm0, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
+    vmulps       .Lspot_idx8(%rip), %ymm0, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
     vbroadcastss 12(%rbp), %ymm14
-    vsubps %ymm11, %ymm14, %ymm14
+    vsubps       %ymm11, %ymm14, %ymm14
     vbroadcastss 16(%rbp), %ymm15
     vbroadcastss 44(%rbp), %ymm0
-    vsubps %ymm0, %ymm15, %ymm15
+    vsubps       %ymm0, %ymm15, %ymm15
     vbroadcastss 20(%rbp), %ymm1
-    vsubps %ymm13, %ymm1, %ymm13
-    vmulps %ymm14, %ymm14, %ymm0
-    vmulps %ymm15, %ymm15, %ymm1
-    vaddps %ymm1, %ymm0, %ymm0
-    vmulps %ymm13, %ymm13, %ymm1
-    vaddps %ymm1, %ymm0, %ymm0
+    vsubps       %ymm13, %ymm1, %ymm13
+    vmulps       %ymm14, %ymm14, %ymm0
+    vmulps       %ymm15, %ymm15, %ymm1
+    vaddps       %ymm1, %ymm0, %ymm0
+    vmulps       %ymm13, %ymm13, %ymm1
+    vaddps       %ymm1, %ymm0, %ymm0
     NORM_INV %ymm0, %ymm14, %ymm15, %ymm13, %ymm6, %ymm7
-    vxorps %ymm0, %ymm0, %ymm0
-    vsubps %ymm14, %ymm0, %ymm6
+    vxorps       %ymm0, %ymm0, %ymm0
+    vsubps       %ymm14, %ymm0, %ymm6
     vbroadcastss 52(%rbp), %ymm1
-    vmulps %ymm1, %ymm6, %ymm6
-    vsubps %ymm15, %ymm0, %ymm1
+    vmulps       %ymm1, %ymm6, %ymm6
+    vsubps       %ymm15, %ymm0, %ymm1
     vbroadcastss 56(%rbp), %ymm2
-    vmulps %ymm2, %ymm1, %ymm1
-    vaddps %ymm1, %ymm6, %ymm6
-    vsubps %ymm13, %ymm0, %ymm1
+    vmulps       %ymm2, %ymm1, %ymm1
+    vaddps       %ymm1, %ymm6, %ymm6
+    vsubps       %ymm13, %ymm0, %ymm1
     vbroadcastss 60(%rbp), %ymm2
-    vmulps %ymm2, %ymm1, %ymm1
-    vaddps %ymm1, %ymm6, %ymm6
-    vmaxps %ymm0, %ymm6, %ymm6
+    vmulps       %ymm2, %ymm1, %ymm1
+    vaddps       %ymm1, %ymm6, %ymm6
+    vmaxps       %ymm0, %ymm6, %ymm6
     vbroadcastss .Lspot_one(%rip), %ymm7
-    vminps %ymm7, %ymm6, %ymm6
+    vminps       %ymm7, %ymm6, %ymm6
     vbroadcastss 64(%rbp), %ymm7
-    vmovaps %ymm7, %ymm1
-    vcmpps $2, %ymm6, %ymm7, %ymm7
-    vcmpps $3, %ymm1, %ymm1, %ymm1
-    vorps %ymm1, %ymm7, %ymm7
-    vandps %ymm7, %ymm6, %ymm6
-    vmovaps %ymm14, %ymm7
-    vmovaps %ymm15, %ymm1
-    vmovaps %ymm13, %ymm2
+    vmovaps      %ymm7, %ymm1
+    vcmpps       $2, %ymm6, %ymm7, %ymm7
+    vcmpps       $3, %ymm1, %ymm1, %ymm1
+    vorps        %ymm1, %ymm7, %ymm7
+    vandps       %ymm7, %ymm6, %ymm6
+    vmovaps      %ymm14, %ymm7
+    vmovaps      %ymm15, %ymm1
+    vmovaps      %ymm13, %ymm2
     vbroadcastss .Lspot_one(%rip), %ymm0
-    vaddps %ymm0, %ymm2, %ymm2
-    vmulps %ymm7, %ymm7, %ymm11
-    vmulps %ymm1, %ymm1, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
-    vmulps %ymm2, %ymm2, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
+    vaddps       %ymm0, %ymm2, %ymm2
+    vmulps       %ymm7, %ymm7, %ymm11
+    vmulps       %ymm1, %ymm1, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
+    vmulps       %ymm2, %ymm2, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
     NORM_INV %ymm11, %ymm7, %ymm1, %ymm2, %ymm0, %ymm8
-    vmulps %ymm7, %ymm9, %ymm11
-    vmulps %ymm1, %ymm10, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
-    vmulps %ymm2, %ymm12, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
-    vxorps %ymm0, %ymm0, %ymm0
-    vmaxps %ymm0, %ymm11, %ymm11
-    vmovups %ymm11, 0(%rsp)
-    vmovups %ymm6, 32(%rsp)
-    leaq .Lspot_l2s_data(%rip), %r15
+    vmulps       %ymm7, %ymm9, %ymm11
+    vmulps       %ymm1, %ymm10, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
+    vmulps       %ymm2, %ymm12, %ymm0
+    vaddps       %ymm0, %ymm11, %ymm11
+    vxorps       %ymm0, %ymm0, %ymm0
+    vmaxps       %ymm0, %ymm11, %ymm11
+    vmovups      %ymm11, 0(%rsp)
+    vmovups      %ymm6, 32(%rsp)
+    leaq         .Lspot_l2s_data(%rip), %r15
     vzeroupper
+    // Per-pixel specular blocks below (powf + intensity + RGB + pack).
     SPOT_SPEC_PIXEL 0, 32, 0, %r14, %rbp, %r13d, 1
     SPOT_SPEC_PIXEL 4, 36, 4, %r14, %rbp, %r13d, 1
     SPOT_SPEC_PIXEL 8, 40, 8, %r14, %rbp, %r13d, 1
@@ -630,11 +650,11 @@ SYM(ksvgLightingSpotSpecularRowAvx2Linear):
     SPOT_SPEC_PIXEL 20, 52, 20, %r14, %rbp, %r13d, 1
     SPOT_SPEC_PIXEL 24, 56, 24, %r14, %rbp, %r13d, 1
     SPOT_SPEC_PIXEL 28, 60, 28, %r14, %rbp, %r13d, 1
-    vmovd %r13d, %xmm0
-    addq $80, %rsp
-    popq %r15
-    popq %r14
-    popq %r13
-    popq %r12
-    popq %rbp
+    vmovd        %r13d, %xmm0
+    addq         $80, %rsp
+    popq         %r15
+    popq         %r14
+    popq         %r13
+    popq         %r12
+    popq         %rbp
     retq

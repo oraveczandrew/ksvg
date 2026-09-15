@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -57,11 +57,11 @@
 //   q0-q3, q15     = scratch (q15 is transient only)
 
 ksvgLightingDistantDiffuseRowNeon32:
-    push    {r4-r11, r12, lr}      @ 10 words -> sp stays 8-byte aligned for vpush
-    vpush   {d8-d15}               @ preserve callee-saved d8-d15 (q4-q7)
+    push    {r4-r11, r12, lr}      // 10 words -> sp stays 8-byte aligned for vpush
+    vpush   {d8-d15}               // preserve callee-saved d8-d15 (q4-q7)
 
-    ldr     r4, [sp, #104]         @ count
-    ldr     r5, [sp, #108]         @ params
+    ldr     r4, [sp, #104]         // count
+    ldr     r5, [sp, #108]         // params
     cmp     r4, #0
     beq     .Ldone
 
@@ -76,136 +76,136 @@ ksvgLightingDistantDiffuseRowNeon32:
     vdiv.f32 s0, s16, s0
     vdiv.f32 s1, s16, s1
 
-    vdup.32 q4, d4[1]     @ ss
-    vdup.32 q5, d0[0]     @ scaleX
-    vdup.32 q6, d0[1]     @ scaleY
-    vdup.32 q7, d1[0]     @ k
-    vdup.32 q8, d1[1]     @ lx
-    vdup.32 q9, d2[0]     @ ly
-    vdup.32 q10, d2[1]    @ lz
-    vdup.32 q11, d3[0]    @ lr
-    vdup.32 q12, d3[1]    @ lg
-    vdup.32 q13, d4[0]    @ lb
-    vmov.f32 q14, #1.0    @ one
+    vdup.32 q4, d4[1]     // ss
+    vdup.32 q5, d0[0]     // scaleX
+    vdup.32 q6, d0[1]     // scaleY
+    vdup.32 q7, d1[0]     // k
+    vdup.32 q8, d1[1]     // lx
+    vdup.32 q9, d2[0]     // ly
+    vdup.32 q10, d2[1]    // lz
+    vdup.32 q11, d3[0]    // lr
+    vdup.32 q12, d3[1]    // lg
+    vdup.32 q13, d4[0]    // lb
+    vmov.f32 q14, #1.0    // one
 
 .Lloop:
     // ---- Row T ----
     vld1.32 {q0}, [r0]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ tl
+    vmul.f32 q0, q0, q4          // tl
 
     add     r10, r0, #4
     vld1.32 {q1}, [r10]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ tm
+    vmul.f32 q1, q1, q4          // tm
 
     add     r10, r0, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ tr
+    vmul.f32 q2, q2, q4          // tr
 
     // Exact scalar top sum: tr + tm + tm + tl
     vadd.f32 q3, q2, q1
     vadd.f32 q3, q3, q1
-    vadd.f32 q3, q3, q0          @ top sum
+    vadd.f32 q3, q3, q0          // top sum
 
     // ---- Row M ----
     vld1.32 {q0}, [r1]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ ml
+    vmul.f32 q0, q0, q4          // ml
 
     add     r10, r1, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ mr
+    vmul.f32 q2, q2, q4          // mr
 
     // ---- Row B ----
     vld1.32 {q0}, [r2]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ bl
+    vmul.f32 q0, q0, q4          // bl
 
     add     r10, r2, #4
     vld1.32 {q1}, [r10]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ bm
+    vmul.f32 q1, q1, q4          // bm
 
     add     r10, r2, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ br
+    vmul.f32 q2, q2, q4          // br
 
     // Exact scalar bottom sum: bl + bm + bm + br
     vadd.f32 q14, q0, q1
     vadd.f32 q14, q14, q1
-    vadd.f32 q14, q14, q2        @ bottom sum
-    vsub.f32 q3, q14, q3         @ dyRel
-    vmov    q14, q3               @ preserve dyRel while recomputing dx
+    vadd.f32 q14, q14, q2        // bottom sum
+    vsub.f32 q3, q14, q3         // dyRel
+    vmov    q14, q3               // preserve dyRel while recomputing dx
 
     // Recompute dx with the exact scalar order:
     //   (tr + mr) + mr + br - ((tl + ml) + ml + bl)
     vld1.32 {q0}, [r0]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ tl
+    vmul.f32 q0, q0, q4          // tl
 
     add     r10, r0, #8
     vld1.32 {q1}, [r10]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ tr
+    vmul.f32 q1, q1, q4          // tr
 
     vld1.32 {q2}, [r1]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ ml
+    vmul.f32 q2, q2, q4          // ml
 
     add     r10, r1, #8
     vld1.32 {q3}, [r10]
     vshr.u32 q3, q3, #24
     vcvt.f32.u32 q3, q3
-    vmul.f32 q3, q3, q4          @ mr
+    vmul.f32 q3, q3, q4          // mr
 
-    vadd.f32 q0, q0, q2         @ tl + ml
-    vadd.f32 q0, q0, q2         @ (tl + ml) + ml
-    vadd.f32 q1, q1, q3         @ tr + mr
-    vadd.f32 q1, q1, q3         @ (tr + mr) + mr
+    vadd.f32 q0, q0, q2         // tl + ml
+    vadd.f32 q0, q0, q2         // (tl + ml) + ml
+    vadd.f32 q1, q1, q3         // tr + mr
+    vadd.f32 q1, q1, q3         // (tr + mr) + mr
 
     add     r10, r2, #0
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ bl
-    vadd.f32 q0, q0, q2         @ + bl
+    vmul.f32 q2, q2, q4          // bl
+    vadd.f32 q0, q0, q2         // + bl
 
     add     r10, r2, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ br
-    vadd.f32 q1, q1, q2         @ + br
-    vsub.f32 q0, q1, q0         @ dxRel
-    vmov    q3, q14               @ restore dyRel
+    vmul.f32 q2, q2, q4          // br
+    vadd.f32 q1, q1, q2         // + br
+    vsub.f32 q0, q1, q0         // dxRel
+    vmov    q3, q14               // restore dyRel
 
     // ---- Apply per-axis scale ----
-    vmul.f32 q0, q0, q5          @ q0 = dx
-    vmul.f32 q1, q3, q6          @ q1 = dy
+    vmul.f32 q0, q0, q5          // q0 = dx
+    vmul.f32 q1, q3, q6          // q1 = dy
     // ---- Normalize exactly like Kotlin reference ----
     // nLen = sqrt(nx*nx + ny*ny + 1); nx/=nLen; ny/=nLen; nz=1/nLen
-    vneg.f32 q0, q0              @ nx0
-    vneg.f32 q1, q1              @ ny0
+    vneg.f32 q0, q0              // nx0
+    vneg.f32 q1, q1              // ny0
     vmul.f32 q2, q0, q0
     vmul.f32 q3, q1, q1
     vadd.f32 q2, q2, q3
     vmov.f32 q14, #1.0
-    vadd.f32 q2, q2, q14         @ nLen^2
+    vadd.f32 q2, q2, q14         // nLen^2
 
     // ARMv7 VFP sqrt/div are scalar; normalize four lanes exactly.
     vsqrt.f32 s12, s8
@@ -218,9 +218,9 @@ ksvgLightingDistantDiffuseRowNeon32:
     vdiv.f32 s15, s31, s15
 
     // q3 now contains invLen = 1/nLen.
-    vmul.f32 q0, q0, q3          @ normalized nx
-    vmul.f32 q1, q1, q3          @ normalized ny
-    vmov q14, q3                 @ normalized nz = invLen
+    vmul.f32 q0, q0, q3          // normalized nx
+    vmul.f32 q1, q1, q3          // normalized ny
+    vmov q14, q3                 // normalized nz = invLen
 
     // Kotlin dot: nx*lx + ny*ly + nz*lz
     vmul.f32 q2, q0, q8
@@ -228,18 +228,18 @@ ksvgLightingDistantDiffuseRowNeon32:
     vadd.f32 q2, q2, q15
     vmul.f32 q15, q14, q10
     vadd.f32 q2, q2, q15
-    vmov.f32 q14, #1.0           @ restore one
+    vmov.f32 q14, #1.0           // restore one
 
     // ---- intensity = min(max(dot, 0)*k, 1) ----
-    veor    q15, q15, q15         @ zero (transient scratch)
+    veor    q15, q15, q15         // zero (transient scratch)
     vmax.f32 q2, q2, q15
     vmul.f32 q2, q2, q7
-    vmin.f32 q2, q2, q14          @ q2 = intensity
+    vmin.f32 q2, q2, q14          // q2 = intensity
 
     // ---- Pack ARGB ----
-    vmul.f32 q0, q2, q11          @ outR
-    vmul.f32 q1, q2, q12          @ outG
-    vmul.f32 q3, q2, q13          @ outB
+    vmul.f32 q0, q2, q11          // outR
+    vmul.f32 q1, q2, q12          // outG
+    vmul.f32 q3, q2, q13          // outB
     // Kotlin roundToInt() for nonnegative values: floor(x + 0.5).
     vmov.f32 q14, #0.5
     vadd.f32 q0, q0, q14
@@ -255,7 +255,7 @@ ksvgLightingDistantDiffuseRowNeon32:
     vorr    q3, q3, q1
 
     mov     r6, #0xFF000000
-    vdup.32 q0, r6                @ alpha = 0xFF
+    vdup.32 q0, r6                // alpha = 0xFF
     vorr    q3, q3, q0
 
     vst1.32 {q3}, [r3]!
@@ -297,13 +297,13 @@ ksvgLightingDistantDiffuseRowNeon32:
 // 0xFF - no L2S on alpha), then stored scalar per pixel.
 
 .macro L2S_PIXEL inr
-    mov     r9, \inr, lsr #16        @ R index (bits 23-16)
+    mov     r9, \inr, lsr #16        // R index (bits 23-16)
     and     r9, r9, #0xFF
     ldrb    r9, [r6, r9]
-    mov     r10, \inr, lsr #8        @ G index (bits 15-8)
+    mov     r10, \inr, lsr #8        // G index (bits 15-8)
     and     r10, r10, #0xFF
     ldrb    r10, [r6, r10]
-    and     \inr, \inr, #0xFF        @ B index (bits 7-0)
+    and     \inr, \inr, #0xFF        // B index (bits 7-0)
     ldrb    \inr, [r6, \inr]
     lsl     r9, r9, #16
     orr     r9, r9, r10, lsl #8
@@ -316,12 +316,12 @@ ksvgLightingDistantDiffuseRowNeon32:
 .type ksvgLightingDistantDiffuseRowNeon32Linear, %function
 
 ksvgLightingDistantDiffuseRowNeon32Linear:
-    push    {r4-r11, r12, lr}      @ 10 words -> sp stays 8-byte aligned for vpush
-    vpush   {d8-d15}               @ preserve callee-saved d8-d15 (q4-q7)
+    push    {r4-r11, r12, lr}      // 10 words -> sp stays 8-byte aligned for vpush
+    vpush   {d8-d15}               // preserve callee-saved d8-d15 (q4-q7)
 
-    ldr     r4, [sp, #104]         @ count
-    ldr     r5, [sp, #108]         @ params
-    ldr     r6, [sp, #112]         @ linearToSrgb LUT
+    ldr     r4, [sp, #104]         // count
+    ldr     r5, [sp, #108]         // params
+    ldr     r6, [sp, #112]         // linearToSrgb LUT
     cmp     r4, #0
     beq     .Llin_done
 
@@ -334,136 +334,136 @@ ksvgLightingDistantDiffuseRowNeon32Linear:
     vdiv.f32 s0, s16, s0
     vdiv.f32 s1, s16, s1
 
-    vdup.32 q4, d4[1]     @ ss
-    vdup.32 q5, d0[0]     @ scaleX
-    vdup.32 q6, d0[1]     @ scaleY
-    vdup.32 q7, d1[0]     @ k
-    vdup.32 q8, d1[1]     @ lx
-    vdup.32 q9, d2[0]     @ ly
-    vdup.32 q10, d2[1]    @ lz
-    vdup.32 q11, d3[0]    @ lr
-    vdup.32 q12, d3[1]    @ lg
-    vdup.32 q13, d4[0]    @ lb
-    vmov.f32 q14, #1.0    @ one
+    vdup.32 q4, d4[1]     // ss
+    vdup.32 q5, d0[0]     // scaleX
+    vdup.32 q6, d0[1]     // scaleY
+    vdup.32 q7, d1[0]     // k
+    vdup.32 q8, d1[1]     // lx
+    vdup.32 q9, d2[0]     // ly
+    vdup.32 q10, d2[1]    // lz
+    vdup.32 q11, d3[0]    // lr
+    vdup.32 q12, d3[1]    // lg
+    vdup.32 q13, d4[0]    // lb
+    vmov.f32 q14, #1.0    // one
 
 .Llin_loop:
     // ---- Row T ----
     vld1.32 {q0}, [r0]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ tl
+    vmul.f32 q0, q0, q4          // tl
 
     add     r10, r0, #4
     vld1.32 {q1}, [r10]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ tm
+    vmul.f32 q1, q1, q4          // tm
 
     add     r10, r0, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ tr
+    vmul.f32 q2, q2, q4          // tr
 
     // Exact scalar top sum: tr + tm + tm + tl
     vadd.f32 q3, q2, q1
     vadd.f32 q3, q3, q1
-    vadd.f32 q3, q3, q0          @ top sum
+    vadd.f32 q3, q3, q0          // top sum
 
     // ---- Row M ----
     vld1.32 {q0}, [r1]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ ml
+    vmul.f32 q0, q0, q4          // ml
 
     add     r10, r1, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ mr
+    vmul.f32 q2, q2, q4          // mr
 
     // ---- Row B ----
     vld1.32 {q0}, [r2]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ bl
+    vmul.f32 q0, q0, q4          // bl
 
     add     r10, r2, #4
     vld1.32 {q1}, [r10]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ bm
+    vmul.f32 q1, q1, q4          // bm
 
     add     r10, r2, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ br
+    vmul.f32 q2, q2, q4          // br
 
     // Exact scalar bottom sum: bl + bm + bm + br
     vadd.f32 q14, q0, q1
     vadd.f32 q14, q14, q1
-    vadd.f32 q14, q14, q2        @ bottom sum
-    vsub.f32 q3, q14, q3         @ dyRel
-    vmov    q14, q3               @ preserve dyRel while recomputing dx
+    vadd.f32 q14, q14, q2        // bottom sum
+    vsub.f32 q3, q14, q3         // dyRel
+    vmov    q14, q3               // preserve dyRel while recomputing dx
 
     // Recompute dx with the exact scalar order:
     //   (tr + mr) + mr + br - ((tl + ml) + ml + bl)
     vld1.32 {q0}, [r0]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ tl
+    vmul.f32 q0, q0, q4          // tl
 
     add     r10, r0, #8
     vld1.32 {q1}, [r10]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ tr
+    vmul.f32 q1, q1, q4          // tr
 
     vld1.32 {q2}, [r1]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ ml
+    vmul.f32 q2, q2, q4          // ml
 
     add     r10, r1, #8
     vld1.32 {q3}, [r10]
     vshr.u32 q3, q3, #24
     vcvt.f32.u32 q3, q3
-    vmul.f32 q3, q3, q4          @ mr
+    vmul.f32 q3, q3, q4          // mr
 
-    vadd.f32 q0, q0, q2         @ tl + ml
-    vadd.f32 q0, q0, q2         @ (tl + ml) + ml
-    vadd.f32 q1, q1, q3         @ tr + mr
-    vadd.f32 q1, q1, q3         @ (tr + mr) + mr
+    vadd.f32 q0, q0, q2         // tl + ml
+    vadd.f32 q0, q0, q2         // (tl + ml) + ml
+    vadd.f32 q1, q1, q3         // tr + mr
+    vadd.f32 q1, q1, q3         // (tr + mr) + mr
 
     add     r10, r2, #0
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ bl
-    vadd.f32 q0, q0, q2         @ + bl
+    vmul.f32 q2, q2, q4          // bl
+    vadd.f32 q0, q0, q2         // + bl
 
     add     r10, r2, #8
     vld1.32 {q2}, [r10]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ br
-    vadd.f32 q1, q1, q2         @ + br
-    vsub.f32 q0, q1, q0         @ dxRel
-    vmov    q3, q14               @ restore dyRel
+    vmul.f32 q2, q2, q4          // br
+    vadd.f32 q1, q1, q2         // + br
+    vsub.f32 q0, q1, q0         // dxRel
+    vmov    q3, q14               // restore dyRel
 
     // ---- Apply per-axis scale ----
-    vmul.f32 q0, q0, q5          @ q0 = dx
-    vmul.f32 q1, q3, q6          @ q1 = dy
+    vmul.f32 q0, q0, q5          // q0 = dx
+    vmul.f32 q1, q3, q6          // q1 = dy
     // ---- Normalize exactly like Kotlin reference ----
     // nLen = sqrt(nx*nx + ny*ny + 1); nx/=nLen; ny/=nLen; nz=1/nLen
-    vneg.f32 q0, q0              @ nx0
-    vneg.f32 q1, q1              @ ny0
+    vneg.f32 q0, q0              // nx0
+    vneg.f32 q1, q1              // ny0
     vmul.f32 q2, q0, q0
     vmul.f32 q3, q1, q1
     vadd.f32 q2, q2, q3
     vmov.f32 q14, #1.0
-    vadd.f32 q2, q2, q14         @ nLen^2
+    vadd.f32 q2, q2, q14         // nLen^2
 
     // ARMv7 VFP sqrt/div are scalar; normalize four lanes exactly.
     vsqrt.f32 s12, s8
@@ -476,9 +476,9 @@ ksvgLightingDistantDiffuseRowNeon32Linear:
     vdiv.f32 s15, s31, s15
 
     // q3 now contains invLen = 1/nLen.
-    vmul.f32 q0, q0, q3          @ normalized nx
-    vmul.f32 q1, q1, q3          @ normalized ny
-    vmov q14, q3                 @ normalized nz = invLen
+    vmul.f32 q0, q0, q3          // normalized nx
+    vmul.f32 q1, q1, q3          // normalized ny
+    vmov q14, q3                 // normalized nz = invLen
 
     // Kotlin dot: nx*lx + ny*ly + nz*lz
     vmul.f32 q2, q0, q8
@@ -486,18 +486,18 @@ ksvgLightingDistantDiffuseRowNeon32Linear:
     vadd.f32 q2, q2, q15
     vmul.f32 q15, q14, q10
     vadd.f32 q2, q2, q15
-    vmov.f32 q14, #1.0           @ restore one
+    vmov.f32 q14, #1.0           // restore one
 
     // ---- intensity = min(max(dot, 0)*k, 1) ----
-    veor    q15, q15, q15         @ zero (transient scratch)
+    veor    q15, q15, q15         // zero (transient scratch)
     vmax.f32 q2, q2, q15
     vmul.f32 q2, q2, q7
-    vmin.f32 q2, q2, q14          @ q2 = intensity
+    vmin.f32 q2, q2, q14          // q2 = intensity
 
     // ---- Pack ARGB (linear-light bytes, alpha = 0xFF) ----
-    vmul.f32 q0, q2, q11          @ outR
-    vmul.f32 q1, q2, q12          @ outG
-    vmul.f32 q3, q2, q13          @ outB
+    vmul.f32 q0, q2, q11          // outR
+    vmul.f32 q1, q2, q12          // outG
+    vmul.f32 q3, q2, q13          // outB
     // Kotlin roundToInt() for nonnegative values: floor(x + 0.5).
     vmov.f32 q14, #0.5
     vadd.f32 q0, q0, q14
@@ -513,7 +513,7 @@ ksvgLightingDistantDiffuseRowNeon32Linear:
     vorr    q3, q3, q1
 
     mov     r7, #0xFF000000
-    vdup.32 q0, r7                @ alpha = 0xFF
+    vdup.32 q0, r7                // alpha = 0xFF
     vorr    q3, q3, q0
 
     // ---- Linear -> sRGB (scalar LUT lookups, one 4-px vector) ----

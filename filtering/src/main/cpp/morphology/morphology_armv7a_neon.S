@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,28 +21,28 @@
 .align 2
 
 /* ---------------------------------------------------------------------
- * Row kernel: ksvgMorphologyApplyRowNeon32
- *
- * ABI:
- *   r0 = src
- *   r1 = dst
- *   r2 = width
- *   r3 = radiusX
- *   [sp, #0]  = radiusY
- *   [sp, #4]  = erode
- *   [sp, #8]  = y
- *   [sp, #12] = xStart
- *   [sp, #16] = xEnd
- *   [sp, #20] = scratch
- */
+* Row kernel: ksvgMorphologyApplyRowNeon32
+*
+* ABI:
+*   r0 = src
+*   r1 = dst
+*   r2 = width
+*   r3 = radiusX
+*   [sp, #0]  = radiusY
+*   [sp, #4]  = erode
+*   [sp, #8]  = y
+*   [sp, #12] = xStart
+*   [sp, #16] = xEnd
+*   [sp, #20] = scratch
+*/
 .global ksvgMorphologyApplyRowNeon32
 .type ksvgMorphologyApplyRowNeon32, %function
 
 ksvgMorphologyApplyRowNeon32:
     push    {r4-r11, lr}
-    @ sp+36: radiusY, sp+40: erode, sp+44: y, sp+48: xStart, sp+52: xEnd, sp+56: scratch
+    @       sp+36: radiusY, sp+40: erode, sp+44: y, sp+48: xStart, sp+52: xEnd, sp+56: scratch
 
-    @ Constant geometry
+    @       Constant geometry
     ldr     r4, [sp, #36]               @ r4 = radiusY
     add     r4, r4, r4
     add     r4, r4, #1                  @ r4 = rowCount (STABLE)
@@ -69,14 +69,14 @@ ksvgMorphologyApplyRowNeon32:
     lsr     r9, r5, #2                  @ r9 = fullGroups
     and     r7, r5, #3                  @ r7 = tailCols
 
-    @ Check erode
+    @       Check erode
     ldr     r12, [sp, #40]              @ erode
     tst     r12, #255
     bne     .L_row_erode
 
 /* ---------------------------------------------------------------------
- * Dilation (Row).
- * --------------------------------------------------------------------- */
+* Dilation (Row).
+* --------------------------------------------------------------------- */
 .L_row_dv:
     ldr     r0, [sp, #56]               @ r0 = scratch cursor
     mov     r1, r10                     @ r1 = moving src base
@@ -193,8 +193,8 @@ ksvgMorphologyApplyRowNeon32:
     pop     {r4-r11, pc}
 
 /* ---------------------------------------------------------------------
- * Erosion (Row).
- * --------------------------------------------------------------------- */
+* Erosion (Row).
+* --------------------------------------------------------------------- */
 .L_row_erode:
 .L_row_ev:
     ldr     r0, [sp, #56]

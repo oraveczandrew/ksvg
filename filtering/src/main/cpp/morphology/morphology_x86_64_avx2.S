@@ -3,7 +3,18 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * x86-64 / AVX2 implementation of the interior morphology kernels.
  *
  * Native little-endian ARGB_8888 jint bytes:
@@ -26,24 +37,24 @@
 
 #include "asm_macros.S"
 
-
 .text
 .p2align 5
 
 /* -------------------------------------------------------------------------
- * Row kernel
- *
- * Stage 1: vertical byte-wise min/max into scratch for the source span
- *          [xStart-radiusX, xEnd+radiusX).
- *
- * Stage 2: horizontal byte-wise min/max over overlapping scratch windows.
- *
- * AVX2 processes 8 pixels per vector. Tail counts are handled explicitly
- * and may be 0..7 in the vertical stage and 1,3,5,7 in the horizontal stage.
- * ------------------------------------------------------------------------- */
+* Row kernel
+*
+* Stage 1: vertical byte-wise min/max into scratch for the source span
+*          [xStart-radiusX, xEnd+radiusX).
+*
+* Stage 2: horizontal byte-wise min/max over overlapping scratch windows.
+*
+* AVX2 processes 8 pixels per vector. Tail counts are handled explicitly
+* and may be 0..7 in the vertical stage and 1,3,5,7 in the horizontal stage.
+* ------------------------------------------------------------------------- */
+
 .globl SYM(ksvgMorphologyApplyRowAvx2)
 TYPE(SYM(ksvgMorphologyApplyRowAvx2), @function)
-SYM(ksvgMorphologyApplyRowAvx2):
+    SYM(ksvgMorphologyApplyRowAvx2):
     push    %rbx
     push    %rbp
     push    %r12
@@ -51,57 +62,57 @@ SYM(ksvgMorphologyApplyRowAvx2):
     push    %r14
     push    %r15
 
-    /* Six pushes = 48 bytes; original stack args are +56/+64/+72/+80. */
-    mov     56(%rsp), %r15d              # y
-    mov     64(%rsp), %ebx               # xStart
-    mov     80(%rsp), %r10               # scratch base
+/* Six pushes = 48 bytes; original stack args are +56/+64/+72/+80. */
+    mov     56(%rsp), %r15d  // y
+    mov     64(%rsp), %ebx  // xStart
+    mov     80(%rsp), %r10  // scratch base
 
-    mov     %r9d, %ebp                  # erode
-    mov     %edx, %r13d                 # width
-    mov     %ecx, %r14d                 # radiusX
-    mov     %ecx, %r12d                 # saved radiusX for horizontal stage
-    /* rowCount = 2*radiusY + 1. */
-    lea     1(%r8d,%r8d), %r9d
+    mov     %r9d, %ebp  // erode
+    mov     %edx, %r13d  // width
+    mov     %ecx, %r14d  // radiusX
+    mov     %ecx, %r12d  // saved radiusX for horizontal stage
+/* rowCount = 2*radiusY + 1. */
+    lea     1(%r8d, %r8d), %r9d
 
-    /* colLo = xStart - radiusX. */
+/* colLo = xStart - radiusX. */
     mov     %ebx, %r11d
-    sub     %r14d, %r11d                # r11d = colLo
+    sub     %r14d, %r11d  // r11d = colLo
 
-    /*
-     * Build the source cursor before reusing the temporary registers for
-     * colCount/groupCount.
-     */
+/*
+* Build the source cursor before reusing the temporary registers for
+* colCount/groupCount.
+*/
     mov     %r15d, %edx
-    sub     %r8d, %edx                  # top = y-radiusY
+    sub     %r8d, %edx  // top = y-radiusY
     movslq  %edx, %rdx
     movslq  %r13d, %rax
     imul    %rax, %rdx
-    movslq  %r11d, %rax                 # colLo
+    movslq  %r11d, %rax  // colLo
     add     %rax, %rdx
-    lea     (%rdi,%rdx,4), %r11         # r11 = source group cursor
+    lea     (%rdi, %rdx, 4), %r11  // r11 = source group cursor
 
-    /*
-     * colCount = outputCount + 2*radiusX
-     *          = (xEnd-xStart) + 2*radiusX
-     */
+/*
+* colCount = outputCount + 2*radiusX
+*          = (xEnd-xStart) + 2*radiusX
+*/
     mov     72(%rsp), %ecx
-    sub     %ebx, %ecx                  # outputCount
-    lea     (%rcx,%r14,2), %rax          # colCount
+    sub     %ebx, %ecx  // outputCount
+    lea     (%rcx, %r14, 2), %rax  // colCount
     mov     %eax, %ecx
 
-    /* vertical groupCount / tail */
+/* vertical groupCount / tail */
     mov     %ecx, %edx
     and     $7, %edx
-    mov     %edx, %r8d                  # tailCols
-    shr     $3, %ecx                    # groupCount
+    mov     %edx, %r8d  // tailCols
+    shr     $3, %ecx  // groupCount
 
-    /*
-     * Source cursor is now independent of the original src argument.
-     * Reuse rdi as the destination base and rsi as the scratch cursor.
-     */
+/*
+* Source cursor is now independent of the original src argument.
+* Reuse rdi as the destination base and rsi as the scratch cursor.
+*/
     mov     %rsi, %rdi
 
-    /* rowStride bytes in r14; radiusX was saved in r14d earlier. */
+/* rowStride bytes in r14; radiusX was saved in r14d earlier. */
     movslq  %r13d, %r14
     shl     $2, %r14
 
@@ -109,7 +120,7 @@ SYM(ksvgMorphologyApplyRowAvx2):
     jne     .L_row_avx2_e_vertical
 
 /* -------------------- vertical dilation -------------------- */
-    mov     %r10, %rsi                 # scratch cursor
+    mov     %r10, %rsi  // scratch cursor
 
 .L_row_avx2_d_group:
     test    %ecx, %ecx
@@ -117,7 +128,7 @@ SYM(ksvgMorphologyApplyRowAvx2):
 
     vxorps  %ymm0, %ymm0, %ymm0
     mov     %r11, %rax
-    mov     %r9d, %edx                 # row counter
+    mov     %r9d, %edx  // row counter
 
 .L_row_avx2_d_rows:
     vmovdqu (%rax), %ymm1
@@ -139,7 +150,7 @@ SYM(ksvgMorphologyApplyRowAvx2):
 .L_row_avx2_d_tail_col:
     vxorps  %ymm0, %ymm0, %ymm0
     mov     %r11, %rax
-    mov     %r9d, %ecx                 # row counter
+    mov     %r9d, %ecx  // row counter
 
 .L_row_avx2_d_tail_rows:
     mov     (%rax), %edx
@@ -160,7 +171,7 @@ SYM(ksvgMorphologyApplyRowAvx2):
 
 /* -------------------- vertical erosion -------------------- */
 .L_row_avx2_e_vertical:
-    mov     %r10, %rsi                 # scratch cursor
+    mov     %r10, %rsi  // scratch cursor
 
 .L_row_avx2_e_group:
     test    %ecx, %ecx
@@ -211,32 +222,32 @@ SYM(ksvgMorphologyApplyRowAvx2):
 
 /* -------------------- horizontal dilation -------------------- */
 .L_row_avx2_d_horizontal:
-    /* L = 2*radiusX+1; r12d still holds saved radiusX. */
-    lea     1(%r12d,%r12d), %eax
+/* L = 2*radiusX+1; r12d still holds saved radiusX. */
+    lea     1(%r12d, %r12d), %eax
     mov     %eax, %ecx
-    shr     $3, %ecx                    # vectorCount
+    shr     $3, %ecx  // vectorCount
     and     $7, %eax
-    mov     %eax, %r9d                  # tail = 1,3,5,7
+    mov     %eax, %r9d  // tail = 1,3,5,7
 
-    mov     72(%rsp), %r12d             # xEnd
-    sub     %ebx, %r12d                 # outputCount
+    mov     72(%rsp), %r12d  // xEnd
+    sub     %ebx, %r12d  // outputCount
 
-    /* dst cursor = dst + (y*width+xStart)*4 */
-    mov     56(%rsp), %r15d             # reload y
+/* dst cursor = dst + (y*width+xStart)*4 */
+    mov     56(%rsp), %r15d  // reload y
     movslq  %r15d, %rax
     movslq  %r13d, %rdx
     imul    %rdx, %rax
     movslq  %ebx, %rdx
     add     %rdx, %rax
-    lea     (%rdi,%rax,4), %rdi
+    lea     (%rdi, %rax, 4), %rdi
 
-    mov     %r10, %r11                  # scratch window cursor
+    mov     %r10, %r11  // scratch window cursor
 
 .L_row_avx2_d_h_px:
     vxorps  %ymm0, %ymm0, %ymm0
     mov     %r11, %rdx
     mov     %ecx, %eax
-    mov     %r9d, %r8d                  # restore tail for this output pixel
+    mov     %r9d, %r8d  // restore tail for this output pixel
 
 .L_row_avx2_d_h_vec:
     test    %eax, %eax
@@ -277,24 +288,24 @@ SYM(ksvgMorphologyApplyRowAvx2):
 
 /* -------------------- horizontal erosion -------------------- */
 .L_row_avx2_e_horizontal:
-    /* L = 2*radiusX+1; r12d still holds saved radiusX. */
-    lea     1(%r12d,%r12d), %eax
+/* L = 2*radiusX+1; r12d still holds saved radiusX. */
+    lea     1(%r12d, %r12d), %eax
     mov     %eax, %ecx
-    shr     $3, %ecx                    # vectorCount
+    shr     $3, %ecx  // vectorCount
     and     $7, %eax
-    mov     %eax, %r9d                  # tail = 1,3,5,7
+    mov     %eax, %r9d  // tail = 1,3,5,7
 
     mov     72(%rsp), %r12d
-    sub     %ebx, %r12d                # outputCount
+    sub     %ebx, %r12d  // outputCount
 
-    /* dst cursor = dst + (y*width+xStart)*4 */
-    mov     56(%rsp), %r15d             # reload y
+/* dst cursor = dst + (y*width+xStart)*4 */
+    mov     56(%rsp), %r15d  // reload y
     movslq  %r15d, %rax
     movslq  %r13d, %rdx
     imul    %rdx, %rax
     movslq  %ebx, %rdx
     add     %rdx, %rax
-    lea     (%rdi,%rax,4), %rdi
+    lea     (%rdi, %rax, 4), %rdi
 
     mov     %r10, %r11
 
@@ -349,4 +360,4 @@ SYM(ksvgMorphologyApplyRowAvx2):
     pop     %rbp
     pop     %rbx
     ret
-//// SIZE(SYM(ksvgMorphologyApplyRowAvx2))
+    // // SIZE(SYM(ksvgMorphologyApplyRowAvx2))

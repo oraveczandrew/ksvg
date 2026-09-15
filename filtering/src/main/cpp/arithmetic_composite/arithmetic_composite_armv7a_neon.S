@@ -1,17 +1,17 @@
 /*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
+ * Copyright 2026 András Oravecz <info@oandras.hu>
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "asm_macros.S"
@@ -188,8 +188,8 @@ SYM(applyArithmeticNeon):
 .Lnonlin_vec:
     cmp     r14, #32
     blo     .Lnonlin_tail
-    vld4.8  {d0,d1,d2,d3}, [r4]!
-    vld4.8  {d4,d5,d6,d7}, [r5]!
+    vld4.8  {d0, d1, d2, d3}, [r4]!
+    vld4.8  {d4, d5, d6, d7}, [r5]!
     vmov    d16, d0
     vmov    d17, d1
     vmov    d18, d2
@@ -202,7 +202,7 @@ SYM(applyArithmeticNeon):
     FORMULA8 d17, d21, d25
     FORMULA8 d18, d22, d26
     FORMULA8 d19, d23, d27
-    vst4.8  {d24,d25,d26,d27}, [r6]!
+    vst4.8  {d24, d25, d26, d27}, [r6]!
     sub     r14, r14, #32
     b       .Lnonlin_vec
 
@@ -236,8 +236,8 @@ SYM(applyArithmeticNeon):
 .Llinear_vec:
     cmp     r14, #32
     blo     .Llinear_tail
-    vld4.8  {d0,d1,d2,d3}, [r4]!
-    vld4.8  {d4,d5,d6,d7}, [r5]!
+    vld4.8  {d0, d1, d2, d3}, [r4]!
+    vld4.8  {d4, d5, d6, d7}, [r5]!
     vmov    d22, d3
     vmov    d23, d7
 
@@ -249,48 +249,48 @@ SYM(applyArithmeticNeon):
     mov     r12, #0
     vmov.i8 d31, #15
 .Ls2l_scan:
-    vld1.8  {d14,d15}, [r3]!
+    vld1.8  {d14, d15}, [r3]!
     vdup.8  d30, r12
 
     vshr.u8 d29, d0, #4
     vceq.u8 d29, d29, d30
     vand    d28, d0, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d16
     vmov    d16, d29
 
     vshr.u8 d29, d1, #4
     vceq.u8 d29, d29, d30
     vand    d28, d1, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d17
     vmov    d17, d29
 
     vshr.u8 d29, d2, #4
     vceq.u8 d29, d29, d30
     vand    d28, d2, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d18
     vmov    d18, d29
 
     vshr.u8 d29, d4, #4
     vceq.u8 d29, d29, d30
     vand    d28, d4, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d19
     vmov    d19, d29
 
     vshr.u8 d29, d5, #4
     vceq.u8 d29, d29, d30
     vand    d28, d5, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d20
     vmov    d20, d29
 
     vshr.u8 d29, d6, #4
     vceq.u8 d29, d29, d30
     vand    d28, d6, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d21
     vmov    d21, d29
 
@@ -310,24 +310,24 @@ SYM(applyArithmeticNeon):
     mov     r3, r1
     mov     r12, #0
 .Ll2s_scan:
-    vld1.8  {d14,d15}, [r3]!
+    vld1.8  {d14, d15}, [r3]!
     vdup.8  d30, r12
     vshr.u8 d29, d16, #4
     vceq.u8 d29, d29, d30
     vand    d28, d16, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d24
     vmov    d24, d29
     vshr.u8 d29, d17, #4
     vceq.u8 d29, d29, d30
     vand    d28, d17, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d25
     vmov    d25, d29
     vshr.u8 d29, d18, #4
     vceq.u8 d29, d29, d30
     vand    d28, d18, d31
-    vtbl.8  d28, {d14,d15}, d28
+    vtbl.8  d28, {d14, d15}, d28
     vbsl    d29, d28, d26
     vmov    d26, d29
     add     r12, #1
@@ -336,7 +336,7 @@ SYM(applyArithmeticNeon):
     sub     r3, r3, #256
 
     vmov    d27, d19
-    vst4.8  {d24,d25,d26,d27}, [r6]!
+    vst4.8  {d24, d25, d26, d27}, [r6]!
     sub     r14, r14, #32
     b       .Llinear_vec
 

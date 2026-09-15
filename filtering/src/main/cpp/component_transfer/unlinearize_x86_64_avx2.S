@@ -1,17 +1,17 @@
 /*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
+ * Copyright 2026 András Oravecz <info@oandras.hu>
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 /*
@@ -35,7 +35,6 @@
  */
 
 #include "asm_macros.S"
-
 
 .text
 .p2align 5
@@ -199,7 +198,7 @@ SYM(ksvgUnlinearizeApplyAvx2):
 .L_tail:
     testl   %r10d, %r10d
     jz      .L_done
-    
+
     /* Scalar remainder, same mapping as unlinearize.cpp. */
 .L_tail_loop:
     movl    (%rdi), %eax
@@ -208,19 +207,19 @@ SYM(ksvgUnlinearizeApplyAvx2):
 
     movl    %eax, %ecx
     andl    $0xff, %ecx
-    movzbl  (%r8,%rcx), %ecx            /* B */
+    movzbl  (%r8, %rcx), %ecx            /* B */
     movl    %ecx, %r11d
 
     shrl    $8, %eax
     andl    $0xff, %eax
-    movzbl  (%r8,%rax), %eax             /* G */
+    movzbl  (%r8, %rax), %eax             /* G */
     shll    $8, %eax
     orl     %eax, %r11d
 
     movl    (%rdi), %eax
     shrl    $16, %eax
     andl    $0xff, %eax
-    movzbl  (%r8,%rax), %eax             /* R */
+    movzbl  (%r8, %rax), %eax             /* R */
     shll    $16, %eax
     orl     %eax, %r11d
 
@@ -234,7 +233,7 @@ SYM(ksvgUnlinearizeApplyAvx2):
 .L_done:
     vzeroupper
     ret
-//// SIZE(SYM(ksvgUnlinearizeApplyAvx2))
+// SIZE(SYM(ksvgUnlinearizeApplyAvx2))
 
 RODATA
 .p2align 5

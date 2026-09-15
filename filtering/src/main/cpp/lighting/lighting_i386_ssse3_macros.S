@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,7 +43,10 @@
  *   %xmm0
  */
 .macro TO_FLOAT stack_off
-    movd \stack_off(%ebp),%xmm0; cvtdq2ps %xmm0,%xmm0; mulss %xmm7,%xmm0; movss %xmm0,\stack_off(%ebp)
+    movd  \stack_off(%ebp), %xmm0
+    cvtdq2ps %xmm0, %xmm0
+    mulss %xmm7, %xmm0
+    movss %xmm0, \stack_off(%ebp)
 .endm
 
 /*
@@ -64,7 +67,9 @@
  *   %ecx
  */
 .macro ALPHA_EXTRACT src_off, dst_off
-    movl \src_off(%eax),%ecx; shrl $24,%ecx; movl %ecx,\dst_off(%ebp)
+    movl  \src_off(%eax), %ecx
+    shrl  $24, %ecx
+    movl  %ecx, \dst_off(%ebp)
 .endm
 
 /*
@@ -90,7 +95,10 @@
  *   \dst (written)
  */
 .macro CHAN_TO_INT mem_off, base, dst, half
-    movss \mem_off(\base),%xmm1; mulss %xmm0,%xmm1; addss \half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,\dst
+    movss \mem_off(\base), %xmm1
+    mulss %xmm0, %xmm1
+    addss \half@GOTOFF(%ebx), %xmm1
+    cvttss2si %xmm1, \dst
 .endm
 
 /*
@@ -111,7 +119,10 @@
  *   %eax/%ecx/%edx (in-place)
  */
 .macro L2S_GATHER lut
-    movl -24(%ebp),\lut; movzbl (\lut,%eax),%eax; movzbl (\lut,%ecx),%ecx; movzbl (\lut,%edx),%edx
+    movl  -24(%ebp), \lut
+    movzbl (\lut,%eax), %eax
+    movzbl (\lut,%ecx), %ecx
+    movzbl (\lut,%edx), %edx
 .endm
 
 /*
@@ -130,9 +141,13 @@
  *   %ecx (reloaded as dst pointer)
  */
 .macro PACK_FORCE_ALPHA
-    shll $16,%eax; shll $8,%ecx; orl %ecx,%eax; orl %edx,%eax
-    orl $-16777216, %eax
-    movl -8(%ebp),%ecx; movl %eax,(%ecx)
+    shll  $16, %eax
+    shll  $8, %ecx
+    orl   %ecx, %eax
+    orl   %edx, %eax
+    orl   $-16777216, %eax
+    movl  -8(%ebp), %ecx
+    movl  %eax, (%ecx)
 .endm
 
 /*
@@ -150,8 +165,17 @@
  *   %ecx (reloaded as dst pointer)
  */
 .macro PACK_MAX_ALPHA
-    shll $16,%eax; shll $8,%ecx; orl %ecx,%eax; orl %edx,%eax
-    movl %eax,%esi; cmpl %ecx,%esi; cmovl %ecx,%esi; cmpl %edx,%esi; cmovl %edx,%esi
-    shll $24,%esi; orl %esi,%eax
-    movl -8(%ebp),%ecx; movl %eax,(%ecx)
+    shll  $16, %eax
+    shll  $8, %ecx
+    orl   %ecx, %eax
+    orl   %edx, %eax
+    movl  %eax, %esi
+    cmpl  %ecx, %esi
+    cmovl %ecx, %esi
+    cmpl  %edx, %esi
+    cmovl %edx, %esi
+    shll  $24, %esi
+    orl   %esi, %eax
+    movl  -8(%ebp), %ecx
+    movl  %eax, (%ecx)
 .endm

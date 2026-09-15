@@ -1,21 +1,20 @@
 /*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
+ * Copyright 2026 András Oravecz <info@oandras.hu>
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "asm_macros.S"
-
 
 .text
 .p2align 4
@@ -26,7 +25,7 @@
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 
 .globl SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3)
-TYPE(SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3),@function)
+TYPE(SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3), @function)
 SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3):
     pushl %ebp
     pushl %ebx
@@ -44,7 +43,7 @@ SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3):
     movl %eax, 0(%esp)
 
     # source = pin + x1 * 4
-    leal (%esi,%ebp,4), %esi
+    leal (%esi, %ebp, 4), %esi
 
     call 1f
 1:  popl %eax
@@ -59,7 +58,7 @@ SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3):
     pxor %xmm1, %xmm1
 
     movl 40(%esp), %ecx                 # weight pointer
-    leal (%ecx,%ebx,4), %eax            # weight end
+    leal (%ecx, %ebx, 4), %eax            # weight end
 .LV_row:
     movss (%ecx), %xmm2
     shufps $0, %xmm2, %xmm2
@@ -96,10 +95,10 @@ SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3):
     popl %ebx
     popl %ebp
     ret
-//// SIZE(SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3))
+// SIZE(SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3))
 
 .globl SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3)
-TYPE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3),@function)
+TYPE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3), @function)
 SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3):
     pushl %ebp
     pushl %ebx
@@ -114,8 +113,8 @@ SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3):
     movl 40(%esp), %ebx                 # x2
 
     # current input = pin + x1 * 16
-    leal (%esi,%ebp,8), %eax
-    leal (%eax,%ebp,8), %esi
+    leal (%esi, %ebp, 8), %eax
+    leal (%eax, %ebp, 8), %esi
 
     call 2f
 2:  popl %eax
@@ -164,5 +163,4 @@ SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3):
     popl %ebx
     popl %ebp
     ret
-//// SIZE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3))
-GNU_STACK
+// SIZE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3))

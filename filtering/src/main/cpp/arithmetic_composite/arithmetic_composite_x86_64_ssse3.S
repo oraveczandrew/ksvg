@@ -1,17 +1,17 @@
 /*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
+ * Copyright 2026 András Oravecz <info@oandras.hu>
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 /*
@@ -29,7 +29,6 @@
  * evaluation while preserving the scalar arithmetic order.
  */
 #include "asm_macros.S"
-
 
 .equ ALPHA_SHIFT, 24
 
@@ -241,7 +240,7 @@
 .text
 .p2align 5
 .globl SYM(ksvgArithmeticApplySse)
-TYPE(SYM(ksvgArithmeticApplySse),@function)
+TYPE(SYM(ksvgArithmeticApplySse), @function)
 SYM(ksvgArithmeticApplySse):
     pushq %rbp
     pushq %rbx
@@ -293,11 +292,11 @@ SYM(ksvgArithmeticApplySse):
     imull %r15d, %eax
     addl %ebp, %eax
     movslq %eax, %rax
-    leaq (%r12,%rax,4), %rdi
-    leaq (%r13,%rax,4), %rsi
-    leaq (%r14,%rax,4), %rdx
-    leal (%r15,%r15), %eax
-    leal (%rax,%rax), %r15d          /* persistent row stride = width * 4 */
+    leaq (%r12, %rax, 4), %rdi
+    leaq (%r13, %rax, 4), %rsi
+    leaq (%r14, %rax, 4), %rdx
+    leal (%r15, %r15), %eax
+    leal (%rax, %rax), %r15d          /* persistent row stride = width * 4 */
 
     /* Linear mode uses fixed built-in sRGB <-> linear transforms.
        The caller-supplied LUT pointers are intentionally ignored. */
@@ -477,7 +476,6 @@ SYM(ksvgArithmeticApplySse):
     LINEAR_BLOCK_UNROLLED
     decl %r9d
     jmp .Llinear_remainder_loop
-
 
 .Ltail:
     /* LOOKUP4_BYTE clobbers %ecx; derive tail count from persistent bounds. */

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,12 +23,12 @@
 // AArch64 / AAPCS64.
 //
 // Optimizations over the scalar baseline:
-//   1. Branch hoisting: the fractal/turbulence fabs is done via a sign-bit
-//      mask (BIC), so the flag is checked once per pixel pair, not per channel.
-//   2. Two-pixel interleaving: the octave loop processes two adjacent pixels,
-//      sharing Y geometry and halving loop overhead.
-//   3. SIMD packing: the final pixel pack uses vector convert+saturate+shift
-//      instead of four scalar clamp-and-pack sequences.
+// 1. Branch hoisting: the fractal/turbulence fabs is done via a sign-bit
+// mask (BIC), so the flag is checked once per pixel pair, not per channel.
+// 2. Two-pixel interleaving: the octave loop processes two adjacent pixels,
+// sharing Y geometry and halving loop overhead.
+// 3. SIMD packing: the final pixel pack uses vector convert+saturate+shift
+// instead of four scalar clamp-and-pack sequences.
 
 // ── Argument offsets ────────────────────────────────────────────────────────
 .equ A_SELECTOR, 0
@@ -57,24 +57,24 @@
 // Callee-saved d8-d13 are saved (read geometry); d14/d15 also live across the
 // whole octave loop as the P1 sum accumulators (v14/v15), so they must be
 // saved/restored too (AAPCS64: d14/d15 are callee-saved).
-.equ S_SAVE_D8,   0
+.equ S_SAVE_D8, 0
 .equ S_SAVE_D10, 16
 .equ S_SAVE_D12, 32
 .equ S_SAVE_D14, 48
-.equ S_PIXELS,   64   // x: base pixel pointer (row-start recomputation)
-.equ S_FX_BASE,  72   // double: P0 fx start for this row
-.equ S_FX_STEP,  80   // double: fx advance per pixel (= invScaleX/unitX*freqX)
-.equ S_CTLX_BASE,88   // double: P0 curtlx start (= 0 for clipLeft)
-.equ S_PY0,      96   // double: py0 for this row
-.equ S_CTLY,    104   // double: curtly for this row
-.equ S_FX1,     112   // double: P1 fx (= fxBase + fxStep, updated per pixel pair)
-.equ S_CTLX1,   120   // double: P1 curtlx (= freqX, updated per pixel pair)
-.equ S_BY0,     128   // w: saved by0 (needed by P1 after P0's permutation)
-.equ S_BY1,     132   // w: saved by1 (needed by P1 after P0's permutation)
-.equ S_PACK_SCALE, 144 // q: [scale, scale]   pack vector (built once at entry)
-.equ S_PACK_OFFSET,160 // q: [offset, offset] pack vector (built once at entry)
-.equ S_PACK_HALF,  176 // q: [0.5, 0.5]       pack vector (built once at entry)
-.equ S_SIZE,    192   // must be 16-byte aligned
+.equ S_PIXELS, 64  // x: base pixel pointer (row-start recomputation)
+.equ S_FX_BASE, 72  // double: P0 fx start for this row
+.equ S_FX_STEP, 80  // double: fx advance per pixel (= invScaleX/unitX*freqX)
+.equ S_CTLX_BASE, 88  // double: P0 curtlx start (= 0 for clipLeft)
+.equ S_PY0, 96  // double: py0 for this row
+.equ S_CTLY, 104  // double: curtly for this row
+.equ S_FX1, 112  // double: P1 fx (= fxBase + fxStep, updated per pixel pair)
+.equ S_CTLX1, 120  // double: P1 curtlx (= freqX, updated per pixel pair)
+.equ S_BY0, 128  // w: saved by0 (needed by P1 after P0's permutation)
+.equ S_BY1, 132  // w: saved by1 (needed by P1 after P0's permutation)
+.equ S_PACK_SCALE, 144  // q: [scale, scale]   pack vector (built once at entry)
+.equ S_PACK_OFFSET, 160  // q: [offset, offset] pack vector (built once at entry)
+.equ S_PACK_HALF, 176  // q: [0.5, 0.5]       pack vector (built once at entry)
+.equ S_SIZE, 192  // must be 16-byte aligned
 
 // ── Register map (stable across the function unless noted) ──────────────────
 // x0 = args pointer (preserved)
@@ -96,8 +96,8 @@
 // v1 = P0 sums channels 2/3   v15 = P1 sums channels 2/3
 // v2-v6 = arithmetic temporaries (reused for both pixels)
 // v7  = fabs sign mask: 0x8000000000000000 in BOTH 64-bit lanes for turbulence,
-//       0 for fractal. BIC with v7 clears the sign bit (fabs) or is a no-op.
-//       Set once at entry; never modified elsewhere.
+// 0 for fractal. BIC with v7 clears the sign bit (fabs) or is a no-op.
+// Set once at entry; never modified elsewhere.
 // v30 = pack clamp ceiling [255,255,255,255]. NOT a set-once register: d30
 // (its low 64 bits) is a geometry scratch double, so v30 is re-established
 // (movi v30.4s,#255) at the top of every pack_pixel_pair.
@@ -111,7 +111,7 @@
 // (In the pack paths v24/v25/v26 are instead loaded from the frame slots
 // S_PACK_SCALE/S_PACK_OFFSET/S_PACK_HALF — see entry.)
 // d29 = scratch   d30 = scratch (NOTE: d30 ALIASES v30.d[0], the pack clamp
-//      ceiling — see the pack_pixel_pair movi)   d31 = scratch
+// ceiling — see the pack_pixel_pair movi)   d31 = scratch
 //
 // v16-v23 = gradient loads (reused for P0 then P1)
 
@@ -120,10 +120,10 @@
 
 turbulence64Asm:
     sub     sp, sp, #S_SIZE
-    stp     d8, d9,  [sp, #S_SAVE_D8]
-    stp     d10, d11,[sp, #S_SAVE_D10]
-    stp     d12, d13,[sp, #S_SAVE_D12]
-    stp     d14, d15,[sp, #S_SAVE_D14]
+    stp     d8, d9, [sp, #S_SAVE_D8]
+    stp     d10, d11, [sp, #S_SAVE_D10]
+    stp     d12, d13, [sp, #S_SAVE_D12]
+    stp     d14, d15, [sp, #S_SAVE_D14]
 
     ldr     x3, [x0, #A_GRADX]
     ldr     x4, [x0, #A_GRADY]
@@ -139,7 +139,7 @@ turbulence64Asm:
     cmp     w1, #0
     csel    x16, xzr, x16, ne
     fmov    d7, x16
-    ins     v7.d[1], x16               // both 64-bit lanes identical
+    ins     v7.d[1], x16  // both 64-bit lanes identical
     // v7 is now our permanent fabs mask; it is NOT modified elsewhere.
 
     // ── Pre-build the pack constant vectors (once per call) ───────────────────
@@ -151,10 +151,10 @@ turbulence64Asm:
     cmp     w1, #0
     ldr     d20, const_127_5
     ldr     d21, const_255
-    fcsel   d20, d20, d21, ne       // d20 = fractal ? 127.5 : 255.0
+    fcsel   d20, d20, d21, ne  // d20 = fractal ? 127.5 : 255.0
     ldr     d21, const_1
     fmov    d22, xzr
-    fcsel   d21, d21, d22, ne       // d21 = fractal ? 1.0 : 0.0
+    fcsel   d21, d21, d22, ne  // d21 = fractal ? 1.0 : 0.0
     ldr     d22, const_half
     dup     v24.2d, v20.d[0]
     dup     v25.2d, v21.d[0]
@@ -163,7 +163,7 @@ turbulence64Asm:
     str     q25, [sp, #S_PACK_OFFSET]
     str     q26, [sp, #S_PACK_HALF]
 
-    movi    v30.4s, #255               // pack clamp ceiling (0x000000ff per lane)
+    movi    v30.4s, #255  // pack clamp ceiling (0x000000ff per lane)
 
     // y = clipTop
     ldr     w6, [x0, #A_CLIP_TOP]
@@ -246,19 +246,19 @@ pixel_loop_2:
     // Need at least 2 pixels remaining.
     add     w17, w8, #1
     cmp     w17, w9
-    b.ge    tail_pixel                // fall through to single-pixel tail
+    b.ge    tail_pixel  // fall through to single-pixel tail
 
-    movi    v0.2d, #0                 // P0 sums ch 0/1
-    movi    v1.2d, #0                 // P0 sums ch 2/3
-    movi    v14.2d, #0                // P1 sums ch 0/1
-    movi    v15.2d, #0                // P1 sums ch 2/3
+    movi    v0.2d, #0  // P0 sums ch 0/1
+    movi    v1.2d, #0  // P0 sums ch 2/3
+    movi    v14.2d, #0  // P1 sums ch 0/1
+    movi    v15.2d, #0  // P1 sums ch 2/3
 
     // ── Load per-pixel starting coordinates ──────────────────────────────────
-    ldr     d24, [sp, #S_FX_BASE]     // fx0
-    ldr     d25, [sp, #S_PY0]         // fy (shared)
-    ldr     d26, [sp, #S_CTLX_BASE]   // curtlx0
-    ldr     d27, [sp, #S_CTLY]        // curtly (shared)
-    ldr     d28, const_1              // ratio = 1.0 (shared)
+    ldr     d24, [sp, #S_FX_BASE]  // fx0
+    ldr     d25, [sp, #S_PY0]  // fy (shared)
+    ldr     d26, [sp, #S_CTLX_BASE]  // curtlx0
+    ldr     d27, [sp, #S_CTLY]  // curtly (shared)
+    ldr     d28, const_1  // ratio = 1.0 (shared)
 
     ldr     w7, [x0, #A_OCTAVES]
     ldr     w10, [x0, #A_PERIOD_X]
@@ -275,16 +275,16 @@ pixel_loop_2:
 octave_loop_2:
 
     // ──────────────────────────────────────────────────────────────────────────
-    //  Shared Y geometry (once per octave, used by both pixels)
+    // Shared Y geometry (once per octave, used by both pixels)
     // ──────────────────────────────────────────────────────────────────────────
     ldr     d29, const_4096
-    fadd    d29, d25, d29             // ty = fy + 4096
-    fcvtms  x14, d29                  // by0_raw
+    fadd    d29, d25, d29  // ty = fy + 4096
+    fcvtms  x14, d29  // by0_raw
     scvtf   d30, x14
-    fsub    d10, d29, d30             // ry0
+    fsub    d10, d29, d30  // ry0
     ldr     d31, const_1
-    fsub    d11, d10, d31             // ry1 = ry0 - 1
-    add     x15, x14, #1             // by1_raw
+    fsub    d11, d10, d31  // ry1 = ry0 - 1
+    add     x15, x14, #1  // by1_raw
 
     // Stitch Y
     cmp     w11, #0
@@ -315,7 +315,7 @@ no_stitch_y_2:
     fmul    d13, d13, d30
 
     // ──────────────────────────────────────────────────────────────────────────
-    //  Pixel 0 — X geometry, permutation, gradients, lerp
+    // Pixel 0 — X geometry, permutation, gradients, lerp
     // ──────────────────────────────────────────────────────────────────────────
 
     // tx0/floor/rx0/rx1
@@ -323,9 +323,9 @@ no_stitch_y_2:
     fadd    d29, d24, d29
     fcvtms  x12, d29
     scvtf   d30, x12
-    fsub    d8, d29, d30              // rx0
+    fsub    d8, d29, d30  // rx0
     ldr     d31, const_1
-    fsub    d9, d8, d31               // rx1
+    fsub    d9, d8, d31  // rx1
     add     x13, x12, #1
 
     // Stitch X for P0
@@ -433,28 +433,28 @@ no_stitch_x_p0:
     fmla    v1.2d, v2.2d, v28.d[0]
 
     // ──────────────────────────────────────────────────────────────────────────
-    //  Pixel 1 — X geometry, permutation, gradients, lerp
+    // Pixel 1 — X geometry, permutation, gradients, lerp
     // ──────────────────────────────────────────────────────────────────────────
     // ry0/ry1/sy unchanged (shared).  Overwrite rx0/rx1/sx in d8/d9/d12.
     // by0/by1 are reloaded from the stack before the permutation.
 
-    ldr     d29, [sp, #S_FX1]         // fx1
-    ldr     d30, [sp, #S_CTLX1]       // curtlx1 (stays live in d30 for stitch)
+    ldr     d29, [sp, #S_FX1]  // fx1
+    ldr     d30, [sp, #S_CTLX1]  // curtlx1 (stays live in d30 for stitch)
 
     // tx1/floor/rx0/rx1
     ldr     d31, const_4096
     fadd    d29, d29, d31
     fcvtms  x12, d29
-    scvtf   d31, x12                  // floor value into scratch (d30 = curtlx1 kept)
-    fsub    d8, d29, d31              // rx0_p1
+    scvtf   d31, x12  // floor value into scratch (d30 = curtlx1 kept)
+    fsub    d8, d29, d31  // rx0_p1
     ldr     d31, const_1
-    fsub    d9, d8, d31               // rx1_p1
+    fsub    d9, d8, d31  // rx1_p1
     add     x13, x12, #1
 
     // Stitch X for P1
     cmp     w10, #0
     b.le    no_stitch_x_p1
-    fcvtms  x16, d30                  // d30 = curtlx1 (still live)
+    fcvtms  x16, d30  // d30 = curtlx1 (still live)
     add     x16, x16, #4096
     add     x16, x16, x10
     cmp     x12, x16
@@ -556,14 +556,14 @@ no_stitch_x_p1:
     fmla    v15.2d, v2.2d, v28.d[0]
 
     // ──────────────────────────────────────────────────────────────────────────
-    //  Update coordinates for next octave (shared)
+    // Update coordinates for next octave (shared)
     // ──────────────────────────────────────────────────────────────────────────
-    fadd    d24, d24, d24             // fx0 *= 2
-    fadd    d25, d25, d25             // fy  *= 2
-    fadd    d26, d26, d26             // curtlx0 *= 2
-    fadd    d27, d27, d27             // curtly *= 2
+    fadd    d24, d24, d24  // fx0 *= 2
+    fadd    d25, d25, d25  // fy  *= 2
+    fadd    d26, d26, d26  // curtlx0 *= 2
+    fadd    d27, d27, d27  // curtly *= 2
     ldr     d29, const_half
-    fmul    d28, d28, d29             // ratio *= 0.5
+    fmul    d28, d28, d29  // ratio *= 0.5
 
     // P1 coords on stack
     ldr     d29, [sp, #S_FX1]
@@ -647,9 +647,9 @@ pack_pixel_pair:
 
     // ── Shift to final bit positions and OR-combine (ARGB32) ─────────────────
     // Note: lanes 2/3 contain garbage, but only lanes 0/1 are stored.
-    shl     v2.4s, v2.4s, #16         // R << 16
-    shl     v3.4s, v3.4s, #8          // G << 8
-    shl     v5.4s, v5.4s, #24         // A << 24
+    shl     v2.4s, v2.4s, #16  // R << 16
+    shl     v3.4s, v3.4s, #8  // G << 8
+    shl     v5.4s, v5.4s, #24  // A << 24
     orr     v2.16b, v2.16b, v3.16b
     orr     v2.16b, v2.16b, v4.16b
     orr     v2.16b, v2.16b, v5.16b
@@ -664,13 +664,13 @@ pack_pixel_pair:
     ldr     d20, [sp, #S_FX_BASE]
     ldr     d21, [sp, #S_FX_STEP]
     fadd    d20, d20, d21
-    fadd    d20, d20, d21             // fxBase += 2 * fxStep
+    fadd    d20, d20, d21  // fxBase += 2 * fxStep
     str     d20, [sp, #S_FX_BASE]
 
     ldr     d20, [sp, #S_CTLX_BASE]
     ldr     d21, [x0, #A_FREQ_X]
     fadd    d20, d20, d21
-    fadd    d20, d20, d21             // ctlxBase += 2 * freqX
+    fadd    d20, d20, d21  // ctlxBase += 2 * freqX
     str     d20, [sp, #S_CTLX_BASE]
 
     // P1 fx/ctlx for next pair
@@ -874,9 +874,9 @@ no_double_stitch_tail:
 // ── Pack single pixel (scalar — one pixel, not worth SIMD) ──────────────────
 pack_single:
     // Load pre-built pack scalars (lane 0 of the cached vectors, see entry).
-    ldr     d20, [sp, #S_PACK_SCALE]   // scale
+    ldr     d20, [sp, #S_PACK_SCALE]  // scale
     ldr     d21, [sp, #S_PACK_OFFSET]  // offset
-    ldr     d22, [sp, #S_PACK_HALF]    // +0.5
+    ldr     d22, [sp, #S_PACK_HALF]  // +0.5
 
     fadd    d23, d0, d21
     fmul    d23, d23, d20
@@ -942,25 +942,25 @@ finish:
     ldp     d14, d15, [sp, #S_SAVE_D14]
     ldp     d12, d13, [sp, #S_SAVE_D12]
     ldp     d10, d11, [sp, #S_SAVE_D10]
-    ldp     d8, d9,  [sp, #S_SAVE_D8]
+    ldp     d8, d9, [sp, #S_SAVE_D8]
     add     sp, sp, #S_SIZE
     ret
 
 // ── Literal pool ────────────────────────────────────────────────────────────
 .align 3
 const_1:
-    .double 1.0
+.double 1.0
 const_2:
-    .double 2.0
+.double 2.0
 const_3:
-    .double 3.0
+.double 3.0
 const_4096:
-    .double 4096.0
+.double 4096.0
 const_half:
-    .double 0.5
+.double 0.5
 const_127_5:
-    .double 127.5
+.double 127.5
 const_255:
-    .double 255.0
+.double 255.0
 
 .size turbulence64Asm, .-turbulence64Asm

@@ -3,15 +3,23 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "asm_macros.S"
 
-
-    .syntax unified
-    .text
-    .fpu neon
-    .align 2
+.syntax unified
+.text
+.fpu neon
+.align 2
 
 /*
  * void ksvgDisplacementMapApplyNeon32(
@@ -34,9 +42,9 @@
  * is 1 ulp off against the Kotlin /255f reference).
  */
 
-    .global SYM(ksvgDisplacementMapApplyNeon32)
-    TYPE(SYM(ksvgDisplacementMapApplyNeon32), %function)
-SYM(ksvgDisplacementMapApplyNeon32):
+.global SYM(ksvgDisplacementMapApplyNeon32)
+TYPE(SYM(ksvgDisplacementMapApplyNeon32), %function)
+    SYM(ksvgDisplacementMapApplyNeon32):
     ldr     r8, [sp, #8]
     ldr     r9, [sp, #12]
     and     r8, r8, #3
@@ -76,71 +84,71 @@ SYM(ksvgDisplacementMapApplyNeon32):
     beq     .L_AB
     b       .L_AA
 
-    .macro DEFINE_KERNEL label, xshift, yshift
-\label:
+.macro DEFINE_KERNEL label, xshift, yshift
+    \label:
     push    {r4-r11, lr}
 
-    mov     r4, r0                @ src
-    mov     r5, r1                @ map row pointer
-    mov     r6, r2                @ dst row pointer
-    mov     r7, r3                @ width
-    ldr     r8, [sp, #36]         @ height
-    sub     r9, r7, #1            @ width - 1
-    sub     r10, r8, #1           @ height - 1
-    mov     r11, #0               @ y
+    mov     r4, r0 @ src
+    mov     r5, r1 @ map row pointer
+    mov     r6, r2 @ dst row pointer
+    mov     r7, r3 @ width
+    ldr     r8, [sp, #36] @ height
+    sub     r9, r7, #1 @ width - 1
+    sub     r10, r8, #1 @ height - 1
+    mov     r11, #0 @ y
 
     cmp     r7, #0
     beq     .L_done_\label
     cmp     r8, #0
     beq     .L_done_\label
 
-    vdup.32 q7, r9               @ width - 1
-    vdup.32 q8, r10              @ height - 1
-    vmov.i32 q9, #0              @ zero
-    vmov.i32 q10, #255           @ byte mask / 255 source
+    vdup.32 q7, r9 @ width - 1
+    vdup.32 q8, r10 @ height - 1
+    vmov.i32 q9, #0 @ zero
+    vmov.i32 q10, #255 @ byte mask / 255 source
 
-    vldr    s22, [sp, #40]       @ scale
-    vdup.32 q11, d11[0]          @ scale = s22 (=d11[0]); NOT d22[0] (s44, uninit)
-    vmov.f32 q12, #0.5           @ half
+    vldr    s22, [sp, #40] @ scale
+    vdup.32 q11, d11[0] @ scale = s22 (=d11[0]); NOT d22[0] (s44, uninit)
+    vmov.f32 q12, #0.5 @ half
 
-    @ 255.0f for the true per-lane divide below. s26 = d13[0] is only safe
-    @ because the row's y-broadcast lives in q13, NOT q6 (= d12/d13): a
-    @ vdup.32 q6, r11 would have clobbered s26 with raw y bits every row,
-    @ yielding byte/0.0f -> +Inf -> saturating INT_MAX indices.
+    @       255.0f for the true per-lane divide below. s26 = d13[0] is only safe
+    @       because the row's y-broadcast lives in q13, NOT q6 (= d12/d13): a
+    @       vdup.32 q6, r11 would have clobbered s26 with raw y bits every row,
+    @       yielding byte/0.0f -> +Inf -> saturating INT_MAX indices.
     vldr    s26, .L_float255_\label
 
     adr     r0, .L_inc_\label
-    vld1.32  {d28-d29}, [r0]     @ q14 = 0,1,2,3
+    vld1.32 {d28-d29}, [r0] @ q14 = 0, 1, 2, 3
 
-    mov     r12, #0              @ x
+    mov     r12, #0 @ x
 
 .L_row_\label:
     cmp     r11, r8
     bge     .L_done_\label
 
-    vdup.32 q13, r11             @ y,y,y,y (q13: do NOT use q6, it aliases the s26 divisor)
+    vdup.32 q13, r11 @ y, y, y, y (q13: do NOT use q6, it aliases the s26 divisor)
     mov     r12, #0
 
 .L_vec_\label:
     cmp     r12, r7
     bge     .L_tail_\label
 
-    vld1.32  {d0-d1}, [r5]!      @ 4 map pixels
+    vld1.32 {d0-d1}, [r5]! @ 4 map pixels
 
     .if \xshift == 0
-        vmov    q1, q0
-        vand    q1, q1, q10
+    vmov    q1, q0
+    vand    q1, q1, q10
     .else
-        vshr.u32 q1, q0, #\xshift
-        vand    q1, q1, q10
+    vshr.u32 q1, q0, #\xshift
+    vand    q1, q1, q10
     .endif
 
     .if \yshift == 0
-        vmov    q2, q0
-        vand    q2, q2, q10
+    vmov    q2, q0
+    vand    q2, q2, q10
     .else
-        vshr.u32 q2, q0, #\yshift
-        vand    q2, q2, q10
+    vshr.u32 q2, q0, #\yshift
+    vand    q2, q2, q10
     .endif
 
     vcvt.f32.u32 s4, s4
@@ -167,7 +175,7 @@ SYM(ksvgDisplacementMapApplyNeon32):
     vcvt.s32.f32 q2, q2
 
     vdup.32 q5, r12
-    vadd.i32 q5, q5, q14         @ x..x+3
+    vadd.i32 q5, q5, q14 @ x..x+3
 
     vadd.i32 q3, q5, q1
     vmax.s32 q3, q3, q9
@@ -177,30 +185,30 @@ SYM(ksvgDisplacementMapApplyNeon32):
     vmax.s32 q4, q4, q9
     vmin.s32 q4, q4, q8
 
-    @ lane 0
-    vmov    r0, s12              @ sx0
-    vmov    r1, s16              @ sy0
+    @       lane 0
+    vmov    r0, s12 @ sx0
+    vmov    r1, s16 @ sy0
     mla     r2, r1, r7, r0
     ldr     r3, [r4, r2, lsl #2]
     str     r3, [r6, #0]
 
-    @ lane 1
-    vmov    r0, s13              @ sx1
-    vmov    r1, s17              @ sy1
+    @       lane 1
+    vmov    r0, s13 @ sx1
+    vmov    r1, s17 @ sy1
     mla     r2, r1, r7, r0
     ldr     r3, [r4, r2, lsl #2]
     str     r3, [r6, #4]
 
-    @ lane 2
-    vmov    r0, s14              @ sx2
-    vmov    r1, s18              @ sy2
+    @       lane 2
+    vmov    r0, s14 @ sx2
+    vmov    r1, s18 @ sy2
     mla     r2, r1, r7, r0
     ldr     r3, [r4, r2, lsl #2]
     str     r3, [r6, #8]
 
-    @ lane 3
-    vmov    r0, s15              @ sx3
-    vmov    r1, s19              @ sy3
+    @       lane 3
+    vmov    r0, s15 @ sx3
+    vmov    r1, s19 @ sy3
     mla     r2, r1, r7, r0
     ldr     r3, [r4, r2, lsl #2]
     str     r3, [r6, #12]
@@ -274,9 +282,9 @@ SYM(ksvgDisplacementMapApplyNeon32):
     .word 0x437f0000
 .L_half_\label:
     .word 0x3f000000
-    .endm
+.endm
 
-    .align 2
+.align 2
 .L_RR:
     DEFINE_KERNEL ksvgDisplacementMapApplyNeon32_RR, 16, 16
 .L_RG:
@@ -310,4 +318,4 @@ SYM(ksvgDisplacementMapApplyNeon32):
 .L_AA:
     DEFINE_KERNEL ksvgDisplacementMapApplyNeon32_AA, 24, 24
 
-    .section .note.GNU-stack,"",%progbits
+.section .note.GNU-stack,"",%progbits

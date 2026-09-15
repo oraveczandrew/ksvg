@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -74,23 +74,23 @@
 // before the #40 sub). Exponent is at [sp,#112] from entry.
 
 ksvgLightingDistantSpecularRowNeon32:
-    push    {r4-r11, r12, lr}      @ 10 words -> sp stays 8-byte aligned for vpush
-    vpush   {d8-d15}               @ preserve callee-saved d8-d15 (q4-q7)
+    push    {r4-r11, r12, lr}      // 10 words -> sp stays 8-byte aligned for vpush
+    vpush   {d8-d15}               // preserve callee-saved d8-d15 (q4-q7)
 
-    ldr     r4, [sp, #104]         @ count
-    ldr     r5, [sp, #108]         @ params
+    ldr     r4, [sp, #104]         // count
+    ldr     r5, [sp, #108]         // params
     cmp     r4, #0
     beq     .Lexit0
 
-    sub     sp, sp, #40            @ local scratch frame (8-byte aligned)
+    sub     sp, sp, #40            // local scratch frame (8-byte aligned)
 
     // Move the incoming source/dest pointers into callee-saved GPRs: `bl pow`
     // below clobbers the caller-saved r0-r3, so the row pointers must live in
     // r8-r11 for the whole loop (mirrors the aarch64 x19-x22 move).
-    mov     r8, r0                  @ srcT
-    mov     r9, r1                  @ srcM
-    mov     r10, r2                 @ srcB
-    mov     r11, r3                 @ dst
+    mov     r8, r0                  // srcT
+    mov     r9, r1                  // srcM
+    mov     r10, r2                 // srcB
+    mov     r11, r3                 // dst
 
     // Exponent (softfp stack argument) -> double on the stack, before the
     // param loads below clobber q0 (d0/s0 holder).
@@ -101,23 +101,23 @@ ksvgLightingDistantSpecularRowNeon32:
     // h = normalize(lx, ly, lz + 1), computed once (loop invariant).
     // hLen^2 association: (lx^2 + ly^2) + hz_raw^2 via separate muls/adds
     // (matches the x86/64 reference op order), single-precision sqrt.
-    vldr    s16, [r5, #12]         @ lx
-    vldr    s17, [r5, #16]         @ ly
-    vldr    s18, [r5, #20]         @ lz
+    vldr    s16, [r5, #12]         // lx
+    vldr    s17, [r5, #16]         // ly
+    vldr    s18, [r5, #20]         // lz
     vmov.f32 s19, #1.0
-    vadd.f32 s18, s18, s19         @ hz_raw = lz + 1
-    vmul.f32 s20, s17, s17         @ ly^2
-    vmul.f32 s21, s16, s16         @ lx^2
-    vadd.f32 s19, s20, s21         @ lx^2 + ly^2
-    vmul.f32 s20, s18, s18         @ hz_raw^2
-    vadd.f32 s19, s19, s20         @ hLen^2
-    vsqrt.f32 s19, s19             @ hLen (single precision)
+    vadd.f32 s18, s18, s19         // hz_raw = lz + 1
+    vmul.f32 s20, s17, s17         // ly^2
+    vmul.f32 s21, s16, s16         // lx^2
+    vadd.f32 s19, s20, s21         // lx^2 + ly^2
+    vmul.f32 s20, s18, s18         // hz_raw^2
+    vadd.f32 s19, s19, s20         // hLen^2
+    vsqrt.f32 s19, s19             // hLen (single precision)
     vcmp.f32 s19, #0.0
     vmrs    APSR_nzcv, FPSCR
     beq     .Lh_zero
-    vdiv.f32 s16, s16, s19         @ hx
-    vdiv.f32 s17, s17, s19         @ hy
-    vdiv.f32 s18, s18, s19         @ hz
+    vdiv.f32 s16, s16, s19         // hx
+    vdiv.f32 s17, s17, s19         // hy
+    vdiv.f32 s18, s18, s19         // hz
 .Lh_zero:
     vstr    s16, [sp, #24]
     vstr    s17, [sp, #28]
@@ -127,21 +127,21 @@ ksvgLightingDistantSpecularRowNeon32:
     //   q0 = [invDx, invDy, k, lx]; q1 = [ly, lz, lr, lg]; d4 = [lb, ss]
     vld1.32 {d0, d1}, [r5]!
     vld1.32 {d2, d3}, [r5]!
-    vld1.32 {d4}, [r5]             @ r5 now points at params+32
+    vld1.32 {d4}, [r5]             // r5 now points at params+32
 
     // scaleX = 1/invDx, scaleY = 1/invDy (single-precision VFP, VFPv3 ok)
     vmov.f32 s16, #1.0
     vdiv.f32 s0, s16, s0
     vdiv.f32 s1, s16, s1
 
-    vdup.32 q4, d4[1]     @ ss
-    vdup.32 q5, d0[0]     @ scaleX
-    vdup.32 q6, d0[1]     @ scaleY
-    vdup.32 q7, d1[0]     @ k
-    vdup.32 q11, d3[0]    @ lr
-    vdup.32 q12, d3[1]    @ lg
-    vdup.32 q13, d4[0]    @ lb
-    vmov.f32 q14, #1.0    @ one
+    vdup.32 q4, d4[1]     // ss
+    vdup.32 q5, d0[0]     // scaleX
+    vdup.32 q6, d0[1]     // scaleY
+    vdup.32 q7, d1[0]     // k
+    vdup.32 q11, d3[0]    // lr
+    vdup.32 q12, d3[1]    // lg
+    vdup.32 q13, d4[0]    // lb
+    vmov.f32 q14, #1.0    // one
 
     // hx/hy/hz come from the stack (the definitive h values).
     vldr    d16, [sp, #24]
@@ -155,119 +155,119 @@ ksvgLightingDistantSpecularRowNeon32:
     vld1.32 {q0}, [r8]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ tl
+    vmul.f32 q0, q0, q4          // tl
 
     add     r12, r8, #4
     vld1.32 {q1}, [r12]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ tm
+    vmul.f32 q1, q1, q4          // tm
 
     add     r12, r8, #8
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ tr
+    vmul.f32 q2, q2, q4          // tr
 
     // Exact scalar top sum: tr + tm + tm + tl
     vadd.f32 q3, q2, q1
     vadd.f32 q3, q3, q1
-    vadd.f32 q3, q3, q0          @ top sum
+    vadd.f32 q3, q3, q0          // top sum
 
     // ---- Row M ----
     vld1.32 {q0}, [r9]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ ml
+    vmul.f32 q0, q0, q4          // ml
 
     add     r12, r9, #8
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ mr
+    vmul.f32 q2, q2, q4          // mr
 
     // ---- Row B ----
     vld1.32 {q0}, [r10]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ bl
+    vmul.f32 q0, q0, q4          // bl
 
     add     r12, r10, #4
     vld1.32 {q1}, [r12]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ bm
+    vmul.f32 q1, q1, q4          // bm
 
     add     r12, r10, #8
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ br
+    vmul.f32 q2, q2, q4          // br
 
     // Exact scalar bottom sum: bl + bm + bm + br
     vadd.f32 q14, q0, q1
     vadd.f32 q14, q14, q1
-    vadd.f32 q14, q14, q2        @ bottom sum
-    vsub.f32 q3, q14, q3         @ dyRel
-    vmov    q14, q3               @ preserve dyRel while recomputing dx
+    vadd.f32 q14, q14, q2        // bottom sum
+    vsub.f32 q3, q14, q3         // dyRel
+    vmov    q14, q3               // preserve dyRel while recomputing dx
 
     // Recompute dx with the exact scalar order:
     //   (tr + mr) + mr + br - ((tl + ml) + ml + bl)
     vld1.32 {q0}, [r8]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ tl
+    vmul.f32 q0, q0, q4          // tl
 
     add     r12, r8, #8
     vld1.32 {q1}, [r12]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ tr
+    vmul.f32 q1, q1, q4          // tr
 
     vld1.32 {q2}, [r9]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ ml
+    vmul.f32 q2, q2, q4          // ml
 
     add     r12, r9, #8
     vld1.32 {q3}, [r12]
     vshr.u32 q3, q3, #24
     vcvt.f32.u32 q3, q3
-    vmul.f32 q3, q3, q4          @ mr
+    vmul.f32 q3, q3, q4          // mr
 
-    vadd.f32 q0, q0, q2         @ tl + ml
-    vadd.f32 q0, q0, q2         @ (tl + ml) + ml
-    vadd.f32 q1, q1, q3         @ tr + mr
-    vadd.f32 q1, q1, q3         @ (tr + mr) + mr
+    vadd.f32 q0, q0, q2         // tl + ml
+    vadd.f32 q0, q0, q2         // (tl + ml) + ml
+    vadd.f32 q1, q1, q3         // tr + mr
+    vadd.f32 q1, q1, q3         // (tr + mr) + mr
 
     add     r12, r10, #0
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ bl
-    vadd.f32 q0, q0, q2         @ + bl
+    vmul.f32 q2, q2, q4          // bl
+    vadd.f32 q0, q0, q2         // + bl
 
     add     r12, r10, #8
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ br
-    vadd.f32 q1, q1, q2         @ + br
-    vsub.f32 q0, q1, q0         @ dxRel
-    vmov    q3, q14              @ restore dyRel
+    vmul.f32 q2, q2, q4          // br
+    vadd.f32 q1, q1, q2         // + br
+    vsub.f32 q0, q1, q0         // dxRel
+    vmov    q3, q14              // restore dyRel
 
     // ---- Apply per-axis scale ----
-    vmul.f32 q0, q0, q5          @ q0 = dx
-    vmul.f32 q1, q3, q6          @ q1 = dy
+    vmul.f32 q0, q0, q5          // q0 = dx
+    vmul.f32 q1, q3, q6          // q1 = dy
     // ---- Normalize exactly like Kotlin reference ----
     // nLen = sqrt(nx*nx + ny*ny + 1); nx/=nLen; ny/=nLen; nz=1/nLen
-    vneg.f32 q0, q0              @ nx0
-    vneg.f32 q1, q1              @ ny0
+    vneg.f32 q0, q0              // nx0
+    vneg.f32 q1, q1              // ny0
     vmul.f32 q2, q0, q0
     vmul.f32 q3, q1, q1
     vadd.f32 q2, q2, q3
     vmov.f32 q14, #1.0
-    vadd.f32 q2, q2, q14         @ nLen^2
+    vadd.f32 q2, q2, q14         // nLen^2
 
     // ARMv7 VFP sqrt/div are scalar; normalize four lanes exactly.
     // Dividend is TRUE 1.0 (NOT k like the diffuse copy): the Kotlin
@@ -283,9 +283,9 @@ ksvgLightingDistantSpecularRowNeon32:
     vdiv.f32 s15, s11, s15
 
     // q3 now contains invLen = 1/nLen.
-    vmul.f32 q0, q0, q3          @ normalized nx
-    vmul.f32 q1, q1, q3          @ normalized ny
-    vmov q14, q3                 @ normalized nz = invLen
+    vmul.f32 q0, q0, q3          // normalized nx
+    vmul.f32 q1, q1, q3          // normalized ny
+    vmov q14, q3                 // normalized nz = invLen
 
     // Kotlin dot with the half vector h (q8-q10): nx*hx + ny*hy + nz*hz
     vmul.f32 q2, q0, q8
@@ -293,18 +293,18 @@ ksvgLightingDistantSpecularRowNeon32:
     vadd.f32 q2, q2, q15
     vmul.f32 q15, q14, q10
     vadd.f32 q2, q2, q15
-    vmov.f32 q14, #1.0           @ restore one
+    vmov.f32 q14, #1.0           // restore one
 
     // ---- ndoth = max(dot, 0) ----
     veor    q15, q15, q15
-    vmax.f32 q2, q2, q15         @ ndoth (clamped, non-negative)
+    vmax.f32 q2, q2, q15         // ndoth (clamped, non-negative)
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
-    vst1.32 {q2}, [sp]           @ stash ndoth at [sp,#0..#15]
+    vst1.32 {q2}, [sp]           // stash ndoth at [sp,#0..#15]
     vldr    s0, [sp, #0]
     vcvt.f64.f32 d0, s0
     vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        @ Read double exponent
+    vldr    d1, [sp, #16]        // Read double exponent
     vmov    r2, r3, d1
     bl      pow
     vmov    d0, r0, r1
@@ -314,7 +314,7 @@ ksvgLightingDistantSpecularRowNeon32:
     vldr    s0, [sp, #4]
     vcvt.f64.f32 d0, s0
     vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        @ Read double exponent
+    vldr    d1, [sp, #16]        // Read double exponent
     vmov    r2, r3, d1
     bl      pow
     vmov    d0, r0, r1
@@ -324,7 +324,7 @@ ksvgLightingDistantSpecularRowNeon32:
     vldr    s0, [sp, #8]
     vcvt.f64.f32 d0, s0
     vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        @ Read double exponent
+    vldr    d1, [sp, #16]        // Read double exponent
     vmov    r2, r3, d1
     bl      pow
     vmov    d0, r0, r1
@@ -334,7 +334,7 @@ ksvgLightingDistantSpecularRowNeon32:
     vldr    s0, [sp, #12]
     vcvt.f64.f32 d0, s0
     vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        @ Read double exponent
+    vldr    d1, [sp, #16]        // Read double exponent
     vmov    r2, r3, d1
     bl      pow
     vmov    d0, r0, r1
@@ -347,24 +347,24 @@ ksvgLightingDistantSpecularRowNeon32:
     vdup.32 q9, d16[1]
     vldr    d17, [sp, #32]
     vdup.32 q10, d17[0]
-    vldr    d18, [r5, #-8]       @ lr | lg
-    vldr    d19, [r5, #0]        @ lb | ss
-    vdup.32 q11, d18[0]          @ lr
-    vdup.32 q12, d18[1]          @ lg
-    vdup.32 q13, d19[0]          @ lb
-    vmov.f32 q14, #1.0           @ one
+    vldr    d18, [r5, #-8]       // lr | lg
+    vldr    d19, [r5, #0]        // lb | ss
+    vdup.32 q11, d18[0]          // lr
+    vdup.32 q12, d18[1]          // lg
+    vdup.32 q13, d19[0]          // lb
+    vmov.f32 q14, #1.0           // one
 
     // ---- intensity = clamp01(k * p) ----
-    vld1.32 {q2}, [sp]           @ q2 = p (in-place pow results)
-    vmul.f32 q2, q2, q7          @ k * p
+    vld1.32 {q2}, [sp]           // q2 = p (in-place pow results)
+    vmul.f32 q2, q2, q7          // k * p
     veor    q15, q15, q15
     vmax.f32 q2, q2, q15
-    vmin.f32 q2, q2, q14         @ q2 = intensity
+    vmin.f32 q2, q2, q14         // q2 = intensity
 
     // ---- Pack ARGB ----
-    vmul.f32 q1, q2, q11          @ outR
-    vmul.f32 q0, q2, q12          @ outG
-    vmul.f32 q3, q2, q13          @ outB
+    vmul.f32 q1, q2, q11          // outR
+    vmul.f32 q0, q2, q12          // outG
+    vmul.f32 q3, q2, q13          // outB
     // Kotlin roundToInt() for nonnegative values: floor(x + 0.5).
     vmov.f32 q14, #0.5
     vadd.f32 q1, q1, q14
@@ -377,20 +377,20 @@ ksvgLightingDistantSpecularRowNeon32:
     vshl.u32 q1, q1, #16
     vshl.u32 q0, q0, #8
     vorr    q3, q3, q1
-    vorr    q3, q3, q0            @ q3 = [0, R, G, B] (alpha byte = 0)
+    vorr    q3, q3, q0            // q3 = [0, R, G, B] (alpha byte = 0)
 
     // alpha = max(R,G,B) bytes (straight form, NOT premultiplied)
     mov     r7, #0xFF
-    vdup.32 q0, r7                @ 0x000000FF byte mask
-    vand    q1, q3, q0            @ B
+    vdup.32 q0, r7                // 0x000000FF byte mask
+    vand    q1, q3, q0            // B
     vshr.u32 q15, q3, #8
-    vand    q15, q15, q0          @ G
+    vand    q15, q15, q0          // G
     vshr.u32 q2, q3, #16
-    vand    q2, q2, q0            @ R
+    vand    q2, q2, q0            // R
     vmax.u8 q1, q1, q15
     vmax.u8 q1, q1, q2
     vshl.u32 q1, q1, #24
-    vorr    q3, q3, q1            @ alpha = max(R,G,B)
+    vorr    q3, q3, q1            // alpha = max(R,G,B)
 
     vst1.32 {q3}, [r11]!
 
@@ -399,7 +399,7 @@ ksvgLightingDistantSpecularRowNeon32:
     add     r10, r10, #16
     subs    r4, r4, #4
     bne     .Lloop
-    b       .Ldone                  @ loop done: sp is offset by #40, use .Ldone
+    b       .Ldone                  // loop done: sp is offset by #40, use .Ldone
 
 .Lexit0:
     vpop    {d8-d15}
@@ -433,30 +433,30 @@ ksvgLightingDistantSpecularRowNeon32:
 // ---------------------------------------------------------------------------
 
 .macro L2S_ARGB_PIXEL inr
-    @ \inr = 0xAARRGGBB, converted in place through the LUT at r6.
-    @ Scratch: r12 only. Preserves r8-r11 (LUT base is r6).
-    mov     r12, \inr, lsr #16        @ R index (bits 23-16)
+    // \inr = 0xAARRGGBB, converted in place through the LUT at r6.
+    // Scratch: r12 only. Preserves r8-r11 (LUT base is r6).
+    mov     r12, \inr, lsr #16        // R index (bits 23-16)
     and     r12, r12, #0xFF
-    ldrb    r12, [r6, r12]            @ sR
+    ldrb    r12, [r6, r12]            // sR
     bic     \inr, \inr, #0x00FF0000
     lsl     r12, r12, #16
     orr     \inr, \inr, r12
 
-    mov     r12, \inr, lsr #8         @ G index (bits 15-8)
+    mov     r12, \inr, lsr #8         // G index (bits 15-8)
     and     r12, r12, #0xFF
-    ldrb    r12, [r6, r12]            @ sG
+    ldrb    r12, [r6, r12]            // sG
     bic     \inr, \inr, #0x0000FF00
     lsl     r12, r12, #8
     orr     \inr, \inr, r12
 
-    and     r12, \inr, #0xFF          @ B index (bits 7-0)
-    ldrb    r12, [r6, r12]            @ sB
+    and     r12, \inr, #0xFF          // B index (bits 7-0)
+    ldrb    r12, [r6, r12]            // sB
     bic     \inr, \inr, #0x000000FF
     orr     \inr, \inr, r12
 
-    mov     r12, \inr, lsr #24        @ alpha index (bits 31-24, max-linear)
+    mov     r12, \inr, lsr #24        // alpha index (bits 31-24, max-linear)
     and     r12, r12, #0xFF
-    ldrb    r12, [r6, r12]            @ sA
+    ldrb    r12, [r6, r12]            // sA
     bic     \inr, \inr, #0xFF000000
     lsl     r12, r12, #24
     orr     \inr, \inr, r12
@@ -467,27 +467,27 @@ ksvgLightingDistantSpecularRowNeon32:
 .type ksvgLightingDistantSpecularRowNeon32Linear, %function
 
 ksvgLightingDistantSpecularRowNeon32Linear:
-    push    {r4-r11, r12, lr}      @ 10 words -> sp stays 8-byte aligned for vpush
-    vpush   {d8-d15}               @ preserve callee-saved d8-d15 (q4-q7)
+    push    {r4-r11, r12, lr}      // 10 words -> sp stays 8-byte aligned for vpush
+    vpush   {d8-d15}               // preserve callee-saved d8-d15 (q4-q7)
 
-    ldr     r4, [sp, #104]         @ count
-    ldr     r5, [sp, #108]         @ params
-    ldr     r6, [sp, #112]         @ linearToSrgb LUT
-    vldr    s0, [sp, #116]         @ exponent (softfp stack argument)
+    ldr     r4, [sp, #104]         // count
+    ldr     r5, [sp, #108]         // params
+    ldr     r6, [sp, #112]         // linearToSrgb LUT
+    vldr    s0, [sp, #116]         // exponent (softfp stack argument)
     cmp     r4, #0
     beq     .Llin_exit0
 
-    sub     sp, sp, #40            @ local scratch frame (8-byte aligned)
+    sub     sp, sp, #40            // local scratch frame (8-byte aligned)
 
     // Move the incoming source/dest pointers into callee-saved GPRs: `bl pow`
     // below clobbers the caller-saved r0-r3, so the row pointers must live in
     // r8-r11 for the whole loop (mirrors the aarch64 x19-x22 move).
-    mov     r8, r0                  @ srcT
-    mov     r9, r1                  @ srcM
-    mov     r10, r2                 @ srcB
-    mov     r11, r3                 @ dst
+    mov     r8, r0                  // srcT
+    mov     r9, r1                  // srcM
+    mov     r10, r2                 // srcB
+    mov     r11, r3                 // dst
 
-    vcvt.f64.f32 d0, s0            @ exponent -> double, before q0 clobber
+    vcvt.f64.f32 d0, s0            // exponent -> double, before q0 clobber
     vstr    d0, [sp, #16]
 
     // h = normalize(lx, ly, lz + 1), loop invariant (identical to Neon32).
@@ -495,19 +495,19 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vldr    s17, [r5, #16]
     vldr    s18, [r5, #20]
     vmov.f32 s19, #1.0
-    vadd.f32 s18, s18, s19         @ hz_raw = lz + 1
+    vadd.f32 s18, s18, s19         // hz_raw = lz + 1
     vmul.f32 s20, s17, s17
     vmul.f32 s21, s16, s16
     vadd.f32 s19, s20, s21
     vmul.f32 s20, s18, s18
-    vadd.f32 s19, s19, s20         @ hLen^2
-    vsqrt.f32 s19, s19             @ hLen
+    vadd.f32 s19, s19, s20         // hLen^2
+    vsqrt.f32 s19, s19             // hLen
     vcmp.f32 s19, #0.0
     vmrs    APSR_nzcv, FPSCR
     beq     .Llin_h_zero
-    vdiv.f32 s16, s16, s19         @ hx
-    vdiv.f32 s17, s17, s19         @ hy
-    vdiv.f32 s18, s18, s19         @ hz
+    vdiv.f32 s16, s16, s19         // hx
+    vdiv.f32 s17, s17, s19         // hy
+    vdiv.f32 s18, s18, s19         // hz
 .Llin_h_zero:
     vstr    s16, [sp, #24]
     vstr    s17, [sp, #28]
@@ -522,14 +522,14 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vdiv.f32 s0, s16, s0
     vdiv.f32 s1, s16, s1
 
-    vdup.32 q4, d4[1]     @ ss
-    vdup.32 q5, d0[0]     @ scaleX
-    vdup.32 q6, d0[1]     @ scaleY
-    vdup.32 q7, d1[0]     @ k
-    vdup.32 q11, d3[0]    @ lr
-    vdup.32 q12, d3[1]    @ lg
-    vdup.32 q13, d4[0]    @ lb
-    vmov.f32 q14, #1.0    @ one
+    vdup.32 q4, d4[1]     // ss
+    vdup.32 q5, d0[0]     // scaleX
+    vdup.32 q6, d0[1]     // scaleY
+    vdup.32 q7, d1[0]     // k
+    vdup.32 q11, d3[0]    // lr
+    vdup.32 q12, d3[1]    // lg
+    vdup.32 q13, d4[0]    // lb
+    vmov.f32 q14, #1.0    // one
 
     vldr    d16, [sp, #24]
     vdup.32 q8, d16[0]
@@ -542,118 +542,118 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vld1.32 {q0}, [r8]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ tl
+    vmul.f32 q0, q0, q4          // tl
 
     add     r12, r8, #4
     vld1.32 {q1}, [r12]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ tm
+    vmul.f32 q1, q1, q4          // tm
 
     add     r12, r8, #8
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ tr
+    vmul.f32 q2, q2, q4          // tr
 
     // Exact scalar top sum: tr + tm + tm + tl
     vadd.f32 q3, q2, q1
     vadd.f32 q3, q3, q1
-    vadd.f32 q3, q3, q0          @ top sum
+    vadd.f32 q3, q3, q0          // top sum
 
     // ---- Row M ----
     vld1.32 {q0}, [r9]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ ml
+    vmul.f32 q0, q0, q4          // ml
 
     add     r12, r9, #8
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ mr
+    vmul.f32 q2, q2, q4          // mr
 
     // ---- Row B ----
     vld1.32 {q0}, [r10]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ bl
+    vmul.f32 q0, q0, q4          // bl
 
     add     r12, r10, #4
     vld1.32 {q1}, [r12]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ bm
+    vmul.f32 q1, q1, q4          // bm
 
     add     r12, r10, #8
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ br
+    vmul.f32 q2, q2, q4          // br
 
     // Exact scalar bottom sum: bl + bm + bm + br
     vadd.f32 q14, q0, q1
     vadd.f32 q14, q14, q1
-    vadd.f32 q14, q14, q2        @ bottom sum
-    vsub.f32 q3, q14, q3         @ dyRel
-    vmov    q14, q3               @ preserve dyRel while recomputing dx
+    vadd.f32 q14, q14, q2        // bottom sum
+    vsub.f32 q3, q14, q3         // dyRel
+    vmov    q14, q3               // preserve dyRel while recomputing dx
 
     // Recompute dx with the exact scalar order:
     //   (tr + mr) + mr + br - ((tl + ml) + ml + bl)
     vld1.32 {q0}, [r8]
     vshr.u32 q0, q0, #24
     vcvt.f32.u32 q0, q0
-    vmul.f32 q0, q0, q4          @ tl
+    vmul.f32 q0, q0, q4          // tl
 
     add     r12, r8, #8
     vld1.32 {q1}, [r12]
     vshr.u32 q1, q1, #24
     vcvt.f32.u32 q1, q1
-    vmul.f32 q1, q1, q4          @ tr
+    vmul.f32 q1, q1, q4          // tr
 
     vld1.32 {q2}, [r9]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ ml
+    vmul.f32 q2, q2, q4          // ml
 
     add     r12, r9, #8
     vld1.32 {q3}, [r12]
     vshr.u32 q3, q3, #24
     vcvt.f32.u32 q3, q3
-    vmul.f32 q3, q3, q4          @ mr
+    vmul.f32 q3, q3, q4          // mr
 
-    vadd.f32 q0, q0, q2         @ tl + ml
-    vadd.f32 q0, q0, q2         @ (tl + ml) + ml
-    vadd.f32 q1, q1, q3         @ tr + mr
-    vadd.f32 q1, q1, q3         @ (tr + mr) + mr
+    vadd.f32 q0, q0, q2         // tl + ml
+    vadd.f32 q0, q0, q2         // (tl + ml) + ml
+    vadd.f32 q1, q1, q3         // tr + mr
+    vadd.f32 q1, q1, q3         // (tr + mr) + mr
 
     add     r12, r10, #0
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ bl
-    vadd.f32 q0, q0, q2         @ + bl
+    vmul.f32 q2, q2, q4          // bl
+    vadd.f32 q0, q0, q2         // + bl
 
     add     r12, r10, #8
     vld1.32 {q2}, [r12]
     vshr.u32 q2, q2, #24
     vcvt.f32.u32 q2, q2
-    vmul.f32 q2, q2, q4          @ br
-    vadd.f32 q1, q1, q2         @ + br
-    vsub.f32 q0, q1, q0         @ dxRel
-    vmov    q3, q14              @ restore dyRel
+    vmul.f32 q2, q2, q4          // br
+    vadd.f32 q1, q1, q2         // + br
+    vsub.f32 q0, q1, q0         // dxRel
+    vmov    q3, q14              // restore dyRel
 
     // ---- Apply per-axis scale ----
-    vmul.f32 q0, q0, q5          @ q0 = dx
-    vmul.f32 q1, q3, q6          @ q1 = dy
+    vmul.f32 q0, q0, q5          // q0 = dx
+    vmul.f32 q1, q3, q6          // q1 = dy
     // ---- Normalize exactly like Kotlin reference ----
-    vneg.f32 q0, q0              @ nx0
-    vneg.f32 q1, q1              @ ny0
+    vneg.f32 q0, q0              // nx0
+    vneg.f32 q1, q1              // ny0
     vmul.f32 q2, q0, q0
     vmul.f32 q3, q1, q1
     vadd.f32 q2, q2, q3
     vmov.f32 q14, #1.0
-    vadd.f32 q2, q2, q14         @ nLen^2
+    vadd.f32 q2, q2, q14         // nLen^2
 
     vsqrt.f32 s12, s8
     vsqrt.f32 s13, s9
@@ -666,9 +666,9 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vdiv.f32 s15, s11, s15
 
     // q3 now contains invLen = 1/nLen.
-    vmul.f32 q0, q0, q3          @ normalized nx
-    vmul.f32 q1, q1, q3          @ normalized ny
-    vmov q14, q3                 @ normalized nz = invLen
+    vmul.f32 q0, q0, q3          // normalized nx
+    vmul.f32 q1, q1, q3          // normalized ny
+    vmov q14, q3                 // normalized nz = invLen
 
     // Kotlin dot with the half vector h (q8-q10): nx*hx + ny*hy + nz*hz
     vmul.f32 q2, q0, q8
@@ -676,7 +676,7 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vadd.f32 q2, q2, q15
     vmul.f32 q15, q14, q10
     vadd.f32 q2, q2, q15
-    vmov.f32 q14, #1.0           @ restore one
+    vmov.f32 q14, #1.0           // restore one
 
     // ---- ndoth = max(dot, 0) ----
     veor    q15, q15, q15
@@ -730,24 +730,24 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vdup.32 q9, d16[1]
     vldr    d17, [sp, #32]
     vdup.32 q10, d17[0]
-    vldr    d18, [r5, #-8]       @ lr | lg
-    vldr    d19, [r5, #0]        @ lb | ss
-    vdup.32 q11, d18[0]          @ lr
-    vdup.32 q12, d18[1]          @ lg
-    vdup.32 q13, d19[0]          @ lb
-    vmov.f32 q14, #1.0           @ one
+    vldr    d18, [r5, #-8]       // lr | lg
+    vldr    d19, [r5, #0]        // lb | ss
+    vdup.32 q11, d18[0]          // lr
+    vdup.32 q12, d18[1]          // lg
+    vdup.32 q13, d19[0]          // lb
+    vmov.f32 q14, #1.0           // one
 
     // ---- intensity = clamp01(k * p) ----
     vld1.32 {q2}, [sp]
-    vmul.f32 q2, q2, q7          @ k * p
+    vmul.f32 q2, q2, q7          // k * p
     veor    q15, q15, q15
     vmax.f32 q2, q2, q15
-    vmin.f32 q2, q2, q14         @ q2 = intensity
+    vmin.f32 q2, q2, q14         // q2 = intensity
 
     // ---- Pack ARGB (linear-light bytes) ----
-    vmul.f32 q1, q2, q11          @ outR
-    vmul.f32 q0, q2, q12          @ outG
-    vmul.f32 q3, q2, q13          @ outB
+    vmul.f32 q1, q2, q11          // outR
+    vmul.f32 q0, q2, q12          // outG
+    vmul.f32 q3, q2, q13          // outB
     vmov.f32 q14, #0.5
     vadd.f32 q1, q1, q14
     vadd.f32 q0, q0, q14
@@ -759,21 +759,21 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vshl.u32 q1, q1, #16
     vshl.u32 q0, q0, #8
     vorr    q3, q3, q1
-    vorr    q3, q3, q0            @ q3 = [0, R, G, B]
+    vorr    q3, q3, q0            // q3 = [0, R, G, B]
 
     // alpha = max(R,G,B) of the LINEAR bytes, computed PRE-LUT (monotonic
     // LUT preserves the max through the conversion below).
     mov     r7, #0xFF
     vdup.32 q0, r7
-    vand    q1, q3, q0            @ B
+    vand    q1, q3, q0            // B
     vshr.u32 q15, q3, #8
-    vand    q15, q15, q0          @ G
+    vand    q15, q15, q0          // G
     vshr.u32 q2, q3, #16
-    vand    q2, q2, q0            @ R
+    vand    q2, q2, q0            // R
     vmax.u8 q1, q1, q15
     vmax.u8 q1, q1, q2
     vshl.u32 q1, q1, #24
-    vorr    q3, q3, q1            @ alpha = max(Rlin,Glin,Blin)
+    vorr    q3, q3, q1            // alpha = max(Rlin,Glin,Blin)
 
     // ---- Linear -> sRGB (scalar LUT lookups, all 4 bytes incl alpha) ----
     vmov    r7, s12
@@ -790,7 +790,7 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     add     r10, r10, #16
     subs    r4, r4, #4
     bne     .Llin_loop
-    b       .Llin_done              @ loop done: sp is offset by #40, use .Llin_done
+    b       .Llin_done              // loop done: sp is offset by #40, use .Llin_done
 
 .Llin_exit0:
     vpop    {d8-d15}

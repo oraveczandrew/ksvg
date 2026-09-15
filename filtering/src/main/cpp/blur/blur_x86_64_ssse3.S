@@ -1,21 +1,20 @@
 /*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
+ * Copyright 2026 András Oravecz <info@oandras.hu>
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "asm_macros.S"
-
 
 .text
 .p2align 4
@@ -26,10 +25,10 @@
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 
 .globl SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3)
-TYPE(SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3),@function)
+TYPE(SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3), @function)
 SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3):
     push %r12
-    # rdi=dst rsi=pin edx=stride rcx=gptr r8d=rct r9d=x1; after push, x2 is at [rsp+16]
+    // rdi=dst rsi=pin edx=stride rcx=gptr r8d=rct r9d=x1; after push, x2 is at [rsp+16]
     mov 16(%rsp), %r10d
     movslq %edx, %rdx
     movdqa .Lcvte_mask(%rip), %xmm7
@@ -38,7 +37,7 @@ SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3):
 .LV_pair:
     mov %r9d, %eax
     shl $2, %rax
-    lea (%rsi,%rax), %r11
+    lea (%rsi, %rax), %r11
     pxor %xmm0, %xmm0
     pxor %xmm1, %xmm1
     xor %eax, %eax
@@ -70,13 +69,13 @@ SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3):
 .LV_done:
     pop %r12
     ret
-//// SIZE(SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3))
+// SIZE(SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3))
 
 .globl SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3)
-TYPE(SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3),@function)
+TYPE(SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3), @function)
 SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3):
     push %r12
-    # rdi=dst rsi=pin rdx=gptr ecx=rct r8d=x1 r9d=x2
+    // rdi=dst rsi=pin rdx=gptr ecx=rct r8d=x1 r9d=x2
     cmp %r9d, %r8d
     jge .LH_done
     movdqa .Lpack_mask(%rip), %xmm7
@@ -84,7 +83,7 @@ SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3):
 .LH_pixel:
     mov %r8d, %eax
     shl $4, %rax
-    lea (%rsi,%rax), %r11
+    lea (%rsi, %rax), %r11
     movss (%r12), %xmm0
     shufps $0, %xmm0, %xmm0
     movups (%r11), %xmm1
@@ -113,5 +112,4 @@ SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3):
 .LH_done:
     pop %r12
     ret
-//// SIZE(SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3))
-GNU_STACK
+// SIZE(SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3))

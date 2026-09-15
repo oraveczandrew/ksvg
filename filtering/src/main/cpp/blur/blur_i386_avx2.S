@@ -1,21 +1,20 @@
 /*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
+ * Copyright 2026 András Oravecz <info@oandras.hu>
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "asm_macros.S"
-
 
 .text
 .p2align 5
@@ -40,7 +39,7 @@
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 
 .globl SYM(ksvgBlurVerticalAvx2_i386)
-TYPE(SYM(ksvgBlurVerticalAvx2_i386),@function)
+TYPE(SYM(ksvgBlurVerticalAvx2_i386), @function)
 SYM(ksvgBlurVerticalAvx2_i386):
     pushl %ebp
     pushl %ebx
@@ -57,7 +56,7 @@ SYM(ksvgBlurVerticalAvx2_i386):
     movl 176(%esp), %ebp
     movl 180(%esp), %eax
     movl %eax, 128(%esp)
-    leal (%esi,%ebp,4), %esi
+    leal (%esi, %ebp, 4), %esi
 
     call 1f
 1:  popl %eax
@@ -78,13 +77,13 @@ SYM(ksvgBlurVerticalAvx2_i386):
     jge .AV_done
 .AV_group:
     movl %esi, 132(%esp)
-    vxorps %ymm0,%ymm0,%ymm0
-    vxorps %ymm1,%ymm1,%ymm1
-    vxorps %ymm2,%ymm2,%ymm2
-    vxorps %ymm3,%ymm3,%ymm3
+    vxorps %ymm0, %ymm0, %ymm0
+    vxorps %ymm1, %ymm1, %ymm1
+    vxorps %ymm2, %ymm2, %ymm2
+    vxorps %ymm3, %ymm3, %ymm3
 
     movl 168(%esp), %ecx
-    leal (%ecx,%ebx,4), %eax             # weight end
+    leal (%ecx, %ebx, 4), %eax             # weight end
 .AV_row:
     vbroadcastss (%ecx), %ymm4
     vmovdqu (%esi), %ymm5
@@ -114,45 +113,45 @@ SYM(ksvgBlurVerticalAvx2_i386):
     cmpl %eax, %ecx
     jne .AV_row
 
-    vunpcklps %ymm1,%ymm0,%ymm4
-    vunpckhps %ymm1,%ymm0,%ymm5
-    vunpcklps %ymm3,%ymm2,%ymm6
-    vunpckhps %ymm3,%ymm2,%ymm7
-    vshufps $0x44,%ymm6,%ymm4,%ymm0
-    vshufps $0xEE,%ymm6,%ymm4,%ymm1
-    vshufps $0x44,%ymm7,%ymm5,%ymm2
-    vshufps $0xEE,%ymm7,%ymm5,%ymm3
-    vmovups %xmm0,0(%edi)
-    vmovups %xmm1,16(%edi)
-    vmovups %xmm2,32(%edi)
-    vmovups %xmm3,48(%edi)
-    vextractf128 $1,%ymm0,%xmm0
-    vextractf128 $1,%ymm1,%xmm1
-    vextractf128 $1,%ymm2,%xmm2
-    vextractf128 $1,%ymm3,%xmm3
-    vmovups %xmm0,64(%edi)
-    vmovups %xmm1,80(%edi)
-    vmovups %xmm2,96(%edi)
-    vmovups %xmm3,112(%edi)
+    vunpcklps %ymm1, %ymm0, %ymm4
+    vunpckhps %ymm1, %ymm0, %ymm5
+    vunpcklps %ymm3, %ymm2, %ymm6
+    vunpckhps %ymm3, %ymm2, %ymm7
+    vshufps $0x44, %ymm6, %ymm4, %ymm0
+    vshufps $0xEE, %ymm6, %ymm4, %ymm1
+    vshufps $0x44, %ymm7, %ymm5, %ymm2
+    vshufps $0xEE, %ymm7, %ymm5, %ymm3
+    vmovups %xmm0, 0(%edi)
+    vmovups %xmm1, 16(%edi)
+    vmovups %xmm2, 32(%edi)
+    vmovups %xmm3, 48(%edi)
+    vextractf128 $1, %ymm0, %xmm0
+    vextractf128 $1, %ymm1, %xmm1
+    vextractf128 $1, %ymm2, %xmm2
+    vextractf128 $1, %ymm3, %xmm3
+    vmovups %xmm0, 64(%edi)
+    vmovups %xmm1, 80(%edi)
+    vmovups %xmm2, 96(%edi)
+    vmovups %xmm3, 112(%edi)
 
     movl 132(%esp), %esi
-    addl $8,%esi
-    addl $128,%edi
-    addl $8,%ebp
-    cmpl 128(%esp),%ebp
+    addl $8, %esi
+    addl $128, %edi
+    addl $8, %ebp
+    cmpl 128(%esp), %ebp
     jl .AV_group
 .AV_done:
     vzeroupper
-    addl $136,%esp
+    addl $136, %esp
     popl %edi
     popl %esi
     popl %ebx
     popl %ebp
     ret
-//// SIZE(SYM(ksvgBlurVerticalAvx2_i386))
+// SIZE(SYM(ksvgBlurVerticalAvx2_i386))
 
 .globl SYM(ksvgBlurHorizontalAvx2_i386)
-TYPE(SYM(ksvgBlurHorizontalAvx2_i386),@function)
+TYPE(SYM(ksvgBlurHorizontalAvx2_i386), @function)
 SYM(ksvgBlurHorizontalAvx2_i386):
     pushl %ebp
     pushl %ebx
@@ -173,8 +172,8 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     vmovdqu (%eax), %ymm7
 
     # current input = pin + x1*16
-    leal (%esi,%ebp,8), %eax
-    leal (%eax,%ebp,8), %esi
+    leal (%esi, %ebp, 8), %eax
+    leal (%eax, %ebp, 8), %esi
 
 .AH_pair_check:
     movl %ebp, %eax
@@ -199,57 +198,56 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     decl %eax
     jnz .AH_row
 .AH_pair_store:
-    vcvtps2dq %ymm1,%ymm1
-    vpshufb %ymm7,%ymm1,%ymm1
-    vmovd %xmm1,(%edi)
-    vextracti128 $1,%ymm1,%xmm2
-    vmovd %xmm2,4(%edi)
-    addl $8,%edi
+    vcvtps2dq %ymm1, %ymm1
+    vpshufb %ymm7, %ymm1, %ymm1
+    vmovd %xmm1, (%edi)
+    vextracti128 $1, %ymm1, %xmm2
+    vmovd %xmm2, 4(%edi)
+    addl $8, %edi
 
-    addl $2,%ebp
+    addl $2, %ebp
     # Reconstruct next pair source directly. This avoids carrying a row-end pointer.
     movl 28(%esp), %esi
     movl %ebp, %eax
-    leal (%esi,%eax,8), %esi
-    leal (%esi,%eax,8), %esi
+    leal (%esi, %eax, 8), %esi
+    leal (%esi, %eax, 8), %esi
     jmp .AH_pair_check
 
 .AH_tail:
-    cmpl %ebx,%ebp
+    cmpl %ebx, %ebp
     jge .AH_done
     movl 28(%esp), %esi
-    movl %ebp,%eax
-    leal (%esi,%eax,8),%esi
-    leal (%esi,%eax,8),%esi
-    movl 32(%esp),%edx
-    movl %ecx,%eax
-    vbroadcastss (%edx),%xmm0
-    movups (%esi),%xmm1
-    mulps %xmm0,%xmm1
-    addl $4,%edx
+    movl %ebp, %eax
+    leal (%esi, %eax, 8), %esi
+    leal (%esi, %eax, 8), %esi
+    movl 32(%esp), %edx
+    movl %ecx, %eax
+    vbroadcastss (%edx), %xmm0
+    movups (%esi), %xmm1
+    mulps %xmm0, %xmm1
+    addl $4, %edx
     decl %eax
     jz .AH_tail_store
 .AH_tail_row:
-    addl $16,%esi
-    movss (%edx),%xmm0
-    shufps $0,%xmm0,%xmm0
-    movups (%esi),%xmm2
-    mulps %xmm0,%xmm2
-    addps %xmm2,%xmm1
-    addl $4,%edx
+    addl $16, %esi
+    movss (%edx), %xmm0
+    shufps $0, %xmm0, %xmm0
+    movups (%esi), %xmm2
+    mulps %xmm0, %xmm2
+    addps %xmm2, %xmm1
+    addl $4, %edx
     decl %eax
     jnz .AH_tail_row
 .AH_tail_store:
-    cvtps2dq %xmm1,%xmm1
-    pshufb %xmm7,%xmm1
-    movd %xmm1,(%edi)
+    cvtps2dq %xmm1, %xmm1
+    pshufb %xmm7, %xmm1
+    movd %xmm1, (%edi)
 .AH_done:
     vzeroupper
-    addl $4,%esp
+    addl $4, %esp
     popl %edi
     popl %esi
     popl %ebx
     popl %ebp
     ret
-//// SIZE(SYM(ksvgBlurHorizontalAvx2_i386))
-GNU_STACK
+// SIZE(SYM(ksvgBlurHorizontalAvx2_i386))

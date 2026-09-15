@@ -1,49 +1,48 @@
 /*
- *    Copyright 2026 András Oravecz <info@oandras.hu>
+ * Copyright 2026 András Oravecz <info@oandras.hu>
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "asm_macros.S"
 
-
 .text
 .globl SYM(ksvgConvolveApplyInteriorAvx2)
 TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
-SYM(ksvgConvolveApplyInteriorAvx2):
-    # preserveAlpha is the 10th integer argument: 48(%rsp)
+    SYM(ksvgConvolveApplyInteriorAvx2):
+    // preserveAlpha is the 10th integer argument: 48(%rsp)
     cmpl    $0, 32(%rsp)
     je      .Lbest_false
     jmp     .Lbest_true
-//// SIZE(SYM(ksvgConvolveApplyInteriorAvx2))
+    // // SIZE(SYM(ksvgConvolveApplyInteriorAvx2))
 
-RODATA
+    RODATA
 .p2align 5
 .Lbest_maskB:
-    .byte 0,128,128,128, 4,128,128,128, 8,128,128,128, 12,128,128,128
-    .byte 16,128,128,128, 20,128,128,128, 24,128,128,128, 28,128,128,128
+.byte 0, 128, 128, 128, 4, 128, 128, 128, 8, 128, 128, 128, 12, 128, 128, 128
+.byte 16, 128, 128, 128, 20, 128, 128, 128, 24, 128, 128, 128, 28, 128, 128, 128
 .Lbest_maskG:
-    .byte 1,128,128,128, 5,128,128,128, 9,128,128,128, 13,128,128,128
-    .byte 17,128,128,128, 21,128,128,128, 25,128,128,128, 29,128,128,128
+.byte 1, 128, 128, 128, 5, 128, 128, 128, 9, 128, 128, 128, 13, 128, 128, 128
+.byte 17, 128, 128, 128, 21, 128, 128, 128, 25, 128, 128, 128, 29, 128, 128, 128
 .Lbest_maskR:
-    .byte 2,128,128,128, 6,128,128,128, 10,128,128,128, 14,128,128,128
-    .byte 18,128,128,128, 22,128,128,128, 26,128,128,128, 30,128,128,128
+.byte 2, 128, 128, 128, 6, 128, 128, 128, 10, 128, 128, 128, 14, 128, 128, 128
+.byte 18, 128, 128, 128, 22, 128, 128, 128, 26, 128, 128, 128, 30, 128, 128, 128
 .Lbest_255f:
-    .long 0x437f0000
+.long 0x437f0000
 .Lbest_half:
-    .long 0x3f000000
+.long 0x3f000000
 .Lbest_255i:
-    .long 255
+.long 255
 
 .text
 .p2align 4
@@ -56,39 +55,39 @@ RODATA
     pushq   %rbx
     subq    $24, %rsp
 
-    movq    %rdi, %r13              # dst base / current dst row
-    movq    %rsi, %r12              # src base / current src row
-    movq    %r8,  %r15              # kernel base
-    movl    %r9d, %ebx              # orderX
-    movl    80(%rsp), %ebp          # orderY
-    movl    88(%rsp), %r10d         # targetX
-    movl    96(%rsp), %r11d         # targetY
-    movslq  %edx, %r14              # width -> stride bytes below
+    movq    %rdi, %r13  // dst base / current dst row
+    movq    %rsi, %r12  // src base / current src row
+    movq    %r8, %r15  // kernel base
+    movl    %r9d, %ebx  // orderX
+    movl    80(%rsp), %ebp  // orderY
+    movl    88(%rsp), %r10d  // targetX
+    movl    96(%rsp), %r11d  // targetY
+    movslq  %edx, %r14  // width -> stride bytes below
 
-    # xHi = width - orderX + 1 + targetX
+    // xHi = width - orderX + 1 + targetX
     movl    %edx, %eax
     subl    %ebx, %eax
-    leal    1(%rax,%r10,1), %eax
-    # fullEnd = targetX + ((xHi-targetX) & ~7)
+    leal    1(%rax, %r10, 1), %eax
+    // fullEnd = targetX + ((xHi-targetX) & ~7)
     subl    %r10d, %eax
     andl    $-8, %eax
     addl    %r10d, %eax
-    movl    %eax, %r9d              # r9d = fullEnd (returned)
+    movl    %eax, %r9d  // r9d = fullEnd (returned)
 
-    # stride bytes = width * 4
-    leaq    (,%r14,4), %r14
+    // stride bytes = width * 4
+    leaq    (, %r14, 4), %r14
     movq    %rbx, %rax
     shlq    $2, %rax
     movq    %r14, %r8
-    subq    %rax, %r8                    # rowAdvance = stride - orderX*4
+    subq    %rax, %r8  // rowAdvance = stride - orderX*4
 
-    # Save targetX*4 as a row-invariant local.
+    // Save targetX*4 as a row-invariant local.
     movslq  %r10d, %rax
     shlq    $2, %rax
     movq    %rax, (%rsp)
 
-    # Save end source row. Current source row starts at yLo-targetY=0,
-    # so the number of output rows is height-orderY+1 (targetY cancels).
+    // Save end source row. Current source row starts at yLo-targetY=0,
+    // so the number of output rows is height-orderY+1 (targetY cancels).
     movl    %ecx, %eax
     subl    %ebp, %eax
     incl    %eax
@@ -97,62 +96,62 @@ RODATA
     addq    %r12, %rax
     movq    %rax, 8(%rsp)
 
-    # yLo == targetY, so first source row is src + (yLo-targetY)*stride = src.
-    # First destination row is dst + targetY*stride.
+    // yLo == targetY, so first source row is src + (yLo-targetY)*stride = src.
+    // First destination row is dst + targetY*stride.
     movslq  %r11d, %rax
     imulq   %r14, %rax
     movq    %rax, 16(%rsp)
     addq    %rax, %r13
 
-    # Constants.
+    // Constants.
     vbroadcastss .Lbest_half(%rip), %ymm11
     vpbroadcastd .Lbest_255i(%rip), %ymm7
-    vpxor       %xmm8, %xmm8, %xmm8              # zero
-    vbroadcastss %xmm0, %ymm9                    # divisor
-    vmulss      .Lbest_255f(%rip), %xmm1, %xmm1
-    vbroadcastss %xmm1, %ymm6                    # bias255
-    vmovdqa     .Lbest_maskB(%rip), %ymm12
-    vmovdqa     .Lbest_maskG(%rip), %ymm13
-    vmovdqa     .Lbest_maskR(%rip), %ymm14
+    vpxor   %xmm8, %xmm8, %xmm8  // zero
+    vbroadcastss %xmm0, %ymm9  // divisor
+    vmulss  .Lbest_255f(%rip), %xmm1, %xmm1
+    vbroadcastss %xmm1, %ymm6  // bias255
+    vmovdqa .Lbest_maskB(%rip), %ymm12
+    vmovdqa .Lbest_maskG(%rip), %ymm13
+    vmovdqa .Lbest_maskR(%rip), %ymm14
 
-    # x starts at targetX; source block starts at current source row + targetX*4.
+    // x starts at targetX; source block starts at current source row + targetX*4.
 .Ltrue_y:
     movq    (%rsp), %rax
-    movq    %r12, %rsi               # src block: x-targetX, so first block is row start
-    leaq    (%r13,%rax), %r10       # dst block pointer
-    movl    88(%rsp), %edi          # x = targetX
+    movq    %r12, %rsi  // src block: x-targetX, so first block is row start
+    leaq    (%r13, %rax), %r10  // dst block pointer
+    movl    88(%rsp), %edi  // x = targetX
 
 .Ltrue_x:
     cmpl    %r9d, %edi
     jge     .Ltrue_next_y
 
-    # Accumulators: ymm0=B, ymm1=G, ymm2=R.
+    // Accumulators: ymm0=B, ymm1=G, ymm2=R.
     vxorps  %xmm0, %xmm0, %xmm0
     vxorps  %xmm1, %xmm1, %xmm1
     vxorps  %xmm2, %xmm2, %xmm2
-    vxorps  %xmm3, %xmm3, %xmm3          # unused alpha accumulator; keeps register map simple
+    vxorps  %xmm3, %xmm3, %xmm3  // unused alpha accumulator; keeps register map simple
 
-    movq    %rsi, %rdx                    # tap source row
-    movq    %r15, %rcx                    # tap kernel row
-    xorl    %eax, %eax                    # ky = 0
+    movq    %rsi, %rdx  // tap source row
+    movq    %r15, %rcx  // tap kernel row
+    xorl    %eax, %eax  // ky = 0
 
 .Ltrue_ky:
-    xorl    %r11d, %r11d                  # kx = 0
+    xorl    %r11d, %r11d  // kx = 0
 .Ltrue_kx:
-    vmovdqu  (%rdx), %ymm4               # 8 pixels
+    vmovdqu (%rdx), %ymm4  // 8 pixels
     vbroadcastss (%rcx), %ymm5
 
-    vpand   %ymm7, %ymm4, %ymm15         # B
+    vpand   %ymm7, %ymm4, %ymm15  // B
     vcvtdq2ps %ymm15, %ymm15
     vmulps  %ymm15, %ymm5, %ymm15
     vaddps  %ymm15, %ymm0, %ymm0
 
-    vpshufb %ymm13, %ymm4, %ymm15         # G
+    vpshufb %ymm13, %ymm4, %ymm15  // G
     vcvtdq2ps %ymm15, %ymm15
     vmulps  %ymm15, %ymm5, %ymm15
     vaddps  %ymm15, %ymm1, %ymm1
 
-    vpshufb %ymm14, %ymm4, %ymm15         # R
+    vpshufb %ymm14, %ymm4, %ymm15  // R
     vcvtdq2ps %ymm15, %ymm15
     vmulps  %ymm15, %ymm5, %ymm15
     vaddps  %ymm15, %ymm2, %ymm2
@@ -163,12 +162,12 @@ RODATA
     cmpl    %ebx, %r11d
     jne     .Ltrue_kx
 
-    addq    %r8, %rdx                    # next source row
+    addq    %r8, %rdx  // next source row
     incl    %eax
     cmpl    %ebp, %eax
     jne     .Ltrue_ky
 
-    # Round + clamp R/G/B, exact order matching intrinsic implementation.
+    // Round + clamp R/G/B, exact order matching intrinsic implementation.
     vdivps  %ymm9, %ymm2, %ymm2
     vaddps  %ymm6, %ymm2, %ymm2
     vaddps  %ymm11, %ymm2, %ymm2
@@ -193,15 +192,15 @@ RODATA
     vpmaxsd %ymm8, %ymm0, %ymm0
     vpminsd %ymm7, %ymm0, %ymm0
 
-    # Preserve alpha from center source pixel: srcRow + targetX*4 + current x*4.
+    // Preserve alpha from center source pixel: srcRow + targetX*4 + current x*4.
     movslq  %edi, %rax
     shlq    $2, %rax
     addq    16(%rsp), %rax
-    vmovdqu (%r12,%rax), %ymm3
+    vmovdqu (%r12, %rax), %ymm3
     vpsrld  $24, %ymm3, %ymm3
 
     vpslld  $16, %ymm2, %ymm2
-    vpslld  $8,  %ymm1, %ymm1
+    vpslld  $8, %ymm1, %ymm1
     vpor    %ymm1, %ymm0, %ymm0
     vpor    %ymm2, %ymm0, %ymm0
     vpslld  $24, %ymm3, %ymm3
@@ -219,7 +218,7 @@ RODATA
     cmpq    8(%rsp), %r12
     jb      .Ltrue_y
 
-    movl    %r9d, %eax                  # return tailX/fullEnd
+    movl    %r9d, %eax  // return tailX/fullEnd
     addq    $24, %rsp
     popq    %rbx
     popq    %r12
@@ -242,7 +241,7 @@ RODATA
 
     movq    %rdi, %r13
     movq    %rsi, %r12
-    movq    %r8,  %r15
+    movq    %r8, %r15
     movl    %r9d, %ebx
     movl    80(%rsp), %ebp
     movl    88(%rsp), %r10d
@@ -251,17 +250,17 @@ RODATA
 
     movl    %edx, %eax
     subl    %ebx, %eax
-    leal    1(%rax,%r10,1), %eax
+    leal    1(%rax, %r10, 1), %eax
     subl    %r10d, %eax
     andl    $-8, %eax
     addl    %r10d, %eax
     movl    %eax, %r9d
 
-    leaq    (,%r14,4), %r14
+    leaq    (, %r14, 4), %r14
     movq    %rbx, %rax
     shlq    $2, %rax
     movq    %r14, %r8
-    subq    %rax, %r8                    # rowAdvance = stride - orderX*4
+    subq    %rax, %r8  // rowAdvance = stride - orderX*4
 
     movslq  %r10d, %rax
     shlq    $2, %rax
@@ -282,28 +281,28 @@ RODATA
 
     vbroadcastss .Lbest_half(%rip), %ymm11
     vpbroadcastd .Lbest_255i(%rip), %ymm7
-    vpxor       %xmm8, %xmm8, %xmm8
+    vpxor   %xmm8, %xmm8, %xmm8
     vbroadcastss %xmm0, %ymm9
-    vmulss      .Lbest_255f(%rip), %xmm1, %xmm1
+    vmulss  .Lbest_255f(%rip), %xmm1, %xmm1
     vbroadcastss %xmm1, %ymm6
-    vmovdqa     .Lbest_maskB(%rip), %ymm12
-    vmovdqa     .Lbest_maskG(%rip), %ymm13
-    vmovdqa     .Lbest_maskR(%rip), %ymm14
+    vmovdqa .Lbest_maskB(%rip), %ymm12
+    vmovdqa .Lbest_maskG(%rip), %ymm13
+    vmovdqa .Lbest_maskR(%rip), %ymm14
 
 .Lfalse_y:
     movq    (%rsp), %rax
     movq    %r12, %rsi
-    leaq    (%r13,%rax), %r10
+    leaq    (%r13, %rax), %r10
     movl    88(%rsp), %edi
 
 .Lfalse_x:
     cmpl    %r9d, %edi
     jge     .Lfalse_next_y
 
-    vxorps  %xmm0, %xmm0, %xmm0           # B
-    vxorps  %xmm1, %xmm1, %xmm1           # G
-    vxorps  %xmm2, %xmm2, %xmm2           # R
-    vxorps  %xmm3, %xmm3, %xmm3           # A
+    vxorps  %xmm0, %xmm0, %xmm0  // B
+    vxorps  %xmm1, %xmm1, %xmm1  // G
+    vxorps  %xmm2, %xmm2, %xmm2  // R
+    vxorps  %xmm3, %xmm3, %xmm3  // A
 
     movq    %rsi, %rdx
     movq    %r15, %rcx
@@ -346,7 +345,7 @@ RODATA
     cmpl    %ebp, %eax
     jne     .Lfalse_ky
 
-    # R
+    // R
     vdivps  %ymm9, %ymm2, %ymm2
     vaddps  %ymm6, %ymm2, %ymm2
     vaddps  %ymm11, %ymm2, %ymm2
@@ -354,7 +353,7 @@ RODATA
     vcvttps2dq %ymm2, %ymm2
     vpmaxsd %ymm8, %ymm2, %ymm2
     vpminsd %ymm7, %ymm2, %ymm2
-    # G
+    // G
     vdivps  %ymm9, %ymm1, %ymm1
     vaddps  %ymm6, %ymm1, %ymm1
     vaddps  %ymm11, %ymm1, %ymm1
@@ -362,7 +361,7 @@ RODATA
     vcvttps2dq %ymm1, %ymm1
     vpmaxsd %ymm8, %ymm1, %ymm1
     vpminsd %ymm7, %ymm1, %ymm1
-    # B
+    // B
     vdivps  %ymm9, %ymm0, %ymm0
     vaddps  %ymm6, %ymm0, %ymm0
     vaddps  %ymm11, %ymm0, %ymm0
@@ -370,7 +369,7 @@ RODATA
     vcvttps2dq %ymm0, %ymm0
     vpmaxsd %ymm8, %ymm0, %ymm0
     vpminsd %ymm7, %ymm0, %ymm0
-    # A
+    // A
     vdivps  %ymm9, %ymm3, %ymm3
     vaddps  %ymm6, %ymm3, %ymm3
     vaddps  %ymm11, %ymm3, %ymm3
@@ -382,7 +381,7 @@ RODATA
     vpslld  $24, %ymm3, %ymm3
     vpslld  $16, %ymm2, %ymm2
     vpor    %ymm3, %ymm2, %ymm2
-    vpslld  $8,  %ymm1, %ymm1
+    vpslld  $8, %ymm1, %ymm1
     vpor    %ymm1, %ymm0, %ymm0
     vpor    %ymm0, %ymm2, %ymm0
     vmovdqu %ymm0, (%r10)
