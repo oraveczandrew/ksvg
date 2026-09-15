@@ -125,9 +125,15 @@ TYPE(SYM(ksvgDisplacementMapApplyAvx2_i386), @function)
     test    edx, edx
     jle     .Ldone_\LABEL
 
-    vmovdqa ymm1, YMMWORD PTR [ebp+DM_MASK_OFF]
-    vmovups ymm2, YMMWORD PTR [ebp+DM_HALF_OFF]
-    vmovups ymm3, YMMWORD PTR [ebp+DM_255_OFF]
+        /* Precompute the clamp bounds: width/height never change during the
+         * call, so width-1 / height-1 are materialized once here instead of
+         * being recomputed (with a 1's vector) on every 8-pixel iteration.
+         * Slots [esp+24]/[esp+28] are otherwise unused (tail uses +0..+20). */
+    lea     eax, [ecx-1]
+    mov     DWORD PTR [esp+24], eax /* width - 1 */
+    lea     eax, [edx-1]
+    mov     DWORD PTR [esp+28], eax /* height - 1 */
+
     vmovss  xmm4, DWORD PTR [esp+72]
     vbroadcastss ymm4, xmm4
 
@@ -148,35 +154,33 @@ TYPE(SYM(ksvgDisplacementMapApplyAvx2_i386), @function)
     vmovdqa ymm6, ymm5
 
     vpsrld  ymm6, ymm6, \SHIFTX
-    vpand   ymm6, ymm6, ymm1
+    vpand   ymm6, ymm6, YMMWORD PTR [ebp+DM_MASK_OFF]
     vpsrld  ymm5, ymm5, \SHIFTY
-    vpand   ymm5, ymm5, ymm1
+    vpand   ymm5, ymm5, YMMWORD PTR [ebp+DM_MASK_OFF]
 
-        /* dx = (int)(scale * ((channel / 255.0f) - 0.5f)). */
+        /* dx = (int)(scale * ((channel / 255.0f) - 0.5f)).
+         * 255.0f / 0.5f are read from the constant pool every iteration:
+         * the ymm2/ymm3 registers are reused below for the width-1/height-1
+         * clamp bounds, so they do NOT hold these floats from iteration 2 on.
+         * Memory forms mirror the everywhere-reloaded channel mask. */
     vcvtdq2ps ymm6, ymm6
-    vdivps  ymm6, ymm6, ymm3
-    vsubps  ymm6, ymm6, ymm2
+    vdivps  ymm6, ymm6, YMMWORD PTR [ebp+DM_255_OFF]
+    vsubps  ymm6, ymm6, YMMWORD PTR [ebp+DM_HALF_OFF]
     vmulps  ymm6, ymm6, ymm4
     vcvttps2dq ymm6, ymm6
 
         /* dy */
     vcvtdq2ps ymm5, ymm5
-    vdivps  ymm5, ymm5, ymm3
-    vsubps  ymm5, ymm5, ymm2
+    vdivps  ymm5, ymm5, YMMWORD PTR [ebp+DM_255_OFF]
+    vsubps  ymm5, ymm5, YMMWORD PTR [ebp+DM_HALF_OFF]
     vmulps  ymm5, ymm5, ymm4
     vcvttps2dq ymm5, ymm5
 
-        /* Old floating constants are dead.  Reuse the registers for clamp/index. */
+        /* The float constants are dead.  Reuse the registers for clamp/index. */
     vpxor   ymm1, ymm1, ymm1 /* zero */
-    vpcmpeqd ymm7, ymm7, ymm7
-    vpsrld  ymm7, ymm7, 31 /* 1 */
-
-    vmovd   xmm2, ecx
-    vpbroadcastd ymm2, xmm2
-    vpsubd  ymm2, ymm2, ymm7 /* width - 1 */
-    vmovd   xmm3, DWORD PTR [esp+68]
-    vpbroadcastd ymm3, DWORD PTR [esp+68]
-    vpsubd  ymm3, ymm3, ymm7 /* height - 1 */
+        /* width-1 / height-1 precomputed in the prologue. */
+    vpbroadcastd ymm2, DWORD PTR [esp+24] /* width - 1 */
+    vpbroadcastd ymm3, DWORD PTR [esp+28] /* height - 1 */
 
         /* sx = clamp(x + dx, 0, width - 1). */
     vmovd   xmm0, eax
@@ -186,9 +190,10 @@ TYPE(SYM(ksvgDisplacementMapApplyAvx2_i386), @function)
     vpmaxsd ymm6, ymm6, ymm1
     vpminsd ymm6, ymm6, ymm2
 
-        /* sy = clamp(y + dy, 0, height - 1). */
+        /* sy = clamp(y + dy, 0, height - 1).
+         * All eight lanes share the destination row y, so NO lane offset is
+         * added here (unlike sx, which advances by the column offset). */
     vpbroadcastd ymm0, DWORD PTR [esp+4]
-    vpaddd  ymm0, ymm0, YMMWORD PTR [ebp+DM_INC_OFF]
     vpaddd  ymm5, ymm0, ymm5
     vpmaxsd ymm5, ymm5, ymm1
     vpminsd ymm5, ymm5, ymm3
@@ -198,6 +203,16 @@ TYPE(SYM(ksvgDisplacementMapApplyAvx2_i386), @function)
     vpbroadcastd ymm2, xmm2
     vpmulld ymm5, ymm5, ymm2
     vpaddd  ymm5, ymm5, ymm6
+
+        /*
+         * Restore an all-ones gather mask for VPGATHERDD.  The instruction
+         * clears the mask bits it gathers, so YMM1 must be regenerated on
+         * every iteration; it currently holds the clamp zero and is free
+         * here.  Bit 31 of each dword selects the lane for the 32-bit gather.
+         * Mirrors the x86_64 kernel, which keeps a reusable all-ones mask in
+         * YMM14.
+         */
+    vpcmpeqd ymm1, ymm1, ymm1 /* all-ones gather mask */
 
         /*
          * VPGATHERDD ymm0, [esi + ymm5*4], ymm1
