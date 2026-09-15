@@ -15,6 +15,7 @@
  */
 
 #include "asm_macros.S"
+#include "turbulence_noise_common.S"
 
 .text
 .p2align 4
@@ -152,35 +153,35 @@ TYPE(ksvgTurbulenceApplySse2_x86_64, @function)
     movdqa  .LC3(%rip), %xmm0
     leaq    1135(%rsp), %rcx
     movaps  %xmm0, 880(%rsp)
-    movdqa  .LC4(%rip), %xmm0
+    movdqa  .LC3+16(%rip), %xmm0
     movaps  %xmm0, 896(%rsp)
-    movdqa  .LC5(%rip), %xmm0
+    movdqa  .LC3+32(%rip), %xmm0
     movaps  %xmm0, 912(%rsp)
-    movdqa  .LC6(%rip), %xmm0
+    movdqa  .LC3+48(%rip), %xmm0
     movaps  %xmm0, 928(%rsp)
-    movdqa  .LC7(%rip), %xmm0
+    movdqa  .LC3+64(%rip), %xmm0
     movaps  %xmm0, 944(%rsp)
-    movdqa  .LC8(%rip), %xmm0
+    movdqa  .LC3+80(%rip), %xmm0
     movaps  %xmm0, 960(%rsp)
-    movdqa  .LC9(%rip), %xmm0
+    movdqa  .LC3+96(%rip), %xmm0
     movaps  %xmm0, 976(%rsp)
-    movdqa  .LC10(%rip), %xmm0
+    movdqa  .LC3+112(%rip), %xmm0
     movaps  %xmm0, 992(%rsp)
-    movdqa  .LC11(%rip), %xmm0
+    movdqa  .LC3+128(%rip), %xmm0
     movaps  %xmm0, 1008(%rsp)
-    movdqa  .LC12(%rip), %xmm0
+    movdqa  .LC3+144(%rip), %xmm0
     movaps  %xmm0, 1024(%rsp)
-    movdqa  .LC13(%rip), %xmm0
+    movdqa  .LC3+160(%rip), %xmm0
     movaps  %xmm0, 1040(%rsp)
-    movdqa  .LC14(%rip), %xmm0
+    movdqa  .LC3+176(%rip), %xmm0
     movaps  %xmm0, 1056(%rsp)
-    movdqa  .LC15(%rip), %xmm0
+    movdqa  .LC3+192(%rip), %xmm0
     movaps  %xmm0, 1072(%rsp)
-    movdqa  .LC16(%rip), %xmm0
+    movdqa  .LC3+208(%rip), %xmm0
     movaps  %xmm0, 1088(%rsp)
-    movdqa  .LC17(%rip), %xmm0
+    movdqa  .LC3+224(%rip), %xmm0
     movaps  %xmm0, 1104(%rsp)
-    movdqa  .LC18(%rip), %xmm0
+    movdqa  .LC3+240(%rip), %xmm0
     movaps  %xmm0, 1120(%rsp)
 .p2align 4
 .p2align 3
@@ -1733,334 +1734,23 @@ TYPE(ksvgTurbulenceApplySse2_x86_64, @function)
 // // SIZE(ksvgTurbulenceApplySse2_x86_64)
     RODATA
 .balign 8
-.LC0:
-.long 0
-.long 1072693248
-.balign 8
-.LC2:
-.long 0
-.long 1064304640
+.LC0: TURB_DBL_1
+.LC2: TURB_DBL_1_256
     RODATA
 .balign 16
-.LC3:
-.byte 0
-.byte 1
-.byte 2
-.byte 3
-.byte 4
-.byte 5
-.byte 6
-.byte 7
-.byte 8
-.byte 9
-.byte 10
-.byte 11
-.byte 12
-.byte 13
-.byte 14
-.byte 15
-.balign 16
-.LC4:
-.byte 16
-.byte 17
-.byte 18
-.byte 19
-.byte 20
-.byte 21
-.byte 22
-.byte 23
-.byte 24
-.byte 25
-.byte 26
-.byte 27
-.byte 28
-.byte 29
-.byte 30
-.byte 31
-.balign 16
-.LC5:
-.byte 32
-.byte 33
-.byte 34
-.byte 35
-.byte 36
-.byte 37
-.byte 38
-.byte 39
-.byte 40
-.byte 41
-.byte 42
-.byte 43
-.byte 44
-.byte 45
-.byte 46
-.byte 47
-.balign 16
-.LC6:
-.byte 48
-.byte 49
-.byte 50
-.byte 51
-.byte 52
-.byte 53
-.byte 54
-.byte 55
-.byte 56
-.byte 57
-.byte 58
-.byte 59
-.byte 60
-.byte 61
-.byte 62
-.byte 63
-.balign 16
-.LC7:
-.byte 64
-.byte 65
-.byte 66
-.byte 67
-.byte 68
-.byte 69
-.byte 70
-.byte 71
-.byte 72
-.byte 73
-.byte 74
-.byte 75
-.byte 76
-.byte 77
-.byte 78
-.byte 79
-.balign 16
-.LC8:
-.byte 80
-.byte 81
-.byte 82
-.byte 83
-.byte 84
-.byte 85
-.byte 86
-.byte 87
-.byte 88
-.byte 89
-.byte 90
-.byte 91
-.byte 92
-.byte 93
-.byte 94
-.byte 95
-.balign 16
-.LC9:
-.byte 96
-.byte 97
-.byte 98
-.byte 99
-.byte 100
-.byte 101
-.byte 102
-.byte 103
-.byte 104
-.byte 105
-.byte 106
-.byte 107
-.byte 108
-.byte 109
-.byte 110
-.byte 111
-.balign 16
-.LC10:
-.byte 112
-.byte 113
-.byte 114
-.byte 115
-.byte 116
-.byte 117
-.byte 118
-.byte 119
-.byte 120
-.byte 121
-.byte 122
-.byte 123
-.byte 124
-.byte 125
-.byte 126
-.byte 127
-.balign 16
-.LC11:
-.byte -128
-.byte -127
-.byte -126
-.byte -125
-.byte -124
-.byte -123
-.byte -122
-.byte -121
-.byte -120
-.byte -119
-.byte -118
-.byte -117
-.byte -116
-.byte -115
-.byte -114
-.byte -113
-.balign 16
-.LC12:
-.byte -112
-.byte -111
-.byte -110
-.byte -109
-.byte -108
-.byte -107
-.byte -106
-.byte -105
-.byte -104
-.byte -103
-.byte -102
-.byte -101
-.byte -100
-.byte -99
-.byte -98
-.byte -97
-.balign 16
-.LC13:
-.byte -96
-.byte -95
-.byte -94
-.byte -93
-.byte -92
-.byte -91
-.byte -90
-.byte -89
-.byte -88
-.byte -87
-.byte -86
-.byte -85
-.byte -84
-.byte -83
-.byte -82
-.byte -81
-.balign 16
-.LC14:
-.byte -80
-.byte -79
-.byte -78
-.byte -77
-.byte -76
-.byte -75
-.byte -74
-.byte -73
-.byte -72
-.byte -71
-.byte -70
-.byte -69
-.byte -68
-.byte -67
-.byte -66
-.byte -65
-.balign 16
-.LC15:
-.byte -64
-.byte -63
-.byte -62
-.byte -61
-.byte -60
-.byte -59
-.byte -58
-.byte -57
-.byte -56
-.byte -55
-.byte -54
-.byte -53
-.byte -52
-.byte -51
-.byte -50
-.byte -49
-.balign 16
-.LC16:
-.byte -48
-.byte -47
-.byte -46
-.byte -45
-.byte -44
-.byte -43
-.byte -42
-.byte -41
-.byte -40
-.byte -39
-.byte -38
-.byte -37
-.byte -36
-.byte -35
-.byte -34
-.byte -33
-.balign 16
-.LC17:
-.byte -32
-.byte -31
-.byte -30
-.byte -29
-.byte -28
-.byte -27
-.byte -26
-.byte -25
-.byte -24
-.byte -23
-.byte -22
-.byte -21
-.byte -20
-.byte -19
-.byte -18
-.byte -17
-.balign 16
-.LC18:
-.byte -16
-.byte -15
-.byte -14
-.byte -13
-.byte -12
-.byte -11
-.byte -10
-.byte -9
-.byte -8
-.byte -7
-.byte -6
-.byte -5
-.byte -4
-.byte -3
-.byte -2
-.byte -1
+.LC3: TURB_PERMUTATION_DATA
     RODATA
 .balign 8
-.LC19:
-.long 0
-.long 1080025088
-.balign 8
-.LC20:
-.long 0
-.long 1081073664
-.balign 8
-.LC21:
-.long 0
-.long 1085276160
-.balign 8
-.LC22:
-.long 0
-.long 1127219200
-.balign 8
-.LC24:
-.long 0
-.long 1074266112
+.LC19: TURB_DBL_127_5
+.LC20: TURB_DBL_255
+.LC21: TURB_DBL_4096
+.LC22: TURB_DBL_2_POW_52
+.LC24: TURB_DBL_3
     RODATA
 .balign 16
-.LC25:
-.long -1
-.long 2147483647
-.long -1
-.long 2147483647
+.LC25: TURB_ABS_MASK_SSE2
 .set .LC26, .LC25
     RODATA
 .balign 8
-.LC27:
-.long 0
-.long 1071644672
+.LC27: TURB_DBL_0_5
 GNU_STACK
