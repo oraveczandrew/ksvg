@@ -24,7 +24,7 @@ the render tree. Bounds unions are refreshed bottom-up.
 - **`SVG_REFERENCE_v2.md`**: AI-facing, audit-first reference for implementing/reviewing SVG behavior (SVG 2 + SVG 1.1 + delegated CSS/graphics specs). It is a map and audit framework, not a substitute for the specifications.
 - **`RENDERING_FILTERING.md`**: Living architecture & validation notes for the rendering/filtering pipeline. Re-read it before touching render/filter code.
 - **`BENCHMARKS.md`**: Kernel benchmark tables (native SIMD vs scalar C++ vs Kotlin reference). Rows follow the ISA superset order (see "Benchmark table conventions").
-- **`SIMD_KERNEL_TRICKS.md`**: Transferable SIMD optimization checklist distilled from the top-performing filter kernels (and their negative controls).
+- **`native-docs/`**: Low-level native docs — `ASSEMBLY_CONVENTIONS.md` (ABI/argument/register/PIC contract plus parity gate), `SIMD_KERNEL_TRICKS.md` (transferable SIMD optimization checklist distilled from the top-performing filter kernels), and per-ISA implicit-register-clobber tables (`X86_IMPLICIT_REGISTER_CLOBBERS.md`, `AARCH64_IMPLICIT_REGISTER_CLOBBERS.md`, `ARM32_IMPLICIT_REGISTER_CLOBBERS.md`): reference lists of which instructions read/write registers or architectural state implicitly (e.g. `MUL`/`DIV` clobbering `EDX`, `CPUID` clobbering `EBX`, string/SP/flags state, pointer-auth/exclusive-monitor state) so hand-written assembly never relies on value survival that the ISA does not guarantee.
 - **`README.md`**: Public project overview, key enhancements, and usage.
 
 ## Critical Development Conventions
@@ -56,7 +56,18 @@ Animations must respect `dur`, `repeatCount`, `repeatDur`, and `end`.
 Do **not** fabricate or guess complex low-level sources (e.g. hand-written ARM/NEON assembly, AArch64 assembly, GPU shaders, or generated coefficient/lookup tables). If such a file is required and you cannot reproduce it exactly, **ask the user to provide the file** — it is always acceptable to request it rather than invent a subtly-wrong version.
 *   When wiring in a third-party source (e.g. the RIR Toolkit `Blur` kernels), confirm the exact symbol/ABI contract before calling into it; mismatched calling conventions produce silent, hard-to-debug corruption.
 
-### 5. Benchmark table conventions
+### 5. Assembly bug investigation — start here
+When investigating a suspected native/assembly kernel bug, first read native-docs/ASSEMBLY_CONVENTIONS.md (especially the "Typical mistakes" checklist), then native-docs/SIMD_KERNEL_TRICKS.md (structural patterns, rounding/parity checklist, known traps).
+
+Before touching code, identify the target ISA and grep the relevant implicit-register-clobber table for every suspicious instruction:
+
+x86/x86-64: native-docs/X86_IMPLICIT_REGISTER_CLOBBERS.md
+AArch64: native-docs/AARCH64_IMPLICIT_REGISTER_CLOBBERS.md
+ARM32: native-docs/ARM32_IMPLICIT_REGISTER_CLOBBERS.md
+
+Use the grep results to verify whether any instruction has implicit register/state inputs or outputs that could invalidate the suspected register-liveness assumptions.
+
+### 6. Benchmark table conventions
 *   `BENCHMARKS.md` kernel rows follow the ISA superset order (each ISA builds on the previous): x86 `scalar → sse2 → ssse3 → avx2 → avx512`; ARM `scalar → neon32 → neon64`. Keep this ordering when adding or re-measuring rows — never append `sse2` after `avx512`.
 
 ## How-To Guides
