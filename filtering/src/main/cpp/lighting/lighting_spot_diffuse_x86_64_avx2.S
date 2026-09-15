@@ -175,6 +175,8 @@ LSPOTAVX2_LOOP:  # =>This Inner Loop Header: Depth=1
     vaddps       %ymm1, %ymm10, %ymm10
     // Normalize + spot-cone factor (cutoff) + intensity = k * factor * dot.
     vsqrtps      %ymm10, %ymm10
+    vdivps       %ymm10, %ymm8, %ymm8  # nx = nx0 / nLen
+    vdivps       %ymm10, %ymm9, %ymm9  # ny = ny0 / nLen
     vpsrld       $24, %ymm11, %ymm11
     vxorps       %xmm15, %xmm15, %xmm15
     vcvtsi2ss    %r8d, %xmm15, %xmm12

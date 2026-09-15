@@ -213,6 +213,8 @@ LSPOTSSSE3_LOOP:  # =>This Inner Loop Header: Depth=1
     addps          %xmm8, %xmm12
     addps          %xmm2, %xmm12
     sqrtps         %xmm12, %xmm12
+    divps          %xmm12, %xmm11  # nx = nx0 / nLen
+    divps          %xmm12, %xmm10  # ny = ny0 / nLen
     xorps          %xmm13, %xmm13
     cvtsi2ss       %r8d, %xmm13
     movaps         %xmm2, %xmm8

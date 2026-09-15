@@ -544,9 +544,10 @@ LBB1_16:
     vmovss       32(%r15), %xmm0  # xmm0 = mem[0],zero,zero,zero
     // With an L2S table, scalar gather packs (below); otherwise take the
     // vector-pack fast path (.LBB1_17).
-    testq        %r14, %r14
-    je           LBB1_17
+  testq        %r14, %r14
+  je           LBB1_17
     vmulss       %xmm6, %xmm0, %xmm3
+    vaddss       LCPI1_6(%rip), %xmm3, %xmm3  # +0.5 round-half-up
     vroundss     $11, %xmm3, %xmm3, %xmm3
     vcvttss2si   %xmm3, %edx
     cmpl         $255, %edx
@@ -557,6 +558,7 @@ LBB1_16:
     cmovlel      %ecx, %edx
     vbroadcastss %xmm6, %xmm3
     vmulps       %xmm3, %xmm1, %xmm3
+    vaddps       LCPI1_6(%rip), %xmm3, %xmm3  # +0.5 round-half-up
     vroundps     $11, %xmm3, %xmm3
     vcvttps2dq   %xmm3, %xmm4
     vpbroadcastd LCPI1_2(%rip), %xmm3  # xmm3 = [255,255,255,255]
@@ -565,6 +567,7 @@ LBB1_16:
     vpmaxsd      %xmm4, %xmm6, %xmm6
     L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
     vmulss       %xmm0, %xmm11, %xmm6
+    vaddss       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundss     $11, %xmm6, %xmm6, %xmm6
     vcvttss2si   %xmm6, %edx
     movl         %edi, (%rbx)
@@ -574,12 +577,14 @@ LBB1_16:
     cmovlel      %ecx, %edx
     vbroadcastss %xmm11, %xmm6
     vmulps       %xmm6, %xmm1, %xmm6
+    vaddps       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundps     $11, %xmm6, %xmm6
     vcvttps2dq   %xmm6, %xmm6
     vpminsd      %xmm3, %xmm6, %xmm6
     vpmaxsd      %xmm4, %xmm6, %xmm6
     L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
     vmulss       %xmm0, %xmm10, %xmm6
+    vaddss       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundss     $11, %xmm6, %xmm6, %xmm6
     vcvttss2si   %xmm6, %edx
     movl         %edi, 4(%rbx)
@@ -589,12 +594,14 @@ LBB1_16:
     cmovlel      %ecx, %edx
     vbroadcastss %xmm10, %xmm6
     vmulps       %xmm6, %xmm1, %xmm6
+    vaddps       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundps     $11, %xmm6, %xmm6
     vcvttps2dq   %xmm6, %xmm6
     vpminsd      %xmm3, %xmm6, %xmm6
     vpmaxsd      %xmm4, %xmm6, %xmm6
     L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
     vmulss       %xmm0, %xmm9, %xmm6
+    vaddss       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundss     $11, %xmm6, %xmm6, %xmm6
     vcvttss2si   %xmm6, %edx
     movl         %edi, 8(%rbx)
@@ -604,12 +611,14 @@ LBB1_16:
     cmovlel      %ecx, %edx
     vbroadcastss %xmm9, %xmm6
     vmulps       %xmm6, %xmm1, %xmm6
+    vaddps       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundps     $11, %xmm6, %xmm6
     vcvttps2dq   %xmm6, %xmm6
     vpminsd      %xmm3, %xmm6, %xmm6
     vpmaxsd      %xmm4, %xmm6, %xmm6
     L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
     vmulss       %xmm0, %xmm8, %xmm6
+    vaddss       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundss     $11, %xmm6, %xmm6, %xmm6
     vcvttss2si   %xmm6, %edx
     movl         %edi, 12(%rbx)
@@ -619,12 +628,14 @@ LBB1_16:
     cmovlel      %ecx, %edx
     vbroadcastss %xmm8, %xmm6
     vmulps       %xmm6, %xmm1, %xmm6
+    vaddps       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundps     $11, %xmm6, %xmm6
     vcvttps2dq   %xmm6, %xmm6
     vpminsd      %xmm3, %xmm6, %xmm6
     vpmaxsd      %xmm4, %xmm6, %xmm6
     L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
     vmulss       %xmm7, %xmm0, %xmm6
+    vaddss       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundss     $11, %xmm6, %xmm6, %xmm6
     vcvttss2si   %xmm6, %edx
     movl         %edi, 16(%rbx)
@@ -634,12 +645,14 @@ LBB1_16:
     cmovlel      %ecx, %edx
     vbroadcastss %xmm7, %xmm6
     vmulps       %xmm6, %xmm1, %xmm6
+    vaddps       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundps     $11, %xmm6, %xmm6
     vcvttps2dq   %xmm6, %xmm6
     vpminsd      %xmm3, %xmm6, %xmm6
     vpmaxsd      %xmm4, %xmm6, %xmm6
     L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
     vmulss       %xmm5, %xmm0, %xmm6
+    vaddss       LCPI1_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
     vroundss     $11, %xmm6, %xmm6, %xmm6
     vcvttss2si   %xmm6, %edx
     movl         %edi, 20(%rbx)
@@ -649,12 +662,14 @@ LBB1_16:
     cmovlel      %ecx, %edx
     vbroadcastss %xmm5, %xmm5
     vmulps       %xmm5, %xmm1, %xmm5
+    vaddps       LCPI1_6(%rip), %xmm5, %xmm5  # +0.5 round-half-up
     vroundps     $11, %xmm5, %xmm5
     vcvttps2dq   %xmm5, %xmm5
     vpminsd      %xmm3, %xmm5, %xmm5
     vpmaxsd      %xmm4, %xmm5, %xmm5
     L2S_GATHER_CMOV_PACK %r14, %xmm5, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
     vmulss       %xmm2, %xmm0, %xmm0
+    vaddss       LCPI1_6(%rip), %xmm0, %xmm0  # +0.5 round-half-up
     vroundss     $11, %xmm0, %xmm0, %xmm0
     vcvttss2si   %xmm0, %edx
     movl         %edi, 24(%rbx)
@@ -664,6 +679,7 @@ LBB1_16:
     cmovlel      %ecx, %eax
     vbroadcastss %xmm2, %xmm0
     vmulps       %xmm0, %xmm1, %xmm0
+    vaddps       LCPI1_6(%rip), %xmm0, %xmm0  # +0.5 round-half-up
     vroundps     $11, %xmm0, %xmm0
     vcvttps2dq   %xmm0, %xmm0
     vpminsd      %xmm3, %xmm0, %xmm0
