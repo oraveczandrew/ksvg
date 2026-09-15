@@ -1,4 +1,24 @@
 #include "asm_macros.S"
+
+/*
+ * Description:
+ *   Extracts one pixel's alpha byte (accumulator form): loads the pixel
+ *   into %eax itself, shifts the alpha byte down, stores the 0..255 integer.
+ *   Callers load the row base into %eax per row group. Single-file use.
+ *
+ * Inputs:
+ *   \src_off  = byte offset of the pixel from the row pointer in %eax
+ *   \dst_off  = stack offset of the integer slot in (%ebp)
+ *
+ * Output:
+ *   0..255 integer at \dst_off(%ebp); %eax = shifted alpha (clobbered)
+ *
+ * Clobbers:
+ *   %eax (in-place)
+ */
+.macro ALPHA_EXTRACT_ACC src_off, dst_off
+    movl \src_off(%eax),%eax; shrl $24,%eax; movl %eax,\dst_off(%ebp)
+.endm
 RODATA
 .p2align 4
 .Lsp_zero: .long 0
@@ -15,6 +35,73 @@ RODATA
  cmpl $0,\reg; jge 1f; xorl \reg,\reg; jmp 2f
 1: cmpl $255,\reg; jle 2f; movl $255,\reg
 2:
+.endm
+
+/*
+ * Description:
+ *   Converts one stacked integer alpha to a scaled float: loads the int,
+ *   converts int32->float (exact), scales by surfaceScale reloaded from
+ *   params each time, stores back. Single-file use.
+ *
+ * Inputs:
+ *   \stack_off = stack offset of the int slot in (%ebp) (in/out)
+ *
+ * Output:
+ *   float at \stack_off(%ebp)
+ *
+ * Clobbers:
+ *   %xmm0, %eax
+ */
+.macro TO_FLOAT stack_off
+movd \stack_off(%ebp),%xmm0
+cvtdq2ps %xmm0,%xmm0
+movl -16(%ebp),%eax
+mulss 36(%eax),%xmm0
+movss %xmm0,\stack_off(%ebp)
+.endm
+
+/*
+ * Description:
+ *   Scales one color channel by the spilled intensity, rounds half-up, and
+ *   truncates to int. The intensity spill (-164(%ebp)) and the 0.5 literal
+ *   (.Lsp_half) are fixed (single-file use). Intensity in %xmm0 contract.
+ *
+ * Inputs:
+ *   \mem_off  = byte offset of the channel factor from the params base
+ *   \base     = params base register
+ *   \dst      = 32-bit GPR receiving the truncated channel
+ *
+ * Output:
+ *   \dst = (int)(\base[\mem_off] * intensity + 0.5)
+ *
+ * Clobbers:
+ *   %xmm0
+ *   \dst (written)
+ */
+.macro SP_CHAN mem_off, base, dst
+movss \mem_off(\base),%xmm0
+mulss -164(%ebp),%xmm0
+addss .Lsp_half@GOTOFF(%ebx),%xmm0; cvttss2si %xmm0,\dst
+.endm
+
+/*
+ * Description:
+ *   Clamps one stacked channel integer to [0, 255] via the file-local CLAMP
+ *   macro, with optional exact L2S conversion (linear path, via the
+ *   file-local L2S macro reading the global LUT base). Single-file use.
+ *
+ * Inputs:
+ *   \slot  = stack offset of the channel integer slot in (%ebp) (in/out)
+ *   \l2s   = 1 to run L2S after clamping, 0 for clamp only
+ *
+ * Clobbers:
+ *   %eax
+ */
+.macro CLAMP_SLOT slot, l2s
+    movl \slot(%ebp),%eax; CLAMP %eax; movl %eax,\slot(%ebp)
+    .if \l2s
+    L2S %eax; movl %eax,\slot(%ebp)
+    .endif
 .endm
 
 .globl SYM(ksvgLightingSpotSpecularRowAvx2)
@@ -45,78 +132,30 @@ SYM(ksvgLightingSpotSpecularRowAvx2Linear):
     movl 32(%ebp), %eax; movl %eax,-20(%ebp)
 .Lsp_loop_Avx2:
     cmpl $0,-12(%ebp); jle .Lsp_done_Avx2
-movl -32(%ebp),%eax
-movl 0(%eax),%eax
-shrl $24,%eax
-movl %eax,-84(%ebp)
-movl -32(%ebp),%eax
-movl 4(%eax),%eax
-shrl $24,%eax
-movl %eax,-88(%ebp)
-movl -32(%ebp),%eax
-movl 8(%eax),%eax
-shrl $24,%eax
-movl %eax,-92(%ebp)
-movl -36(%ebp),%eax
-movl 0(%eax),%eax
-shrl $24,%eax
-movl %eax,-96(%ebp)
-movl -36(%ebp),%eax
-movl 8(%eax),%eax
-shrl $24,%eax
-movl %eax,-100(%ebp)
-movl -40(%ebp),%eax
-movl 0(%eax),%eax
-shrl $24,%eax
-movl %eax,-104(%ebp)
-movl -40(%ebp),%eax
-movl 4(%eax),%eax
-shrl $24,%eax
-movl %eax,-108(%ebp)
-movl -40(%ebp),%eax
-movl 8(%eax),%eax
-shrl $24,%eax
-movl %eax,-112(%ebp)
-movd -84(%ebp),%xmm0
-cvtdq2ps %xmm0,%xmm0
-movl -16(%ebp),%eax
-mulss 36(%eax),%xmm0
-movss %xmm0,-84(%ebp)
-movd -88(%ebp),%xmm0
-cvtdq2ps %xmm0,%xmm0
-movl -16(%ebp),%eax
-mulss 36(%eax),%xmm0
-movss %xmm0,-88(%ebp)
-movd -92(%ebp),%xmm0
-cvtdq2ps %xmm0,%xmm0
-movl -16(%ebp),%eax
-mulss 36(%eax),%xmm0
-movss %xmm0,-92(%ebp)
-movd -96(%ebp),%xmm0
-cvtdq2ps %xmm0,%xmm0
-movl -16(%ebp),%eax
-mulss 36(%eax),%xmm0
-movss %xmm0,-96(%ebp)
-movd -100(%ebp),%xmm0
-cvtdq2ps %xmm0,%xmm0
-movl -16(%ebp),%eax
-mulss 36(%eax),%xmm0
-movss %xmm0,-100(%ebp)
-movd -104(%ebp),%xmm0
-cvtdq2ps %xmm0,%xmm0
-movl -16(%ebp),%eax
-mulss 36(%eax),%xmm0
-movss %xmm0,-104(%ebp)
-movd -108(%ebp),%xmm0
-cvtdq2ps %xmm0,%xmm0
-movl -16(%ebp),%eax
-mulss 36(%eax),%xmm0
-movss %xmm0,-108(%ebp)
-movd -112(%ebp),%xmm0
-cvtdq2ps %xmm0,%xmm0
-movl -16(%ebp),%eax
-mulss 36(%eax),%xmm0
-movss %xmm0,-112(%ebp)
+    movl -32(%ebp),%eax
+    ALPHA_EXTRACT_ACC 0, -84
+    movl -32(%ebp),%eax
+    ALPHA_EXTRACT_ACC 4, -88
+    movl -32(%ebp),%eax
+    ALPHA_EXTRACT_ACC 8, -92
+    movl -36(%ebp),%eax
+    ALPHA_EXTRACT_ACC 0, -96
+    movl -36(%ebp),%eax
+    ALPHA_EXTRACT_ACC 8, -100
+    movl -40(%ebp),%eax
+    ALPHA_EXTRACT_ACC 0, -104
+    movl -40(%ebp),%eax
+    ALPHA_EXTRACT_ACC 4, -108
+    movl -40(%ebp),%eax
+    ALPHA_EXTRACT_ACC 8, -112
+TO_FLOAT -84
+TO_FLOAT -88
+TO_FLOAT -92
+TO_FLOAT -96
+TO_FLOAT -100
+TO_FLOAT -104
+TO_FLOAT -108
+TO_FLOAT -112
 movss -92(%ebp),%xmm0
 addss -100(%ebp),%xmm0
 addss -100(%ebp),%xmm0
@@ -283,32 +322,26 @@ movss .Lsp_one@GOTOFF(%ebx),%xmm1
 minss %xmm1,%xmm0
 movss %xmm0,-164(%ebp)
 movl -16(%ebp),%eax
-movss 24(%eax),%xmm0
-mulss -164(%ebp),%xmm0
-addss .Lsp_half@GOTOFF(%ebx),%xmm0; cvttss2si %xmm0,%eax
-movl %eax,%ecx
+    SP_CHAN 24, %eax, %eax
+    movl %eax,%ecx
 movl -16(%ebp),%edx
-movss 28(%edx),%xmm0
-mulss -164(%ebp),%xmm0
-addss .Lsp_half@GOTOFF(%ebx),%xmm0; cvttss2si %xmm0,%edx
+    SP_CHAN 28, %edx, %edx
 movl -16(%ebp),%eax
-movss 32(%eax),%xmm0
-mulss -164(%ebp),%xmm0
-addss .Lsp_half@GOTOFF(%ebx),%xmm0; cvttss2si %xmm0,%esi
+    SP_CHAN 32, %eax, %esi
     # Store channel integers before optional L2S.
     movl %ecx,-168(%ebp)
     movl %edx,-172(%ebp)
     movl %esi,-176(%ebp)
     cmpl $0,-4(%ebp)
     je .Lsp_nolinear_0
-    movl -168(%ebp),%eax; CLAMP %eax; movl %eax,-168(%ebp); L2S %eax; movl %eax,-168(%ebp)
-    movl -172(%ebp),%eax; CLAMP %eax; movl %eax,-172(%ebp); L2S %eax; movl %eax,-172(%ebp)
-    movl -176(%ebp),%eax; CLAMP %eax; movl %eax,-176(%ebp); L2S %eax; movl %eax,-176(%ebp)
+    CLAMP_SLOT -168, 1
+    CLAMP_SLOT -172, 1
+    CLAMP_SLOT -176, 1
     jmp .Lsp_out_0
 .Lsp_nolinear_0:
-    movl -168(%ebp),%eax; CLAMP %eax; movl %eax,-168(%ebp)
-    movl -172(%ebp),%eax; CLAMP %eax; movl %eax,-172(%ebp)
-    movl -176(%ebp),%eax; CLAMP %eax; movl %eax,-176(%ebp)
+    CLAMP_SLOT -168, 0
+    CLAMP_SLOT -172, 0
+    CLAMP_SLOT -176, 0
 .Lsp_out_0:
     movl -168(%ebp),%eax
     movl -172(%ebp),%ecx

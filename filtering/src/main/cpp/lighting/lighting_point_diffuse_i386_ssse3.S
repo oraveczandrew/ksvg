@@ -7,6 +7,7 @@
  */
 
 #include "asm_macros.S"
+#include "lighting_i386_ssse3_macros.S"
 
 	.text
 POINT_LIT4
@@ -45,33 +46,26 @@ SYM(ksvgLightingPointDiffuseRowSsse3Linear):
     cmpl $0,-12(%ebp); jle .Lpd_done_Ssse3
 
     movl -32(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-84(%ebp) # tl
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-88(%ebp) # tm
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-92(%ebp) # tr
+    ALPHA_EXTRACT 0, -84
+    ALPHA_EXTRACT 4, -88
+    ALPHA_EXTRACT 8, -92
 
     movl -36(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-96(%ebp) # ml
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-136(%ebp) # mm (surfaceZ)
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-100(%ebp) # mr
+    ALPHA_EXTRACT 0, -96
+    ALPHA_EXTRACT 4, -136
+    ALPHA_EXTRACT 8, -100
 
     movl -40(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-104(%ebp) # bl
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-108(%ebp) # bm
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-112(%ebp) # br
+    ALPHA_EXTRACT 0, -104
+    ALPHA_EXTRACT 4, -108
+    ALPHA_EXTRACT 8, -112
 
     movl -16(%ebp),%eax
     movss 36(%eax),%xmm7 # ss
 
-    .macro PD_TO_FLOAT stack_off
-    movd \stack_off(%ebp),%xmm0
-    cvtdq2ps %xmm0,%xmm0
-    mulss %xmm7,%xmm0
-    movss %xmm0,\stack_off(%ebp)
-    .endm
-
-    PD_TO_FLOAT -84; PD_TO_FLOAT -88; PD_TO_FLOAT -92
-    PD_TO_FLOAT -96; PD_TO_FLOAT -136; PD_TO_FLOAT -100
-    PD_TO_FLOAT -104; PD_TO_FLOAT -108; PD_TO_FLOAT -112
+    TO_FLOAT -84; TO_FLOAT -88; TO_FLOAT -92
+    TO_FLOAT -96; TO_FLOAT -136; TO_FLOAT -100
+    TO_FLOAT -104; TO_FLOAT -108; TO_FLOAT -112
 
     # dzdx = (tr + 2*mr + br) - (tl + 2*ml + bl)
     movss -92(%ebp),%xmm0
@@ -138,21 +132,16 @@ SYM(ksvgLightingPointDiffuseRowSsse3Linear):
     movaps %xmm3,%xmm0
 
     # R,G,B
-    movss 24(%eax),%xmm1; mulss %xmm0,%xmm1; addss .Lpd_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%eax
+    CHAN_TO_INT 24, %eax, %eax, .Lpd_half
     movl -16(%ebp),%edx
-    movss 28(%edx),%xmm1; mulss %xmm0,%xmm1; addss .Lpd_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%ecx
-    movss 32(%edx),%xmm1; mulss %xmm0,%xmm1; addss .Lpd_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%edx
+    CHAN_TO_INT 28, %edx, %ecx, .Lpd_half
+    CHAN_TO_INT 32, %edx, %edx, .Lpd_half
 
     cmpl $0,-4(%ebp) # useLinear
     je .Lpd_out
-    movl -24(%ebp),%esi # lut
-    movzbl (%esi,%eax),%eax
-    movzbl (%esi,%ecx),%ecx
-    movzbl (%esi,%edx),%edx
+    L2S_GATHER %esi
 .Lpd_out:
-    shll $16,%eax; shll $8,%ecx; orl %ecx,%eax; orl %edx,%eax
-    orl $-16777216, %eax
-    movl -8(%ebp),%ecx; movl %eax,(%ecx)
+    PACK_FORCE_ALPHA
 
     addl $4,-32(%ebp); addl $4,-36(%ebp); addl $4,-40(%ebp); addl $4,-8(%ebp)
     movl -16(%ebp),%eax

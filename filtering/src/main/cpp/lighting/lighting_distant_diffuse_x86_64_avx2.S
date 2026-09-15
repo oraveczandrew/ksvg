@@ -16,10 +16,27 @@
 
 #include "asm_macros.S"
 
-
-/* Exact amortized linear->sRGB conversion for four ARGB pixels.
- * Same arithmetic/table path as the validated standalone SSSE3 unlinearize kernel.
- * Input/output: xmm0 = four packed ARGB pixels.
+/*
+ * Description:
+ *   Amortized linear->sRGB conversion for four ARGB pixels in xmm0: exact
+ *   value for the low nibbles (0..15) via .L_exact_low16, otherwise nibble
+ *   base/slope interpolation rounded to +16>>5 plus the correction bitset,
+ *   preserving the source alpha. Same arithmetic/table path as the validated
+ *   standalone SSSE3 unlinearize kernel.
+ *
+ * Inputs:
+ *   \sh4, \sh5, \sh3, \sh7  = shift amounts (call sites pass 4,5,3,7)
+ *   %xmm0                   = four packed ARGB pixels (in-place)
+ *
+ * Output:
+ *   %xmm0                   = four packed sRGB ARGB pixels
+ *
+ * Clobbers:
+ *   %xmm0      (in-place)
+ *   %xmm1..%xmm8
+ *   (these are the full 128-bit lanes; on kernels that keep vectors in the
+ *   upper ymm halves of ymm6/ymm7/ymm8 the caller must reload them after the
+ *   call — the linear distant-diffuse kernel does exactly that)
  */
 .macro L2S_ARGB4 sh4, sh5, sh3, sh7
     movdqa  %xmm0, %xmm8
@@ -91,6 +108,250 @@
     movdqa  %xmm1, %xmm0
 .endm
 
+/*
+ * Description:
+ *   Weighted row/column sum a + 2b + c over three integer vectors
+ *   (e.g. the 1:2:1 Sobel row-sum). Emits vpaddd b,b,dst; vpaddd a,dst,dst;
+ *   vpaddd c,dst,dst so dst = a + 2*b + c, matching the pre-existing
+ *   distant-diffuse kernels bit-for-bit (integer add is associative, so the
+ *   accumulation order into dst is arbitrary; keep this exact form anyway).
+ *
+ * Inputs:
+ *   \v0, \v1, \v2  = three 256-bit integer vectors (l/m/r or l/b/r);
+ *                    \v1 is the doubled middle term. All preserved.
+ *   \dst           = distinct destination/accumulator ymm register.
+ *
+ * Output:
+ *   \dst = \v0 + 2*\v1 + \v2
+ *
+ * Clobbers:
+ *   \dst
+ *
+ * Example: SUM121 %ymm0, %ymm1, %ymm2, %ymm3 computes sumT from lT/mT/rT lanes.
+ */
+.macro SUM121 v0, v1, v2, dst
+    vpaddd  \v1, \v1, \dst
+    vpaddd  \v0, \dst, \dst
+    vpaddd  \v2, \dst, \dst
+.endm
+
+/*
+ * Description:
+ *   3x3 Sobel window over three alpha rows: extracts the alpha byte of each
+ *   lane (vpsrld $24), computes sumT = lT+2*mT+rT and sumB = lB+2*mB+rB via
+ *   SUM121, and accumulates the integer x-derivative
+ *   dx_rel = rT-lT + 2*(rM-lM) + rB-lB. Matches the pre-existing
+ *   distant-diffuse window block bit-for-bit, including the middle row loading
+ *   only its l and r lanes (the m lane is unused by the derivative).
+ *
+ * Inputs:
+ *   \srcT, \srcM, \srcB  = three row base addresses (top/mid/bottom)
+ *   \a, \b, \c           = scratch ymm registers for the current row's
+ *                          l/m/r alpha lanes (clobbered as rows are loaded)
+ *   \sumT, \sumB         = output registers for the 1:2:1 sums
+ *   \dx                  = output/accumulator register for dx_rel
+ *   \tmp                 = scratch for 2*(rM-lM); may alias \sumB (the
+ *                          distant-diffuse kernels use %ymm5 for both)
+ *
+ * Output:
+ *   \sumT, \sumB, \dx set as described above.
+ *
+ * Clobbers:
+ *   \a, \b, \c (row lan scratch, in-place and discarded)
+ *   \tmp
+ *   \sumT, \sumB, \dx   (written, not preserved)
+ */
+.macro SOBEL_SUMS_DX srcT, srcM, srcB, a, b, c, sumT, dx, sumB, tmp
+    vmovups 0(\srcT), \a
+    vpsrld  $24, \a, \a
+    vmovups 4(\srcT), \b
+    vpsrld  $24, \b, \b
+    vmovups 8(\srcT), \c
+    vpsrld  $24, \c, \c
+    SUM121 \a, \b, \c, \sumT
+    vpsubd  \a, \c, \dx
+    vmovups 0(\srcM), \a
+    vpsrld  $24, \a, \a
+    vmovups 8(\srcM), \c
+    vpsrld  $24, \c, \c
+    vpsubd  \a, \c, \tmp
+    vpaddd  \tmp, \tmp, \tmp
+    vpaddd  \tmp, \dx, \dx
+    vmovups 0(\srcB), \a
+    vpsrld  $24, \a, \a
+    vmovups 4(\srcB), \b
+    vpsrld  $24, \b, \b
+    vmovups 8(\srcB), \c
+    vpsrld  $24, \c, \c
+    SUM121 \a, \b, \c, \sumB
+    vpsubd  \a, \c, \a
+    vpaddd  \a, \dx, \dx
+.endm
+
+/*
+ * Description:
+ *   Normalizes the surface normal from integer derivatives scaled into dx/dy:
+ *   nx = -dx; ny = -dy; nz = 1; len = sqrt(nx^2 + ny^2 + nz^2); then divides
+ *   all three components by len (vdivps path, distinct from the reciprocal-mul
+ *   NORM_INV). Matches the pre-existing distant-diffuse normalize block
+ *   bit-for-bit.
+ *
+ * Inputs:
+ *   \dx, \dy       = float derivative vectors
+ *   \one           = broadcast 1.0 constant vector
+ *
+ * Output:
+ *   \nx, \ny, \nz  = normalized normal components (|n| = 1)
+ *
+ * Clobbers:
+ *   \nx, \ny, \nz     (written)
+ *   \scratch0, \scratch1   (squares and sqrt temp)
+ *   \dx, \dy, \one referents may be reused/aliased after the call as the
+ *   macro reads them; in the distant-diffuse kernels \nz aliases \dy (dy is
+ *   consumed in step 3, nz written last) and \one = %ymm15 is untouched.
+ */
+.macro NORM_NEGXY_DIV dx, dy, one, nx, ny, nz, scratch0, scratch1
+    vxorps  \nx, \nx, \nx
+    vsubps  \dx, \nx, \nx         // nx = -dx
+    vxorps  \ny, \ny, \ny
+    vsubps  \dy, \ny, \ny         // ny = -dy
+    vmulps  \nx, \nx, \scratch0   // nx^2
+    vmulps  \ny, \ny, \scratch1   // ny^2
+    vaddps  \scratch0, \scratch1, \scratch0  // nx^2 + ny^2
+    vaddps  \one, \scratch0, \scratch0       // + 1
+    vsqrtps \scratch0, \scratch1              // len
+    vdivps  \scratch1, \nx, \nx
+    vdivps  \scratch1, \ny, \ny
+    vmovaps \one, \nz
+    vdivps  \scratch1, \nz, \nz
+.endm
+
+/*
+ * Description:
+ *   Scales an intensity by three color factors, rounds half-up, truncates to
+ *   int32, and packs into 0xFFRRGGBB (ARGB with full alpha): R<<16 | G<<8 | B
+ *   then ORs the alpha byte built as 0xFF000000. No per-channel clamp (the
+ *   caller has already clamped the intensity to [0, 1]); matches the
+ *   distant-diffuse pack block bit-for-bit.
+ *
+ * Inputs:
+ *   \i            = clamped intensity (float)
+ *   \lr, \lg, \lb = per-channel color factors (float; may be memory operands)
+ *   \half         = symbol of the 0.5 broadcast literal (e.g. .Lhalf)
+ *
+ * Output:
+ *   \i            = packed 0xFFRRGGBB pixel (int32 lanes)
+ *
+ * Clobbers:
+ *   \i                                   (in-place: holds B then the result)
+ *   \r, \g, \tmp
+ *   Depends on the passed \half literal in the caller's RODATA.
+ *
+ * Example: PACK_RGB %ymm0, %ymm12, %ymm13, %ymm14, %ymm1, %ymm2, %ymm3, .Lhalf
+ */
+.macro PACK_RGB i, lr, lg, lb, r, g, tmp, half
+    vmulps  \lr, \i, \r             // R = i * lr
+    vmulps  \lg, \i, \g             // G = i * lg
+    vmulps  \lb, \i, \i             // B = i * lb
+    vbroadcastss \half(%rip), \tmp
+    vaddps  \tmp, \r, \r            // R + 0.5
+    vaddps  \tmp, \g, \g            // G + 0.5
+    vaddps  \tmp, \i, \i            // B + 0.5
+    vcvttps2dq \r, \r
+    vcvttps2dq \g, \g
+    vcvttps2dq \i, \i
+    vpslld  $16, \r, \r
+    vpslld  $8, \g, \g
+    vpor    \r, \i, \i              // B | (G << 8)
+    vpor    \g, \i, \i              // ... | (R << 16)
+    vpcmpeqd \tmp, \tmp, \tmp       // 0xFFFFFFFF
+    vpslld  $24, \tmp, \tmp         // 0xFF000000
+    vpor    \tmp, \i, \i
+.endm
+
+/*
+ * Description:
+ *   Three-term dot product of the surface normal (nx, ny, nz) with the light
+ *   direction (lx, ly, lz), clamped to [0, 1] with the k scale applied between
+ *   the clamps: i = min(max(nx*lx + ny*ly + nz*lz, 0) * k, 1). The FP operation
+ *   order (including which operand accumulates) matches the pre-existing
+ *   distant-diffuse kernels bit-for-bit: nx accumulates (lx then ly then lz
+ *   products), and the zero bound is materialized with vxorps into \zero.
+ *
+ * Inputs:
+ *   \nx, \ny, \nz = normal components (float vectors)
+ *   \lx, \ly, \lz = light direction components (float vectors, preserved)
+ *   \k            = intensity scale (float vector, preserved)
+ *   \one          = broadcast 1.0 (preserved)
+ *   \tmp          = scratch for the ny*ly product
+ *   \zero         = scratch materialized to +0.0 via vxorps
+ *
+ * Output:
+ *   \nx          = clamped intensity
+ *
+ * Clobbers:
+ *   \nx  (in-place: holds nx*lx, then the dot, then the intensity)
+ *   \nz  (in-place: holds nz*lz, then discarded)
+ *   \tmp, \zero
+ */
+.macro DOT3_K_CLAMP nx, ny, nz, lx, ly, lz, k, one, tmp, zero
+    vmulps  \lx, \nx, \nx
+    vmulps  \ly, \ny, \tmp
+    vaddps  \nx, \tmp, \nx
+    vmulps  \lz, \nz, \nz
+    vaddps  \nx, \nz, \nx
+    vxorps  \zero, \zero, \zero
+    vmaxps  \zero, \nx, \nx
+    vmulps  \k, \nx, \nx
+    vminps  \one, \nx, \nx
+.endm
+
+/*
+ * Description:
+ *   Entry prologue of the distant-diffuse kernels: broadcasts the
+ *   DistantLightingParams struct (invDx, invDy, k, lx, ly, lz, lr, lg, lb, ss)
+ *   into vectors, forms 1/invDx and 1/invDy via vdivss, and folds the surface
+ *   scale ss into the derivative scales. The ss holder is reused for the 1.0
+ *   broadcast last. Matches the pre-existing distant-diffuse entry blocks
+ *   bit-for-bit (same FP division order).
+ *
+ * Inputs:
+ *   \pb           = GPR pointing at DistantLightingParams (0 -> invDx,
+ *                   4 -> invDy, 8 -> k, 12/16/20 -> lx/ly/lz, 24/28/32 ->
+ *                   lr/lg/lb, 36 -> ss)
+ *   \one          = symbol of the 1.0 broadcast literal (e.g. .Lone)
+ *
+ * Output:
+ *   \idx, \idy    = 1/invDx, 1/invDy folded with ss
+ *   \k, \lx, \ly, \lz, \lr, \lg, \lb = broadcast params
+ *   \ss_one       = broadcast 1.0 (held ss transiently)
+ *
+ * Clobbers:
+ *   \t0, \t1 (including their \t0x, \t1x low lanes)
+ *   \idx, \idy, \k, \lx, \ly, \lz, \lr, \lg, \lb, \ss_one (written)
+ *
+ * Example: DISTANT_DIFFUSE_PARAMS %r9, .Lone, %ymm0, %ymm1, %xmm0, %xmm1,
+ *   %ymm6, %ymm7, %ymm8, %ymm9, %ymm10, %ymm11, %ymm12, %ymm13, %ymm14, %ymm15
+ */
+.macro DISTANT_DIFFUSE_PARAMS pb, one, t0, t1, t0x, t1x, idx, idy, k, lx, ly, lz, lr, lg, lb, ss_one
+    vbroadcastss \one(%rip), \t0
+    vdivss  0(\pb), \t0x, \t1x
+    vbroadcastss \t1x, \idx
+    vdivss  4(\pb), \t0x, \t1x
+    vbroadcastss \t1x, \idy
+    vbroadcastss 8(\pb), \k
+    vbroadcastss 12(\pb), \lx
+    vbroadcastss 16(\pb), \ly
+    vbroadcastss 20(\pb), \lz
+    vbroadcastss 24(\pb), \lr
+    vbroadcastss 28(\pb), \lg
+    vbroadcastss 32(\pb), \lb
+    vbroadcastss 36(\pb), \ss_one
+    vmulps  \ss_one, \idx, \idx
+    vmulps  \ss_one, \idy, \idy
+    vbroadcastss \one(%rip), \ss_one
+.endm
+
 .text
 .p2align 5
 .globl SYM(ksvgLightingDistantDiffuseRowAvx2)
@@ -102,71 +363,13 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     jz      .Ldone
 
     // Load Params
-    vbroadcastss .Lone(%rip), %ymm0
-    vdivss  0(%r9), %xmm0, %xmm1
-    vbroadcastss %xmm1, %ymm6           // ymm6 = 1/invDx
-    vdivss  4(%r9), %xmm0, %xmm1
-    vbroadcastss %xmm1, %ymm7           // ymm7 = 1/invDy
-
-    vbroadcastss 8(%r9), %ymm8           // k
-    vbroadcastss 12(%r9), %ymm9          // lx
-    vbroadcastss 16(%r9), %ymm10         // ly
-    vbroadcastss 20(%r9), %ymm11         // lz
-    vbroadcastss 24(%r9), %ymm12         // lr
-    vbroadcastss 28(%r9), %ymm13         // lg
-    vbroadcastss 32(%r9), %ymm14         // lb
-    // Fold surface scale into derivative scales; ymm15 becomes available.
-    vbroadcastss 36(%r9), %ymm15         // ss
-    vmulps  %ymm15, %ymm6, %ymm6         // ss / invDx
-    vmulps  %ymm15, %ymm7, %ymm7         // ss / invDy
-    vbroadcastss .Lone(%rip), %ymm15     // 1.0
+    DISTANT_DIFFUSE_PARAMS %r9, .Lone, %ymm0, %ymm1, %xmm0, %xmm1, %ymm6, %ymm7, %ymm8, %ymm9, %ymm10, %ymm11, %ymm12, %ymm13, %ymm14, %ymm15
 
     mov     %r8d, %r10d
 
 .Lloop:
-    // rowT alpha
-    vmovups 0(%rdi), %ymm0
-    vpsrld  $24, %ymm0, %ymm0        // hT_l
-    vmovups 4(%rdi), %ymm1
-    vpsrld  $24, %ymm1, %ymm1        // hT_m
-    vmovups 8(%rdi), %ymm2
-    vpsrld  $24, %ymm2, %ymm2        // hT_r
-
-    // sumT = lT + 2*mT + rT
-    vpaddd  %ymm1, %ymm1, %ymm3
-    vpaddd  %ymm0, %ymm3, %ymm3
-    vpaddd  %ymm2, %ymm3, %ymm3
-
-    // dx_rel = rT - lT
-    vpsubd  %ymm0, %ymm2, %ymm4
-
-    // rowM alpha
-    vmovups 0(%rsi), %ymm0
-    vpsrld  $24, %ymm0, %ymm0        // hM_l
-    vmovups 8(%rsi), %ymm2
-    vpsrld  $24, %ymm2, %ymm2        // hM_r
-
-    // dx_rel += 2*(rM - lM)
-    vpsubd  %ymm0, %ymm2, %ymm5
-    vpaddd  %ymm5, %ymm5, %ymm5
-    vpaddd  %ymm5, %ymm4, %ymm4
-
-    // rowB alpha
-    vmovups 0(%rdx), %ymm0
-    vpsrld  $24, %ymm0, %ymm0        // hB_l
-    vmovups 4(%rdx), %ymm1
-    vpsrld  $24, %ymm1, %ymm1        // hB_m
-    vmovups 8(%rdx), %ymm2
-    vpsrld  $24, %ymm2, %ymm2        // hB_r
-
-    // sumB = lB + 2*mB + rB
-    vpaddd  %ymm1, %ymm1, %ymm5
-    vpaddd  %ymm0, %ymm5, %ymm5
-    vpaddd  %ymm2, %ymm5, %ymm5
-
-    // final dx_rel += rB - lB
-    vpsubd  %ymm0, %ymm2, %ymm0
-    vpaddd  %ymm0, %ymm4, %ymm4
+    // 3x3 Sobel window: sumT, dx_rel, sumB
+    SOBEL_SUMS_DX %rdi, %rsi, %rdx, %ymm0, %ymm1, %ymm2, %ymm3, %ymm4, %ymm5, %ymm5
 
     // Convert the final integer derivatives to float and apply scale once.
     vcvtdq2ps %ymm4, %ymm4
@@ -175,56 +378,13 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vcvtdq2ps %ymm5, %ymm5
     vmulps  %ymm7, %ymm5, %ymm5       // dy (includes ss)
 
-    // n = (-dx, -dy, 1)
-    vxorps  %ymm0, %ymm0, %ymm0
-    vsubps  %ymm4, %ymm0, %ymm0         // nx
-    vxorps  %ymm1, %ymm1, %ymm1
-    vsubps  %ymm5, %ymm1, %ymm1         // ny
+    // n = (-dx, -dy, 1) / |(-dx,-dy,1)|
+    NORM_NEGXY_DIV %ymm4, %ymm5, %ymm15, %ymm0, %ymm1, %ymm5, %ymm2, %ymm3
 
-    vmulps  %ymm0, %ymm0, %ymm2
-    vmulps  %ymm1, %ymm1, %ymm3
-    vaddps  %ymm2, %ymm3, %ymm2         // nx² + ny²
-    vaddps  %ymm15, %ymm2, %ymm2        // nLen^2
-
-    vsqrtps %ymm2, %ymm3                // nLen
-    vdivps  %ymm3, %ymm0, %ymm0         // nx
-    vdivps  %ymm3, %ymm1, %ymm1         // ny
-    vmovaps %ymm15, %ymm5
-    vdivps  %ymm3, %ymm5, %ymm5         // nz
-
-    vmulps  %ymm9, %ymm0, %ymm0
-    vmulps  %ymm10, %ymm1, %ymm3
-    vaddps  %ymm0, %ymm3, %ymm0         // nx*lx + ny*ly
-    vmulps  %ymm11, %ymm5, %ymm5
-    vaddps  %ymm0, %ymm5, %ymm0         // + nz*lz
-
-    vxorps  %ymm4, %ymm4, %ymm4
-    vmaxps  %ymm4, %ymm0, %ymm0
-    vmulps  %ymm8, %ymm0, %ymm0
-    vminps  %ymm15, %ymm0, %ymm0         // intensity
+    DOT3_K_CLAMP %ymm0, %ymm1, %ymm5, %ymm9, %ymm10, %ymm11, %ymm8, %ymm15, %ymm3, %ymm4
 
     // Pack
-    vmulps  %ymm12, %ymm0, %ymm1
-    vmulps  %ymm13, %ymm0, %ymm2
-    vmulps  %ymm14, %ymm0, %ymm0
-
-    vbroadcastss .Lhalf(%rip), %ymm3
-    vaddps  %ymm3, %ymm1, %ymm1
-    vaddps  %ymm3, %ymm2, %ymm2
-    vaddps  %ymm3, %ymm0, %ymm0
-
-    vcvttps2dq %ymm1, %ymm1
-    vcvttps2dq %ymm2, %ymm2
-    vcvttps2dq %ymm0, %ymm0
-
-    vpslld  $16, %ymm1, %ymm1
-    vpslld  $8, %ymm2, %ymm2
-    vpor    %ymm1, %ymm0, %ymm0
-    vpor    %ymm2, %ymm0, %ymm0
-    // Build 0xFF000000 in scratch ymm3; keep ymm15=1.0 for next iteration.
-    vpcmpeqd %ymm3, %ymm3, %ymm3
-    vpslld   $24, %ymm3, %ymm3
-    vpor     %ymm3, %ymm0, %ymm0
+    PACK_RGB %ymm0, %ymm12, %ymm13, %ymm14, %ymm1, %ymm2, %ymm3, .Lhalf
 
     vmovups %ymm0, (%rcx)
 
@@ -250,24 +410,7 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     jz      .Llin_done
 
     // Load Params
-    vbroadcastss .Lone(%rip), %ymm0
-    vdivss  0(%r9), %xmm0, %xmm1
-    vbroadcastss %xmm1, %ymm6           // ymm6 = 1/invDx
-    vdivss  4(%r9), %xmm0, %xmm1
-    vbroadcastss %xmm1, %ymm7           // ymm7 = 1/invDy
-
-    vbroadcastss 8(%r9), %ymm8           // k
-    vbroadcastss 12(%r9), %ymm9          // lx
-    vbroadcastss 16(%r9), %ymm10         // ly
-    vbroadcastss 20(%r9), %ymm11         // lz
-    vbroadcastss 24(%r9), %ymm12         // lr
-    vbroadcastss 28(%r9), %ymm13         // lg
-    vbroadcastss 32(%r9), %ymm14         // lb
-    // Fold surface scale into derivative scales; ymm15 becomes available.
-    vbroadcastss 36(%r9), %ymm15         // ss
-    vmulps  %ymm15, %ymm6, %ymm6         // ss / invDx
-    vmulps  %ymm15, %ymm7, %ymm7         // ss / invDy
-    vbroadcastss .Lone(%rip), %ymm15     // 1.0
+    DISTANT_DIFFUSE_PARAMS %r9, .Lone, %ymm0, %ymm1, %xmm0, %xmm1, %ymm6, %ymm7, %ymm8, %ymm9, %ymm10, %ymm11, %ymm12, %ymm13, %ymm14, %ymm15
 
     mov     %r8d, %r10d
 
@@ -291,49 +434,8 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     vbroadcastss 28(%r9), %ymm13
     vbroadcastss 32(%r9), %ymm14
 
-    // rowT alpha
-    vmovups 0(%rdi), %ymm0
-    vpsrld  $24, %ymm0, %ymm0        // hT_l
-    vmovups 4(%rdi), %ymm1
-    vpsrld  $24, %ymm1, %ymm1        // hT_m
-    vmovups 8(%rdi), %ymm2
-    vpsrld  $24, %ymm2, %ymm2        // hT_r
-
-    // sumT = lT + 2*mT + rT
-    vpaddd  %ymm1, %ymm1, %ymm3
-    vpaddd  %ymm0, %ymm3, %ymm3
-    vpaddd  %ymm2, %ymm3, %ymm3
-
-    // dx_rel = rT - lT
-    vpsubd  %ymm0, %ymm2, %ymm4
-
-    // rowM alpha
-    vmovups 0(%rsi), %ymm0
-    vpsrld  $24, %ymm0, %ymm0        // hM_l
-    vmovups 8(%rsi), %ymm2
-    vpsrld  $24, %ymm2, %ymm2        // hM_r
-
-    // dx_rel += 2*(rM - lM)
-    vpsubd  %ymm0, %ymm2, %ymm5
-    vpaddd  %ymm5, %ymm5, %ymm5
-    vpaddd  %ymm5, %ymm4, %ymm4
-
-    // rowB alpha
-    vmovups 0(%rdx), %ymm0
-    vpsrld  $24, %ymm0, %ymm0        // hB_l
-    vmovups 4(%rdx), %ymm1
-    vpsrld  $24, %ymm1, %ymm1        // hB_m
-    vmovups 8(%rdx), %ymm2
-    vpsrld  $24, %ymm2, %ymm2        // hB_r
-
-    // sumB = lB + 2*mB + rB
-    vpaddd  %ymm1, %ymm1, %ymm5
-    vpaddd  %ymm0, %ymm5, %ymm5
-    vpaddd  %ymm2, %ymm5, %ymm5
-
-    // final dx_rel += rB - lB
-    vpsubd  %ymm0, %ymm2, %ymm0
-    vpaddd  %ymm0, %ymm4, %ymm4
+    // 3x3 Sobel window: sumT, dx_rel, sumB
+    SOBEL_SUMS_DX %rdi, %rsi, %rdx, %ymm0, %ymm1, %ymm2, %ymm3, %ymm4, %ymm5, %ymm5
 
     // Convert the final integer derivatives to float and apply scale once.
     vcvtdq2ps %ymm4, %ymm4
@@ -342,56 +444,13 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     vcvtdq2ps %ymm5, %ymm5
     vmulps  %ymm7, %ymm5, %ymm5       // dy (includes ss)
 
-    // n = (-dx, -dy, 1)
-    vxorps  %ymm0, %ymm0, %ymm0
-    vsubps  %ymm4, %ymm0, %ymm0         // nx
-    vxorps  %ymm1, %ymm1, %ymm1
-    vsubps  %ymm5, %ymm1, %ymm1         // ny
+    // n = (-dx, -dy, 1) / |(-dx,-dy,1)|
+    NORM_NEGXY_DIV %ymm4, %ymm5, %ymm15, %ymm0, %ymm1, %ymm5, %ymm2, %ymm3
 
-    vmulps  %ymm0, %ymm0, %ymm2
-    vmulps  %ymm1, %ymm1, %ymm3
-    vaddps  %ymm2, %ymm3, %ymm2         // nx² + ny²
-    vaddps  %ymm15, %ymm2, %ymm2        // nLen^2
-
-    vsqrtps %ymm2, %ymm3                // nLen
-    vdivps  %ymm3, %ymm0, %ymm0         // nx
-    vdivps  %ymm3, %ymm1, %ymm1         // ny
-    vmovaps %ymm15, %ymm5
-    vdivps  %ymm3, %ymm5, %ymm5         // nz
-
-    vmulps  %ymm9, %ymm0, %ymm0
-    vmulps  %ymm10, %ymm1, %ymm3
-    vaddps  %ymm0, %ymm3, %ymm0         // nx*lx + ny*ly
-    vmulps  %ymm11, %ymm5, %ymm5
-    vaddps  %ymm0, %ymm5, %ymm0         // + nz*lz
-
-    vxorps  %ymm4, %ymm4, %ymm4
-    vmaxps  %ymm4, %ymm0, %ymm0
-    vmulps  %ymm8, %ymm0, %ymm0
-    vminps  %ymm15, %ymm0, %ymm0         // intensity
+    DOT3_K_CLAMP %ymm0, %ymm1, %ymm5, %ymm9, %ymm10, %ymm11, %ymm8, %ymm15, %ymm3, %ymm4
 
     // Pack
-    vmulps  %ymm12, %ymm0, %ymm1
-    vmulps  %ymm13, %ymm0, %ymm2
-    vmulps  %ymm14, %ymm0, %ymm0
-
-    vbroadcastss .Lhalf(%rip), %ymm3
-    vaddps  %ymm3, %ymm1, %ymm1
-    vaddps  %ymm3, %ymm2, %ymm2
-    vaddps  %ymm3, %ymm0, %ymm0
-
-    vcvttps2dq %ymm1, %ymm1
-    vcvttps2dq %ymm2, %ymm2
-    vcvttps2dq %ymm0, %ymm0
-
-    vpslld  $16, %ymm1, %ymm1
-    vpslld  $8, %ymm2, %ymm2
-    vpor    %ymm1, %ymm0, %ymm0
-    vpor    %ymm2, %ymm0, %ymm0
-    // Build 0xFF000000 in scratch ymm3; keep ymm15=1.0 for next iteration.
-    vpcmpeqd %ymm3, %ymm3, %ymm3
-    vpslld   $24, %ymm3, %ymm3
-    vpor     %ymm3, %ymm0, %ymm0
+    PACK_RGB %ymm0, %ymm12, %ymm13, %ymm14, %ymm1, %ymm2, %ymm3, .Lhalf
 
     subq    $32, %rsp
     vextracti128 $1, %ymm0, %xmm6

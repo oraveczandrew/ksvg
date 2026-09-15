@@ -16,6 +16,56 @@
 
 #include "asm_macros.S"
 
+/*
+ * Description:
+ *   Scalar L2S gather + force-alpha byte pack for the linear kernel: gathers
+ *   R/G/B bytes via the LUT base in %edx and packs (R << 16) | (G << 8) | B
+ *   | 0xFF000000 into %edi. Registers are deliberately fixed (identical at
+ *   all 7 use sites), so parameters would be pure noise. Uses VEX extracts
+ *   at the call sites (this file is AVX1-class); the last partial block
+ *   jumps to the shared .LBB1_5 tail instead and is NOT covered.
+ *
+ * Output:
+ *   %edi = packed 0xFFRRGGBB pixel
+ *
+ * Clobbers:
+ *   %ebp (R<<16), %edi (in-place: G<<8, then the packed pixel), %eax (B)
+ */
+.macro L2S_GATHER_PACK
+	movzbl	(%edx,%ebp), %ebp
+	movzbl	(%edx,%edi), %edi
+	movzbl	(%edx,%eax), %eax
+	shll	$16, %ebp
+	shll	$8, %edi
+	orl	%ebp, %edi
+	orl	%eax, %edi
+	orl	$-16777216, %edi
+.endm
+
+/*
+ * Description:
+ *   Alpha-byte to scaled float, VEX-encoded form: extracts the alpha lane,
+ *   converts int32->float (exact for 0..255), and scales. The 3-operand VEX
+ *   encoding allows arbitrary src/ch/dst combinations (incl. memory-operand
+ *   scale) with no extra moves. Mul operand order normalized scale-first;
+ *   bit-exact per the header ALPHA_FSCALE argument (finite channel floats).
+ *
+ * Inputs:
+ *   \src, \ch, \scale, \dst as in ALPHA_FSCALE (\scale may be a memory
+ *   operand, e.g. a loop-invariant spill reload).
+ *
+ * Output:
+ *   \dst = float((\src >> 24) & 0xFF) * \scale
+ *
+ * Clobbers:
+ *   \ch, \dst (written; \src preserved unless aliased)
+ */
+.macro ALPHA_FSCALE_V src, ch, scale, dst
+	vpsrld	$24, \src, \ch
+	vcvtdq2ps	\ch, \ch
+	vmulps	\scale, \ch, \dst
+.endm
+
 	.text
 	.file	"pd_av.c"
 	RODATA16
@@ -135,42 +185,28 @@ SYM(ksvgLightingPointDiffuseRowAvx2):        # @ksvgLightingPointDiffuseRowAvx2
 	vmovups	128(%esp), %ymm1                # 32-byte Reload
 	vmulps	%ymm3, %ymm1, %ymm7
 	vmovdqu	8(%edi,%ebp,4), %ymm3
-	vpsrld	$24, %ymm3, %ymm3
-	vcvtdq2ps	%ymm3, %ymm3
-	vmulps	%ymm3, %ymm1, %ymm5
+	ALPHA_FSCALE_V %ymm3, %ymm3, %ymm1, %ymm5
 	vmovdqu	(%esi,%ebp,4), %ymm3
 	vmovdqu	8(%esi,%ebp,4), %ymm6
-	vpsrld	$24, %ymm3, %ymm3
-	vcvtdq2ps	%ymm3, %ymm3
-	vmulps	%ymm3, %ymm1, %ymm3
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	%ymm6, %ymm1, %ymm4
+	ALPHA_FSCALE_V %ymm3, %ymm3, %ymm1, %ymm3
+	ALPHA_FSCALE_V %ymm6, %ymm6, %ymm1, %ymm4
 	vmovdqu	(%edx,%ebp,4), %ymm6
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	%ymm6, %ymm1, %ymm6
+	ALPHA_FSCALE_V %ymm6, %ymm6, %ymm1, %ymm6
 	vaddps	%ymm4, %ymm5, %ymm0
 	vaddps	%ymm0, %ymm4, %ymm0
 	vaddps	%ymm3, %ymm7, %ymm4
 	vaddps	%ymm4, %ymm3, %ymm3
 	vmovdqu	8(%edx,%ebp,4), %ymm4
-	vpsrld	$24, %ymm4, %ymm4
-	vcvtdq2ps	%ymm4, %ymm4
-	vmulps	%ymm4, %ymm1, %ymm4
+	ALPHA_FSCALE_V %ymm4, %ymm4, %ymm1, %ymm4
 	vaddps	%ymm4, %ymm0, %ymm0
 	vaddps	%ymm6, %ymm3, %ymm3
 	vsubps	%ymm3, %ymm0, %ymm0
 	vmovdqu	4(%edx,%ebp,4), %ymm3
-	vpsrld	$24, %ymm3, %ymm3
-	vcvtdq2ps	%ymm3, %ymm3
-	vmulps	%ymm3, %ymm1, %ymm3
+	ALPHA_FSCALE_V %ymm3, %ymm3, %ymm1, %ymm3
 	vaddps	%ymm3, %ymm6, %ymm6
 	vaddps	%ymm6, %ymm3, %ymm3
 	vmovdqu	4(%edi,%ebp,4), %ymm6
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	%ymm6, %ymm1, %ymm6
+	ALPHA_FSCALE_V %ymm6, %ymm6, %ymm1, %ymm6
 	vaddps	%ymm3, %ymm4, %ymm3
 	vaddps	%ymm6, %ymm7, %ymm4
 	vaddps	%ymm4, %ymm6, %ymm4
@@ -200,9 +236,7 @@ SYM(ksvgLightingPointDiffuseRowAvx2):        # @ksvgLightingPointDiffuseRowAvx2
 	vmovups	352(%esp), %ymm2
 # surfaceZ = srcM[j+1..j+8] * ss (window center), not srcT(tm) center
 	vmovdqu	4(%esi,%ebp,4), %ymm6
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	128(%esp), %ymm6, %ymm6
+	ALPHA_FSCALE_V %ymm6, %ymm6, 128(%esp), %ymm6
 	vsubps	%ymm6, %ymm2, %ymm6
 	vmulps	%ymm4, %ymm4, %ymm7
 	vaddps	384(%esp), %ymm7, %ymm7
@@ -415,44 +449,30 @@ SYM(ksvgLightingPointDiffuseRowAvx2Linear):  # @ksvgLightingPointDiffuseRowAvx2L
 	vmovups	96(%esp), %ymm1                 # 32-byte Reload
 	vmulps	%ymm3, %ymm1, %ymm3
 	vmovdqu	8(%edi,%ecx,4), %ymm4
-	vpsrld	$24, %ymm4, %ymm4
-	vcvtdq2ps	%ymm4, %ymm4
-	vmulps	%ymm4, %ymm1, %ymm4
+	ALPHA_FSCALE_V %ymm4, %ymm4, %ymm1, %ymm4
 	movl	580(%esp), %eax # srcM
 	vmovdqu	(%eax,%ecx,4), %ymm5
 	vmovdqu	8(%eax,%ecx,4), %ymm7
-	vpsrld	$24, %ymm5, %ymm5
-	vcvtdq2ps	%ymm5, %ymm5
-	vmulps	%ymm5, %ymm1, %ymm6
-	vpsrld	$24, %ymm7, %ymm5
-	vcvtdq2ps	%ymm5, %ymm5
-	vmulps	%ymm5, %ymm1, %ymm7
+	ALPHA_FSCALE_V %ymm5, %ymm5, %ymm1, %ymm6
+	ALPHA_FSCALE_V %ymm7, %ymm5, %ymm1, %ymm7
 	movl	584(%esp), %eax # srcB
 	vmovdqu	(%eax,%ecx,4), %ymm5
-	vpsrld	$24, %ymm5, %ymm5
-	vcvtdq2ps	%ymm5, %ymm5
-	vmulps	%ymm5, %ymm1, %ymm5
+	ALPHA_FSCALE_V %ymm5, %ymm5, %ymm1, %ymm5
 	vaddps	%ymm7, %ymm4, %ymm2
 	vaddps	%ymm2, %ymm7, %ymm2
 	vaddps	%ymm6, %ymm3, %ymm7
 	vaddps	%ymm7, %ymm6, %ymm6
 	vmovdqu	8(%eax,%ecx,4), %ymm7
-	vpsrld	$24, %ymm7, %ymm7
-	vcvtdq2ps	%ymm7, %ymm7
-	vmulps	%ymm7, %ymm1, %ymm7
+	ALPHA_FSCALE_V %ymm7, %ymm7, %ymm1, %ymm7
 	vaddps	%ymm7, %ymm2, %ymm2
 	vaddps	%ymm5, %ymm6, %ymm6
 	vsubps	%ymm6, %ymm2, %ymm2
 	vmovdqu	4(%eax,%ecx,4), %ymm6
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	%ymm6, %ymm1, %ymm6
+	ALPHA_FSCALE_V %ymm6, %ymm6, %ymm1, %ymm6
 	vaddps	%ymm6, %ymm5, %ymm5
 	vaddps	%ymm5, %ymm6, %ymm6
 	vmovdqu	4(%edi,%ecx,4), %ymm5
-	vpsrld	$24, %ymm5, %ymm5
-	vcvtdq2ps	%ymm5, %ymm5
-	vmulps	%ymm5, %ymm1, %ymm5
+	ALPHA_FSCALE_V %ymm5, %ymm5, %ymm1, %ymm5
 	vaddps	%ymm6, %ymm7, %ymm6
 	vaddps	%ymm5, %ymm3, %ymm3
 	vaddps	%ymm3, %ymm5, %ymm3
@@ -481,9 +501,7 @@ vmovups	416(%esp), %ymm6
 # surfaceZ = srcM[j+1..j+8] * ss (center of window), not srcT (tm)
 	movl	580(%esp), %eax # srcM
 	vmovdqu	4(%eax,%ecx,4), %ymm4
-	vpsrld	$24, %ymm4, %ymm4
-	vcvtdq2ps	%ymm4, %ymm4
-	vmulps	96(%esp), %ymm4, %ymm4
+	ALPHA_FSCALE_V %ymm4, %ymm4, 96(%esp), %ymm4
 	vmovups	320(%esp), %ymm6              # lightZ
 	vsubps	%ymm4, %ymm6, %ymm5
 	vmulps	%ymm2, %ymm2, %ymm6
@@ -540,86 +558,37 @@ vmovups	416(%esp), %ymm6
 	vmovd	%xmm4, %eax
 	vmovd	%xmm5, %edi
 	vmovd	%xmm7, %ebp # Register swap: ebp was used for temp. ebx is GOT.
-	movzbl	(%edx,%ebp), %ebp
-	movzbl	(%edx,%edi), %edi
-	movzbl	(%edx,%eax), %eax
-	shll	$16, %ebp
-	shll	$8, %edi
-	orl	%ebp, %edi
-	orl	%eax, %edi
-	orl	$-16777216, %edi
+	L2S_GATHER_PACK
 	movl	%edi, (%esi,%ecx,4)
 	vpextrd	$1, %xmm7, %ebp
 	vpextrd	$1, %xmm5, %edi
 	vpextrd	$1, %xmm4, %eax
-	movzbl	(%edx,%ebp), %ebp
-	movzbl	(%edx,%edi), %edi
-	movzbl	(%edx,%eax), %eax
-	shll	$16, %ebp
-	shll	$8, %edi
-	orl	%ebp, %edi
-	orl	%eax, %edi
-	orl	$-16777216, %edi
+	L2S_GATHER_PACK
 	movl	%edi, 4(%esi,%ecx,4)
 	vpextrd	$2, %xmm7, %ebp
 	vpextrd	$2, %xmm5, %edi
 	vpextrd	$2, %xmm4, %eax
-	movzbl	(%edx,%ebp), %ebp
-	movzbl	(%edx,%edi), %edi
-	movzbl	(%edx,%eax), %eax
-	shll	$16, %ebp
-	shll	$8, %edi
-	orl	%ebp, %edi
-	orl	%eax, %edi
-	orl	$-16777216, %edi
+	L2S_GATHER_PACK
 	movl	%edi, 8(%esi,%ecx,4)
 	vpextrd	$3, %xmm7, %ebp
 	vpextrd	$3, %xmm5, %edi
 	vpextrd	$3, %xmm4, %eax
-	movzbl	(%edx,%ebp), %ebp
-	movzbl	(%edx,%edi), %edi
-	movzbl	(%edx,%eax), %eax
-	shll	$16, %ebp
-	shll	$8, %edi
-	orl	%ebp, %edi
-	orl	%eax, %edi
-	orl	$-16777216, %edi
+	L2S_GATHER_PACK
 	movl	%edi, 12(%esi,%ecx,4)
 	vmovd	%xmm3, %ebp
 	vmovd	%xmm0, %edi
 	vmovd	%xmm6, %eax
-	movzbl	(%edx,%ebp), %ebp
-	movzbl	(%edx,%edi), %edi
-	movzbl	(%edx,%eax), %eax
-	shll	$16, %ebp
-	shll	$8, %edi
-	orl	%ebp, %edi
-	orl	%eax, %edi
-	orl	$-16777216, %edi
+	L2S_GATHER_PACK
 	movl	%edi, 16(%esi,%ecx,4)
 	vpextrd	$1, %xmm3, %ebp
 	vpextrd	$1, %xmm0, %edi
 	vpextrd	$1, %xmm6, %eax
-	movzbl	(%edx,%ebp), %ebp
-	movzbl	(%edx,%edi), %edi
-	movzbl	(%edx,%eax), %eax
-	shll	$16, %ebp
-	shll	$8, %edi
-	orl	%ebp, %edi
-	orl	%eax, %edi
-	orl	$-16777216, %edi
+	L2S_GATHER_PACK
 	movl	%edi, 20(%esi,%ecx,4)
 	vpextrd	$2, %xmm3, %ebp
 	vpextrd	$2, %xmm0, %edi
 	vpextrd	$2, %xmm6, %eax
-	movzbl	(%edx,%ebp), %ebp
-	movzbl	(%edx,%edi), %edi
-	movzbl	(%edx,%eax), %eax
-	shll	$16, %ebp
-	shll	$8, %edi
-	orl	%ebp, %edi
-	orl	%eax, %edi
-	orl	$-16777216, %edi
+	L2S_GATHER_PACK
 	movl	%edi, 24(%esi,%ecx,4)
 	vpextrd	$3, %xmm3, %ebp
 	vpextrd	$3, %xmm0, %edx

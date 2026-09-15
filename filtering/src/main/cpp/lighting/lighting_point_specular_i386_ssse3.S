@@ -10,6 +10,7 @@
  */
 
 #include "asm_macros.S"
+#include "lighting_i386_ssse3_macros.S"
 
 	.text
 
@@ -24,33 +25,23 @@ POINT_LIT4
 .Lp_idx2:  .long 0x40000000
 .Lp_idx3:  .long 0x40400000
 
-.p2align 4
-.Lp_l2s_data:
- .byte 0,13,22,28,34,38,42,46,50,53,56,59,61,64,66,69
- .byte 0,72,100,121,137,152,165,177,188,198,208,217,225,233,241,248
- .byte 0,58,41,31,31,27,24,22,20,19,16,15,16,16,15,16
- .byte 0,0,7,241,5,0,7,0,0,240,0,194,0,64,0,1
- .byte 16,0,0,0,42,0,1,0,0,0,0,168,0,80,128,170
- .byte 1,2,4,8,16,32,64,128
-
 .text
 
-.macro L2S reg
- movl \reg,%ecx
- cmpl $16,%ecx
- jb 1f
- movl %ecx,%edx; shrl $4,%edx; movzbl (.Lp_l2s_data+16)@GOTOFF(%ebx,%edx),%edx
- movl \reg,%eax; shrl $4,%eax; movzbl (.Lp_l2s_data+32)@GOTOFF(%ebx,%eax),%eax
- movl \reg,%ecx; andl $15,%ecx; imull %ecx,%eax; addl $16,%eax; shrl $5,%eax; addl %eax,%edx
- movl \reg,%ecx; shrl $3,%ecx; movl %ecx,%eax; andl $7,%eax
- cmpl $16,%ecx; jb 2f
- subl $16,%ecx; movzbl (.Lp_l2s_data+64)@GOTOFF(%ebx,%ecx),%ecx; jmp 3f
-2: movzbl (.Lp_l2s_data+48)@GOTOFF(%ebx,%ecx),%ecx
-3: movzbl (.Lp_l2s_data+80)@GOTOFF(%ebx,%eax),%eax; testb %al,%cl; setne %al; movzbl %al,%eax; subl %eax,%edx; movl %edx,\reg; jmp 4f
-1: movzbl .Lp_l2s_data@GOTOFF(%ebx,%ecx),%ecx; movl %ecx,\reg
-4:
-.endm
-
+/*
+ * Description:
+ *   Clamps a channel integer to [0, 255] via branches. Pre-existing
+ *   file-local macro (single-file use); preserved as-is.
+ *
+ * Inputs:
+ *   \reg  = 32-bit GPR holding the channel value (in-place)
+ *
+ * Output:
+ *   \reg  = clamped to [0, 255]
+ *
+ * Clobbers:
+ *   \reg (in-place)
+ *   flags
+ */
 .macro CLAMP reg
  cmpl $0,\reg; jge 1f; xorl \reg,\reg; jmp 2f
 1: cmpl $255,\reg; jle 2f; movl $255,\reg
@@ -91,32 +82,25 @@ SYM(ksvgLightingPointSpecularRowSsse3Linear):
     # Output pixel 0 needs samples at x-1, x, x+1.
     # srcT/M/B pointers are already at x-1.
     movl -32(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-84(%ebp) # tl
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-88(%ebp) # tm
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-92(%ebp) # tr
+    ALPHA_EXTRACT 0, -84
+    ALPHA_EXTRACT 4, -88
+    ALPHA_EXTRACT 8, -92
 
     movl -36(%ebp),%eax
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-136(%ebp) # mm (middle-middle)
+    ALPHA_EXTRACT 4, -136
 
     movl -36(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-96(%ebp) # ml
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-100(%ebp) # mr
+    ALPHA_EXTRACT 0, -96
+    ALPHA_EXTRACT 8, -100
 
     movl -40(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-104(%ebp) # bl
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-108(%ebp) # bm
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-112(%ebp) # br
+    ALPHA_EXTRACT 0, -104
+    ALPHA_EXTRACT 4, -108
+    ALPHA_EXTRACT 8, -112
 
     # Convert to float and scale by surfaceScale.
     movl -16(%ebp),%eax
     movss 36(%eax),%xmm7 # ss
-
-    .macro TO_FLOAT stack_off
-    movd \stack_off(%ebp),%xmm0
-    cvtdq2ps %xmm0,%xmm0
-    mulss %xmm7,%xmm0
-    movss %xmm0,\stack_off(%ebp)
-    .endm
 
     TO_FLOAT -84; TO_FLOAT -88; TO_FLOAT -92
     TO_FLOAT -96; TO_FLOAT -100; TO_FLOAT -136
@@ -229,10 +213,10 @@ SYM(ksvgLightingPointSpecularRowSsse3Linear):
     movss .Lp_one@GOTOFF(%ebx),%xmm1; minss %xmm1,%xmm0
 
     # R = lr * intensity, G = lg * intensity, B = lb * intensity
-    movss 24(%eax),%xmm1; mulss %xmm0,%xmm1; addss .Lp_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%eax # R
+    CHAN_TO_INT 24, %eax, %eax, .Lp_half
     movl -16(%ebp),%edx
-    movss 28(%edx),%xmm1; mulss %xmm0,%xmm1; addss .Lp_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%ecx # G
-    movss 32(%edx),%xmm1; mulss %xmm0,%xmm1; addss .Lp_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%edx # B
+    CHAN_TO_INT 28, %edx, %ecx, .Lp_half
+    CHAN_TO_INT 32, %edx, %edx, .Lp_half
 
     movl %eax,-168(%ebp)
     movl %ecx,-172(%ebp)

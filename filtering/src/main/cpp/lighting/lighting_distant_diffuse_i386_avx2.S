@@ -391,18 +391,11 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):# @ksvgLightingDistantDiffuseRowAvx
 	movzbl	(%ebx,%edx), %edx
 	movzbl	(%ebx,%ecx), %ecx
 	movzbl	(%ebx,%eax), %eax
-	cmpl	%ecx, %edx
-	movl	%ecx, %ebx
-	cmoval	%edx, %ebx
-	cmpl	%eax, %ebx
-	cmovbel	%eax, %ebx
 	shll	$16, %edx
 	orl	%eax, %edx
 	shll	$8, %ecx
 	orl	%edx, %ecx
-	shll	$24, %ebx
-	orl	%ebx, %ecx
-	orl	$-16777216, %ecx # wait, alpha? Specular alpha is max(r,g,b).
+	orl	$-16777216, %ecx # diffuse alpha is always 255 (no max needed)
 	movl	20(%ebp), %edx # dst
 	# esi is loop counter (0, 8, 16...)
 	# edi is sub-loop index (0..7)

@@ -1,4 +1,36 @@
 #include "asm_macros.S"
+#include "lighting_x86_64_ssse3_macros.S"
+
+/*
+ * Description:
+ *   Scalar L2S gather + force-alpha byte pack, matching the point-diffuse
+ *   linear path. Gathers three bytes from \lut (one per channel) and packs
+ *   (R << 16) | (G << 8) | B | 0xFF000000 (full alpha). Legacy SSE
+ *   mnemonics.
+ *
+ * Inputs:
+ *   \lut        = base of the L2S table (e.g. %rax)
+ *   \ri, \gi, \bi = 64-bit index registers holding the byte indices
+ *   \ro, \go, \bo = 32-bit registers receiving the gathered bytes
+ *                   (may differ from the index regs)
+ *
+ * Output:
+ *   \go         = packed 0xAARRGGBB pixel
+ *
+ * Clobbers:
+ *   \ro, \go, \bo
+ *   Upper 32 bits of the 32-bit dests are zero-extended by movzbl.
+ */
+.macro L2S_GATHER_PACK lut, ri, ro, gi, go, bi, bo
+    movzbl  (\lut,\ri), \ro
+    movzbl  (\lut,\gi), \go
+    movzbl  (\lut,\bi), \bo
+    shll    $16, \ro
+    shll    $8, \go
+    orl     \ro, \go
+    orl     \bo, \go
+    orl     $-16777216, \go
+.endm
 
 	.text
 	.file	"pd_ss.c"
@@ -102,31 +134,19 @@ SYM(ksvgLightingPointDiffuseRowSsse3):       # @ksvgLightingPointDiffuseRowSsse3
 	movdqu	(%rdi,%r8,4), %xmm5
 	movdqu	4(%rdi,%r8,4), %xmm6
 	movdqu	8(%rdi,%r8,4), %xmm7
-	psrld	$24, %xmm5
-	cvtdq2ps	%xmm5, %xmm10
-	mulps	%xmm3, %xmm10
-	psrld	$24, %xmm6
-	cvtdq2ps	%xmm6, %xmm5
-	mulps	%xmm3, %xmm5
-	psrld	$24, %xmm7
-	cvtdq2ps	%xmm7, %xmm7
-	mulps	%xmm3, %xmm7
+	ALPHA_FSCALE_X %xmm5, %xmm10, %xmm3
+	ALPHA_FSCALE_X %xmm6, %xmm5, %xmm3
+	ALPHA_FSCALE %xmm7, %xmm3
 	movdqu	(%rsi,%r8,4), %xmm6
 	movdqu	8(%rsi,%r8,4), %xmm9
-	psrld	$24, %xmm6
-	cvtdq2ps	%xmm6, %xmm8
-	mulps	%xmm3, %xmm8
-	psrld	$24, %xmm9
-	cvtdq2ps	%xmm9, %xmm9
-	mulps	%xmm3, %xmm9
+	ALPHA_FSCALE_X %xmm6, %xmm8, %xmm3
+	ALPHA_FSCALE %xmm9, %xmm3
 	movdqu	(%rdx,%r8,4), %xmm14
 	movaps	%xmm10, %xmm6
 	addps	%xmm5, %xmm10
 	addps	%xmm5, %xmm10
 	movdqu	4(%rsi,%r8,4), %xmm5
-	psrld	$24, %xmm5
-	cvtdq2ps	%xmm5, %xmm5
-	mulps	%xmm3, %xmm5
+	ALPHA_FSCALE %xmm5, %xmm3
 	addps	%xmm7, %xmm10
 	addps	%xmm9, %xmm7
 	addps	%xmm9, %xmm7
@@ -134,15 +154,9 @@ SYM(ksvgLightingPointDiffuseRowSsse3):       # @ksvgLightingPointDiffuseRowSsse3
 	addps	%xmm8, %xmm6
 	addps	%xmm8, %xmm6
 	movdqu	8(%rdx,%r8,4), %xmm11
-	psrld	$24, %xmm14
-	cvtdq2ps	%xmm14, %xmm8
-	mulps	%xmm3, %xmm8
-	psrld	$24, %xmm9
-	cvtdq2ps	%xmm9, %xmm9
-	mulps	%xmm3, %xmm9
-	psrld	$24, %xmm11
-	cvtdq2ps	%xmm11, %xmm11
-	mulps	%xmm3, %xmm11
+	ALPHA_FSCALE_X %xmm14, %xmm8, %xmm3
+	ALPHA_FSCALE %xmm9, %xmm3
+	ALPHA_FSCALE %xmm11, %xmm3
 	addps	%xmm11, %xmm7
 	addps	%xmm8, %xmm6
 	subps	%xmm6, %xmm7
@@ -380,46 +394,30 @@ SYM(ksvgLightingPointDiffuseRowSsse3Linear): # @ksvgLightingPointDiffuseRowSsse3
 	movdqu	(%rdi,%r9,4), %xmm2
 	movdqu	4(%rdi,%r9,4), %xmm5
 	movdqu	8(%rdi,%r9,4), %xmm7
-	psrld	$24, %xmm2
-	cvtdq2ps	%xmm2, %xmm6
-	mulps	%xmm3, %xmm6
-	psrld	$24, %xmm5
-	cvtdq2ps	%xmm5, %xmm5
-	mulps	%xmm3, %xmm5
+	ALPHA_FSCALE_X %xmm2, %xmm6, %xmm3
+	ALPHA_FSCALE %xmm5, %xmm3
 	psrld	$24, %xmm7
 
 	cvtdq2ps	%xmm7, %xmm7
 	mulps	%xmm3, %xmm7
 	movdqu	(%rsi,%r9,4), %xmm2
 	movdqu	8(%rsi,%r9,4), %xmm8
-	psrld	$24, %xmm2
-	cvtdq2ps	%xmm2, %xmm14
-	mulps	%xmm3, %xmm14
-	psrld	$24, %xmm8
-	cvtdq2ps	%xmm8, %xmm2
-	mulps	%xmm3, %xmm2
+	ALPHA_FSCALE_X %xmm2, %xmm14, %xmm3
+	ALPHA_FSCALE_X %xmm8, %xmm2, %xmm3
 	movdqu	(%rdx,%r9,4), %xmm8
 	movdqu	4(%rdx,%r9,4), %xmm9
 	movaps	%xmm6, %xmm10
 	addps	%xmm5, %xmm6
 	addps	%xmm5, %xmm6
 	movdqu	4(%rsi,%r9,4), %xmm5
-	psrld	$24, %xmm5
-	cvtdq2ps	%xmm5, %xmm5
-	mulps	%xmm3, %xmm5
+	ALPHA_FSCALE %xmm5, %xmm3
 	addps	%xmm7, %xmm6
 	addps	%xmm2, %xmm7
 	addps	%xmm2, %xmm7
 	movdqu	8(%rdx,%r9,4), %xmm2
-	psrld	$24, %xmm8
-	cvtdq2ps	%xmm8, %xmm8
-	mulps	%xmm3, %xmm8
-	psrld	$24, %xmm9
-	cvtdq2ps	%xmm9, %xmm9
-	mulps	%xmm3, %xmm9
-	psrld	$24, %xmm2
-	cvtdq2ps	%xmm2, %xmm2
-	mulps	%xmm3, %xmm2
+	ALPHA_FSCALE %xmm8, %xmm3
+	ALPHA_FSCALE %xmm9, %xmm3
+	ALPHA_FSCALE %xmm2, %xmm3
 	addps	%xmm2, %xmm7
 	addps	%xmm14, %xmm10
 	addps	%xmm14, %xmm10
@@ -524,14 +522,7 @@ SYM(ksvgLightingPointDiffuseRowSsse3Linear): # @ksvgLightingPointDiffuseRowSsse3
 	movd	%xmm2, %r10d
 	movd	%xmm14, %r11d
 	movd	%xmm7, %ebx
-	movzbl	(%rax,%rbx), %ebx
-	movzbl	(%rax,%r11), %r11d
-	movzbl	(%rax,%r10), %r10d
-	shll	$16, %ebx
-	shll	$8, %r11d
-	orl	%ebx, %r11d
-	orl	%r10d, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %rbx, %ebx, %r11, %r11d, %r10, %r10d
 	movl	%r11d, (%rcx,%r9,4)
 	pshufd	$85, %xmm7, %xmm7               # xmm7 = xmm7[1,1,1,1]
 	movd	%xmm7, %r10d
@@ -539,26 +530,12 @@ SYM(ksvgLightingPointDiffuseRowSsse3Linear): # @ksvgLightingPointDiffuseRowSsse3
 	movd	%xmm7, %r11d
 	pshufd	$85, %xmm2, %xmm2               # xmm2 = xmm2[1,1,1,1]
 	movd	%xmm2, %ebx
-	movzbl	(%rax,%r10), %r10d
-	movzbl	(%rax,%r11), %r11d
-	movzbl	(%rax,%rbx), %ebx
-	shll	$16, %r10d
-	shll	$8, %r11d
-	orl	%r10d, %r11d
-	orl	%ebx, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %r10, %r10d, %r11, %r11d, %rbx, %ebx
 	movl	%r11d, 4(%rcx,%r9,4)
 	movd	%xmm10, %r10d
 	movd	%xmm9, %r11d
 	movd	%xmm8, %ebx
-	movzbl	(%rax,%r10), %r10d
-	movzbl	(%rax,%r11), %r11d
-	movzbl	(%rax,%rbx), %ebx
-	shll	$16, %r10d
-	shll	$8, %r11d
-	orl	%r10d, %r11d
-	orl	%ebx, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %r10, %r10d, %r11, %r11d, %rbx, %ebx
 	movl	%r11d, 8(%rcx,%r9,4)
 	movd	%xmm6, %r10d
 	movd	%xmm5, %ebx

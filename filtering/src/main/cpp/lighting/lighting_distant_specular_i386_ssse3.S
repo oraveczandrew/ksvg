@@ -3,6 +3,7 @@
  */
 
 #include "asm_macros.S"
+#include "lighting_i386_ssse3_macros.S"
 
 	.text
 POINT_LIT4
@@ -63,25 +64,22 @@ SYM(ksvgLightingDistantSpecularRowSsse3Linear):
     cmpl $0,-12(%ebp); jle .Ldss_done_Ssse3
 
     movl -32(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-84(%ebp) # tl
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-88(%ebp) # tm
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-92(%ebp) # tr
+    ALPHA_EXTRACT 0, -84
+    ALPHA_EXTRACT 4, -88
+    ALPHA_EXTRACT 8, -92
     movl -36(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-96(%ebp) # ml
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-100(%ebp) # mr
+    ALPHA_EXTRACT 0, -96
+    ALPHA_EXTRACT 8, -100
     movl -40(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-104(%ebp) # bl
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-108(%ebp) # bm
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-112(%ebp) # br
+    ALPHA_EXTRACT 0, -104
+    ALPHA_EXTRACT 4, -108
+    ALPHA_EXTRACT 8, -112
 
     movl -16(%ebp),%eax
     movss 36(%eax),%xmm7 # ss
-    .macro DSS_TO_FLOAT stack_off
-    movd \stack_off(%ebp),%xmm0; cvtdq2ps %xmm0,%xmm0; mulss %xmm7,%xmm0; movss %xmm0,\stack_off(%ebp)
-    .endm
-    DSS_TO_FLOAT -84; DSS_TO_FLOAT -88; DSS_TO_FLOAT -92
-    DSS_TO_FLOAT -96; DSS_TO_FLOAT -100
-    DSS_TO_FLOAT -104; DSS_TO_FLOAT -108; DSS_TO_FLOAT -112
+    TO_FLOAT -84; TO_FLOAT -88; TO_FLOAT -92
+    TO_FLOAT -96; TO_FLOAT -100
+    TO_FLOAT -104; TO_FLOAT -108; TO_FLOAT -112
 
     # dzdx
     movss -92(%ebp),%xmm0; addss -100(%ebp),%xmm0; addss -100(%ebp),%xmm0; addss -112(%ebp),%xmm0
@@ -113,20 +111,16 @@ SYM(ksvgLightingDistantSpecularRowSsse3Linear):
     xorps %xmm1,%xmm1; maxss %xmm1,%xmm0; minss .Ldss_one@GOTOFF(%ebx),%xmm0
 
     # R,G,B
-    movss 24(%eax),%xmm1; mulss %xmm0,%xmm1; addss .Ldss_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%eax
+    CHAN_TO_INT 24, %eax, %eax, .Ldss_half
     movl -16(%ebp),%edx
-    movss 28(%edx),%xmm1; mulss %xmm0,%xmm1; addss .Ldss_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%ecx
-    movss 32(%edx),%xmm1; mulss %xmm0,%xmm1; addss .Ldss_half@GOTOFF(%ebx),%xmm1; cvttss2si %xmm1,%edx
+    CHAN_TO_INT 28, %edx, %ecx, .Ldss_half
+    CHAN_TO_INT 32, %edx, %edx, .Ldss_half
 
     cmpl $0,-4(%ebp) # useLinear
     je .Ldss_out
-    movl -24(%ebp),%esi # lut
-    movzbl (%esi,%eax),%eax; movzbl (%esi,%ecx),%ecx; movzbl (%esi,%edx),%edx
+    L2S_GATHER %esi
 .Ldss_out:
-    shll $16,%eax; shll $8,%ecx; orl %ecx,%eax; orl %edx,%eax
-    movl %eax,%esi; cmpl %ecx,%esi; cmovl %ecx,%esi; cmpl %edx,%esi; cmovl %edx,%esi
-    shll $24,%esi; orl %esi,%eax
-    movl -8(%ebp),%ecx; movl %eax,(%ecx)
+    PACK_MAX_ALPHA
 
     addl $4,-32(%ebp); addl $4,-36(%ebp); addl $4,-40(%ebp); addl $4,-8(%ebp)
     decl -12(%ebp)

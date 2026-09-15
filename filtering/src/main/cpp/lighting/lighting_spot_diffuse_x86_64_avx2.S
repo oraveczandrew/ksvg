@@ -1,34 +1,5 @@
 #include "asm_macros.S"
-
-/* Exact Linear -> sRGB conversion via the 256-entry LUT,
- * matching ksvg_linear_to_srgb_lut / ColorLuts.LINEAR_TO_SRGB.
- * Scratch registers: %r10 only. The caller keeps its loop index in %r9 and
- * the loop limit in %r8, plus the L2S table base in %r15; never clobber
- * those (this mirrors the SSSE3 copy of the macro exactly). */
-.macro L2S_SPOT64 reg
-    movl \reg, %r10d
-    movzbl (%r15,%r10,1), %r10d
-    movl %r10d, \reg
-.endm
-
-.p2align 4
-.Lspot_l2s_data:
-    .byte 0,13,22,28,34,38,42,46,50,53,56,59,61,64,66,69
-    .byte 71,73,75,77,79,81,83,85,86,88,90,92,93,95,96,98
-    .byte 99,101,102,104,105,106,108,109,110,112,113,114,115,117,118,119
-    .byte 120,121,122,124,125,126,127,128,129,130,131,132,133,134,135,136
-    .byte 137,138,139,140,141,142,143,144,145,146,147,148,148,149,150,151
-    .byte 152,153,154,155,155,156,157,158,159,159,160,161,162,163,163,164
-    .byte 165,166,167,167,168,169,170,170,171,172,173,173,174,175,175,176
-    .byte 177,178,178,179,180,180,181,182,182,183,184,185,185,186,187,187
-    .byte 188,189,189,190,190,191,192,192,193,194,194,195,196,196,197,197
-    .byte 198,199,199,200,200,201,202,202,203,203,204,205,205,206,206,207
-    .byte 208,208,209,209,210,210,211,212,212,213,213,214,214,215,215,216
-    .byte 216,217,218,218,219,219,220,220,221,221,222,222,223,223,224,224
-    .byte 225,226,226,227,227,228,228,229,229,230,230,231,231,232,232,233
-    .byte 233,234,234,235,235,236,236,237,237,238,238,238,239,239,240,240
-    .byte 241,241,242,242,243,243,244,244,245,245,246,246,246,247,247,248
-    .byte 248,249,249,250,250,251,251,251,252,252,253,253,254,254,255,255
+#include "lighting_x86_64_avx2_macros.S"
 
 /* Spot-light diffuse SIMD kernel.
  * SpotLightingParams layout (17 x float):
@@ -145,15 +116,9 @@ LSPOTAVX2_LOOP:                                # =>This Inner Loop Header: Depth
 	vmovdqu	(%rdi,%r8,4), %ymm8
 	vmovdqu	4(%rdi,%r8,4), %ymm9
 	vmovdqu	8(%rdi,%r8,4), %ymm10
-	vpsrld	$24, %ymm8, %ymm8
-	vcvtdq2ps	%ymm8, %ymm8
-	vmulps	%ymm0, %ymm8, %ymm8
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm0, %ymm9, %ymm9
-	vpsrld	$24, %ymm10, %ymm10
-	vcvtdq2ps	%ymm10, %ymm10
-	vmulps	%ymm0, %ymm10, %ymm10
+	ALPHA_FSCALE %ymm8, %ymm8, %ymm0, %ymm8
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm0, %ymm9
+	ALPHA_FSCALE %ymm10, %ymm10, %ymm0, %ymm10
 	vsubps	%ymm8, %ymm10, %ymm12
 	vaddps	%ymm9, %ymm9, %ymm9
 	vaddps	%ymm9, %ymm8, %ymm8
@@ -162,12 +127,8 @@ LSPOTAVX2_LOOP:                                # =>This Inner Loop Header: Depth
 	vmovdqu	(%rsi,%r8,4), %ymm9
 	vmovdqu	4(%rsi,%r8,4), %ymm11
 	vmovdqu	8(%rsi,%r8,4), %ymm10
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm0, %ymm9, %ymm9
-	vpsrld	$24, %ymm10, %ymm10
-	vcvtdq2ps	%ymm10, %ymm10
-	vmulps	%ymm0, %ymm10, %ymm10
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm0, %ymm9
+	ALPHA_FSCALE %ymm10, %ymm10, %ymm0, %ymm10
 	vaddps	%ymm10, %ymm10, %ymm10
 	vaddps	%ymm10, %ymm12, %ymm10
 	vaddps	%ymm9, %ymm9, %ymm9
@@ -175,15 +136,9 @@ LSPOTAVX2_LOOP:                                # =>This Inner Loop Header: Depth
 	vmovdqu	(%rdx,%r8,4), %ymm10
 	vmovdqu	4(%rdx,%r8,4), %ymm12
 	vmovdqu	8(%rdx,%r8,4), %ymm13
-	vpsrld	$24, %ymm10, %ymm10
-	vcvtdq2ps	%ymm10, %ymm10
-	vmulps	%ymm0, %ymm10, %ymm10
-	vpsrld	$24, %ymm12, %ymm12
-	vcvtdq2ps	%ymm12, %ymm12
-	vmulps	%ymm0, %ymm12, %ymm12
-	vpsrld	$24, %ymm13, %ymm13
-	vcvtdq2ps	%ymm13, %ymm13
-	vmulps	%ymm0, %ymm13, %ymm13
+	ALPHA_FSCALE %ymm10, %ymm10, %ymm0, %ymm10
+	ALPHA_FSCALE %ymm12, %ymm12, %ymm0, %ymm12
+	ALPHA_FSCALE %ymm13, %ymm13, %ymm0, %ymm13
 	vsubps	%ymm10, %ymm13, %ymm14
 	vaddps	%ymm14, %ymm9, %ymm9
 	vaddps	%ymm12, %ymm12, %ymm12
@@ -491,9 +446,9 @@ SYM(ksvgLightingSpotDiffuseRowAvx2Linear):   # @SYM(ksvgLightingSpotDiffuseRowAv
 	movl	%r11d, %esi
 	movl	%r14d, %edx
 	leaq	.Lspot_l2s_data(%rip), %r15
-	L2S_SPOT64 %eax
-	L2S_SPOT64 %esi
-	L2S_SPOT64 %edx
+	L2S_SPOT %eax
+	L2S_SPOT %esi
+	L2S_SPOT %edx
 	shll	$16, %eax
 	shll	$8, %esi
 	orl	%eax, %esi

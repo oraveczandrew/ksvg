@@ -15,15 +15,29 @@
  */
 
 #include "asm_macros.S"
-
+#include "lighting_x86_64_avx2_macros.S"
 
 /*
- * Apply the same L2S amortization used by the existing color conversion SIMD:
- * exact values for 0..15, otherwise base + slope interpolation followed by
- * the correction bitset. REG is an integer 0..255.
+ * Description:
+ *   Amortized linear->sRGB conversion for one byte 0..255: exact value for
+ *   0..15 via table entry 0, otherwise base + slope interpolation followed by
+ *   the per-bit correction set (correction_lo/correction_hi AND onehot).
+ *   Matches the pre-existing file-local definition in
+ *   lighting_distant_specular_x86_64_avx2.S.
  *
- * Scratch registers: r8d, r9d, r10d, r11 (table base). On these kernels r8/r9
- * are no longer needed after the parameter setup, while r10 is free.
+ * Inputs:
+ *   \reg  = 32-bit general-purpose register holding the linear intensity (0..255)
+ *   %r11  = base of a .Lspec_l2s_data-shaped LUT (loaded by the caller)
+ *
+ * Output:
+ *   \reg  = sRGB byte value, stored through %r9d (top bits zeroed)
+ *
+ * Clobbers:
+ *   \reg      (in-place)
+ *   %r8d, %r9d, %r10d
+ *
+ * Uses \@-suffixed local labels; caller keeps its loop index / loop limit in
+ * its own registers.
  */
 .macro L2S1 reg
     movl \reg, %r10d
@@ -136,31 +150,19 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
 	vmovdqu	(%rax,%r13,4), %ymm1
 	vmovdqu	4(%rax,%r13,4), %ymm2
 	vmovdqu	8(%rax,%r13,4), %ymm3
-	vpsrld	$24, %ymm1, %ymm1
-	vcvtdq2ps	%ymm1, %ymm1
-	vmulps	%ymm1, %ymm0, %ymm1
-	vpsrld	$24, %ymm2, %ymm2
-	vcvtdq2ps	%ymm2, %ymm2
-	vmulps	%ymm2, %ymm0, %ymm2
-	vpsrld	$24, %ymm3, %ymm3
-	vcvtdq2ps	%ymm3, %ymm3
-	vmulps	%ymm3, %ymm0, %ymm3
+	ALPHA_FSCALE %ymm1, %ymm1, %ymm0, %ymm1
+	ALPHA_FSCALE %ymm2, %ymm2, %ymm0, %ymm2
+	ALPHA_FSCALE %ymm3, %ymm3, %ymm0, %ymm3
 	movq	40(%rsp), %rax                  # 8-byte Reload
 	vmovdqu	(%rax,%r13,4), %ymm4
 	vmovdqu	8(%rax,%r13,4), %ymm5
-	vpsrld	$24, %ymm4, %ymm4
-	vcvtdq2ps	%ymm4, %ymm4
-	vmulps	%ymm4, %ymm0, %ymm4
-	vpsrld	$24, %ymm5, %ymm5
-	vcvtdq2ps	%ymm5, %ymm5
-	vmulps	%ymm5, %ymm0, %ymm5
+	ALPHA_FSCALE %ymm4, %ymm4, %ymm0, %ymm4
+	ALPHA_FSCALE %ymm5, %ymm5, %ymm0, %ymm5
 	movq	48(%rsp), %rax                  # 8-byte Reload
 	vmovdqu	(%rax,%r13,4), %ymm6
 	vmovdqu	4(%rax,%r13,4), %ymm7
 	vmovdqu	8(%rax,%r13,4), %ymm8
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	%ymm6, %ymm0, %ymm6
+	ALPHA_FSCALE %ymm6, %ymm6, %ymm0, %ymm6
 	vpsrld	$24, %ymm7, %ymm7
 	vcvtdq2ps	%ymm7, %ymm7
 	vpsrld	$24, %ymm8, %ymm8
@@ -335,7 +337,6 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 	movq	%r9, %rbx
 	movq	%rcx, %r15
 	movq	%r8, %rax
-	leaq	.Lspec_l2s_data(%rip), %r11
 	vbroadcastss	(%r9), %ymm1
 	vmovaps	%ymm1, 224(%rsp)                # 32-byte Spill
 	vbroadcastss	12(%r9), %ymm1
@@ -380,31 +381,19 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 	vmovdqu	(%rax,%r13,4), %ymm1
 	vmovdqu	4(%rax,%r13,4), %ymm2
 	vmovdqu	8(%rax,%r13,4), %ymm3
-	vpsrld	$24, %ymm1, %ymm1
-	vcvtdq2ps	%ymm1, %ymm1
-	vmulps	%ymm1, %ymm0, %ymm1
-	vpsrld	$24, %ymm2, %ymm2
-	vcvtdq2ps	%ymm2, %ymm2
-	vmulps	%ymm2, %ymm0, %ymm2
-	vpsrld	$24, %ymm3, %ymm3
-	vcvtdq2ps	%ymm3, %ymm3
-	vmulps	%ymm3, %ymm0, %ymm3
+	ALPHA_FSCALE %ymm1, %ymm1, %ymm0, %ymm1
+	ALPHA_FSCALE %ymm2, %ymm2, %ymm0, %ymm2
+	ALPHA_FSCALE %ymm3, %ymm3, %ymm0, %ymm3
 	movq	40(%rsp), %rax                  # 8-byte Reload
 	vmovdqu	(%rax,%r13,4), %ymm4
 	vmovdqu	8(%rax,%r13,4), %ymm5
-	vpsrld	$24, %ymm4, %ymm4
-	vcvtdq2ps	%ymm4, %ymm4
-	vmulps	%ymm4, %ymm0, %ymm4
-	vpsrld	$24, %ymm5, %ymm5
-	vcvtdq2ps	%ymm5, %ymm5
-	vmulps	%ymm5, %ymm0, %ymm5
+	ALPHA_FSCALE %ymm4, %ymm4, %ymm0, %ymm4
+	ALPHA_FSCALE %ymm5, %ymm5, %ymm0, %ymm5
 	movq	48(%rsp), %rax                  # 8-byte Reload
 	vmovdqu	(%rax,%r13,4), %ymm6
 	vmovdqu	4(%rax,%r13,4), %ymm7
 	vmovdqu	8(%rax,%r13,4), %ymm8
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	%ymm6, %ymm0, %ymm6
+	ALPHA_FSCALE %ymm6, %ymm6, %ymm0, %ymm6
 	vpsrld	$24, %ymm7, %ymm7
 	vcvtdq2ps	%ymm7, %ymm7
 	vpsrld	$24, %ymm8, %ymm8
@@ -451,9 +440,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 .LBS1_18:                               #   in Loop: Header=BB1_3 Depth=2
 	leaq	.Lspec_l2s_data(%rip), %r11
 	L2S1 %eax
-	leaq	.Lspec_l2s_data(%rip), %r11
 	L2S1 %edx
-	leaq	.Lspec_l2s_data(%rip), %r11
 	L2S1 %esi
 	cmpl	%edx, %eax
 	movl	%edx, %eax

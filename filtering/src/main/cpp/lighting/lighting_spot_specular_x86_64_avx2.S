@@ -1,4 +1,181 @@
 #include "asm_macros.S"
+#include "lighting_x86_64_avx2_macros.S"
+
+/*
+ * Description:
+ *   Packs three already-truncated 0..255 channel values into one ARGB pixel
+ *   and stores it: alpha = max(r, g, b) (channel carrying the specular
+ *   intensity), then A<<24 | R<<16 | G<<8 | B, stored to dst_off(dst_reg).
+ *   The channel order is the AOSP-style AARRGGBB little-endian word used by
+ *   the lighting kernels.
+ *
+ * Inputs:
+ *   \r, \g, \b   = 32-bit GPRs holding R, G, B in 0..255 (must be distinct;
+ *                  must not be \dst_reg)
+ *   \dst_reg    = GPR base for the output store
+ *   \dst_off    = immediate byte offset added to (\dst_reg)
+ *   \tmp        = 32-bit GPR scratch (must be distinct from \r, \g, \b)
+ *
+ * Output:
+ *   \r          = packed ARGB value (also stored to \dst_off(\dst_reg))
+ *
+ * Clobbers:
+ *   \r      (in-place)
+ *   \g      (shifted to G<<8)
+ *   \b      (shifted to B<<8 and OR-ed away)
+ *   \tmp    (shifts to alpha<<24)
+ *   flags
+ */
+.macro SPOT_PACK r, g, b, dst_reg, dst_off, tmp
+    movl \r, \tmp
+    cmpl \g, \tmp
+    cmovl \g, \tmp
+    cmpl \b, \tmp
+    cmovl \b, \tmp
+    shll $24, \tmp
+    shll $16, \r
+    shll $8, \g
+    orl \g, \r
+    orl \b, \r
+    orl \tmp, \r
+    movl \r, \dst_off(\dst_reg)
+.endm
+
+/*
+ * Description:
+ *   Per-pixel spot-specular front half: intensity[i] -> powf(specular
+ *   exponent) -> x k -> x spot-factor segment -> clamp intensity to [0,1],
+ *   then R/G/B = intensity x lr/lg/lb, per-channel max 0 / min 255 /
+ *   round-nearest (+.5, vroundss $11) / truncate, and finally the packed
+ *   ARGB pixel stored via SPOT_PACK to out_off(dst_reg). With \l2s == 1 the
+ *   three truncated bytes go through L2S_SPOT first (linear core).
+ *
+ * Inputs:
+ *   \intens_off  = byte offset of intensity[i] in the caller's 32(%rsp)-based
+ *                  scratch area (e.g. 4*i)
+ *   \spot_off    = byte offset of the spot-factor segment (e.g. 32+4*i)
+ *   \out_off     = byte offset for the packed pixel store
+ *   \dst_reg     = GPR store base
+ *   \params_reg  = GPR pointing at SpotLightingParams (8 -> k, 24/28/32 ->
+ *                  lr/lg/lb). Must be callee-saved: powf is called inside.
+ *   \exp_reg     = specular exponent GPR (must be callee-saved)
+ *   \l2s         = 1 to run L2S_SPOT on the three truncated bytes (uses %r15
+ *                  LUT base loaded by the caller), 0 otherwise
+ *
+ * Output:
+ *   packed ARGB stored at \out_off(\dst_reg)
+ *
+ * Clobbers:
+ *   %xmm0 (in-place), %xmm1, %xmm2, %xmm3
+ *   %eax, %ecx, %edx, %edi   (via the truncation + SPOT_PACK tail)
+ *   all SysV caller-saved registers via CALL(powf)
+ *   (flags)
+ *
+ * Depends on the file-local .Lspot_zero/.Lspot_one/.Lspot_255/.Lspot_half
+ * literals in the caller's RODATA.
+ */
+.macro SPOT_SPEC_PIXEL intens_off, spot_off, out_off, dst_reg, params_reg, exp_reg, l2s
+    vmovss \intens_off(%rsp), %xmm0
+    vmovd \exp_reg, %xmm1
+    CALL(powf)
+    vmulss 8(\params_reg), %xmm0, %xmm0
+    vmulss \spot_off(%rsp), %xmm0, %xmm0
+    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
+    vminss .Lspot_one(%rip), %xmm0, %xmm0
+    vmulss 24(\params_reg), %xmm0, %xmm1
+    vmulss 28(\params_reg), %xmm0, %xmm2
+    vmulss 32(\params_reg), %xmm0, %xmm3
+    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
+    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
+    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
+    vminss .Lspot_255(%rip), %xmm1, %xmm1
+    vminss .Lspot_255(%rip), %xmm2, %xmm2
+    vminss .Lspot_255(%rip), %xmm3, %xmm3
+    vaddss .Lspot_half(%rip), %xmm1, %xmm1
+    vroundss $11, %xmm1, %xmm1, %xmm1
+    vaddss .Lspot_half(%rip), %xmm2, %xmm2
+    vroundss $11, %xmm2, %xmm2, %xmm2
+    vaddss .Lspot_half(%rip), %xmm3, %xmm3
+    vroundss $11, %xmm3, %xmm3, %xmm3
+    vcvttss2si %xmm1, %eax
+    vcvttss2si %xmm2, %ecx
+    vcvttss2si %xmm3, %edx
+    .if \l2s
+    L2S_SPOT %eax
+    L2S_SPOT %ecx
+    L2S_SPOT %edx
+    .endif
+    SPOT_PACK %eax, %ecx, %edx, \dst_reg, \out_off, %edi
+.endm
+
+/*
+ * Description:
+ *   Weighted 1:2:1 sum over three float vectors, matching the spot-specular
+ *   3x3 window-sum grouping EXACTLY: the two edge operands are added first
+ *   ((v0+v2) -> dst), then the doubled middle term (2*v1 -> scratch), then the
+ *   accumulate (dst += scratch). This FP operation order is significant
+ *   ((v0+v2)+2*v1 is not bit-equal to 2*v1+v0+v2 in general) and must remain
+ *   frozen to keep parity.
+ *
+ * Inputs:
+ *   \v0, \v1, \v2  = three 256-bit float vectors; \v1 is the 1:2:1 middle.
+ *                    v0/v2 are read first, so \scratch may alias either of
+ *                    them for the caller's convenience.
+ *   \dst           = destination/accumulator ymm register.
+ *   \scratch       = ymm scratch for the doubled middle (distinct from \dst;
+ *                    may alias \v0 or \v2, must not alias \v1).
+ *
+ * Output:
+ *   \dst = \v0 + 2*\v1 + \v2
+ *
+ * Clobbers:
+ *   \dst, \scratch
+ */
+.macro SUM121F v0, v1, v2, dst, scratch
+    vaddps  \v0, \v2, \dst
+    vaddps  \v1, \v1, \scratch
+    vaddps  \scratch, \dst, \dst
+.endm
+
+/*
+ * Description:
+ *   Normalizes a float vector (x, y, z) by its sqrt'd squared length using a
+ *   reciprocal: len = sqrt(l2); guard = (len != 0); r = 1/len; then scales
+ *   x, y, z by r and zeroes the lanes where len == 0 via the guard mask.
+ *   Uses the vcmpps $4 (NEQ) + vdivps + vmulps + vandps sequence so the FP
+ *   operation order matches the pre-existing spot-specular view-vector
+ *   normalize blocks bit-for-bit. Caller computes l2 = x^2 + y^2 + z^2
+ *   (optionally plus one component offset) into \l2 beforehand.
+ *
+ * Inputs:
+ *   \l2                = squared length of the vector (float)
+ *   \x, \y, \z         = vector components to normalize
+ *
+ * Output:
+ *   \x, \y, \z         = normalized components (|v| = 1), zero where len == 0
+ *
+ * Clobbers:
+ *   \l2    (len replaces the squared length)
+ *   \x, \y, \z                           (in-place)
+ *   \guard, \recip
+ *   Depends on the file-local .Lspot_one literal in the caller's RODATA.
+ *
+ * Example: NORM_INV %ymm11, %ymm7, %ymm1, %ymm2, %ymm0, %ymm8 normalizes
+ *   the (7, 1, 2) vector, using ymm0 for the guard mask and ymm8 for r.
+ */
+.macro NORM_INV l2, x, y, z, guard, recip
+    vsqrtps \l2, \l2                        // len
+    vxorps  \guard, \guard, \guard
+    vcmpps  $4, \guard, \l2, \guard         // guard = (len != 0)
+    vbroadcastss .Lspot_one(%rip), \recip
+    vdivps  \l2, \recip, \recip             // r = 1/len
+    vmulps  \recip, \x, \x
+    vmulps  \recip, \y, \y
+    vmulps  \recip, \z, \z
+    vandps  \guard, \x, \x
+    vandps  \guard, \y, \y
+    vandps  \guard, \z, \z
+.endm
 
 /* Spot-light + specular Intel SIMD kernels.
  *
@@ -30,32 +207,6 @@ POINT_LIT4
 .Lspot_one:  .long 0x3f800000
 .Lspot_255:  .long 0x437f0000
 .Lspot_half: .long 0x3f000000
-
-.macro L2S_SPOT reg
-    movl \reg, %r10d
-    movzbl (%r15,%r10,1), %r10d
-    movl %r10d, \reg
-.endm
-
-RODATA
-.p2align 5
-.Lspot_l2s_data:
-    .byte 0,13,22,28,34,38,42,46,50,53,56,59,61,64,66,69
-    .byte 71,73,75,77,79,81,83,85,86,88,90,92,93,95,96,98
-    .byte 99,101,102,104,105,106,108,109,110,112,113,114,115,117,118,119
-    .byte 120,121,122,124,125,126,127,128,129,130,131,132,133,134,135,136
-    .byte 137,138,139,140,141,142,143,144,145,146,147,148,148,149,150,151
-    .byte 152,153,154,155,155,156,157,158,159,159,160,161,162,163,163,164
-    .byte 165,166,167,167,168,169,170,170,171,172,173,173,174,175,175,176
-    .byte 177,178,178,179,180,180,181,182,182,183,184,185,185,186,187,187
-    .byte 188,189,189,190,190,191,192,192,193,194,194,195,196,196,197,197
-    .byte 198,199,199,200,200,201,202,202,203,203,204,205,205,206,206,207
-    .byte 208,208,209,209,210,210,211,212,212,213,213,214,214,215,215,216
-    .byte 216,217,218,218,219,219,220,220,221,221,222,222,223,223,224,224
-    .byte 225,226,226,227,227,228,228,229,229,230,230,231,231,232,232,233
-    .byte 233,234,234,235,235,236,236,237,237,238,238,238,239,239,240,240
-    .byte 241,241,242,242,243,243,244,244,245,245,246,246,246,247,247,248
-    .byte 248,249,249,250,250,251,251,251,252,252,253,253,254,254,255,255
 
 TEXT_SECTION
 
@@ -170,19 +321,11 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     vmulps %ymm11, %ymm6, %ymm6
     vmulps %ymm11, %ymm7, %ymm7
     vmulps %ymm11, %ymm8, %ymm8
-    vaddps %ymm2, %ymm8, %ymm9
-    vaddps %ymm5, %ymm5, %ymm11
-    vaddps %ymm11, %ymm9, %ymm9
-    vaddps %ymm0, %ymm6, %ymm10
-    vaddps %ymm3, %ymm3, %ymm11
-    vaddps %ymm11, %ymm10, %ymm10
+    SUM121F %ymm2, %ymm5, %ymm8, %ymm9, %ymm11
+    SUM121F %ymm0, %ymm3, %ymm6, %ymm10, %ymm11
     vsubps %ymm10, %ymm9, %ymm9
-    vaddps %ymm6, %ymm8, %ymm10
-    vaddps %ymm7, %ymm7, %ymm11
-    vaddps %ymm11, %ymm10, %ymm10
-    vaddps %ymm0, %ymm2, %ymm11
-    vaddps %ymm1, %ymm1, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
+    SUM121F %ymm6, %ymm7, %ymm8, %ymm10, %ymm11
+    SUM121F %ymm0, %ymm1, %ymm2, %ymm11, %ymm0
     vsubps %ymm11, %ymm10, %ymm10
     vbroadcastss 0(%rbp), %ymm0
     vdivps %ymm0, %ymm9, %ymm9
@@ -221,17 +364,7 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     vaddps %ymm1, %ymm0, %ymm0
     vmulps %ymm13, %ymm13, %ymm1
     vaddps %ymm1, %ymm0, %ymm0
-    vsqrtps %ymm0, %ymm0
-    vxorps %ymm6, %ymm6, %ymm6
-    vcmpps $4, %ymm6, %ymm0, %ymm6
-    vbroadcastss .Lspot_one(%rip), %ymm7
-    vdivps %ymm0, %ymm7, %ymm7
-    vmulps %ymm7, %ymm14, %ymm14
-    vmulps %ymm7, %ymm15, %ymm15
-    vmulps %ymm7, %ymm13, %ymm13
-    vandps %ymm6, %ymm14, %ymm14
-    vandps %ymm6, %ymm15, %ymm15
-    vandps %ymm6, %ymm13, %ymm13
+    NORM_INV %ymm0, %ymm14, %ymm15, %ymm13, %ymm6, %ymm7
     vxorps %ymm0, %ymm0, %ymm0
     vsubps %ymm14, %ymm0, %ymm6
     vbroadcastss 52(%rbp), %ymm1
@@ -263,17 +396,7 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     vaddps %ymm0, %ymm11, %ymm11
     vmulps %ymm2, %ymm2, %ymm0
     vaddps %ymm0, %ymm11, %ymm11
-    vsqrtps %ymm11, %ymm11
-    vxorps %ymm0, %ymm0, %ymm0
-    vcmpps $4, %ymm0, %ymm11, %ymm0
-    vbroadcastss .Lspot_one(%rip), %ymm8
-    vdivps %ymm11, %ymm8, %ymm8
-    vmulps %ymm8, %ymm7, %ymm7
-    vmulps %ymm8, %ymm1, %ymm1
-    vmulps %ymm8, %ymm2, %ymm2
-    vandps %ymm0, %ymm7, %ymm7
-    vandps %ymm0, %ymm1, %ymm1
-    vandps %ymm0, %ymm2, %ymm2
+    NORM_INV %ymm11, %ymm7, %ymm1, %ymm2, %ymm0, %ymm8
     vmulps %ymm7, %ymm9, %ymm11
     vmulps %ymm1, %ymm10, %ymm0
     vaddps %ymm0, %ymm11, %ymm11
@@ -285,302 +408,14 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     vmovups %ymm6, 32(%rsp)
     leaq .Lspot_l2s_data(%rip), %r15
     vzeroupper
-    vmovss 0(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 32(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 0(%r14)
-    vmovss 4(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 36(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 4(%r14)
-    vmovss 8(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 40(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 8(%r14)
-    vmovss 12(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 44(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 12(%r14)
-    vmovss 16(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 48(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 16(%r14)
-    vmovss 20(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 52(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 20(%r14)
-    vmovss 24(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 56(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 24(%r14)
-    vmovss 28(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 60(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 28(%r14)
+    SPOT_SPEC_PIXEL 0, 32, 0, %r14, %rbp, %r13d, 0
+    SPOT_SPEC_PIXEL 4, 36, 4, %r14, %rbp, %r13d, 0
+    SPOT_SPEC_PIXEL 8, 40, 8, %r14, %rbp, %r13d, 0
+    SPOT_SPEC_PIXEL 12, 44, 12, %r14, %rbp, %r13d, 0
+    SPOT_SPEC_PIXEL 16, 48, 16, %r14, %rbp, %r13d, 0
+    SPOT_SPEC_PIXEL 20, 52, 20, %r14, %rbp, %r13d, 0
+    SPOT_SPEC_PIXEL 24, 56, 24, %r14, %rbp, %r13d, 0
+    SPOT_SPEC_PIXEL 28, 60, 28, %r14, %rbp, %r13d, 0
     vmovd %r13d, %xmm0
     addq $80, %rsp
     popq %r15
@@ -700,19 +535,11 @@ SYM(ksvgLightingSpotSpecularRowAvx2Linear):
     vmulps %ymm11, %ymm6, %ymm6
     vmulps %ymm11, %ymm7, %ymm7
     vmulps %ymm11, %ymm8, %ymm8
-    vaddps %ymm2, %ymm8, %ymm9
-    vaddps %ymm5, %ymm5, %ymm11
-    vaddps %ymm11, %ymm9, %ymm9
-    vaddps %ymm0, %ymm6, %ymm10
-    vaddps %ymm3, %ymm3, %ymm11
-    vaddps %ymm11, %ymm10, %ymm10
+    SUM121F %ymm2, %ymm5, %ymm8, %ymm9, %ymm11
+    SUM121F %ymm0, %ymm3, %ymm6, %ymm10, %ymm11
     vsubps %ymm10, %ymm9, %ymm9
-    vaddps %ymm6, %ymm8, %ymm10
-    vaddps %ymm7, %ymm7, %ymm11
-    vaddps %ymm11, %ymm10, %ymm10
-    vaddps %ymm0, %ymm2, %ymm11
-    vaddps %ymm1, %ymm1, %ymm0
-    vaddps %ymm0, %ymm11, %ymm11
+    SUM121F %ymm6, %ymm7, %ymm8, %ymm10, %ymm11
+    SUM121F %ymm0, %ymm1, %ymm2, %ymm11, %ymm0
     vsubps %ymm11, %ymm10, %ymm10
     vbroadcastss 0(%rbp), %ymm0
     vdivps %ymm0, %ymm9, %ymm9
@@ -751,17 +578,7 @@ SYM(ksvgLightingSpotSpecularRowAvx2Linear):
     vaddps %ymm1, %ymm0, %ymm0
     vmulps %ymm13, %ymm13, %ymm1
     vaddps %ymm1, %ymm0, %ymm0
-    vsqrtps %ymm0, %ymm0
-    vxorps %ymm6, %ymm6, %ymm6
-    vcmpps $4, %ymm6, %ymm0, %ymm6
-    vbroadcastss .Lspot_one(%rip), %ymm7
-    vdivps %ymm0, %ymm7, %ymm7
-    vmulps %ymm7, %ymm14, %ymm14
-    vmulps %ymm7, %ymm15, %ymm15
-    vmulps %ymm7, %ymm13, %ymm13
-    vandps %ymm6, %ymm14, %ymm14
-    vandps %ymm6, %ymm15, %ymm15
-    vandps %ymm6, %ymm13, %ymm13
+    NORM_INV %ymm0, %ymm14, %ymm15, %ymm13, %ymm6, %ymm7
     vxorps %ymm0, %ymm0, %ymm0
     vsubps %ymm14, %ymm0, %ymm6
     vbroadcastss 52(%rbp), %ymm1
@@ -793,17 +610,7 @@ SYM(ksvgLightingSpotSpecularRowAvx2Linear):
     vaddps %ymm0, %ymm11, %ymm11
     vmulps %ymm2, %ymm2, %ymm0
     vaddps %ymm0, %ymm11, %ymm11
-    vsqrtps %ymm11, %ymm11
-    vxorps %ymm0, %ymm0, %ymm0
-    vcmpps $4, %ymm0, %ymm11, %ymm0
-    vbroadcastss .Lspot_one(%rip), %ymm8
-    vdivps %ymm11, %ymm8, %ymm8
-    vmulps %ymm8, %ymm7, %ymm7
-    vmulps %ymm8, %ymm1, %ymm1
-    vmulps %ymm8, %ymm2, %ymm2
-    vandps %ymm0, %ymm7, %ymm7
-    vandps %ymm0, %ymm1, %ymm1
-    vandps %ymm0, %ymm2, %ymm2
+    NORM_INV %ymm11, %ymm7, %ymm1, %ymm2, %ymm0, %ymm8
     vmulps %ymm7, %ymm9, %ymm11
     vmulps %ymm1, %ymm10, %ymm0
     vaddps %ymm0, %ymm11, %ymm11
@@ -815,326 +622,14 @@ SYM(ksvgLightingSpotSpecularRowAvx2Linear):
     vmovups %ymm6, 32(%rsp)
     leaq .Lspot_l2s_data(%rip), %r15
     vzeroupper
-    vmovss 0(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 32(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 0(%r14)
-    vmovss 4(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 36(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 4(%r14)
-    vmovss 8(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 40(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 8(%r14)
-    vmovss 12(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 44(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 12(%r14)
-    vmovss 16(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 48(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 16(%r14)
-    vmovss 20(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 52(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 20(%r14)
-    vmovss 24(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 56(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 24(%r14)
-    vmovss 28(%rsp), %xmm0
-    vmovd %r13d, %xmm1
-    CALL(powf)
-    vmulss 8(%rbp), %xmm0, %xmm0
-    vmulss 60(%rsp), %xmm0, %xmm0
-    vmaxss .Lspot_zero(%rip), %xmm0, %xmm0
-    vminss .Lspot_one(%rip), %xmm0, %xmm0
-    vmulss 24(%rbp), %xmm0, %xmm1
-    vmulss 28(%rbp), %xmm0, %xmm2
-    vmulss 32(%rbp), %xmm0, %xmm3
-    vmaxss .Lspot_zero(%rip), %xmm1, %xmm1
-    vmaxss .Lspot_zero(%rip), %xmm2, %xmm2
-    vmaxss .Lspot_zero(%rip), %xmm3, %xmm3
-    vminss .Lspot_255(%rip), %xmm1, %xmm1
-    vminss .Lspot_255(%rip), %xmm2, %xmm2
-    vminss .Lspot_255(%rip), %xmm3, %xmm3
-    vaddss .Lspot_half(%rip), %xmm1, %xmm1
-    vroundss $11, %xmm1, %xmm1, %xmm1
-    vaddss .Lspot_half(%rip), %xmm2, %xmm2
-    vroundss $11, %xmm2, %xmm2, %xmm2
-    vaddss .Lspot_half(%rip), %xmm3, %xmm3
-    vroundss $11, %xmm3, %xmm3, %xmm3
-    vcvttss2si %xmm1, %eax
-    vcvttss2si %xmm2, %ecx
-    vcvttss2si %xmm3, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 28(%r14)
+    SPOT_SPEC_PIXEL 0, 32, 0, %r14, %rbp, %r13d, 1
+    SPOT_SPEC_PIXEL 4, 36, 4, %r14, %rbp, %r13d, 1
+    SPOT_SPEC_PIXEL 8, 40, 8, %r14, %rbp, %r13d, 1
+    SPOT_SPEC_PIXEL 12, 44, 12, %r14, %rbp, %r13d, 1
+    SPOT_SPEC_PIXEL 16, 48, 16, %r14, %rbp, %r13d, 1
+    SPOT_SPEC_PIXEL 20, 52, 20, %r14, %rbp, %r13d, 1
+    SPOT_SPEC_PIXEL 24, 56, 24, %r14, %rbp, %r13d, 1
+    SPOT_SPEC_PIXEL 28, 60, 28, %r14, %rbp, %r13d, 1
     vmovd %r13d, %xmm0
     addq $80, %rsp
     popq %r15

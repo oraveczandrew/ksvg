@@ -15,6 +15,30 @@
 
 #include "asm_macros.S"
 
+/*
+ * Description:
+ *   Alpha-byte to scaled float, VEX-encoded form matching the rest of this
+ *   (AVX1-class) file: extracts the alpha lane, converts int32->float
+ *   (exact for 0..255), and scales. Unlike the SSSE3-header ALPHA_FSCALE,
+ *   the 3-operand VEX encoding allows arbitrary src/ch/dst combinations
+ *   with no extra moves. Same bit-exactness argument for the normalized
+ *   scale-first mulps order (see the header macro).
+ *
+ * Inputs:
+ *   \src, \ch, \scale, \dst as in ALPHA_FSCALE.
+ *
+ * Output:
+ *   \dst = float((\src >> 24) & 0xFF) * \scale
+ *
+ * Clobbers:
+ *   \ch, \dst (written; \src preserved unless aliased)
+ */
+.macro ALPHA_FSCALE_V src, ch, scale, dst
+    vpsrld  $24, \src, \ch
+    vcvtdq2ps \ch, \ch
+    vmulps  \scale, \ch, \dst
+.endm
+
 	.globl SYM(ksvgLightingPointSpecularRowSsse3) ## -- Begin function ksvgLightingPointSpecularRowSsse3
 	.p2align	4, 0x90
 SYM(ksvgLightingPointSpecularRowSsse3):     ## @ksvgLightingPointSpecularRowSsse3
@@ -145,36 +169,20 @@ SYM(core4):                                 ## @core4
 	vmovdqu	(%rdi), %xmm1
 	vmovdqu	4(%rdi), %xmm5
 	vmovdqu	8(%rdi), %xmm6
-	vpsrld	$24, %xmm1, %xmm1
-	vcvtdq2ps	%xmm1, %xmm1
-	vmulps	%xmm1, %xmm0, %xmm4
-	vpsrld	$24, %xmm5, %xmm1
-	vcvtdq2ps	%xmm1, %xmm1
-	vmulps	%xmm1, %xmm0, %xmm5
-	vpsrld	$24, %xmm6, %xmm1
-	vcvtdq2ps	%xmm1, %xmm1
-	vmulps	%xmm1, %xmm0, %xmm6
+	ALPHA_FSCALE_V %xmm1, %xmm1, %xmm0, %xmm4
+	ALPHA_FSCALE_V %xmm5, %xmm1, %xmm0, %xmm5
+	ALPHA_FSCALE_V %xmm6, %xmm1, %xmm0, %xmm6
 	vmovdqu	(%rsi), %xmm7
 	vmovdqu	4(%rsi), %xmm1
 	vmovdqu	8(%rsi), %xmm8
-	vpsrld	$24, %xmm7, %xmm7
-	vcvtdq2ps	%xmm7, %xmm7
-	vmulps	%xmm7, %xmm0, %xmm7
-	vpsrld	$24, %xmm8, %xmm8
-	vcvtdq2ps	%xmm8, %xmm8
-	vmulps	%xmm0, %xmm8, %xmm8
+	ALPHA_FSCALE_V %xmm7, %xmm7, %xmm0, %xmm7
+	ALPHA_FSCALE_V %xmm8, %xmm8, %xmm0, %xmm8
 	vmovdqu	(%rdx), %xmm9
 	vmovdqu	4(%rdx), %xmm10
 	vmovdqu	8(%rdx), %xmm11
-	vpsrld	$24, %xmm9, %xmm9
-	vcvtdq2ps	%xmm9, %xmm9
-	vmulps	%xmm0, %xmm9, %xmm9
-	vpsrld	$24, %xmm10, %xmm10
-	vcvtdq2ps	%xmm10, %xmm10
-	vmulps	%xmm0, %xmm10, %xmm10
-	vpsrld	$24, %xmm11, %xmm11
-	vcvtdq2ps	%xmm11, %xmm11
-	vmulps	%xmm0, %xmm11, %xmm11
+	ALPHA_FSCALE_V %xmm9, %xmm9, %xmm0, %xmm9
+	ALPHA_FSCALE_V %xmm10, %xmm10, %xmm0, %xmm10
+	ALPHA_FSCALE_V %xmm11, %xmm11, %xmm0, %xmm11
 	vaddps	%xmm6, %xmm8, %xmm12
 	vaddps	%xmm11, %xmm8, %xmm8
 	vaddps	%xmm8, %xmm12, %xmm8
@@ -212,9 +220,7 @@ SYM(core4):                                 ## @core4
 	vsubss	44(%r8), %xmm7, %xmm7
 	vbroadcastss	%xmm7, %xmm8
 	vbroadcastss	20(%r8), %xmm9
-	vpsrld	$24, %xmm1, %xmm1
-	vcvtdq2ps	%xmm1, %xmm1
-	vmulps	%xmm1, %xmm0, %xmm0
+	ALPHA_FSCALE_V %xmm1, %xmm1, %xmm0, %xmm0
 	vsubps	%xmm0, %xmm9, %xmm0
 	vmulss	%xmm7, %xmm7, %xmm1
 	vbroadcastss	%xmm1, %xmm1

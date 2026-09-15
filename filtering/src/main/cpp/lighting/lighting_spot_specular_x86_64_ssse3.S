@@ -1,4 +1,117 @@
 #include "asm_macros.S"
+#include "lighting_x86_64_ssse3_macros.S"
+
+/*
+ * Description:
+ *   Per-pixel spot-specular: intensity[i] -> powf(specular exponent) -> x k
+ *   -> x spot-factor segment -> clamp intensity to [0,1], then R/G/B =
+ *   intensity x lr/lg/lb, per-channel max 0 / min 255 / round-nearest (+.5,
+ *   roundss $11) / truncate, max-channel-alpha cmov pack, stored to
+ *   out_off(%r14). With \l2s == 1 the three truncated bytes go through
+ *   L2S_SPOT first (linear core, %r15 LUT base loaded by the caller).
+ *   Fixed-register form (matches all 8 core sites): params via %rbp,
+ *   exponent in %r13d, intensity/spot segments in the caller's (%rsp)
+ *   scratch area, store base %r14.
+ *
+ * Inputs:
+ *   \intens_off  = byte offset of intensity[i] in (%rsp) (e.g. 4*i)
+ *   \spot_off    = byte offset of the spot-factor segment (e.g. 16+4*i)
+ *   \out_off     = byte offset for the packed pixel store
+ *   \l2s         = 1 to run L2S_SPOT on the three truncated bytes, 0 otherwise
+ *
+ * Output:
+ *   packed ARGB stored at \out_off(%r14)
+ *
+ * Clobbers:
+ *   %xmm0, %xmm1, %xmm2
+ *   %eax, %ecx, %edx, %edi
+ *   all SysV caller-saved registers via CALL(powf)
+ *   (flags)
+ *
+ * Depends on the file-local .Lspot_zero/.Lspot_one/.Lspot_255/.Lspot_half
+ * literals in the caller's RODATA.
+ */
+.macro SPOT_SPEC_PIXEL intens_off, spot_off, out_off, l2s
+    movss \intens_off(%rsp), %xmm0
+    movd %r13d, %xmm1
+    CALL(powf)
+    mulss 8(%rbp), %xmm0
+    mulss \spot_off(%rsp), %xmm0
+    maxss .Lspot_zero(%rip), %xmm0
+    minss .Lspot_one(%rip), %xmm0
+    movaps %xmm0, %xmm1
+    movaps %xmm0, %xmm2
+    mulss 24(%rbp), %xmm0
+    mulss 28(%rbp), %xmm1
+    mulss 32(%rbp), %xmm2
+    maxss .Lspot_zero(%rip), %xmm0
+    maxss .Lspot_zero(%rip), %xmm1
+    maxss .Lspot_zero(%rip), %xmm2
+    minss .Lspot_255(%rip), %xmm0
+    minss .Lspot_255(%rip), %xmm1
+    minss .Lspot_255(%rip), %xmm2
+    addss .Lspot_half(%rip), %xmm0
+    addss .Lspot_half(%rip), %xmm1
+    addss .Lspot_half(%rip), %xmm2
+    cvttss2si %xmm0, %eax
+    cvttss2si %xmm1, %ecx
+    cvttss2si %xmm2, %edx
+    .if \l2s
+    L2S_SPOT %eax
+    L2S_SPOT %ecx
+    L2S_SPOT %edx
+    .endif
+    movl %eax, %edi
+    cmpl %ecx, %edi
+    cmovl %ecx, %edi
+    cmpl %edx, %edi
+    cmovl %edx, %edi
+    shll $24, %edi
+    shll $16, %eax
+    shll $8, %ecx
+    orl %ecx, %eax
+    orl %edx, %eax
+    orl %edi, %eax
+    movl %eax, \out_off(%r14)
+.endm
+
+/*
+ * Description:
+ *   Normalizes a float vector (x, y, z) by its sqrt'd squared length using a
+ *   reciprocal: len = sqrt(l2); guard = (len != 0); r = 1/len; then scales
+ *   x, y, z by r and zeroes the lanes where len == 0 via the guard mask.
+ *   Uses the cmpps $4 (NEQ) + divps + mulps + andps sequence so the FP
+ *   operation order matches the pre-existing spot-specular view-vector
+ *   normalize blocks bit-for-bit. Caller computes l2 = x^2 + y^2 + z^2
+ *   beforehand. Legacy SSE mnemonics; the 1.0 broadcast uses movss+shufps.
+ *
+ * Inputs:
+ *   \l2                = squared length of the vector (float)
+ *   \x, \y, \z         = vector components to normalize
+ *
+ * Output:
+ *   \x, \y, \z         = normalized components (|v| = 1), zero where len == 0
+ *
+ * Clobbers:
+ *   \l2    (len replaces the squared length)
+ *   \x, \y, \z                           (in-place)
+ *   \guard, \recip
+ *   Depends on the file-local .Lspot_one literal in the caller's RODATA.
+ */
+.macro NORM_INV l2, x, y, z, guard, recip
+    sqrtps  \l2, \l2
+    pxor    \guard, \guard
+    cmpps   $4, \l2, \guard
+    movss   .Lspot_one(%rip), \recip
+    shufps  $0, \recip, \recip
+    divps   \l2, \recip
+    mulps   \recip, \x
+    mulps   \recip, \y
+    mulps   \recip, \z
+    andps   \guard, \x
+    andps   \guard, \y
+    andps   \guard, \z
+.endm
 
 /* Spot-light + specular Intel SSSE3 kernels.
  *
@@ -37,32 +150,6 @@ SPOT_LIT4
 .Lspot_one:  .long 0x3f800000
 .Lspot_255:  .long 0x437f0000
 .Lspot_half: .long 0x3f000000
-
-.macro L2S_SPOT reg
-    movl \reg, %r10d
-    movzbl (%r15,%r10,1), %r10d
-    movl %r10d, \reg
-.endm
-
-SPOT_CONST
-.p2align 5
-.Lspot_l2s_data:
-    .byte 0,13,22,28,34,38,42,46,50,53,56,59,61,64,66,69
-    .byte 71,73,75,77,79,81,83,85,86,88,90,92,93,95,96,98
-    .byte 99,101,102,104,105,106,108,109,110,112,113,114,115,117,118,119
-    .byte 120,121,122,124,125,126,127,128,129,130,131,132,133,134,135,136
-    .byte 137,138,139,140,141,142,143,144,145,146,147,148,148,149,150,151
-    .byte 152,153,154,155,155,156,157,158,159,159,160,161,162,163,163,164
-    .byte 165,166,167,167,168,169,170,170,171,172,173,173,174,175,175,176
-    .byte 177,178,178,179,180,180,181,182,182,183,184,185,185,186,187,187
-    .byte 188,189,189,190,190,191,192,192,193,194,194,195,196,196,197,197
-    .byte 198,199,199,200,200,201,202,202,203,203,204,205,205,206,206,207
-    .byte 208,208,209,209,210,210,211,212,212,213,213,214,214,215,215,216
-    .byte 216,217,218,218,219,219,220,220,221,221,222,222,223,223,224,224
-    .byte 225,226,226,227,227,228,228,229,229,230,230,231,231,232,232,233
-    .byte 233,234,234,235,235,236,236,237,237,238,238,238,239,239,240,240
-    .byte 241,241,242,242,243,243,244,244,245,245,246,246,246,247,247,248
-    .byte 248,249,249,250,250,251,251,251,252,252,253,253,254,254,255,255
 
 SPOT_TEXT
 
@@ -286,18 +373,7 @@ SYM(ksvgLightingSpotSpecularRowSsse3):
     movaps %xmm13, %xmm1
     mulps %xmm13, %xmm1
     addps %xmm1, %xmm0
-    sqrtps %xmm0, %xmm0
-    pxor %xmm6, %xmm6
-    cmpps $4, %xmm0, %xmm6
-    movss .Lspot_one(%rip), %xmm7
-    shufps $0, %xmm7, %xmm7
-    divps %xmm0, %xmm7
-    mulps %xmm7, %xmm14
-    mulps %xmm7, %xmm15
-    mulps %xmm7, %xmm13
-    andps %xmm6, %xmm14
-    andps %xmm6, %xmm15
-    andps %xmm6, %xmm13
+    NORM_INV %xmm0, %xmm14, %xmm15, %xmm13, %xmm6, %xmm7
     pxor %xmm0, %xmm0
     movaps %xmm14, %xmm6
     subps %xmm6, %xmm0
@@ -344,18 +420,7 @@ SYM(ksvgLightingSpotSpecularRowSsse3):
     movaps %xmm2, %xmm0
     mulps %xmm2, %xmm0
     addps %xmm0, %xmm11
-    sqrtps %xmm11, %xmm11
-    pxor %xmm8, %xmm8
-    cmpps $4, %xmm11, %xmm8
-    movss .Lspot_one(%rip), %xmm0
-    shufps $0, %xmm0, %xmm0
-    divps %xmm11, %xmm0
-    mulps %xmm0, %xmm7
-    mulps %xmm0, %xmm1
-    mulps %xmm0, %xmm2
-    andps %xmm8, %xmm7
-    andps %xmm8, %xmm1
-    andps %xmm8, %xmm2
+    NORM_INV %xmm11, %xmm7, %xmm1, %xmm2, %xmm8, %xmm0
     movaps %xmm7, %xmm11
     mulps %xmm9, %xmm11
     movaps %xmm1, %xmm0
@@ -367,151 +432,10 @@ SYM(ksvgLightingSpotSpecularRowSsse3):
     pxor %xmm0, %xmm0
     maxps %xmm0, %xmm11
     movups %xmm11, 0(%rsp)
-    leaq .Lspot_l2s_data(%rip), %r15
-    movss 0(%rsp), %xmm0
-    movd %r13d, %xmm1
-    CALL(powf)
-    mulss 8(%rbp), %xmm0
-    mulss 16(%rsp), %xmm0
-    maxss .Lspot_zero(%rip), %xmm0
-    minss .Lspot_one(%rip), %xmm0
-    movaps %xmm0, %xmm1
-    movaps %xmm0, %xmm2
-    mulss 24(%rbp), %xmm0
-    mulss 28(%rbp), %xmm1
-    mulss 32(%rbp), %xmm2
-    maxss .Lspot_zero(%rip), %xmm0
-    maxss .Lspot_zero(%rip), %xmm1
-    maxss .Lspot_zero(%rip), %xmm2
-    minss .Lspot_255(%rip), %xmm0
-    minss .Lspot_255(%rip), %xmm1
-    minss .Lspot_255(%rip), %xmm2
-    addss .Lspot_half(%rip), %xmm0
-    addss .Lspot_half(%rip), %xmm1
-    addss .Lspot_half(%rip), %xmm2
-    cvttss2si %xmm0, %eax
-    cvttss2si %xmm1, %ecx
-    cvttss2si %xmm2, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 0(%r14)
-    movss 4(%rsp), %xmm0
-    movd %r13d, %xmm1
-    CALL(powf)
-    mulss 8(%rbp), %xmm0
-    mulss 20(%rsp), %xmm0
-    maxss .Lspot_zero(%rip), %xmm0
-    minss .Lspot_one(%rip), %xmm0
-    movaps %xmm0, %xmm1
-    movaps %xmm0, %xmm2
-    mulss 24(%rbp), %xmm0
-    mulss 28(%rbp), %xmm1
-    mulss 32(%rbp), %xmm2
-    maxss .Lspot_zero(%rip), %xmm0
-    maxss .Lspot_zero(%rip), %xmm1
-    maxss .Lspot_zero(%rip), %xmm2
-    minss .Lspot_255(%rip), %xmm0
-    minss .Lspot_255(%rip), %xmm1
-    minss .Lspot_255(%rip), %xmm2
-    addss .Lspot_half(%rip), %xmm0
-    addss .Lspot_half(%rip), %xmm1
-    addss .Lspot_half(%rip), %xmm2
-    cvttss2si %xmm0, %eax
-    cvttss2si %xmm1, %ecx
-    cvttss2si %xmm2, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 4(%r14)
-    movss 8(%rsp), %xmm0
-    movd %r13d, %xmm1
-    CALL(powf)
-    mulss 8(%rbp), %xmm0
-    mulss 24(%rsp), %xmm0
-    maxss .Lspot_zero(%rip), %xmm0
-    minss .Lspot_one(%rip), %xmm0
-    movaps %xmm0, %xmm1
-    movaps %xmm0, %xmm2
-    mulss 24(%rbp), %xmm0
-    mulss 28(%rbp), %xmm1
-    mulss 32(%rbp), %xmm2
-    maxss .Lspot_zero(%rip), %xmm0
-    maxss .Lspot_zero(%rip), %xmm1
-    maxss .Lspot_zero(%rip), %xmm2
-    minss .Lspot_255(%rip), %xmm0
-    minss .Lspot_255(%rip), %xmm1
-    minss .Lspot_255(%rip), %xmm2
-    addss .Lspot_half(%rip), %xmm0
-    addss .Lspot_half(%rip), %xmm1
-    addss .Lspot_half(%rip), %xmm2
-    cvttss2si %xmm0, %eax
-    cvttss2si %xmm1, %ecx
-    cvttss2si %xmm2, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 8(%r14)
-    movss 12(%rsp), %xmm0
-    movd %r13d, %xmm1
-    CALL(powf)
-    mulss 8(%rbp), %xmm0
-    mulss 28(%rsp), %xmm0
-    maxss .Lspot_zero(%rip), %xmm0
-    minss .Lspot_one(%rip), %xmm0
-    movaps %xmm0, %xmm1
-    movaps %xmm0, %xmm2
-    mulss 24(%rbp), %xmm0
-    mulss 28(%rbp), %xmm1
-    mulss 32(%rbp), %xmm2
-    maxss .Lspot_zero(%rip), %xmm0
-    maxss .Lspot_zero(%rip), %xmm1
-    maxss .Lspot_zero(%rip), %xmm2
-    minss .Lspot_255(%rip), %xmm0
-    minss .Lspot_255(%rip), %xmm1
-    minss .Lspot_255(%rip), %xmm2
-    addss .Lspot_half(%rip), %xmm0
-    addss .Lspot_half(%rip), %xmm1
-    addss .Lspot_half(%rip), %xmm2
-    cvttss2si %xmm0, %eax
-    cvttss2si %xmm1, %ecx
-    cvttss2si %xmm2, %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 12(%r14)
+    SPOT_SPEC_PIXEL 0, 16, 0, 0
+    SPOT_SPEC_PIXEL 4, 20, 4, 0
+    SPOT_SPEC_PIXEL 8, 24, 8, 0
+    SPOT_SPEC_PIXEL 12, 28, 12, 0
     movd %r13d, %xmm0
     addq $40, %rsp
     popq %r15
@@ -740,18 +664,7 @@ SYM(ksvgLightingSpotSpecularRowSsse3Linear):
     movaps %xmm13, %xmm1
     mulps %xmm13, %xmm1
     addps %xmm1, %xmm0
-    sqrtps %xmm0, %xmm0
-    pxor %xmm6, %xmm6
-    cmpps $4, %xmm0, %xmm6
-    movss .Lspot_one(%rip), %xmm7
-    shufps $0, %xmm7, %xmm7
-    divps %xmm0, %xmm7
-    mulps %xmm7, %xmm14
-    mulps %xmm7, %xmm15
-    mulps %xmm7, %xmm13
-    andps %xmm6, %xmm14
-    andps %xmm6, %xmm15
-    andps %xmm6, %xmm13
+    NORM_INV %xmm0, %xmm14, %xmm15, %xmm13, %xmm6, %xmm7
     pxor %xmm0, %xmm0
     movaps %xmm14, %xmm6
     subps %xmm6, %xmm0
@@ -798,18 +711,7 @@ SYM(ksvgLightingSpotSpecularRowSsse3Linear):
     movaps %xmm2, %xmm0
     mulps %xmm2, %xmm0
     addps %xmm0, %xmm11
-    sqrtps %xmm11, %xmm11
-    pxor %xmm8, %xmm8
-    cmpps $4, %xmm11, %xmm8
-    movss .Lspot_one(%rip), %xmm0
-    shufps $0, %xmm0, %xmm0
-    divps %xmm11, %xmm0
-    mulps %xmm0, %xmm7
-    mulps %xmm0, %xmm1
-    mulps %xmm0, %xmm2
-    andps %xmm8, %xmm7
-    andps %xmm8, %xmm1
-    andps %xmm8, %xmm2
+    NORM_INV %xmm11, %xmm7, %xmm1, %xmm2, %xmm8, %xmm0
     movaps %xmm7, %xmm11
     mulps %xmm9, %xmm11
     movaps %xmm1, %xmm0
@@ -822,162 +724,10 @@ SYM(ksvgLightingSpotSpecularRowSsse3Linear):
     maxps %xmm0, %xmm11
     movups %xmm11, 0(%rsp)
     leaq .Lspot_l2s_data(%rip), %r15
-    movss 0(%rsp), %xmm0
-    movd %r13d, %xmm1
-    CALL(powf)
-    mulss 8(%rbp), %xmm0
-    mulss 16(%rsp), %xmm0
-    maxss .Lspot_zero(%rip), %xmm0
-    minss .Lspot_one(%rip), %xmm0
-    movaps %xmm0, %xmm1
-    movaps %xmm0, %xmm2
-    mulss 24(%rbp), %xmm0
-    mulss 28(%rbp), %xmm1
-    mulss 32(%rbp), %xmm2
-    maxss .Lspot_zero(%rip), %xmm0
-    maxss .Lspot_zero(%rip), %xmm1
-    maxss .Lspot_zero(%rip), %xmm2
-    minss .Lspot_255(%rip), %xmm0
-    minss .Lspot_255(%rip), %xmm1
-    minss .Lspot_255(%rip), %xmm2
-    addss .Lspot_half(%rip), %xmm0
-    addss .Lspot_half(%rip), %xmm1
-    addss .Lspot_half(%rip), %xmm2
-    cvttss2si %xmm0, %eax
-    cvttss2si %xmm1, %ecx
-    cvttss2si %xmm2, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 0(%r14)
-    movss 4(%rsp), %xmm0
-    movd %r13d, %xmm1
-    CALL(powf)
-    mulss 8(%rbp), %xmm0
-    mulss 20(%rsp), %xmm0
-    maxss .Lspot_zero(%rip), %xmm0
-    minss .Lspot_one(%rip), %xmm0
-    movaps %xmm0, %xmm1
-    movaps %xmm0, %xmm2
-    mulss 24(%rbp), %xmm0
-    mulss 28(%rbp), %xmm1
-    mulss 32(%rbp), %xmm2
-    maxss .Lspot_zero(%rip), %xmm0
-    maxss .Lspot_zero(%rip), %xmm1
-    maxss .Lspot_zero(%rip), %xmm2
-    minss .Lspot_255(%rip), %xmm0
-    minss .Lspot_255(%rip), %xmm1
-    minss .Lspot_255(%rip), %xmm2
-    addss .Lspot_half(%rip), %xmm0
-    addss .Lspot_half(%rip), %xmm1
-    addss .Lspot_half(%rip), %xmm2
-    cvttss2si %xmm0, %eax
-    cvttss2si %xmm1, %ecx
-    cvttss2si %xmm2, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 4(%r14)
-    movss 8(%rsp), %xmm0
-    movd %r13d, %xmm1
-    CALL(powf)
-    mulss 8(%rbp), %xmm0
-    mulss 24(%rsp), %xmm0
-    maxss .Lspot_zero(%rip), %xmm0
-    minss .Lspot_one(%rip), %xmm0
-    movaps %xmm0, %xmm1
-    movaps %xmm0, %xmm2
-    mulss 24(%rbp), %xmm0
-    mulss 28(%rbp), %xmm1
-    mulss 32(%rbp), %xmm2
-    maxss .Lspot_zero(%rip), %xmm0
-    maxss .Lspot_zero(%rip), %xmm1
-    maxss .Lspot_zero(%rip), %xmm2
-    minss .Lspot_255(%rip), %xmm0
-    minss .Lspot_255(%rip), %xmm1
-    minss .Lspot_255(%rip), %xmm2
-    addss .Lspot_half(%rip), %xmm0
-    addss .Lspot_half(%rip), %xmm1
-    addss .Lspot_half(%rip), %xmm2
-    cvttss2si %xmm0, %eax
-    cvttss2si %xmm1, %ecx
-    cvttss2si %xmm2, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 8(%r14)
-    movss 12(%rsp), %xmm0
-    movd %r13d, %xmm1
-    CALL(powf)
-    mulss 8(%rbp), %xmm0
-    mulss 28(%rsp), %xmm0
-    maxss .Lspot_zero(%rip), %xmm0
-    minss .Lspot_one(%rip), %xmm0
-    movaps %xmm0, %xmm1
-    movaps %xmm0, %xmm2
-    mulss 24(%rbp), %xmm0
-    mulss 28(%rbp), %xmm1
-    mulss 32(%rbp), %xmm2
-    maxss .Lspot_zero(%rip), %xmm0
-    maxss .Lspot_zero(%rip), %xmm1
-    maxss .Lspot_zero(%rip), %xmm2
-    minss .Lspot_255(%rip), %xmm0
-    minss .Lspot_255(%rip), %xmm1
-    minss .Lspot_255(%rip), %xmm2
-    addss .Lspot_half(%rip), %xmm0
-    addss .Lspot_half(%rip), %xmm1
-    addss .Lspot_half(%rip), %xmm2
-    cvttss2si %xmm0, %eax
-    cvttss2si %xmm1, %ecx
-    cvttss2si %xmm2, %edx
-    L2S_SPOT %eax
-    L2S_SPOT %ecx
-    L2S_SPOT %edx
-    movl %eax, %edi
-    cmpl %ecx, %edi
-    cmovl %ecx, %edi
-    cmpl %edx, %edi
-    cmovl %edx, %edi
-    shll $24, %edi
-    shll $16, %eax
-    shll $8, %ecx
-    orl %ecx, %eax
-    orl %edx, %eax
-    orl %edi, %eax
-    movl %eax, 12(%r14)
+    SPOT_SPEC_PIXEL 0, 16, 0, 1
+    SPOT_SPEC_PIXEL 4, 20, 4, 1
+    SPOT_SPEC_PIXEL 8, 24, 8, 1
+    SPOT_SPEC_PIXEL 12, 28, 12, 1
     movd %r13d, %xmm0
     addq $40, %rsp
     popq %r15

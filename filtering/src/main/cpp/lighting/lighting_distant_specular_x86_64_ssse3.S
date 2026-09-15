@@ -15,6 +15,73 @@
  */
 
 #include "asm_macros.S"
+#include "lighting_x86_64_ssse3_macros.S"
+
+/*
+ * Description:
+ *   Per-pixel specular tail: spills the clamped intensity, scales R/G/B by
+ *   lr/lg/lb, truncates toward zero (truncf), clamps each channel to
+ *   [0, 255] via cmovs, max-channel-alpha cmov pack, and stores the pixel.
+ *   Fixed-register form (all 8 core sites): intensity in %xmm1 on entry,
+ *   255 in %r13d, 0 in %r14d, dst base reloaded from 24(%rsp) into %rax,
+ *   pixel index in %r12. Contains 3 CALL(truncf) invocations.
+ *
+ * Inputs:
+ *   \spill_off  = stack offset of the 4-byte intensity spill (12 or 32 —
+ *                 pixel 3 uses 32 since 12 holds live data on that path)
+ *   \store_off  = byte offset for the packed pixel store (0/4/8/12), i.e.
+ *                 movl %ebp, \store_off(%rax,%r12)
+ *
+ * Output:
+ *   packed ARGB stored at \store_off(%rax,%r12)
+ *
+ * Clobbers:
+ *   %xmm0, %xmm1
+ *   %eax, %ebp, %ecx, %edx, %r15d, %rax
+ *   all SysV caller-saved registers via CALL(truncf)
+ *   (flags)
+ */
+.macro SPEC_PIXEL_TAIL spill_off, store_off
+    movss   %xmm1, \spill_off(%rsp)
+    movss   24(%rbx), %xmm0
+    mulss   %xmm1, %xmm0
+    CALL(truncf)
+    cvttss2si   %xmm0, %r15d
+    movss   28(%rbx), %xmm0
+    mulss   \spill_off(%rsp), %xmm0
+    CALL(truncf)
+    cvttss2si   %xmm0, %ebp
+    movss   \spill_off(%rsp), %xmm0
+    mulss   32(%rbx), %xmm0
+    CALL(truncf)
+    cvttss2si   %xmm0, %eax
+    cmpl    $255, %r15d
+    cmovgel %r13d, %r15d
+    testl   %r15d, %r15d
+    movl    $0, %ecx
+    cmovgl  %r15d, %ecx
+    cmpl    $255, %ebp
+    cmovgel %r13d, %ebp
+    testl   %ebp, %ebp
+    cmovlel %r14d, %ebp
+    cmpl    $255, %eax
+    cmovgel %r13d, %eax
+    testl   %eax, %eax
+    cmovlel %r14d, %eax
+    cmpl    %ebp, %r15d
+    movl    %ebp, %edx
+    cmovgl  %ecx, %edx
+    cmpl    %eax, %edx
+    cmovbel %eax, %edx
+    shll    $24, %edx
+    shll    $16, %ecx
+    shll    $8, %ebp
+    orl     %ecx, %ebp
+    orl     %eax, %ebp
+    orl     %edx, %ebp
+    movq    24(%rsp), %rax
+    movl    %ebp, \store_off(%rax,%r12)
+.endm
 
 .text
 .p2align 4
@@ -94,46 +161,7 @@ SYM(ksvgLightingDistantSpecularRowSsse3):
 	xorl	%r12d, %r12d
 	jmp	.LBB1_2
 .LBB1_14:                               #   in Loop: Header=BB1_2 Depth=1
-	movss	%xmm1, 32(%rsp)                 # 4-byte Spill
-	movss	24(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	%xmm1, %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %r15d
-	movss	28(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rsp), %xmm0                 # 4-byte Folded Reload
-	CALL(truncf)
-	cvttss2si	%xmm0, %ebp
-	movss	32(%rsp), %xmm0                 # 4-byte Reload
-                                        # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rbx), %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %eax
-	cmpl	$255, %r15d
-	cmovgel	%r13d, %r15d
-	testl	%r15d, %r15d
-	movl	$0, %ecx
-	cmovgl	%r15d, %ecx
-	cmpl	$255, %ebp
-	cmovgel	%r13d, %ebp
-	testl	%ebp, %ebp
-	cmovlel	%r14d, %ebp
-	cmpl	$255, %eax
-	cmovgel	%r13d, %eax
-	testl	%eax, %eax
-	cmovlel	%r14d, %eax
-	cmpl	%ebp, %r15d
-	movl	%ebp, %edx
-	cmovgl	%ecx, %edx
-	cmpl	%eax, %edx
-	cmovbel	%eax, %edx
-	shll	$24, %edx
-	shll	$16, %ecx
-	shll	$8, %ebp
-	orl	%ecx, %ebp
-	orl	%eax, %ebp
-	orl	%edx, %ebp
-	movq	24(%rsp), %rax                  # 8-byte Reload
-	movl	%ebp, 12(%rax,%r12)
+    SPEC_PIXEL_TAIL 32, 12
 	addq	$16, %r12
 	cmpq	%r12, 48(%rsp)                  # 8-byte Folded Reload
 	je	.LBB1_15
@@ -147,34 +175,20 @@ SYM(ksvgLightingDistantSpecularRowSsse3):
 	movss	36(%rbx), %xmm4                 # xmm4 = mem[0],zero,zero,zero
 	shufps	$0, %xmm4, %xmm4                # xmm4 = xmm4[0,0,0,0]
 	mulps	%xmm4, %xmm0
-	psrld	$24, %xmm1
-	cvtdq2ps	%xmm1, %xmm1
-	mulps	%xmm4, %xmm1
-	psrld	$24, %xmm2
-	cvtdq2ps	%xmm2, %xmm2
-	mulps	%xmm4, %xmm2
+	ALPHA_FSCALE %xmm1, %xmm4
+	ALPHA_FSCALE %xmm2, %xmm4
 	movq	64(%rsp), %rax                  # 8-byte Reload
 	movdqu	(%rax,%r12), %xmm3
 	movdqu	8(%rax,%r12), %xmm5
-	psrld	$24, %xmm3
-	cvtdq2ps	%xmm3, %xmm6
-	mulps	%xmm4, %xmm6
-	psrld	$24, %xmm5
-	cvtdq2ps	%xmm5, %xmm3
-	mulps	%xmm4, %xmm3
+	ALPHA_FSCALE_X %xmm3, %xmm6, %xmm4
+	ALPHA_FSCALE_X %xmm5, %xmm3, %xmm4
 	movq	72(%rsp), %rax                  # 8-byte Reload
 	movdqu	(%rax,%r12), %xmm5
 	movdqu	4(%rax,%r12), %xmm7
 	movdqu	8(%rax,%r12), %xmm8
-	psrld	$24, %xmm5
-	cvtdq2ps	%xmm5, %xmm9
-	mulps	%xmm4, %xmm9
-	psrld	$24, %xmm7
-	cvtdq2ps	%xmm7, %xmm5
-	mulps	%xmm4, %xmm5
-	psrld	$24, %xmm8
-	cvtdq2ps	%xmm8, %xmm7
-	mulps	%xmm4, %xmm7
+	ALPHA_FSCALE_X %xmm5, %xmm9, %xmm4
+	ALPHA_FSCALE_X %xmm7, %xmm5, %xmm4
+	ALPHA_FSCALE_X %xmm8, %xmm7, %xmm4
 	addps	%xmm3, %xmm3
 	addps	%xmm2, %xmm3
 	addps	%xmm7, %xmm3
@@ -230,46 +244,7 @@ SYM(ksvgLightingDistantSpecularRowSsse3):
 # %bb.4:                                #   in Loop: Header=BB1_2 Depth=1
 	movss	.LCPI1_0(%rip), %xmm1           # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
 .LBB1_5:                                #   in Loop: Header=BB1_2 Depth=1
-	movss	%xmm1, 12(%rsp)                 # 4-byte Spill
-	movss	24(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	%xmm1, %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %r15d
-	movss	28(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	12(%rsp), %xmm0                 # 4-byte Folded Reload
-	CALL(truncf)
-	cvttss2si	%xmm0, %ebp
-	movss	12(%rsp), %xmm0                 # 4-byte Reload
-                                        # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rbx), %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %eax
-	cmpl	$255, %r15d
-	cmovgel	%r13d, %r15d
-	testl	%r15d, %r15d
-	movl	$0, %ecx
-	cmovgl	%r15d, %ecx
-	cmpl	$255, %ebp
-	cmovgel	%r13d, %ebp
-	testl	%ebp, %ebp
-	cmovlel	%r14d, %ebp
-	cmpl	$255, %eax
-	cmovgel	%r13d, %eax
-	testl	%eax, %eax
-	cmovlel	%r14d, %eax
-	cmpl	%ebp, %r15d
-	movl	%ebp, %edx
-	cmovgl	%ecx, %edx
-	cmpl	%eax, %edx
-	cmovbel	%eax, %edx
-	shll	$24, %edx
-	shll	$16, %ecx
-	shll	$8, %ebp
-	orl	%ecx, %ebp
-	orl	%eax, %ebp
-	orl	%edx, %ebp
-	movq	24(%rsp), %rax                  # 8-byte Reload
-	movl	%ebp, (%rax,%r12)
+    SPEC_PIXEL_TAIL 12, 0
 	movaps	32(%rsp), %xmm0                 # 16-byte Reload
 	shufps	$85, %xmm0, %xmm0               # xmm0 = xmm0[1,1,1,1]
 	cvtss2sd	%xmm0, %xmm0
@@ -288,46 +263,7 @@ SYM(ksvgLightingDistantSpecularRowSsse3):
 # %bb.7:                                #   in Loop: Header=BB1_2 Depth=1
 	movss	.LCPI1_0(%rip), %xmm1           # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
 .LBB1_8:                                #   in Loop: Header=BB1_2 Depth=1
-	movss	%xmm1, 12(%rsp)                 # 4-byte Spill
-	movss	24(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	%xmm1, %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %r15d
-	movss	28(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	12(%rsp), %xmm0                 # 4-byte Folded Reload
-	CALL(truncf)
-	cvttss2si	%xmm0, %ebp
-	movss	12(%rsp), %xmm0                 # 4-byte Reload
-                                        # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rbx), %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %eax
-	cmpl	$255, %r15d
-	cmovgel	%r13d, %r15d
-	testl	%r15d, %r15d
-	movl	$0, %ecx
-	cmovgl	%r15d, %ecx
-	cmpl	$255, %ebp
-	cmovgel	%r13d, %ebp
-	testl	%ebp, %ebp
-	cmovlel	%r14d, %ebp
-	cmpl	$255, %eax
-	cmovgel	%r13d, %eax
-	testl	%eax, %eax
-	cmovlel	%r14d, %eax
-	cmpl	%ebp, %r15d
-	movl	%ebp, %edx
-	cmovgl	%ecx, %edx
-	cmpl	%eax, %edx
-	cmovbel	%eax, %edx
-	shll	$24, %edx
-	shll	$16, %ecx
-	shll	$8, %ebp
-	orl	%ecx, %ebp
-	orl	%eax, %ebp
-	orl	%edx, %ebp
-	movq	24(%rsp), %rax                  # 8-byte Reload
-	movl	%ebp, 4(%rax,%r12)
+    SPEC_PIXEL_TAIL 12, 4
 	movaps	32(%rsp), %xmm0                 # 16-byte Reload
 	movhlps	%xmm0, %xmm0                    # xmm0 = xmm0[1,1]
 	cvtss2sd	%xmm0, %xmm0
@@ -346,46 +282,7 @@ SYM(ksvgLightingDistantSpecularRowSsse3):
 # %bb.10:                               #   in Loop: Header=BB1_2 Depth=1
 	movss	.LCPI1_0(%rip), %xmm1           # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
 .LBB1_11:                               #   in Loop: Header=BB1_2 Depth=1
-	movss	%xmm1, 12(%rsp)                 # 4-byte Spill
-	movss	24(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	%xmm1, %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %r15d
-	movss	28(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	12(%rsp), %xmm0                 # 4-byte Folded Reload
-	CALL(truncf)
-	cvttss2si	%xmm0, %ebp
-	movss	12(%rsp), %xmm0                 # 4-byte Reload
-                                        # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rbx), %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %eax
-	cmpl	$255, %r15d
-	cmovgel	%r13d, %r15d
-	testl	%r15d, %r15d
-	movl	$0, %ecx
-	cmovgl	%r15d, %ecx
-	cmpl	$255, %ebp
-	cmovgel	%r13d, %ebp
-	testl	%ebp, %ebp
-	cmovlel	%r14d, %ebp
-	cmpl	$255, %eax
-	cmovgel	%r13d, %eax
-	testl	%eax, %eax
-	cmovlel	%r14d, %eax
-	cmpl	%ebp, %r15d
-	movl	%ebp, %edx
-	cmovgl	%ecx, %edx
-	cmpl	%eax, %edx
-	cmovbel	%eax, %edx
-	shll	$24, %edx
-	shll	$16, %ecx
-	shll	$8, %ebp
-	orl	%ecx, %ebp
-	orl	%eax, %ebp
-	orl	%edx, %ebp
-	movq	24(%rsp), %rax                  # 8-byte Reload
-	movl	%ebp, 8(%rax,%r12)
+    SPEC_PIXEL_TAIL 12, 8
 	movaps	32(%rsp), %xmm0                 # 16-byte Reload
 	shufps	$255, %xmm0, %xmm0              # xmm0 = xmm0[3,3,3,3]
 	cvtss2sd	%xmm0, %xmm0
@@ -503,47 +400,8 @@ SYM(ksvgLightingDistantSpecularRowSsse3Linear):
 	xorl	%r12d, %r12d
 	jmp	.LBB2_2
 .LBB2_14:                               #   in Loop: Header=BB1_2 Depth=1
-	movss	%xmm1, 32(%rsp)                 # 4-byte Spill
-	movss	24(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	%xmm1, %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %r15d
-	movss	28(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rsp), %xmm0                 # 4-byte Folded Reload
-	CALL(truncf)
-	cvttss2si	%xmm0, %ebp
-	movss	32(%rsp), %xmm0                 # 4-byte Reload
-                                        # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rbx), %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %eax
-	cmpl	$255, %r15d
-	cmovgel	%r13d, %r15d
-	testl	%r15d, %r15d
-	movl	$0, %ecx
-	cmovgl	%r15d, %ecx
-	cmpl	$255, %ebp
-	cmovgel	%r13d, %ebp
-	testl	%ebp, %ebp
-	cmovlel	%r14d, %ebp
-	cmpl	$255, %eax
-	cmovgel	%r13d, %eax
-	testl	%eax, %eax
-	cmovlel	%r14d, %eax
-	cmpl	%ebp, %r15d
-	movl	%ebp, %edx
-	cmovgl	%ecx, %edx
-	cmpl	%eax, %edx
-	cmovbel	%eax, %edx
-	shll	$24, %edx
-	shll	$16, %ecx
-	shll	$8, %ebp
-	orl	%ecx, %ebp
-	orl	%eax, %ebp
-	orl	%edx, %ebp
 	/* Complete the fourth pixel before converting the finished 4-pixel block. */
-	movq	24(%rsp), %rax
-	movl	%ebp, 12(%rax,%r12)
+	SPEC_PIXEL_TAIL 32, 12
 
 	/* Inline SSSE3 amortized linear->sRGB for the completed 4-pixel block. */
 	movdqu	(%rax,%r12), %xmm0
@@ -632,34 +490,20 @@ SYM(ksvgLightingDistantSpecularRowSsse3Linear):
 	movss	36(%rbx), %xmm4                 # xmm4 = mem[0],zero,zero,zero
 	shufps	$0, %xmm4, %xmm4                # xmm4 = xmm4[0,0,0,0]
 	mulps	%xmm4, %xmm0
-	psrld	$24, %xmm1
-	cvtdq2ps	%xmm1, %xmm1
-	mulps	%xmm4, %xmm1
-	psrld	$24, %xmm2
-	cvtdq2ps	%xmm2, %xmm2
-	mulps	%xmm4, %xmm2
+	ALPHA_FSCALE %xmm1, %xmm4
+	ALPHA_FSCALE %xmm2, %xmm4
 	movq	64(%rsp), %rax                  # 8-byte Reload
 	movdqu	(%rax,%r12), %xmm3
 	movdqu	8(%rax,%r12), %xmm5
-	psrld	$24, %xmm3
-	cvtdq2ps	%xmm3, %xmm6
-	mulps	%xmm4, %xmm6
-	psrld	$24, %xmm5
-	cvtdq2ps	%xmm5, %xmm3
-	mulps	%xmm4, %xmm3
+	ALPHA_FSCALE_X %xmm3, %xmm6, %xmm4
+	ALPHA_FSCALE_X %xmm5, %xmm3, %xmm4
 	movq	72(%rsp), %rax                  # 8-byte Reload
 	movdqu	(%rax,%r12), %xmm5
 	movdqu	4(%rax,%r12), %xmm7
 	movdqu	8(%rax,%r12), %xmm8
-	psrld	$24, %xmm5
-	cvtdq2ps	%xmm5, %xmm9
-	mulps	%xmm4, %xmm9
-	psrld	$24, %xmm7
-	cvtdq2ps	%xmm7, %xmm5
-	mulps	%xmm4, %xmm5
-	psrld	$24, %xmm8
-	cvtdq2ps	%xmm8, %xmm7
-	mulps	%xmm4, %xmm7
+	ALPHA_FSCALE_X %xmm5, %xmm9, %xmm4
+	ALPHA_FSCALE_X %xmm7, %xmm5, %xmm4
+	ALPHA_FSCALE_X %xmm8, %xmm7, %xmm4
 	addps	%xmm3, %xmm3
 	addps	%xmm2, %xmm3
 	addps	%xmm7, %xmm3
@@ -715,46 +559,7 @@ SYM(ksvgLightingDistantSpecularRowSsse3Linear):
 # %bb.4:                                #   in Loop: Header=BB1_2 Depth=1
 	movss	.LCPI1_0(%rip), %xmm1           # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
 .LBB2_5:                                #   in Loop: Header=BB1_2 Depth=1
-	movss	%xmm1, 12(%rsp)                 # 4-byte Spill
-	movss	24(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	%xmm1, %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %r15d
-	movss	28(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	12(%rsp), %xmm0                 # 4-byte Folded Reload
-	CALL(truncf)
-	cvttss2si	%xmm0, %ebp
-	movss	12(%rsp), %xmm0                 # 4-byte Reload
-                                        # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rbx), %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %eax
-	cmpl	$255, %r15d
-	cmovgel	%r13d, %r15d
-	testl	%r15d, %r15d
-	movl	$0, %ecx
-	cmovgl	%r15d, %ecx
-	cmpl	$255, %ebp
-	cmovgel	%r13d, %ebp
-	testl	%ebp, %ebp
-	cmovlel	%r14d, %ebp
-	cmpl	$255, %eax
-	cmovgel	%r13d, %eax
-	testl	%eax, %eax
-	cmovlel	%r14d, %eax
-	cmpl	%ebp, %r15d
-	movl	%ebp, %edx
-	cmovgl	%ecx, %edx
-	cmpl	%eax, %edx
-	cmovbel	%eax, %edx
-	shll	$24, %edx
-	shll	$16, %ecx
-	shll	$8, %ebp
-	orl	%ecx, %ebp
-	orl	%eax, %ebp
-	orl	%edx, %ebp
-	movq	24(%rsp), %rax                  # 8-byte Reload
-	movl	%ebp, (%rax,%r12)
+    SPEC_PIXEL_TAIL 12, 0
 	movaps	32(%rsp), %xmm0                 # 16-byte Reload
 	shufps	$85, %xmm0, %xmm0               # xmm0 = xmm0[1,1,1,1]
 	cvtss2sd	%xmm0, %xmm0
@@ -773,46 +578,7 @@ SYM(ksvgLightingDistantSpecularRowSsse3Linear):
 # %bb.7:                                #   in Loop: Header=BB1_2 Depth=1
 	movss	.LCPI1_0(%rip), %xmm1           # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
 .LBB2_8:                                #   in Loop: Header=BB1_2 Depth=1
-	movss	%xmm1, 12(%rsp)                 # 4-byte Spill
-	movss	24(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	%xmm1, %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %r15d
-	movss	28(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	12(%rsp), %xmm0                 # 4-byte Folded Reload
-	CALL(truncf)
-	cvttss2si	%xmm0, %ebp
-	movss	12(%rsp), %xmm0                 # 4-byte Reload
-                                        # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rbx), %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %eax
-	cmpl	$255, %r15d
-	cmovgel	%r13d, %r15d
-	testl	%r15d, %r15d
-	movl	$0, %ecx
-	cmovgl	%r15d, %ecx
-	cmpl	$255, %ebp
-	cmovgel	%r13d, %ebp
-	testl	%ebp, %ebp
-	cmovlel	%r14d, %ebp
-	cmpl	$255, %eax
-	cmovgel	%r13d, %eax
-	testl	%eax, %eax
-	cmovlel	%r14d, %eax
-	cmpl	%ebp, %r15d
-	movl	%ebp, %edx
-	cmovgl	%ecx, %edx
-	cmpl	%eax, %edx
-	cmovbel	%eax, %edx
-	shll	$24, %edx
-	shll	$16, %ecx
-	shll	$8, %ebp
-	orl	%ecx, %ebp
-	orl	%eax, %ebp
-	orl	%edx, %ebp
-	movq	24(%rsp), %rax                  # 8-byte Reload
-	movl	%ebp, 4(%rax,%r12)
+    SPEC_PIXEL_TAIL 12, 4
 	movaps	32(%rsp), %xmm0                 # 16-byte Reload
 	movhlps	%xmm0, %xmm0                    # xmm0 = xmm0[1,1]
 	cvtss2sd	%xmm0, %xmm0
@@ -831,46 +597,7 @@ SYM(ksvgLightingDistantSpecularRowSsse3Linear):
 # %bb.10:                               #   in Loop: Header=BB1_2 Depth=1
 	movss	.LCPI1_0(%rip), %xmm1           # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
 .LBB2_11:                               #   in Loop: Header=BB1_2 Depth=1
-	movss	%xmm1, 12(%rsp)                 # 4-byte Spill
-	movss	24(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	%xmm1, %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %r15d
-	movss	28(%rbx), %xmm0                 # xmm0 = mem[0],zero,zero,zero
-	mulss	12(%rsp), %xmm0                 # 4-byte Folded Reload
-	CALL(truncf)
-	cvttss2si	%xmm0, %ebp
-	movss	12(%rsp), %xmm0                 # 4-byte Reload
-                                        # xmm0 = mem[0],zero,zero,zero
-	mulss	32(%rbx), %xmm0
-	CALL(truncf)
-	cvttss2si	%xmm0, %eax
-	cmpl	$255, %r15d
-	cmovgel	%r13d, %r15d
-	testl	%r15d, %r15d
-	movl	$0, %ecx
-	cmovgl	%r15d, %ecx
-	cmpl	$255, %ebp
-	cmovgel	%r13d, %ebp
-	testl	%ebp, %ebp
-	cmovlel	%r14d, %ebp
-	cmpl	$255, %eax
-	cmovgel	%r13d, %eax
-	testl	%eax, %eax
-	cmovlel	%r14d, %eax
-	cmpl	%ebp, %r15d
-	movl	%ebp, %edx
-	cmovgl	%ecx, %edx
-	cmpl	%eax, %edx
-	cmovbel	%eax, %edx
-	shll	$24, %edx
-	shll	$16, %ecx
-	shll	$8, %ebp
-	orl	%ecx, %ebp
-	orl	%eax, %ebp
-	orl	%edx, %ebp
-	movq	24(%rsp), %rax                  # 8-byte Reload
-	movl	%ebp, 8(%rax,%r12)
+    SPEC_PIXEL_TAIL 12, 8
 	movaps	32(%rsp), %xmm0                 # 16-byte Reload
 	shufps	$255, %xmm0, %xmm0              # xmm0 = xmm0[3,3,3,3]
 	cvtss2sd	%xmm0, %xmm0

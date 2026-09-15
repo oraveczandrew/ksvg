@@ -1,4 +1,35 @@
 #include "asm_macros.S"
+#include "lighting_x86_64_avx2_macros.S"
+
+/*
+ * Description:
+ *   Scalar L2S gather + force-alpha byte pack, matching the point-diffuse
+ *   linear path. Gathers three bytes from \lut (one per channel) and packs
+ *   (R << 16) | (G << 8) | B | 0xFF000000 (full alpha).
+ *
+ * Inputs:
+ *   \lut        = base of the L2S table (e.g. %rax)
+ *   \ri, \gi, \bi = 64-bit index registers holding the byte indices
+ *   \ro, \go, \bo = 32-bit registers receiving the gathered bytes
+ *                   (may differ from the index regs)
+ *
+ * Output:
+ *   \go         = packed 0xAARRGGBB pixel
+ *
+ * Clobbers:
+ *   \ro, \go, \bo
+ *   Upper 32 bits of the 32-bit dests are zero-extended by movzbl.
+ */
+.macro L2S_GATHER_PACK lut, ri, ro, gi, go, bi, bo
+    movzbl  (\lut,\ri), \ro
+    movzbl  (\lut,\gi), \go
+    movzbl  (\lut,\bi), \bo
+    shll    $16, \ro
+    shll    $8, \go
+    orl     \ro, \go
+    orl     \bo, \go
+    orl     $-16777216, \go
+.endm
 
 	.text
 	.file	"pd_av.c"
@@ -94,52 +125,34 @@ SYM(ksvgLightingPointDiffuseRowAvx2):        # @ksvgLightingPointDiffuseRowAvx2
 	vcvtsi2ss	%r8d, %xmm7, %xmm5
 	vmovdqu	(%rdi,%r8,4), %ymm1
 	vmovdqu	8(%rdi,%r8,4), %ymm7
-	vpsrld	$24, %ymm1, %ymm1
-	vcvtdq2ps	%ymm1, %ymm1
-	vmulps	%ymm1, %ymm2, %ymm6
-	vpsrld	$24, %ymm7, %ymm1
-	vcvtdq2ps	%ymm1, %ymm1
-	vmulps	%ymm1, %ymm2, %ymm1
+	ALPHA_FSCALE %ymm1, %ymm1, %ymm2, %ymm6
+	ALPHA_FSCALE %ymm7, %ymm1, %ymm2, %ymm1
 	vmovdqu	(%rsi,%r8,4), %ymm7
 	vmovdqu	8(%rsi,%r8,4), %ymm8
-	vpsrld	$24, %ymm7, %ymm7
-	vcvtdq2ps	%ymm7, %ymm7
-	vmulps	%ymm7, %ymm2, %ymm7
-	vpsrld	$24, %ymm8, %ymm8
-	vcvtdq2ps	%ymm8, %ymm8
-	vmulps	%ymm2, %ymm8, %ymm8
+	ALPHA_FSCALE %ymm7, %ymm7, %ymm2, %ymm7
+	ALPHA_FSCALE %ymm8, %ymm8, %ymm2, %ymm8
 	vmovdqu	(%rdx,%r8,4), %ymm9
 	vaddps	%ymm1, %ymm8, %ymm10
 	vaddps	%ymm10, %ymm8, %ymm8
 	vaddps	%ymm7, %ymm6, %ymm10
 	vaddps	%ymm7, %ymm10, %ymm7
 	vmovdqu	8(%rdx,%r8,4), %ymm10
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm2, %ymm9, %ymm9
-	vpsrld	$24, %ymm10, %ymm10
-	vcvtdq2ps	%ymm10, %ymm10
-	vmulps	%ymm2, %ymm10, %ymm10
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm2, %ymm9
+	ALPHA_FSCALE %ymm10, %ymm10, %ymm2, %ymm10
 	vaddps	%ymm10, %ymm8, %ymm8
 	vaddps	%ymm7, %ymm9, %ymm7
 	vsubps	%ymm7, %ymm8, %ymm7
 	vmovdqu	4(%rdx,%r8,4), %ymm8
-	vpsrld	$24, %ymm8, %ymm8
-	vcvtdq2ps	%ymm8, %ymm8
-	vmulps	%ymm2, %ymm8, %ymm8
+	ALPHA_FSCALE %ymm8, %ymm8, %ymm2, %ymm8
 	vaddps	%ymm8, %ymm9, %ymm9
 	vaddps	%ymm9, %ymm8, %ymm8
 	vmovdqu	4(%rdi,%r8,4), %ymm9
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm2, %ymm9, %ymm9
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm2, %ymm9
 	vaddps	%ymm8, %ymm10, %ymm8
 	vaddps	%ymm6, %ymm9, %ymm6
 	vaddps	%ymm6, %ymm9, %ymm6
 	vmovdqu	4(%rsi,%r8,4), %ymm9
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm2, %ymm9, %ymm9
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm2, %ymm9
 	vaddps	%ymm6, %ymm1, %ymm1
 	vsubps	%ymm1, %ymm8, %ymm1
 	vxorps	%ymm7, %ymm14, %ymm6
@@ -340,52 +353,34 @@ SYM(ksvgLightingPointDiffuseRowAvx2Linear):  # @ksvgLightingPointDiffuseRowAvx2L
 	vcvtsi2ss	%r9d, %xmm10, %xmm4
 	vmovdqu	(%rdi,%r9,4), %ymm5
 	vmovdqu	8(%rdi,%r9,4), %ymm6
-	vpsrld	$24, %ymm5, %ymm5
-	vcvtdq2ps	%ymm5, %ymm5
-	vmulps	%ymm5, %ymm2, %ymm5
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	%ymm6, %ymm2, %ymm6
+	ALPHA_FSCALE %ymm5, %ymm5, %ymm2, %ymm5
+	ALPHA_FSCALE %ymm6, %ymm6, %ymm2, %ymm6
 	vmovdqu	(%rsi,%r9,4), %ymm7
 	vmovdqu	8(%rsi,%r9,4), %ymm8
-	vpsrld	$24, %ymm7, %ymm7
-	vcvtdq2ps	%ymm7, %ymm7
-	vmulps	%ymm7, %ymm2, %ymm7
-	vpsrld	$24, %ymm8, %ymm8
-	vcvtdq2ps	%ymm8, %ymm8
-	vmulps	%ymm2, %ymm8, %ymm8
+	ALPHA_FSCALE %ymm7, %ymm7, %ymm2, %ymm7
+	ALPHA_FSCALE %ymm8, %ymm8, %ymm2, %ymm8
 	vmovdqu	(%rdx,%r9,4), %ymm9
 	vaddps	%ymm6, %ymm8, %ymm10
 	vaddps	%ymm10, %ymm8, %ymm8
 	vaddps	%ymm7, %ymm5, %ymm10
 	vaddps	%ymm7, %ymm10, %ymm7
 	vmovdqu	8(%rdx,%r9,4), %ymm10
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm2, %ymm9, %ymm9
-	vpsrld	$24, %ymm10, %ymm10
-	vcvtdq2ps	%ymm10, %ymm10
-	vmulps	%ymm2, %ymm10, %ymm10
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm2, %ymm9
+	ALPHA_FSCALE %ymm10, %ymm10, %ymm2, %ymm10
 	vaddps	%ymm10, %ymm8, %ymm8
 	vaddps	%ymm7, %ymm9, %ymm7
 	vsubps	%ymm7, %ymm8, %ymm7
 	vmovdqu	4(%rdx,%r9,4), %ymm8
-	vpsrld	$24, %ymm8, %ymm8
-	vcvtdq2ps	%ymm8, %ymm8
-	vmulps	%ymm2, %ymm8, %ymm8
+	ALPHA_FSCALE %ymm8, %ymm8, %ymm2, %ymm8
 	vaddps	%ymm8, %ymm9, %ymm9
 	vaddps	%ymm9, %ymm8, %ymm8
 	vmovdqu	4(%rdi,%r9,4), %ymm9
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm2, %ymm9, %ymm9
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm2, %ymm9
 	vaddps	%ymm8, %ymm10, %ymm8
 	vaddps	%ymm5, %ymm9, %ymm5
 	vaddps	%ymm5, %ymm9, %ymm5
 	vmovdqu	4(%rsi,%r9,4), %ymm9
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm2, %ymm9, %ymm9
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm2, %ymm9
 	vaddps	%ymm5, %ymm6, %ymm5
 	vsubps	%ymm5, %ymm8, %ymm5
 	vxorps	%ymm7, %ymm14, %ymm6
@@ -454,86 +449,37 @@ SYM(ksvgLightingPointDiffuseRowAvx2Linear):  # @ksvgLightingPointDiffuseRowAvx2L
 	vmovd	%xmm8, %r10d
 	vmovd	%xmm9, %r11d
 	vmovd	%xmm7, %ebx
-	movzbl	(%rax,%rbx), %ebx
-	movzbl	(%rax,%r11), %r11d
-	movzbl	(%rax,%r10), %r10d
-	shll	$16, %ebx
-	shll	$8, %r11d
-	orl	%ebx, %r11d
-	orl	%r10d, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %rbx, %ebx, %r11, %r11d, %r10, %r10d
 	movl	%r11d, (%rcx,%r9,4)
 	vpextrd	$1, %xmm7, %r10d
 	vpextrd	$1, %xmm9, %r11d
 	vpextrd	$1, %xmm8, %ebx
-	movzbl	(%rax,%r10), %r10d
-	movzbl	(%rax,%r11), %r11d
-	movzbl	(%rax,%rbx), %ebx
-	shll	$16, %r10d
-	shll	$8, %r11d
-	orl	%r10d, %r11d
-	orl	%ebx, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %r10, %r10d, %r11, %r11d, %rbx, %ebx
 	vpextrd	$2, %xmm7, %r10d
 	vpextrd	$2, %xmm9, %ebx
 	vpextrd	$2, %xmm8, %r14d
 	movl	%r11d, 4(%rcx,%r9,4)
-	movzbl	(%rax,%r10), %r10d
-	movzbl	(%rax,%rbx), %r11d
-	movzbl	(%rax,%r14), %ebx
-	shll	$16, %r10d
-	shll	$8, %r11d
-	orl	%r10d, %r11d
-	orl	%ebx, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %r10, %r10d, %rbx, %r11d, %r14, %ebx
 	movl	%r11d, 8(%rcx,%r9,4)
 	vpextrd	$3, %xmm7, %r10d
 	vpextrd	$3, %xmm9, %r11d
 	vpextrd	$3, %xmm8, %ebx
-	movzbl	(%rax,%r10), %r10d
-	movzbl	(%rax,%r11), %r11d
-	movzbl	(%rax,%rbx), %ebx
-	shll	$16, %r10d
-	shll	$8, %r11d
-	orl	%r10d, %r11d
-	orl	%ebx, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %r10, %r10d, %r11, %r11d, %rbx, %ebx
 	movl	%r11d, 12(%rcx,%r9,4)
 	vmovd	%xmm6, %r10d
 	vmovd	%xmm5, %r11d
 	vmovd	%xmm4, %ebx
-	movzbl	(%rax,%r10), %r10d
-	movzbl	(%rax,%r11), %r11d
-	movzbl	(%rax,%rbx), %ebx
-	shll	$16, %r10d
-	shll	$8, %r11d
-	orl	%r10d, %r11d
-	orl	%ebx, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %r10, %r10d, %r11, %r11d, %rbx, %ebx
 	vpextrd	$1, %xmm6, %r10d
 	vpextrd	$1, %xmm5, %ebx
 	movl	%r11d, 16(%rcx,%r9,4)
 	vpextrd	$1, %xmm4, %r11d
-	movzbl	(%rax,%r10), %r10d
-	movzbl	(%rax,%rbx), %ebx
-	movzbl	(%rax,%r11), %r11d
-	shll	$16, %r10d
-	shll	$8, %ebx
-	orl	%r10d, %ebx
-	orl	%r11d, %ebx
-	orl	$-16777216, %ebx                # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %r10, %r10d, %rbx, %ebx, %r11, %r11d
 	movl	%ebx, 20(%rcx,%r9,4)
 	vpextrd	$2, %xmm6, %r10d
 	vpextrd	$2, %xmm5, %r11d
 	vpextrd	$2, %xmm4, %ebx
-	movzbl	(%rax,%r10), %r10d
-	movzbl	(%rax,%r11), %r11d
-	movzbl	(%rax,%rbx), %ebx
-	shll	$16, %r10d
-	shll	$8, %r11d
-	orl	%r10d, %r11d
-	orl	%ebx, %r11d
-	orl	$-16777216, %r11d               # imm = 0xFF000000
+	L2S_GATHER_PACK %rax, %r10, %r10d, %r11, %r11d, %rbx, %ebx
 	vpextrd	$3, %xmm6, %r10d
 	vpextrd	$3, %xmm5, %ebx
 	vpextrd	$3, %xmm4, %r14d

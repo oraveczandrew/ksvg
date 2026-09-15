@@ -4,6 +4,71 @@
 
 #include "asm_macros.S"
 
+/*
+ * Description:
+ *   Extracts one pixel's alpha byte and stores it as an integer: loads the
+ *   pixel, shifts the alpha byte down (shrl $24), and stores the 0..255
+ *   integer to a stack slot. 32-bit GPR-only (ISA-neutral shape, kept
+ *   file-local: single-file use).
+ *
+ * Inputs:
+ *   \src_off  = byte offset of the pixel from the row pointer in %eax
+ *   \dst_off  = stack offset of the integer slot in (%ebp)
+ *
+ * Output:
+ *   0..255 integer at \dst_off(%ebp)
+ *
+ * Clobbers:
+ *   %ecx
+ */
+.macro ALPHA_EXTRACT src_off, dst_off
+    movl \src_off(%eax),%ecx; shrl $24,%ecx; movl %ecx,\dst_off(%ebp)
+.endm
+
+/*
+ * Description:
+ *   Converts one stacked integer alpha (0..255) to a scaled float (VEX
+ *   scalar form): loads the int, converts int32->float (exact), scales by
+ *   the surface-scale vector, stores back. Moved up from inside the loop;
+ *   unchanged semantics.
+ *
+ * Inputs:
+ *   \stack_off = stack offset of the int slot in (%ebp) (in/out)
+ *   %xmm7      = broadcast surface scale ss (loaded by the caller, preserved)
+ *
+ * Output:
+ *   float at \stack_off(%ebp)
+ *
+ * Clobbers:
+ *   %xmm0
+ */
+.macro PSA_TO_FLOAT stack_off
+    vmovd \stack_off(%ebp),%xmm0; vcvtdq2ps %xmm0,%xmm0; vmulss %xmm7,%xmm0, %xmm0; vmovss %xmm0,\stack_off(%ebp)
+.endm
+
+/*
+ * Description:
+ *   Scales one color channel by the intensity (VEX scalar form), rounds
+ *   half-up, and truncates to int. The 0.5 literal (.Lpsa_half) is fixed
+ *   (single-file use); intensity is always in %xmm0 and scratch in %xmm1
+ *   at all 3 call sites (kernel contract).
+ *
+ * Inputs:
+ *   \mem_off  = byte offset of the channel factor from the params base
+ *   \base     = params base register (%eax for R, %edx for G/B)
+ *   \dst      = 32-bit GPR receiving the truncated channel
+ *
+ * Output:
+ *   \dst = (int)(\base[\mem_off] * intensity + 0.5)
+ *
+ * Clobbers:
+ *   %xmm1
+ *   \dst (written)
+ */
+.macro PSA_CHAN mem_off, base, dst
+    vmovss \mem_off(\base),%xmm1; vmulss %xmm0,%xmm1, %xmm1; vaddss .Lpsa_half@GOTOFF(%ebx),%xmm1, %xmm1; vcvttss2si %xmm1,\dst
+.endm
+
 	.text
 POINT_LIT4
 	.p2align 2
@@ -43,23 +108,20 @@ SYM(ksvgLightingPointSpecularRowAvx2Linear):
 
     # Load 3 horizontal samples from 3 rows for ONE output pixel.
     movl -32(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-84(%ebp) # tl
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-88(%ebp) # tm
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-92(%ebp) # tr
+    ALPHA_EXTRACT 0, -84
+    ALPHA_EXTRACT 4, -88
+    ALPHA_EXTRACT 8, -92
     movl -36(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-96(%ebp) # ml
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-136(%ebp) # mm (surfaceZ)
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-100(%ebp) # mr
+    ALPHA_EXTRACT 0, -96
+    ALPHA_EXTRACT 4, -136
+    ALPHA_EXTRACT 8, -100
     movl -40(%ebp),%eax
-    movl 0(%eax),%ecx; shrl $24,%ecx; movl %ecx,-104(%ebp) # bl
-    movl 4(%eax),%ecx; shrl $24,%ecx; movl %ecx,-108(%ebp) # bm
-    movl 8(%eax),%ecx; shrl $24,%ecx; movl %ecx,-112(%ebp) # br
+    ALPHA_EXTRACT 0, -104
+    ALPHA_EXTRACT 4, -108
+    ALPHA_EXTRACT 8, -112
 
     movl -16(%ebp),%eax
     vmovss 36(%eax),%xmm7 # ss
-    .macro PSA_TO_FLOAT stack_off
-    vmovd \stack_off(%ebp),%xmm0; vcvtdq2ps %xmm0,%xmm0; vmulss %xmm7,%xmm0, %xmm0; vmovss %xmm0,\stack_off(%ebp)
-    .endm
     PSA_TO_FLOAT -84; PSA_TO_FLOAT -88; PSA_TO_FLOAT -92
     PSA_TO_FLOAT -96; PSA_TO_FLOAT -136; PSA_TO_FLOAT -100
     PSA_TO_FLOAT -104; PSA_TO_FLOAT -108; PSA_TO_FLOAT -112
@@ -110,10 +172,10 @@ SYM(ksvgLightingPointSpecularRowAvx2Linear):
     movl -16(%ebp),%eax; vmulss 8(%eax),%xmm0, %xmm0; vxorps %xmm1,%xmm1,%xmm1; vmaxss %xmm1,%xmm0, %xmm0; vminss .Lpsa_one@GOTOFF(%ebx),%xmm0, %xmm0
 
     # R,G,B
-    vmovss 24(%eax),%xmm1; vmulss %xmm0,%xmm1, %xmm1; vaddss .Lpsa_half@GOTOFF(%ebx),%xmm1, %xmm1; vcvttss2si %xmm1,%eax
+    PSA_CHAN 24, %eax, %eax
     movl -16(%ebp),%edx
-    vmovss 28(%edx),%xmm1; vmulss %xmm0,%xmm1, %xmm1; vaddss .Lpsa_half@GOTOFF(%ebx),%xmm1, %xmm1; vcvttss2si %xmm1,%ecx
-    vmovss 32(%edx),%xmm1; vmulss %xmm0,%xmm1, %xmm1; vaddss .Lpsa_half@GOTOFF(%ebx),%xmm1, %xmm1; vcvttss2si %xmm1,%edx
+    PSA_CHAN 28, %edx, %ecx
+    PSA_CHAN 32, %edx, %edx
 
     cmpl $0,-4(%ebp) # useLinear
     je .Lpsa_out

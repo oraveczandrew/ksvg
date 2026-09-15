@@ -14,6 +14,49 @@
  */
 
 #include "asm_macros.S"
+#include "lighting_x86_64_avx2_macros.S"
+
+/*
+ * Description:
+ *   Scalar L2S gather + max-channel-alpha byte pack, matching the
+ *   point-specular scalar path (LUT != NULL) bit-for-bit. Gathers three bytes
+ *   from \lut: lane 1 of \xmm, lane 0 of \xmm, and the scalar index \scl,
+ *   then computes alpha = max(R, G, B) with unsigned cmovs (cmoval/cmovbel)
+ *   and packs: (max << 24) | (R << 16) | (G << 8) | B.
+ *
+ * Inputs:
+ *   \lut        = base of the L2S table (e.g. %r14)
+ *   \xmm        = XMM register holding per-lane packed indices (lanes 0/1)
+ *   \lane1q, \lane1d = 64-bit index view / 32-bit value view of the lane-1 reg
+ *   \lane0q, \lane0d = same pair for the lane-0 reg (holds the packed result)
+ *   \sclq, \scld     = same pair for the scalar-index reg
+ *   \tmp        = scratch 32-bit GPR (alpha)
+ *
+ * Output:
+ *   \lane0d     = packed 0xAARRGGBB pixel
+ *
+ * Clobbers:
+ *   \lane1d, \lane0d, \scld, \tmp
+ *   Upper 32 bits of the 64-bit registers are untouched.
+ */
+.macro L2S_GATHER_CMOV_PACK lut, xmm, lane1q, lane1d, lane0q, lane0d, sclq, scld, tmp
+    vpextrd $1, \xmm, \lane1d
+    movzbl  (\lut,\lane1q), \lane1d
+    vmovd   \xmm, \lane0d
+    movzbl  (\lut,\lane0q), \lane0d
+    movzbl  (\lut,\sclq), \scld
+    cmpl    \lane0d, \lane1d
+    movl    \lane0d, \tmp
+    cmoval  \lane1d, \tmp
+    cmpl    \scld, \tmp
+    cmovbel \scld, \tmp
+    shll    $24, \tmp
+    shll    $16, \lane1d
+    shll    $8, \lane0d
+    orl     \lane1d, \lane0d
+    orl     \tmp, \lane0d
+    orl     \scld, \lane0d
+.endm
 
 	.globl SYM(ksvgLightingPointSpecularRowAvx2) ## -- Begin function ksvgLightingPointSpecularRowAvx2
 	.p2align	4, 0x90
@@ -159,29 +202,17 @@ SYM(core8):                                 ## @core8
 	vmovdqu	(%rdi), %ymm3
 	vmovdqu	4(%rdi), %ymm5
 	vmovdqu	8(%rdi), %ymm6
-	vpsrld	$24, %ymm3, %ymm3
-	vcvtdq2ps	%ymm3, %ymm3
-	vmulps	%ymm3, %ymm1, %ymm3
-	vpsrld	$24, %ymm5, %ymm5
-	vcvtdq2ps	%ymm5, %ymm5
-	vmulps	%ymm5, %ymm1, %ymm5
-	vpsrld	$24, %ymm6, %ymm6
-	vcvtdq2ps	%ymm6, %ymm6
-	vmulps	%ymm6, %ymm1, %ymm6
+	ALPHA_FSCALE %ymm3, %ymm3, %ymm1, %ymm3
+	ALPHA_FSCALE %ymm5, %ymm5, %ymm1, %ymm5
+	ALPHA_FSCALE %ymm6, %ymm6, %ymm1, %ymm6
 	vmovdqu	(%rsi), %ymm7
 	vmovdqu	8(%rsi), %ymm8
-	vpsrld	$24, %ymm7, %ymm7
-	vcvtdq2ps	%ymm7, %ymm7
-	vmulps	%ymm7, %ymm1, %ymm7
-	vpsrld	$24, %ymm8, %ymm8
-	vcvtdq2ps	%ymm8, %ymm8
-	vmulps	%ymm1, %ymm8, %ymm8
+	ALPHA_FSCALE %ymm7, %ymm7, %ymm1, %ymm7
+	ALPHA_FSCALE %ymm8, %ymm8, %ymm1, %ymm8
 	vmovdqu	(%rdx), %ymm9
 	vmovdqu	4(%rdx), %ymm10
 	vmovdqu	8(%rdx), %ymm11
-	vpsrld	$24, %ymm9, %ymm9
-	vcvtdq2ps	%ymm9, %ymm9
-	vmulps	%ymm1, %ymm9, %ymm9
+	ALPHA_FSCALE %ymm9, %ymm9, %ymm1, %ymm9
 	vpsrld	$24, %ymm10, %ymm10
 	vpsrld	$24, %ymm11, %ymm11
 	vcvtdq2ps	%ymm11, %ymm11
@@ -230,9 +261,7 @@ SYM(core8):                                 ## @core8
 	vsubss	44(%r8), %xmm7, %xmm7
 	vbroadcastss	%xmm7, %ymm9
 	vbroadcastss	20(%r8), %ymm10
-	vpsrld	$24, %ymm8, %ymm8
-	vcvtdq2ps	%ymm8, %ymm8
-	vmulps	%ymm1, %ymm8, %ymm1
+	ALPHA_FSCALE %ymm8, %ymm8, %ymm1, %ymm1
 	vsubps	%ymm1, %ymm10, %ymm1
 	vmulps	%ymm0, %ymm0, %ymm8
 	vmulss	%xmm7, %xmm7, %xmm7
@@ -518,22 +547,7 @@ LBB1_16:
 	vpminsd	%xmm3, %xmm4, %xmm6
 	vpxor	%xmm4, %xmm4, %xmm4
 	vpmaxsd	%xmm4, %xmm6, %xmm6
-	vpextrd	$1, %xmm6, %esi
-	movzbl	(%r14,%rsi), %esi
-	vmovd	%xmm6, %edi
-	movzbl	(%r14,%rdi), %edi
-	movzbl	(%r14,%rdx), %edx
-	cmpl	%edi, %esi
-	movl	%edi, %r8d
-	cmoval	%esi, %r8d
-	cmpl	%edx, %r8d
-	cmovbel	%edx, %r8d
-	shll	$24, %r8d
-	shll	$16, %esi
-	shll	$8, %edi
-	orl	%esi, %edi
-	orl	%r8d, %edi
-	orl	%edx, %edi
+	L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
 	vmulss	%xmm0, %xmm11, %xmm6
 	vroundss	$11, %xmm6, %xmm6, %xmm6
 	vcvttss2si	%xmm6, %edx
@@ -548,22 +562,7 @@ LBB1_16:
 	vcvttps2dq	%xmm6, %xmm6
 	vpminsd	%xmm3, %xmm6, %xmm6
 	vpmaxsd	%xmm4, %xmm6, %xmm6
-	vpextrd	$1, %xmm6, %esi
-	movzbl	(%r14,%rsi), %esi
-	vmovd	%xmm6, %edi
-	movzbl	(%r14,%rdi), %edi
-	movzbl	(%r14,%rdx), %edx
-	cmpl	%edi, %esi
-	movl	%edi, %r8d
-	cmoval	%esi, %r8d
-	cmpl	%edx, %r8d
-	cmovbel	%edx, %r8d
-	shll	$24, %r8d
-	shll	$16, %esi
-	shll	$8, %edi
-	orl	%esi, %edi
-	orl	%r8d, %edi
-	orl	%edx, %edi
+	L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
 	vmulss	%xmm0, %xmm10, %xmm6
 	vroundss	$11, %xmm6, %xmm6, %xmm6
 	vcvttss2si	%xmm6, %edx
@@ -578,22 +577,7 @@ LBB1_16:
 	vcvttps2dq	%xmm6, %xmm6
 	vpminsd	%xmm3, %xmm6, %xmm6
 	vpmaxsd	%xmm4, %xmm6, %xmm6
-	vpextrd	$1, %xmm6, %esi
-	movzbl	(%r14,%rsi), %esi
-	vmovd	%xmm6, %edi
-	movzbl	(%r14,%rdi), %edi
-	movzbl	(%r14,%rdx), %edx
-	cmpl	%edi, %esi
-	movl	%edi, %r8d
-	cmoval	%esi, %r8d
-	cmpl	%edx, %r8d
-	cmovbel	%edx, %r8d
-	shll	$24, %r8d
-	shll	$16, %esi
-	shll	$8, %edi
-	orl	%esi, %edi
-	orl	%r8d, %edi
-	orl	%edx, %edi
+	L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
 	vmulss	%xmm0, %xmm9, %xmm6
 	vroundss	$11, %xmm6, %xmm6, %xmm6
 	vcvttss2si	%xmm6, %edx
@@ -608,22 +592,7 @@ LBB1_16:
 	vcvttps2dq	%xmm6, %xmm6
 	vpminsd	%xmm3, %xmm6, %xmm6
 	vpmaxsd	%xmm4, %xmm6, %xmm6
-	vpextrd	$1, %xmm6, %esi
-	movzbl	(%r14,%rsi), %esi
-	vmovd	%xmm6, %edi
-	movzbl	(%r14,%rdi), %edi
-	movzbl	(%r14,%rdx), %edx
-	cmpl	%edi, %esi
-	movl	%edi, %r8d
-	cmoval	%esi, %r8d
-	cmpl	%edx, %r8d
-	cmovbel	%edx, %r8d
-	shll	$24, %r8d
-	shll	$16, %esi
-	shll	$8, %edi
-	orl	%esi, %edi
-	orl	%r8d, %edi
-	orl	%edx, %edi
+	L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
 	vmulss	%xmm0, %xmm8, %xmm6
 	vroundss	$11, %xmm6, %xmm6, %xmm6
 	vcvttss2si	%xmm6, %edx
@@ -638,22 +607,7 @@ LBB1_16:
 	vcvttps2dq	%xmm6, %xmm6
 	vpminsd	%xmm3, %xmm6, %xmm6
 	vpmaxsd	%xmm4, %xmm6, %xmm6
-	vpextrd	$1, %xmm6, %esi
-	movzbl	(%r14,%rsi), %esi
-	vmovd	%xmm6, %edi
-	movzbl	(%r14,%rdi), %edi
-	movzbl	(%r14,%rdx), %edx
-	cmpl	%edi, %esi
-	movl	%edi, %r8d
-	cmoval	%esi, %r8d
-	cmpl	%edx, %r8d
-	cmovbel	%edx, %r8d
-	shll	$24, %r8d
-	shll	$16, %esi
-	shll	$8, %edi
-	orl	%esi, %edi
-	orl	%r8d, %edi
-	orl	%edx, %edi
+	L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
 	vmulss	%xmm7, %xmm0, %xmm6
 	vroundss	$11, %xmm6, %xmm6, %xmm6
 	vcvttss2si	%xmm6, %edx
@@ -668,22 +622,7 @@ LBB1_16:
 	vcvttps2dq	%xmm6, %xmm6
 	vpminsd	%xmm3, %xmm6, %xmm6
 	vpmaxsd	%xmm4, %xmm6, %xmm6
-	vpextrd	$1, %xmm6, %esi
-	movzbl	(%r14,%rsi), %esi
-	vmovd	%xmm6, %edi
-	movzbl	(%r14,%rdi), %edi
-	movzbl	(%r14,%rdx), %edx
-	cmpl	%edi, %esi
-	movl	%edi, %r8d
-	cmoval	%esi, %r8d
-	cmpl	%edx, %r8d
-	cmovbel	%edx, %r8d
-	shll	$24, %r8d
-	shll	$16, %esi
-	shll	$8, %edi
-	orl	%esi, %edi
-	orl	%r8d, %edi
-	orl	%edx, %edi
+	L2S_GATHER_CMOV_PACK %r14, %xmm6, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
 	vmulss	%xmm5, %xmm0, %xmm6
 	vroundss	$11, %xmm6, %xmm6, %xmm6
 	vcvttss2si	%xmm6, %edx
@@ -698,22 +637,7 @@ LBB1_16:
 	vcvttps2dq	%xmm5, %xmm5
 	vpminsd	%xmm3, %xmm5, %xmm5
 	vpmaxsd	%xmm4, %xmm5, %xmm5
-	vpextrd	$1, %xmm5, %esi
-	movzbl	(%r14,%rsi), %esi
-	vmovd	%xmm5, %edi
-	movzbl	(%r14,%rdi), %edi
-	movzbl	(%r14,%rdx), %edx
-	cmpl	%edi, %esi
-	movl	%edi, %r8d
-	cmoval	%esi, %r8d
-	cmpl	%edx, %r8d
-	cmovbel	%edx, %r8d
-	shll	$24, %r8d
-	shll	$16, %esi
-	shll	$8, %edi
-	orl	%esi, %edi
-	orl	%r8d, %edi
-	orl	%edx, %edi
+	L2S_GATHER_CMOV_PACK %r14, %xmm5, %rsi, %esi, %rdi, %edi, %rdx, %edx, %r8d
 	vmulss	%xmm2, %xmm0, %xmm0
 	vroundss	$11, %xmm0, %xmm0, %xmm0
 	vcvttss2si	%xmm0, %edx
@@ -728,22 +652,7 @@ LBB1_16:
 	vcvttps2dq	%xmm0, %xmm0
 	vpminsd	%xmm3, %xmm0, %xmm0
 	vpmaxsd	%xmm4, %xmm0, %xmm0
-	vpextrd	$1, %xmm0, %ecx
-	movzbl	(%r14,%rcx), %ecx
-	vmovd	%xmm0, %edx
-	movzbl	(%r14,%rdx), %edx
-	movzbl	(%r14,%rax), %eax
-	cmpl	%edx, %ecx
-	movl	%edx, %esi
-	cmoval	%ecx, %esi
-	cmpl	%eax, %esi
-	cmovbel	%eax, %esi
-	shll	$24, %esi
-	shll	$16, %ecx
-	shll	$8, %edx
-	orl	%ecx, %edx
-	orl	%esi, %edx
-	orl	%eax, %edx
+	L2S_GATHER_CMOV_PACK %r14, %xmm0, %rcx, %ecx, %rdx, %edx, %rax, %eax, %esi
 	movl	%edx, 28(%rbx)
 	jmp	LBB1_18
 LBB1_17:
