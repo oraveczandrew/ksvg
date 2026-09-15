@@ -105,13 +105,15 @@ void ksvgLightingPointSpecularRowSsse3(
         jint* dst, int count, const PointLightingParams* params, float exponent);
 void ksvgLightingPointSpecularRowSsse3Linear(
         const jint* srcT, const jint* srcM, const jint* srcB,
-        jint* dst, int count, const PointLightingParams* params, float exponent);
+        jint* dst, int count, const PointLightingParams* params, float exponent,
+        const uint8_t* linearToSrgb);
 void ksvgLightingPointSpecularRowAvx2(
         const jint* srcT, const jint* srcM, const jint* srcB,
         jint* dst, int count, const PointLightingParams* params, float exponent);
 void ksvgLightingPointSpecularRowAvx2Linear(
         const jint* srcT, const jint* srcM, const jint* srcB,
-        jint* dst, int count, const PointLightingParams* params, float exponent);
+        jint* dst, int count, const PointLightingParams* params, float exponent,
+        const uint8_t* linearToSrgb);
 
 // Spot-light diffuse/specular row kernels (x86_64).
 void ksvgLightingSpotDiffuseRowSsse3(

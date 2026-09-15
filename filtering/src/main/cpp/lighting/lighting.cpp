@@ -576,7 +576,7 @@ void applyVector(
                         if (c8 > 0) {
                             if (isSpecular) {
                                 if (useLinear) {
-                                    ksvgLightingPointSpecularRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &plp, exponent);
+                                    ksvgLightingPointSpecularRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &plp, exponent, ksvg_linear_to_srgb_lut);
                                 } else {
                                     ksvgLightingPointSpecularRowAvx2(srcT, srcM, srcB, rowOut, c8, &plp, exponent);
                                 }
@@ -596,7 +596,7 @@ void applyVector(
                         if (c4 > 0) {
                             if (isSpecular) {
                                 if (useLinear) {
-                                    ksvgLightingPointSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &plp, exponent);
+                                    ksvgLightingPointSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &plp, exponent, ksvg_linear_to_srgb_lut);
                                 } else {
                                     ksvgLightingPointSpecularRowSsse3(srcT, srcM, srcB, rowOut, c4, &plp, exponent);
                                 }
