@@ -100,13 +100,10 @@ void runForced(const jint* src, const jint* map, jint* dst, int width, int heigh
                 applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
                 break;
             case SIMD_BACKEND_SSE2:
-                ksvgDisplacementMapApplySse2(src, map, dst, width, height, scale, xChannel, yChannel);
+                ksvgDisplacementMapApplySsse3(src, map, dst, width, height, scale, xChannel, yChannel);
                 break;
             case SIMD_BACKEND_AVX2:
                 ksvgDisplacementMapApplyAvx2(src, map, dst, width, height, scale, xChannel, yChannel);
-                break;
-            case SIMD_BACKEND_AVX512:
-                ksvgDisplacementMapApplyAvx512(src, map, dst, width, height, scale, xChannel, yChannel);
                 break;
             default:
                 assert(false && "unsupported forced displacement_map backend on x86");
@@ -145,7 +142,6 @@ jint nativeBackendForAbi() {
     const SimdLevel level = detectSimdLevel();
     backends |= SIMD_BACKEND_SSE2;
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
-    if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
 #elif defined(__i386__)
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_SSSE3) backends |= SIMD_BACKEND_SSSE3;
@@ -217,12 +213,10 @@ Java_hu_oandras_ksvg_filtering_DisplacementMapNative_apply(
         ksvgDisplacementMapApplyNeon32(src, map, dst, width, height, scale, xChannel, yChannel);
 #elif defined(__x86_64__)
         const SimdLevel level = detectSimdLevel();
-        if (level >= SIMD_AVX512) {
-            ksvgDisplacementMapApplyAvx512(src, map, dst, width, height, scale, xChannel, yChannel);
-        } else if (level >= SIMD_AVX2) {
+        if (level >= SIMD_AVX2) {
             ksvgDisplacementMapApplyAvx2(src, map, dst, width, height, scale, xChannel, yChannel);
         } else {
-            ksvgDisplacementMapApplySse2(src, map, dst, width, height, scale, xChannel, yChannel);
+            ksvgDisplacementMapApplySsse3(src, map, dst, width, height, scale, xChannel, yChannel);
         }
 #elif defined(__i386__)
         const SimdLevel level = detectSimdLevel();

@@ -234,52 +234,52 @@ SYM(ksvgDisplacementMapApplySsse3):
     .long  \LABEL-.Ldm_jt
 .endm
 
-/* Channel 0/1/2/3 correspond to byte shifts 0/8/16/24. */
-    KERNEL .Ldm_k00, .Ldm_mask_c0, .Ldm_mask_c0, 0, 0
-    KERNEL .Ldm_k01, .Ldm_mask_c0, .Ldm_mask_c1, 0, 8
-    KERNEL .Ldm_k02, .Ldm_mask_c0, .Ldm_mask_c2, 0, 16
-    KERNEL .Ldm_k03, .Ldm_mask_c0, .Ldm_mask_c3, 0, 24
-    KERNEL .Ldm_k04, .Ldm_mask_c1, .Ldm_mask_c0, 8, 0
+    // ARGB_8888 channel layout (little-endian byte order): 0=R(byte 2, shift 16),
+    // 1=G(byte 1, shift 8), 2=B(byte 0, shift 0), 3=A(byte 3, shift 24).
+    // Row = xChannel, column = yChannel (index = y + 4*x).
+    KERNEL .Ldm_k00, .Ldm_mask_c2, .Ldm_mask_c2, 16, 16
+    KERNEL .Ldm_k01, .Ldm_mask_c2, .Ldm_mask_c1, 16, 8
+    KERNEL .Ldm_k02, .Ldm_mask_c2, .Ldm_mask_c0, 16, 0
+    KERNEL .Ldm_k03, .Ldm_mask_c2, .Ldm_mask_c3, 16, 24
+    KERNEL .Ldm_k04, .Ldm_mask_c1, .Ldm_mask_c2, 8, 16
     KERNEL .Ldm_k05, .Ldm_mask_c1, .Ldm_mask_c1, 8, 8
-    KERNEL .Ldm_k06, .Ldm_mask_c1, .Ldm_mask_c2, 8, 16
+    KERNEL .Ldm_k06, .Ldm_mask_c1, .Ldm_mask_c0, 8, 0
     KERNEL .Ldm_k07, .Ldm_mask_c1, .Ldm_mask_c3, 8, 24
-    KERNEL .Ldm_k08, .Ldm_mask_c2, .Ldm_mask_c0, 16, 0
-    KERNEL .Ldm_k09, .Ldm_mask_c2, .Ldm_mask_c1, 16, 8
-    KERNEL .Ldm_k10, .Ldm_mask_c2, .Ldm_mask_c2, 16, 16
-    KERNEL .Ldm_k11, .Ldm_mask_c2, .Ldm_mask_c3, 16, 24
-    KERNEL .Ldm_k12, .Ldm_mask_c3, .Ldm_mask_c0, 24, 0
+    KERNEL .Ldm_k08, .Ldm_mask_c0, .Ldm_mask_c2, 0, 16
+    KERNEL .Ldm_k09, .Ldm_mask_c0, .Ldm_mask_c1, 0, 8
+    KERNEL .Ldm_k10, .Ldm_mask_c0, .Ldm_mask_c0, 0, 0
+    KERNEL .Ldm_k11, .Ldm_mask_c0, .Ldm_mask_c3, 0, 24
+    KERNEL .Ldm_k12, .Ldm_mask_c3, .Ldm_mask_c2, 24, 16
     KERNEL .Ldm_k13, .Ldm_mask_c3, .Ldm_mask_c1, 24, 8
-    KERNEL .Ldm_k14, .Ldm_mask_c3, .Ldm_mask_c2, 24, 16
+    KERNEL .Ldm_k14, .Ldm_mask_c3, .Ldm_mask_c0, 24, 0
     KERNEL .Ldm_k15, .Ldm_mask_c3, .Ldm_mask_c3, 24, 24
 
 .p2align 2
 .Ldm_jt:
-    .long .Ldm_k00-.Ldm_jt, .Ldm_k01-.Ldm_jt, .Ldm_k02-.Ldm_jt, .Ldm_k03-.Ldm_jt
-    .long .Ldm_k04-.Ldm_jt, .Ldm_k05-.Ldm_jt, .Ldm_k06-.Ldm_jt, .Ldm_k07-.Ldm_jt
-    .long .Ldm_k08-.Ldm_jt, .Ldm_k09-.Ldm_jt, .Ldm_k10-.Ldm_jt, .Ldm_k11-.Ldm_jt
-    .long .Ldm_k12-.Ldm_jt, .Ldm_k13-.Ldm_jt, .Ldm_k14-.Ldm_jt, .Ldm_k15-.Ldm_jt
+.long .Ldm_k00-.Ldm_jt, .Ldm_k01-.Ldm_jt, .Ldm_k02-.Ldm_jt, .Ldm_k03-.Ldm_jt
+.long .Ldm_k04-.Ldm_jt, .Ldm_k05-.Ldm_jt, .Ldm_k06-.Ldm_jt, .Ldm_k07-.Ldm_jt
+.long .Ldm_k08-.Ldm_jt, .Ldm_k09-.Ldm_jt, .Ldm_k10-.Ldm_jt, .Ldm_k11-.Ldm_jt
+.long .Ldm_k12-.Ldm_jt, .Ldm_k13-.Ldm_jt, .Ldm_k14-.Ldm_jt, .Ldm_k15-.Ldm_jt
 
 .p2align 4
 .Ldm_mask_c0:
-    .byte 0, 0x80, 0x80, 0x80, 4, 0x80, 0x80, 0x80, 8, 0x80, 0x80, 0x80, 12, 0x80, 0x80, 0x80
+.byte 0, 0x80, 0x80, 0x80, 4, 0x80, 0x80, 0x80, 8, 0x80, 0x80, 0x80, 12, 0x80, 0x80, 0x80
 .Ldm_mask_c1:
-    .byte 1, 0x80, 0x80, 0x80, 5, 0x80, 0x80, 0x80, 9, 0x80, 0x80, 0x80, 13, 0x80, 0x80, 0x80
+.byte 1, 0x80, 0x80, 0x80, 5, 0x80, 0x80, 0x80, 9, 0x80, 0x80, 0x80, 13, 0x80, 0x80, 0x80
 .Ldm_mask_c2:
-    .byte 2, 0x80, 0x80, 0x80, 6, 0x80, 0x80, 0x80, 10, 0x80, 0x80, 0x80, 14, 0x80, 0x80, 0x80
+.byte 2, 0x80, 0x80, 0x80, 6, 0x80, 0x80, 0x80, 10, 0x80, 0x80, 0x80, 14, 0x80, 0x80, 0x80
 .Ldm_mask_c3:
-    .byte 3, 0x80, 0x80, 0x80, 7, 0x80, 0x80, 0x80, 11, 0x80, 0x80, 0x80, 15, 0x80, 0x80, 0x80
+.byte 3, 0x80, 0x80, 0x80, 7, 0x80, 0x80, 0x80, 11, 0x80, 0x80, 0x80, 15, 0x80, 0x80, 0x80
 .Ldm_inc4:
-    .long 0, 1, 2, 3
+.long 0, 1, 2, 3
 .Ldm_one4:
-    .long 1, 1, 1, 1
+.long 1, 1, 1, 1
 .Ldm_255v:
-    .float 255.0, 255.0, 255.0, 255.0
+.float 255.0, 255.0, 255.0, 255.0
 .Ldm_halfv:
-    .float 0.5, 0.5, 0.5, 0.5
+.float 0.5, 0.5, 0.5, 0.5
 .Ldm_255s:
-    .float 255.0
+.float 255.0
 .Ldm_halfs:
-    .float 0.5
+.float 0.5
 
-/* GNU stack marker */
-.section .note.GNU-stack,"",@progbits
