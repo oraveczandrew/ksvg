@@ -75,6 +75,7 @@ TYPE(SYM(ksvgMorphologyApplyRowAvx2), @function)
     mov     (%eax), %edx; vmovd %edx, %xmm1; vpbroadcastd %xmm1, %ymm1; vpminub %ymm1, %ymm0, %ymm0
     add     -16(%ebp), %eax; dec %ecx; jnz .Lra32_etr
     vmovd   %xmm0, %edx; mov %edx, (%edi); add $4, %edi; addl $4, -4(%ebp); dec %esi; jnz .Lra32_etc
+    jmp     .Lra32_hmin
 
 .Lra32_hmax:
     mov     -40(%ebp), %ecx; mov 12(%ebp), %eax; mov 32(%ebp), %edx; imul 16(%ebp), %edx; add 36(%ebp), %edx; lea (%eax, %edx, 4), %eax; mov %eax, -8(%ebp)

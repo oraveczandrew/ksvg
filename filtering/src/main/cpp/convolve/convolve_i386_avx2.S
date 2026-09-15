@@ -181,7 +181,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     movl    264(%esp), %eax
     leal    (, %eax, 4), %ebx
     movl    %edi, %eax
-    movl    256(%esp), %edi
+    movl    260(%esp), %edi
     movl    %ebp, 128(%esp)
     vmovups %ymm2, 160(%esp)
     jmp     .LBB0_3
@@ -203,7 +203,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     movl    %edi, 124(%esp)
     movl    %eax, 148(%esp)
     imull   264(%esp), %eax
-    movl    260(%esp), %edi
+    movl    256(%esp), %edi
     leal    (%edi, %eax, 4), %eax
     movl    %eax, 152(%esp)
     movl    124(%esp), %eax

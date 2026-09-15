@@ -81,6 +81,7 @@ TYPE(SYM(ksvgMorphologyApplyRowSse2), @function)
     mov     (%eax), %edx; movd %edx, %xmm1; pshufd $0, %xmm1, %xmm1; pminub %xmm1, %xmm0
     add     -16(%ebp), %eax; dec %ecx; jnz .Lrs32_etr
     movd    %xmm0, (%edi); add $4, %edi; addl $4, -4(%ebp); dec %esi; jnz .Lrs32_etc
+    jmp     .Lrs32_hmin
 
 .Lrs32_hmax:
     mov     -40(%ebp), %ecx; mov 12(%ebp), %eax; mov 32(%ebp), %edx; imul 16(%ebp), %edx; add 36(%ebp), %edx; lea (%eax, %edx, 4), %eax; mov %eax, -8(%ebp)
