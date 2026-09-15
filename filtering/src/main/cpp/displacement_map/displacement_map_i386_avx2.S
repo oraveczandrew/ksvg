@@ -99,9 +99,7 @@ SYM(ksvgDisplacementMapApplyAvx2_i386):
         .p2align 5
         .globl SYM(\LABEL)
         TYPE(SYM(\LABEL), @function)
-#ifndef __APPLE__
-        .hidden SYM(\LABEL)
-#endif
+        HIDE_SYM(\LABEL)
 SYM(\LABEL):
         push    ebp
         push    ebx
@@ -340,4 +338,4 @@ SYM(\LABEL):
 .Ldm_half_f:
         .float 0.5
 
-        .section .note.GNU-stack,"",@progbits
+GNU_STACK

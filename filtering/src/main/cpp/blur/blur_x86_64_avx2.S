@@ -192,6 +192,4 @@ SYM(ksvgBlurHorizontalAvx2_x86_64):
     pop %r12
     ret
 //// SIZE(SYM(ksvgBlurHorizontalAvx2_x86_64))
-#ifndef __APPLE__
-.section .note.GNU-stack,"",@progbits
-#endif
+GNU_STACK

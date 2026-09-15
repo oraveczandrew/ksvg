@@ -358,11 +358,7 @@ SYM(ksvgConvolveApplyInteriorAvx512):
 
 //// SIZE(SYM(ksvgConvolveApplyInteriorAvx512))
 
-#if defined(__APPLE__)
-.section __TEXT,__const
-#else
-.section .rodata
-#endif
+RODATA
 .p2align 4
 .Lavx512_255f: .long 0x437f0000
 .Lavx512_half: .long 0x3f000000

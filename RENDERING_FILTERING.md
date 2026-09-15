@@ -301,7 +301,7 @@ Detailed performance metrics for both Host (x86_64) and Device (ARM64) are maint
 The 9 native kernels (`:filtering`, §4) have a shared throughput harness
 (`KernelBenchmarkRunner`) driven from two places — a host JVM benchmark for the
 x86 build and an instrumented device benchmark for ARM64. Both report the same
-CSV columns (`Kernel,Backend,Size,AvgMs,MPix/s,GB/s,Speedup`).
+CSV columns (`Kernel,Backend,Size,AvgMs,MPix/s,GB/s,Speedup,IPC,CyclesPerIter`).
 
 **Host (x86)** — `KernelPerformanceBenchmark`, output → `tmp/benchmarks_host*.csv`:
 
@@ -546,6 +546,37 @@ These are implementation invariants, not benchmark-specific optimizations:
   memory regions through the actual JNI/native entry point. A backend that was
   only compiled is unverified.
 
+---
+
+### 6.4 Host-Compatible Performance Auditing & Profiling
+
+The host-JVM benchmark suite (`KernelPerformanceBenchmark`) includes an optional detailed hardware profiling engine for auditing SIMD kernel efficiency directly on development machines (macOS and Linux). It provides per-thread metrics similar to Android's `simpleperf`, allowing for deep architectural analysis (IPC, Cycles) without a device.
+
+**Metrics Provided:**
+- **Avg Time (ms)**: Wall-clock time.
+- **IPC (Instructions Per Cycle)**: Measures execution density. Values > 2.0 indicate high SIMD utilization on modern cores.
+- **Cycles/Iter**: Raw CPU cycles executed for a single kernel call.
+- **Throughput**: MPix/s and GB/s.
+
+**Supported Platforms:**
+- **macOS (Intel & Apple Silicon)**: Uses the private `kpc` (Kernel Performance Counters) API for thread-local PMC access.
+- **Linux (x86_64 & ARM64)**: Uses the `perf_event_open` syscall to read hardware performance counters.
+- **Windows**: Fallback to `NoOp` (timing only).
+
+**Command to run with profiling:**
+Pass the `-Dbenchmark.host.profile=true` system property to the test task.
+
+```bash
+./gradlew :filtering:testDebugUnitTest \
+  --tests "hu.oandras.ksvg.filtering.KernelPerformanceBenchmark" \
+  -Dbenchmark.host.profile=true \
+  -PshowTestOutput --console=plain
+```
+
+The output report will automatically include the **IPC** and **Cycles/Iter** columns in the Markdown table. If hardware counters are restricted by the OS (e.g., `perf_event_paranoid` on Linux), it gracefully falls back to raw timing.
+
+---
+
 ## 7. Change log (append)
 
 - 2026-08-30 — Document created. Recorded: two-phase render model, software/HW
@@ -658,3 +689,34 @@ These are implementation invariants, not benchmark-specific optimizations:
   stays on `__builtin_cpu_supports` — raw detection must never unlock a backend
   that would `#UD` in the emulator. Emulator now detects **AVX2** instead of
   SSSE3.
+- 2026-09-13 — Added NEON `useLinear` (linearRGB) distant-diffuse rows to match
+  the x86 `*Linear` kernels (§3.3): `ksvgLightingDistantDiffuseRowNeon64Linear`
+  (aarch64; full-256-LUT `tbl` conversion, LUT resident in v16-v31) and
+  `ksvgLightingDistantDiffuseRowNeon32Linear` (armv7a; scalar per-pixel `ldrb`
+  lookups into the reference `ksvg_linear_to_srgb_lut`, mirroring the i386
+  SSSE3 `*Linear` row because only 16 q-regs are available). `lighting.cpp`
+  wires both and sets `allowDiffuseLinear = true` unconditionally. Parity on
+  CPH2449: NEON64 16/16 and NEON32 16/16 (`LightingNativeParityTest`, incl.
+  `distant diffuse linear 16x16`); host x86_64 24/24. Previously this combo
+  silently used the scalar fallback on ARM.
+- 2026-09-13 — Replaced the x86_64 distant-light baseline rows: the SSE2
+  lighting asm (`lighting_distant_{diffuse,specular}_x86_64_sse2.S`) was
+  rewritten/renamed to SSSE3 (`*_ssse3.S`, symbols `...RowSsse3`), gaining new
+  `...Linear` entry points that amortize the linear->sRGB byte mapping in place.
+  Wired dispatch, `simd_x86.h` externs, and CMake source lists (base + host).
+  x86_64 lighting now advertises `SIMD_BACKEND_SSSE3` as its baseline (i386
+  stays SSE2); the parity test forces scalar/ssse3/avx2 over the corpus.
+- 2026-09-13 — Dropped the x86_64 AVX-512 distant-light kernels
+  (`lighting_distant_{diffuse,specular}_x86_64_avx512.S`). The 16-lane loops
+  crashed the full suite with SIGABRT in `.L_loop_avx512` (host benchmark runs;
+  the parity corpus never exercised them because widths ≤ 16 leave 0 avx512
+  lanes). Removed the dispatch case, the `simd_x86.h` externs, the CMake source
+  entries (main + host), and the AVX512 advertisement from
+  `nativeBackendForAbi`/`apply`. x86_64 lighting now tops out at `AVX2` (`avx2`
+  rows become the widest advertised backend; parity forces scalar/ssse3/avx2).
+  Parity still green (21 cases), full `:filtering` suite no longer crashes.
+- 2026-09-14 — Integrated host-compatible hardware profiling (Intel/ARM macOS and
+  Linux) into the kernel benchmark runner. Added JNI wrappers for the macOS `kpc`
+  API and Linux `perf_event_open` syscall to measure IPC and CPU cycles for hot-path
+  auditing. Moved `KernelBenchmarkRunner` to the `:filtering` test source set to
+  isolate host-only dependencies.

@@ -165,6 +165,4 @@ SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3):
     popl %ebp
     ret
 //// SIZE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3))
-#ifndef __APPLE__
-.section .note.GNU-stack,"",@progbits
-#endif
+GNU_STACK

@@ -296,3 +296,355 @@ ksvgLightingDistantDiffuseRowNeon64:
     ret
 
 .size ksvgLightingDistantDiffuseRowNeon64, .-ksvgLightingDistantDiffuseRowNeon64
+
+// ---------------------------------------------------------------------------
+// Linear-light output support (useLinear): same Sobel/intensity math, then a
+// linear->sRGB 256-byte LUT lookup instead of straight byte output.
+// ---------------------------------------------------------------------------
+
+// Load + broadcast LightingParams (x5) and the float/byte helpers into
+// v16-v29. s25 (ss) is folded into the gradient scales s16/s17, then left
+// dead (matches the non-linear prologue).
+.macro LOAD_PARAMS
+    ldr     s16, [x5]
+    ldr     s17, [x5, #4]
+    ldr     s18, [x5, #8]
+    ldr     s19, [x5, #12]
+    ldr     s20, [x5, #16]
+    ldr     s21, [x5, #20]
+    ldr     s22, [x5, #24]
+    ldr     s23, [x5, #28]
+    ldr     s24, [x5, #32]
+    ldr     s25, [x5, #36]
+    fdiv    s16, s25, s16
+    fdiv    s17, s25, s17
+    dup     v16.4s, v16.s[0]
+    dup     v17.4s, v17.s[0]
+    dup     v18.4s, v18.s[0]
+    dup     v19.4s, v19.s[0]
+    dup     v20.4s, v20.s[0]
+    dup     v21.4s, v21.s[0]
+    dup     v22.4s, v22.s[0]
+    dup     v23.4s, v23.s[0]
+    dup     v24.4s, v24.s[0]
+    fmov    v26.4s, #1.0
+    fmov    v27.4s, #0.5
+    movi    v28.4s, #0
+    movi    v29.4s, #0xff, lsl #24
+.endm
+
+// Lookup 16 bytes in a 256-byte table resident in v16..v31 (byte lanes, so
+// mapping 0..255). Alpha is preserved by construction: the 0xFF alpha lane
+// maps LUT[255]=255. Requires v12 = #63.
+// Clobbers v4,v5,v6,v7,v14,v15.
+.macro LUT256_16 vIn, vOut
+    and     v15.16b, \vIn\().16b, v12.16b   /* v12 = 63 */
+    ushr    v14.16b, \vIn\().16b, #6        /* bank index 0..3 */
+
+    tbl     v4.16b, {v16.16b-v19.16b}, v15.16b
+    tbl     v5.16b, {v20.16b-v23.16b}, v15.16b
+    tbl     v6.16b, {v24.16b-v27.16b}, v15.16b
+    tbl     v7.16b, {v28.16b-v31.16b}, v15.16b
+
+    movi    v15.16b, #2
+    cmeq    v15.16b, v14.16b, v15.16b
+    bsl     v15.16b, v6.16b, v7.16b     /* (bank==2)? v6 : v7 */
+
+    movi    v7.16b, #1
+    cmeq    v7.16b, v14.16b, v7.16b
+    bsl     v7.16b, v5.16b, v15.16b     /* (bank==1)? v5 : v15 */
+
+    movi    v15.16b, #0
+    cmeq    v15.16b, v14.16b, v15.16b
+    bsl     v15.16b, v4.16b, v7.16b     /* (bank==0)? v4 : v7 */
+
+    mov     \vOut\().16b, v15.16b
+.endm
+
+.text
+.align 2
+.global ksvgLightingDistantDiffuseRowNeon64Linear
+.type ksvgLightingDistantDiffuseRowNeon64Linear, %function
+
+// 8 output pixels / main iteration, mirror of the non-linear kernel: the
+// Sobel/normalize/intensity block is identical, then the linear-light pack
+// (0xFF alpha OR'd on, kept as linear bytes) is converted via the table at
+// x6 (ksvg_linear_to_srgb_lut). LUT256_16 clobbers v16-v31, so params are
+// reloaded at the top of every iteration (and at tail entry).
+ksvgLightingDistantDiffuseRowNeon64Linear:
+    cbz     w4, .Llin_done
+
+.Llin_loop8:
+    cmp     w4, #8
+    b.lo    .Llin_tail4
+
+    LOAD_PARAMS
+
+    // ------------------------------ TOP ---------------------------
+    ld1     {v0.4s-v1.4s}, [x0]
+    ldr     d2, [x0, #32]
+    ushr    v0.4s, v0.4s, #24
+    ushr    v1.4s, v1.4s, #24
+    ushr    v2.2s, v2.2s, #24
+
+    // A = outputs 0..3: p0,p1,p2...
+    ext     v3.16b, v0.16b, v1.16b, #4
+    ext     v4.16b, v0.16b, v1.16b, #8
+    sub     v5.4s, v4.4s, v0.4s
+    add     v6.4s, v3.4s, v3.4s
+    add     v6.4s, v6.4s, v0.4s
+    add     v6.4s, v6.4s, v4.4s
+
+    // B = outputs 4..7: p4,p5,p6...
+    ext     v7.16b, v1.16b, v2.16b, #4
+    ext     v8.16b, v1.16b, v2.16b, #8
+    sub     v9.4s, v8.4s, v1.4s
+    add     v10.4s, v7.4s, v7.4s
+    add     v10.4s, v10.4s, v1.4s
+    add     v10.4s, v10.4s, v8.4s
+
+    // v5=dxT_A, v6=sumT_A, v9=dxT_B, v10=sumT_B
+
+    // ----------------------------- MIDDLE -------------------------
+    ld1     {v0.4s-v1.4s}, [x1]
+    ldr     d2, [x1, #32]
+    ushr    v0.4s, v0.4s, #24
+    ushr    v1.4s, v1.4s, #24
+    ushr    v2.2s, v2.2s, #24
+
+    // A: 2*(p2-p0)
+    ext     v3.16b, v0.16b, v1.16b, #8
+    sub     v11.4s, v3.4s, v0.4s
+    add     v11.4s, v11.4s, v11.4s
+    add     v5.4s, v5.4s, v11.4s
+
+    // B: 2*(p6-p4)
+    ext     v8.16b, v1.16b, v2.16b, #8
+    sub     v11.4s, v8.4s, v1.4s
+    add     v11.4s, v11.4s, v11.4s
+    add     v9.4s, v9.4s, v11.4s
+
+    // ----------------------------- BOTTOM -------------------------
+    ld1     {v0.4s-v1.4s}, [x2]
+    ldr     d2, [x2, #32]
+    ushr    v0.4s, v0.4s, #24
+    ushr    v1.4s, v1.4s, #24
+    ushr    v2.2s, v2.2s, #24
+
+    // A bottom
+    ext     v3.16b, v0.16b, v1.16b, #4
+    ext     v4.16b, v0.16b, v1.16b, #8
+    add     v11.4s, v3.4s, v3.4s
+    add     v11.4s, v11.4s, v0.4s
+    add     v11.4s, v11.4s, v4.4s
+    sub     v4.4s, v4.4s, v0.4s
+    add     v5.4s, v5.4s, v4.4s
+    sub     v11.4s, v11.4s, v6.4s
+
+    // B bottom
+    ext     v7.16b, v1.16b, v2.16b, #4
+    ext     v8.16b, v1.16b, v2.16b, #8
+    add     v12.4s, v7.4s, v7.4s
+    add     v12.4s, v12.4s, v1.4s
+    add     v12.4s, v12.4s, v8.4s
+    sub     v8.4s, v8.4s, v1.4s
+    add     v9.4s, v9.4s, v8.4s
+    sub     v12.4s, v12.4s, v10.4s
+
+    // A dx/dy in v5/v11; B dx/dy in v9/v12.
+    scvtf   v5.4s, v5.4s
+    scvtf   v11.4s, v11.4s
+    fmul    v5.4s, v5.4s, v16.4s
+    fmul    v11.4s, v11.4s, v17.4s
+    scvtf   v9.4s, v9.4s
+    scvtf   v12.4s, v12.4s
+    fmul    v9.4s, v9.4s, v16.4s
+    fmul    v12.4s, v12.4s, v17.4s
+
+    // ------------------- NORMALIZATION / LIGHTING -----------------
+    fmul    v0.4s, v5.4s, v5.4s
+    fmla    v0.4s, v11.4s, v11.4s
+    fadd    v0.4s, v0.4s, v26.4s
+
+    fmul    v1.4s, v9.4s, v19.4s
+    fmla    v1.4s, v12.4s, v20.4s
+    fsub    v1.4s, v21.4s, v1.4s
+
+    fmul    v2.4s, v9.4s, v9.4s
+    fmla    v2.4s, v12.4s, v12.4s
+    fadd    v2.4s, v2.4s, v26.4s
+
+    fmul    v3.4s, v5.4s, v19.4s
+    fmla    v3.4s, v11.4s, v20.4s
+    fsub    v3.4s, v21.4s, v3.4s
+
+    frsqrte v4.4s, v0.4s
+    frsqrte v5.4s, v2.4s
+    fmul    v6.4s, v4.4s, v4.4s
+    fmul    v7.4s, v5.4s, v5.4s
+    frsqrts v6.4s, v0.4s, v6.4s
+    frsqrts v7.4s, v2.4s, v7.4s
+    fmul    v4.4s, v4.4s, v6.4s
+    fmul    v5.4s, v5.4s, v7.4s
+    fmul    v6.4s, v4.4s, v4.4s
+    fmul    v7.4s, v5.4s, v5.4s
+    frsqrts v6.4s, v0.4s, v6.4s
+    frsqrts v7.4s, v2.4s, v7.4s
+    fmul    v4.4s, v4.4s, v6.4s
+    fmul    v5.4s, v5.4s, v7.4s
+
+    // Apply invLen and k/clamp to A.
+    fmul    v3.4s, v3.4s, v4.4s
+    fmul    v3.4s, v3.4s, v18.4s
+    fmax    v3.4s, v3.4s, v28.4s
+    fmin    v3.4s, v3.4s, v26.4s
+    fmul    v6.4s, v3.4s, v22.4s
+    fmul    v7.4s, v3.4s, v23.4s
+    fmul    v8.4s, v3.4s, v24.4s
+    fadd    v6.4s, v6.4s, v27.4s
+    fadd    v7.4s, v7.4s, v27.4s
+    fadd    v8.4s, v8.4s, v27.4s
+    fcvtzu  v6.4s, v6.4s
+    fcvtzu  v7.4s, v7.4s
+    fcvtzu  v8.4s, v8.4s
+    shl     v6.4s, v6.4s, #16
+    shl     v7.4s, v7.4s, #8
+    orr     v8.16b, v8.16b, v7.16b
+    orr     v8.16b, v8.16b, v6.16b
+    orr     v8.16b, v8.16b, v29.16b
+    mov     v0.16b, v8.16b          // stash batch A (linear ARGB)
+
+    // Apply invLen and k/clamp to B.
+    fmul    v3.4s, v1.4s, v5.4s
+    fmul    v3.4s, v3.4s, v18.4s
+    fmax    v3.4s, v3.4s, v28.4s
+    fmin    v3.4s, v3.4s, v26.4s
+    fmul    v6.4s, v3.4s, v22.4s
+    fmul    v7.4s, v3.4s, v23.4s
+    fmul    v8.4s, v3.4s, v24.4s
+    fadd    v6.4s, v6.4s, v27.4s
+    fadd    v7.4s, v7.4s, v27.4s
+    fadd    v8.4s, v8.4s, v27.4s
+    fcvtzu  v6.4s, v6.4s
+    fcvtzu  v7.4s, v7.4s
+    fcvtzu  v8.4s, v8.4s
+    shl     v6.4s, v6.4s, #16
+    shl     v7.4s, v7.4s, #8
+    orr     v8.16b, v8.16b, v7.16b
+    orr     v8.16b, v8.16b, v6.16b
+    orr     v8.16b, v8.16b, v29.16b
+
+    // v0/v8 = linear-light ARGB batches (A/B). Load the 256-byte L2S LUT
+    // into v16-v31 (clobbers the params; reloaded next iteration), convert.
+    mov     x9, x6
+    ld1     {v16.16b-v19.16b}, [x9], #64
+    ld1     {v20.16b-v23.16b}, [x9], #64
+    ld1     {v24.16b-v27.16b}, [x9], #64
+    ld1     {v28.16b-v31.16b}, [x9], #64
+    movi    v12.16b, #63
+    LUT256_16 v0, v0
+    LUT256_16 v8, v8
+    str     q0, [x3]
+    str     q8, [x3, #16]
+
+    add     x0, x0, #32
+    add     x1, x1, #32
+    add     x2, x2, #32
+    add     x3, x3, #32
+    subs    w4, w4, #8
+    cbnz    w4, .Llin_loop8
+    b       .Llin_done
+
+.Llin_tail4:
+    // Params were clobbered by the last LUT load; reload for the 4-px tail.
+    LOAD_PARAMS
+    fmov    v30.4s, #2.0
+
+    ldr     q0, [x0]
+    ldr     q1, [x0, #4]
+    ldr     q2, [x0, #8]
+    ushr    v0.4s, v0.4s, #24
+    ushr    v1.4s, v1.4s, #24
+    ushr    v2.4s, v2.4s, #24
+    ucvtf   v0.4s, v0.4s
+    ucvtf   v1.4s, v1.4s
+    ucvtf   v2.4s, v2.4s
+    fmul    v3.4s, v1.4s, v30.4s
+    fadd    v3.4s, v3.4s, v0.4s
+    fadd    v3.4s, v3.4s, v2.4s
+    fsub    v4.4s, v2.4s, v0.4s
+
+    ldr     q0, [x1]
+    ldr     q2, [x1, #8]
+    ushr    v0.4s, v0.4s, #24
+    ushr    v2.4s, v2.4s, #24
+    ucvtf   v0.4s, v0.4s
+    ucvtf   v2.4s, v2.4s
+    fsub    v5.4s, v2.4s, v0.4s
+    fadd    v5.4s, v5.4s, v5.4s
+    fadd    v4.4s, v4.4s, v5.4s
+
+    ldr     q0, [x2]
+    ldr     q1, [x2, #4]
+    ldr     q2, [x2, #8]
+    ushr    v0.4s, v0.4s, #24
+    ushr    v1.4s, v1.4s, #24
+    ushr    v2.4s, v2.4s, #24
+    ucvtf   v0.4s, v0.4s
+    ucvtf   v1.4s, v1.4s
+    ucvtf   v2.4s, v2.4s
+    fmul    v5.4s, v1.4s, v30.4s
+    fadd    v5.4s, v5.4s, v0.4s
+    fadd    v5.4s, v5.4s, v2.4s
+    fsub    v2.4s, v2.4s, v0.4s
+    fadd    v4.4s, v4.4s, v2.4s
+
+    fsub    v5.4s, v5.4s, v3.4s
+    fmul    v4.4s, v4.4s, v16.4s
+    fmul    v5.4s, v5.4s, v17.4s
+
+    fmul    v0.4s, v4.4s, v4.4s
+    fmla    v0.4s, v5.4s, v5.4s
+    fadd    v0.4s, v0.4s, v26.4s
+    frsqrte v1.4s, v0.4s
+    fmul    v3.4s, v1.4s, v1.4s
+    frsqrts v2.4s, v0.4s, v3.4s
+    fmul    v1.4s, v1.4s, v2.4s
+    fmul    v3.4s, v1.4s, v1.4s
+    frsqrts v2.4s, v0.4s, v3.4s
+    fmul    v1.4s, v1.4s, v2.4s
+    fmul    v2.4s, v4.4s, v19.4s
+    fmla    v2.4s, v5.4s, v20.4s
+    fsub    v2.4s, v21.4s, v2.4s
+    fmul    v2.4s, v2.4s, v1.4s
+    fmul    v2.4s, v2.4s, v18.4s
+    fmax    v2.4s, v2.4s, v28.4s
+    fmin    v2.4s, v2.4s, v26.4s
+    fmul    v0.4s, v2.4s, v22.4s
+    fmul    v1.4s, v2.4s, v23.4s
+    fmul    v3.4s, v2.4s, v24.4s
+    fadd    v0.4s, v0.4s, v27.4s
+    fadd    v1.4s, v1.4s, v27.4s
+    fadd    v3.4s, v3.4s, v27.4s
+    fcvtzu  v0.4s, v0.4s
+    fcvtzu  v1.4s, v1.4s
+    fcvtzu  v3.4s, v3.4s
+    shl     v0.4s, v0.4s, #16
+    shl     v1.4s, v1.4s, #8
+    orr     v3.16b, v3.16b, v1.16b
+    orr     v3.16b, v3.16b, v0.16b
+    orr     v3.16b, v3.16b, v29.16b
+
+    mov     x9, x6
+    ld1     {v16.16b-v19.16b}, [x9], #64
+    ld1     {v20.16b-v23.16b}, [x9], #64
+    ld1     {v24.16b-v27.16b}, [x9], #64
+    ld1     {v28.16b-v31.16b}, [x9], #64
+    movi    v12.16b, #63
+    LUT256_16 v3, v3
+    str     q3, [x3]
+
+.Llin_done:
+    ret
+
+.size ksvgLightingDistantDiffuseRowNeon64Linear, .-ksvgLightingDistantDiffuseRowNeon64Linear

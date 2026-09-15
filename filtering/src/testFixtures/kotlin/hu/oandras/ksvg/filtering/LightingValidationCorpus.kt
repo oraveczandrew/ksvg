@@ -134,6 +134,40 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
 
+        // Distant light, diffuse, linear output (exercises the in-place
+        // linear->sRGB amortized mapping of the *Linear diffuse asm rows).
+        add(Case(
+            name = "distant diffuse linear 16x16",
+            width = 16,
+            height = 16,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = 16,
+            clipBottom = 16,
+            surfaceScale = 1f,
+            invCanvasScaleX = 1.0,
+            invCanvasScaleY = 1.0,
+            userLeft = 0.0,
+            userTop = 0.0,
+            originX = 0.0,
+            originY = 0.0,
+            unitSizeX = 1.0,
+            unitSizeY = 1.0,
+            canvasScaleX = 1f,
+            canvasScaleY = 1f,
+            lightType = 0,
+            specular = false,
+            k = 1f,
+            exponent = 1f,
+            lightR = 255,
+            lightG = 255,
+            lightB = 255,
+            params = doubleArrayOf(45.0, 45.0),
+            premultiplied = false,
+            useLinear = true,
+            input = UnLinearizeValidationCorpus.alternating(16 * 16)
+        ))
+
         // Point light, specular
         add(Case(
             name = "point specular 32x8",
@@ -233,6 +267,40 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
 
+        // Distant light, specular, linear output (exercises the in-place
+        // linear->sRGB amortized mapping of the *Linear asm entry points).
+        add(Case(
+            name = "distant specular linear 16x16",
+            width = 16,
+            height = 16,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = 16,
+            clipBottom = 16,
+            surfaceScale = 1f,
+            invCanvasScaleX = 1.0,
+            invCanvasScaleY = 1.0,
+            userLeft = 0.0,
+            userTop = 0.0,
+            originX = 0.0,
+            originY = 0.0,
+            unitSizeX = 1.0,
+            unitSizeY = 1.0,
+            canvasScaleX = 1f,
+            canvasScaleY = 1f,
+            lightType = 0,
+            specular = true,
+            k = 1f,
+            exponent = 20f,
+            lightR = 255,
+            lightG = 255,
+            lightB = 255,
+            params = doubleArrayOf(30.0, 60.0),
+            premultiplied = false,
+            useLinear = true,
+            input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
+        ))
+
         // Point light, diffuse.
         add(Case(
             name = "point diffuse 24x16",
@@ -264,6 +332,112 @@ public object LightingValidationCorpus {
             premultiplied = false,
             useLinear = true,
             input = UnLinearizeValidationCorpus.fixedSeedRandom(24 * 16)
+        ))
+
+        // Point light, diffuse, NON-linear output. Exercises the non-linear point
+        // rows (lighting_point_diffuse_i386_avx2.S `ksvgLightingPointDiffuseRowAvx2`),
+        // which previously had no corpus coverage: surface-Z read from the srcT row
+        // instead of the srcM window center, and truncation-instead-of-round+0.5.
+        add(Case(
+            name = "point diffuse non-linear 24x16",
+            width = 24,
+            height = 16,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = 24,
+            clipBottom = 16,
+            surfaceScale = 1f,
+            invCanvasScaleX = 1.0,
+            invCanvasScaleY = 1.0,
+            userLeft = 0.0,
+            userTop = 0.0,
+            originX = 0.0,
+            originY = 0.0,
+            unitSizeX = 1.0,
+            unitSizeY = 1.0,
+            canvasScaleX = 1f,
+            canvasScaleY = 1f,
+            lightType = 1,
+            specular = false,
+            k = 1f,
+            exponent = 1f,
+            lightR = 255,
+            lightG = 255,
+            lightB = 255,
+            params = doubleArrayOf(12.0, 8.0, 50.0),
+            premultiplied = false,
+            useLinear = false,
+            input = UnLinearizeValidationCorpus.fixedSeedRandom(24 * 16)
+        ))
+
+        // Spot light, specular, non-premultiplied -> exercises the spot-specular
+        // SIMD rows (ksvgLightingSpotSpecularRow{Ssse3,Avx2}), which the premult
+        // case below never reaches (lighting.cpp dispatches specular SIMD only when
+        // !premultiplied). Covers exponent-scaled cos and the non-linear pack path.
+        add(Case(
+            name = "spot specular 16x16",
+            width = 16,
+            height = 16,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = 16,
+            clipBottom = 16,
+            surfaceScale = 0.05f,
+            invCanvasScaleX = 1.0,
+            invCanvasScaleY = 1.0,
+            userLeft = 0.0,
+            userTop = 0.0,
+            originX = 0.0,
+            originY = 0.0,
+            unitSizeX = 1.0,
+            unitSizeY = 1.0,
+            canvasScaleX = 1f,
+            canvasScaleY = 1f,
+            lightType = 2,
+            specular = true,
+            k = 1f,
+            exponent = 5f,
+            lightR = 255,
+            lightG = 255,
+            lightB = 255,
+            params = doubleArrayOf(8.0, 8.0, 50.0, 8.0, 8.0, 0.0, 30.0),
+            premultiplied = false,
+            useLinear = false,
+            input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
+        ))
+
+        // Spot light, specular, non-premultiplied, LINEAR output. Exercises the
+        // *Linear specular rows and the linear->sRGB mapping.
+        add(Case(
+            name = "spot specular linear 16x16",
+            width = 16,
+            height = 16,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = 16,
+            clipBottom = 16,
+            surfaceScale = 0.05f,
+            invCanvasScaleX = 1.0,
+            invCanvasScaleY = 1.0,
+            userLeft = 0.0,
+            userTop = 0.0,
+            originX = 0.0,
+            originY = 0.0,
+            unitSizeX = 1.0,
+            unitSizeY = 1.0,
+            canvasScaleX = 1f,
+            canvasScaleY = 1f,
+            lightType = 2,
+            specular = true,
+            k = 1f,
+            exponent = 5f,
+            lightR = 255,
+            lightG = 255,
+            lightB = 255,
+            params = doubleArrayOf(8.0, 8.0, 50.0, 8.0, 8.0, 0.0, 30.0),
+            premultiplied = false,
+            useLinear = true,
+            input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
 
         // Spot light, specular, premultiplied output (no limiting cone -> NaN).

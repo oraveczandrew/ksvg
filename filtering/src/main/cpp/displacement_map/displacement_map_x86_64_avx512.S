@@ -16,24 +16,10 @@
 
 #include "asm_macros.S"
 
-#ifdef __APPLE__
-#define CFI_START
-#define CFI_DEF_CFA_OFFSET(x)
-#define CFI_OFFSET(reg, offset)
-#define CFI_END
-#else
-#define CFI_START .cfi_startproc
-#define CFI_DEF_CFA_OFFSET(x) .cfi_def_cfa_offset x
-#define CFI_OFFSET(reg, offset) .cfi_offset reg, offset
-#define CFI_END .cfi_endproc
-#endif
+
 	.text
 	.file	"dm_avx512.cpp"
-#if defined(__APPLE__)
-	.section __TEXT,__const
-#else
-	.section	.rodata,"a",@progbits
-#endif
+RODATA
 	.p2align	6, 0x0                          # -- Begin function ksvgDisplacementMapApplyAvx512
 .LCPI0_0:
 	.long	0                               # 0x0
@@ -117,11 +103,7 @@
 	.byte	0                               # 0x0
 	.byte	0                               # 0x0
 	.byte	0                               # 0x0
-#if defined(__APPLE__)
-	.section __TEXT,__const
-#else
-	.section	.rodata.cst4,"aM",@progbits,4
-#endif
+RODATA4
 	.p2align	2, 0x0
 .LCPI0_1:
 	.long	0x437f0000                      # float 255
@@ -149,11 +131,7 @@
 	.byte	8                               # 0x8
 	.byte	0                               # 0x0
 	.byte	0                               # 0x0
-#if defined(__APPLE__)
-	.section __TEXT,__const
-#else
-	.section	.rodata.cst16,"aM",@progbits,16
-#endif
+RODATA16
 	.p2align	4, 0x0
 .LCPI0_6:
 	.byte	255                             # 0xff
@@ -3718,11 +3696,7 @@ SYM(ksvgDisplacementMapApplyAvx512):     # @ksvgDisplacementMapApplyAvx512
 .Lfunc_end0:
 // SIZE(SYM(ksvgDisplacementMapApplyAvx512))
 	CFI_END
-#if defined(__APPLE__)
-	.section __TEXT,__const
-#else
-	.section	.rodata,"a",@progbits
-#endif
+RODATA
 	.p2align	2, 0x0
 .LJTI0_0:
 	.long	.LBB0_2-.LJTI0_0
@@ -3751,7 +3725,5 @@ SYM(ksvgDisplacementMapApplyAvx512):     # @ksvgDisplacementMapApplyAvx512
 	.long	.LBB0_93-.LJTI0_4
                                         # -- End function
 	.ident	"clang version 17.0.0 (https://github.com/swiftlang/llvm-project.git 10999b6d034fe318f3d56c83bddb6572593a8bb0)"
-#if !defined(__APPLE__)
-	.section	".note.GNU-stack","",@progbits
-#endif
-	.addrsig
+GNU_STACK
+ADDRSIG

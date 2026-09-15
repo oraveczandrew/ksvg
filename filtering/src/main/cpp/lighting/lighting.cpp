@@ -25,11 +25,33 @@
 extern "C" void ksvgLightingDistantDiffuseRowNeon64(
     const jint* srcT, const jint* srcM, const jint* srcB,
     jint* dst, jint count, const LightingParams* params);
+extern "C" void ksvgLightingDistantDiffuseRowNeon64Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const LightingParams* params,
+    const uint8_t* linearToSrgb);
+extern "C" void ksvgLightingDistantSpecularRowNeon64(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const LightingParams* params, float exponent);
+extern "C" void ksvgLightingDistantSpecularRowNeon64Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const LightingParams* params,
+    float exponent, const uint8_t* linearToSrgb);
 #elif defined(__arm__)
 // Hand-written ARM32/AdvSIMD distant-light diffuse kernel (lighting_distant_diffuse_armv7a_neon.S).
 extern "C" void ksvgLightingDistantDiffuseRowNeon32(
     const jint* srcT, const jint* srcM, const jint* srcB,
     jint* dst, jint count, const LightingParams* params);
+extern "C" void ksvgLightingDistantDiffuseRowNeon32Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const LightingParams* params,
+    const uint8_t* linearToSrgb);
+extern "C" void ksvgLightingDistantSpecularRowNeon32(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const LightingParams* params, float exponent);
+extern "C" void ksvgLightingDistantSpecularRowNeon32Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const LightingParams* params,
+    const uint8_t* linearToSrgb, float exponent);
 #elif defined(__i386__) || defined(__x86_64__)
 #include "simd_x86.h"
 #endif
@@ -140,8 +162,8 @@ inline void applyScalarPixel_full(
         if (hLen != 0.f) { hx /= hLen; hy /= hLen; hz /= hLen; }
         float ndoth = nx * hx + ny * hy + nz * hz;
         if (ndoth < 0.f) ndoth = 0.f;
-        const double p = std::pow(static_cast<double>(ndoth), static_cast<double>(exponent));
-        intensity = clamp01(k * static_cast<float>(p) * factor);
+        const float p = std::pow(ndoth, exponent);
+        intensity = clamp01(k * p * factor);
     }
 
     jint outR = ksvg::clamp255(lr * intensity);
@@ -160,7 +182,6 @@ inline void applyScalarPixel_full(
             ? (ksvg::clamp255(intensity * 255.f) << 24) | (static_cast<jint>(lr + 0.5f) << 16) | (static_cast<jint>(lg + 0.5f) << 8) | static_cast<jint>(lb + 0.5f)
             : packPixel(outA, outR, outG, outB);
 }
-
 
 inline void applyScalarDistantDiffuse(
         const jint* pix, jint* out, const jint width, const jint height,
@@ -325,7 +346,7 @@ void applyVector(
         const float canvasScaleX, const float canvasScaleY,
         const jint lightType, const bool isSpecular, const float k, const float exponent,
         const float fr, const float fg, const float fb, const jdouble* params,
-        const bool premultiplied, const bool useLinear, jint backend) {
+        const bool premultiplied, const bool useLinear, const jint backend) {
     const float lr = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fr))) : fr;
     const float lg = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fg))) : fg;
     const float lb = useLinear ? static_cast<float>(sRgbToLight(static_cast<jint>(fb))) : fb;
@@ -373,7 +394,8 @@ void applyVector(
         }
 
         jint x = ixLo;
-        if (lightType == 0 && !isSpecular && !useLinear && ixHi - ixLo >= 4) {
+
+        if (lightType == 0 && ixHi - ixLo >= 4) {
             const jint count = ixHi - ixLo & ~3;
             if (count > 0) {
                 const jint* srcT = pix + (y - 1) * width + (x - 1);
@@ -382,36 +404,75 @@ void applyVector(
                 jint* rowOut = out + rowOffset + x;
 
 #if defined(__aarch64__)
-                assert(backend == SIMD_BACKEND_NEON64);
-                ksvgLightingDistantDiffuseRowNeon64(srcT, srcM, srcB, rowOut, count, &lp);
-                x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
-#elif defined(__arm__)
-                assert(backend == SIMD_BACKEND_NEON32);
-                ksvgLightingDistantDiffuseRowNeon32(srcT, srcM, srcB, rowOut, count, &lp);
-                x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
-#elif defined(__i386__) || defined(__x86_64__)
-#if defined(__x86_64__)
-                switch (backend) {
-                    case SIMD_BACKEND_AVX512: {
-                        const jint c16 = (ixHi - x) & ~15;
-                        if (c16 > 0) {
-                            ksvgLightingDistantDiffuseRowAvx512(srcT, srcM, srcB, rowOut, c16, &lp);
-                            x += c16; srcT += c16; srcM += c16; srcB += c16; rowOut += c16;
+                if (isSpecular) {
+                    // Premultiplied specular uses a different (cairo) terminal
+                    // form in the Kotlin reference; fall back to the scalar path.
+                    if (!premultiplied) {
+                        assert(backend == SIMD_BACKEND_NEON64);
+                        if (useLinear) {
+                            ksvgLightingDistantSpecularRowNeon64Linear(srcT, srcM, srcB, rowOut, count, &lp, exponent, ksvg_linear_to_srgb_lut);
+                        } else {
+                            ksvgLightingDistantSpecularRowNeon64(srcT, srcM, srcB, rowOut, count, &lp, exponent);
                         }
-                        break;
+                        x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
                     }
+                } else {
+                    assert(backend == SIMD_BACKEND_NEON64);
+                    if (useLinear) {
+                        ksvgLightingDistantDiffuseRowNeon64Linear(srcT, srcM, srcB, rowOut, count, &lp, ksvg_linear_to_srgb_lut);
+                    } else {
+                        ksvgLightingDistantDiffuseRowNeon64(srcT, srcM, srcB, rowOut, count, &lp);
+                    }
+                    x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
+                }
+#elif defined(__arm__)
+                if (!isSpecular) {
+                    assert(backend == SIMD_BACKEND_NEON32);
+                    if (useLinear) {
+                        ksvgLightingDistantDiffuseRowNeon32Linear(srcT, srcM, srcB, rowOut, count, &lp, ksvg_linear_to_srgb_lut);
+                    } else {
+                        ksvgLightingDistantDiffuseRowNeon32(srcT, srcM, srcB, rowOut, count, &lp);
+                    }
+                    x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
+                }
+#elif defined(__x86_64__)
+                switch (backend) {
                     case SIMD_BACKEND_AVX2: {
                         const jint c8 = (ixHi - x) & ~7;
                         if (c8 > 0) {
-                            ksvgLightingDistantDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp);
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingDistantSpecularRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &lp, exponent);
+                                } else {
+                                    ksvgLightingDistantSpecularRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingDistantDiffuseRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &lp);
+                                } else {
+                                    ksvgLightingDistantDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp);
+                                }
+                            }
                             x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
                         }
                         break;
                     }
-                    case SIMD_BACKEND_SSE2: {
+                    case SIMD_BACKEND_SSSE3: {
                         const jint c4 = (ixHi - x) & ~3;
                         if (c4 > 0) {
-                            ksvgLightingDistantDiffuseRowSse2(srcT, srcM, srcB, rowOut, c4, &lp);
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingDistantSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &lp, exponent);
+                                } else {
+                                    ksvgLightingDistantSpecularRowSsse3(srcT, srcM, srcB, rowOut, c4, &lp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingDistantDiffuseRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &lp);
+                                } else {
+                                    ksvgLightingDistantDiffuseRowSsse3(srcT, srcM, srcB, rowOut, c4, &lp);
+                                }
+                            }
                             x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
                         }
                         break;
@@ -419,16 +480,317 @@ void applyVector(
                     default:
                         assert(false && "unsupported forced lighting backend on x86-64");
                 }
-#else
-                assert(backend == SIMD_BACKEND_SSE2);
-                const jint c4 = (ixHi - x) & ~3;
-                if (c4 > 0) {
-                    ksvgLightingDistantDiffuseRowSse2(srcT, srcM, srcB, rowOut, c4, &lp);
-                    x += c4;
+#elif defined(__i386__)
+                if (isSpecular) {
+                    switch (backend) {
+                        case SIMD_BACKEND_AVX2: {
+                            const jint c8 = (ixHi - x) & ~7;
+                            if (c8 > 0) {
+                                if (useLinear) {
+                                    ksvgLightingDistantSpecularRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &lp, exponent);
+                                } else {
+                                    ksvgLightingDistantSpecularRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp, exponent);
+                                }
+                                x += c8;
+                            }
+                            break;
+                        }
+                        case SIMD_BACKEND_SSSE3: {
+                            const jint c4 = (ixHi - x) & ~3;
+                            if (c4 > 0) {
+                                if (useLinear) {
+                                    ksvgLightingDistantSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &lp, exponent);
+                                } else {
+                                    ksvgLightingDistantSpecularRowSsse3(srcT, srcM, srcB, rowOut, c4, &lp, exponent);
+                                }
+                                x += c4;
+                            }
+                            break;
+                        }
+                        default:
+                            assert(false && "unsupported forced specular lighting backend on i386");
+                    }
+                } else {
+                    switch (backend) {
+                        case SIMD_BACKEND_AVX2: {
+                            const jint c8 = (ixHi - x) & ~7;
+                            if (c8 > 0) {
+                                if (useLinear) {
+                                    ksvgLightingDistantDiffuseRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &lp);
+                                } else {
+                                    ksvgLightingDistantDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &lp);
+                                }
+                                x += c8;
+                            }
+                            break;
+                        }
+                        case SIMD_BACKEND_SSSE3: {
+                            const jint c4 = (ixHi - x) & ~3;
+                            if (c4 > 0) {
+                                if (useLinear) {
+                                    ksvgLightingDistantDiffuseRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &lp);
+                                } else {
+                                    ksvgLightingDistantDiffuseRowSsse3(srcT, srcM, srcB, rowOut, c4, &lp);
+                                }
+                                x += c4;
+                            }
+                            break;
+                        }
+                        default:
+                            assert(false && "unsupported forced diffuse lighting backend on i386");
+                    }
                 }
-#endif
 #else
                 (void)backend;
+#endif
+            }
+        }
+
+        // --- Point-light SIMD rows (x86_64 / i386) ---
+        if (lightType == 1 && x < ixHi && (ixHi - x) >= 4) {
+            const float ux0 = static_cast<float>((userLeft + x * invCanvasScaleX - originX) / unitSizeX);
+            const float uy  = static_cast<float>((userTop + y * invCanvasScaleY - originY) / unitSizeY);
+            const float dux = static_cast<float>(invCanvasScaleX / unitSizeX);
+            const float plx = static_cast<float>(params[0]);
+            const float ply = static_cast<float>(params[1]);
+            const float plz = static_cast<float>(params[2]);
+
+            const PointLightingParams plp = {
+                .invDx = invDx, .invDy = invDy, .k = k,
+                .lx = plx, .ly = ply, .lz = plz,
+                .lr = lr, .lg = lg, .lb = lb, .ss = ss,
+                .ux0 = ux0, .uy = uy, .dux = dux
+            };
+
+            // Premultiplied specular uses a different (cairo) terminal form in
+            // the Kotlin reference; fall back to the scalar path for it.
+            if (!isSpecular || !premultiplied) {
+                const jint* srcT = pix + (y - 1) * width + (x - 1);
+                const jint* srcM = pix + y * width + (x - 1);
+                const jint* srcB = pix + (y + 1) * width + (x - 1);
+                jint* rowOut = out + rowOffset + x;
+#if defined(__x86_64__)
+                switch (backend) {
+                    case SIMD_BACKEND_AVX2: {
+                        const jint c8 = (ixHi - x) & ~7;
+                        if (c8 > 0) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingPointSpecularRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &plp, exponent);
+                                } else {
+                                    ksvgLightingPointSpecularRowAvx2(srcT, srcM, srcB, rowOut, c8, &plp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingPointDiffuseRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &plp, ksvg_linear_to_srgb_lut);
+                                } else {
+                                    ksvgLightingPointDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &plp);
+                                }
+                            }
+                            x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
+                        }
+                        break;
+                    }
+                    case SIMD_BACKEND_SSSE3: {
+                        const jint c4 = (ixHi - x) & ~3;
+                        if (c4 > 0) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingPointSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &plp, exponent);
+                                } else {
+                                    ksvgLightingPointSpecularRowSsse3(srcT, srcM, srcB, rowOut, c4, &plp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingPointDiffuseRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &plp, ksvg_linear_to_srgb_lut);
+                                } else {
+                                    ksvgLightingPointDiffuseRowSsse3(srcT, srcM, srcB, rowOut, c4, &plp);
+                                }
+                            }
+                            x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+#elif defined(__i386__)
+                switch (backend) {
+                    case SIMD_BACKEND_AVX2: {
+                        const jint c8 = (ixHi - x) & ~7;
+                        if (c8 > 0) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingPointSpecularRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &plp, exponent);
+                                } else {
+                                    ksvgLightingPointSpecularRowAvx2(srcT, srcM, srcB, rowOut, c8, &plp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingPointDiffuseRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &plp);
+                                } else {
+                                    ksvgLightingPointDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &plp);
+                                }
+                            }
+                            x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
+                        }
+                        break;
+                    }
+                    case SIMD_BACKEND_SSSE3: {
+                        const jint c4 = (ixHi - x) & ~3;
+                        if (c4 > 0) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingPointSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &plp, exponent);
+                                } else {
+                                    ksvgLightingPointSpecularRowSsse3(srcT, srcM, srcB, rowOut, c4, &plp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingPointDiffuseRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &plp);
+                                } else {
+                                    ksvgLightingPointDiffuseRowSsse3(srcT, srcM, srcB, rowOut, c4, &plp);
+                                }
+                            }
+                            x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+#endif
+            }
+        }
+
+        // --- Spot-light SIMD rows (x86_64 / i386) ---
+        if (lightType == 2 && x < ixHi && (ixHi - x) >= 4) {
+            const float ux0 = static_cast<float>((userLeft + x * invCanvasScaleX - originX) / unitSizeX);
+            const float uy  = static_cast<float>((userTop + y * invCanvasScaleY - originY) / unitSizeY);
+            const float dux = static_cast<float>(invCanvasScaleX / unitSizeX);
+            const float slx = static_cast<float>(params[0]);
+            const float sly = static_cast<float>(params[1]);
+            const float slz = static_cast<float>(params[2]);
+
+            const double tx = params[3] - params[0];
+            const double ty = params[4] - params[1];
+            const double tz = params[5] - params[2];
+            const double tLen = std::sqrt(tx * tx + ty * ty + tz * tz);
+            float spotDirX, spotDirY, spotDirZ;
+            if (tLen == 0.0) {
+                spotDirX = 0.f; spotDirY = 0.f; spotDirZ = 0.f;
+            } else {
+                spotDirX = static_cast<float>(tx / tLen);
+                spotDirY = static_cast<float>(ty / tLen);
+                spotDirZ = static_cast<float>(tz / tLen);
+            }
+            const float spotCos = std::isnan(params[6]) ? -1.f
+                    : static_cast<float>(std::cos(params[6] * M_PI / 180.0));
+
+            const SpotLightingParams slp = {
+                .invDx = invDx, .invDy = invDy, .k = k,
+                .lx = slx, .ly = sly, .lz = slz,
+                .lr = lr, .lg = lg, .lb = lb, .ss = ss,
+                .ux0 = ux0, .uy = uy, .dux = dux,
+                .spotDirX = spotDirX, .spotDirY = spotDirY, .spotDirZ = spotDirZ,
+                .spotCos = spotCos
+            };
+
+            if (!isSpecular || !premultiplied) {
+                const jint* srcT = pix + (y - 1) * width + (x - 1);
+                const jint* srcM = pix + y * width + (x - 1);
+                const jint* srcB = pix + (y + 1) * width + (x - 1);
+                jint* rowOut = out + rowOffset + x;
+#if defined(__x86_64__)
+                switch (backend) {
+                    case SIMD_BACKEND_AVX2: {
+                        const jint c8 = (ixHi - x) & ~7;
+                        if (c8 > 0) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingSpotSpecularRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &slp, exponent);
+                                } else {
+                                    ksvgLightingSpotSpecularRowAvx2(srcT, srcM, srcB, rowOut, c8, &slp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingSpotDiffuseRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &slp);
+                                } else {
+                                    ksvgLightingSpotDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &slp);
+                                }
+                            }
+                            x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
+                        }
+                        break;
+                    }
+                    case SIMD_BACKEND_SSSE3: {
+                        const jint c4 = (ixHi - x) & ~3;
+                        if (c4 > 0) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingSpotSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &slp, exponent);
+                                } else {
+                                    ksvgLightingSpotSpecularRowSsse3(srcT, srcM, srcB, rowOut, c4, &slp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingSpotDiffuseRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &slp);
+                                } else {
+                                    ksvgLightingSpotDiffuseRowSsse3(srcT, srcM, srcB, rowOut, c4, &slp);
+                                }
+                            }
+                            x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+#elif defined(__i386__)
+                switch (backend) {
+                    case SIMD_BACKEND_AVX2: {
+                        const jint c8 = (ixHi - x) & ~7;
+                        if (c8 > 0) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingSpotSpecularRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &slp, exponent);
+                                } else {
+                                    ksvgLightingSpotSpecularRowAvx2(srcT, srcM, srcB, rowOut, c8, &slp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingSpotDiffuseRowAvx2Linear(srcT, srcM, srcB, rowOut, c8, &slp);
+                                } else {
+                                    ksvgLightingSpotDiffuseRowAvx2(srcT, srcM, srcB, rowOut, c8, &slp);
+                                }
+                            }
+                            x += c8; srcT += c8; srcM += c8; srcB += c8; rowOut += c8;
+                        }
+                        break;
+                    }
+                    case SIMD_BACKEND_SSSE3: {
+                        const jint c4 = (ixHi - x) & ~3;
+                        if (c4 > 0) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingSpotSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &slp, exponent);
+                                } else {
+                                    ksvgLightingSpotSpecularRowSsse3(srcT, srcM, srcB, rowOut, c4, &slp, exponent);
+                                }
+                            } else {
+                                if (useLinear) {
+                                    ksvgLightingSpotDiffuseRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &slp);
+                                } else {
+                                    ksvgLightingSpotDiffuseRowSsse3(srcT, srcM, srcB, rowOut, c4, &slp);
+                                }
+                            }
+                            x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
 #endif
             }
         }
@@ -487,13 +849,15 @@ jint nativeBackendForAbi() {
     backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     backends |= SIMD_BACKEND_NEON32;
-#elif defined(__i386__) || defined(__x86_64__)
-    backends |= SIMD_BACKEND_SSE2;
+#elif defined(__x86_64__)
+    // x86_64 baseline lighting rows are the SSSE3 variants; i386 now shares
+    // the same SSSE3 naming (its _sse2.S files became _ssse3.S).
+    backends |= SIMD_BACKEND_SSSE3;
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
-#if defined(__x86_64__)
-    if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
-#endif
+#elif defined(__i386__)
+    backends |= SIMD_BACKEND_SSSE3;
+    if (detectSimdLevel() >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
 #endif
     return backends;
 }
@@ -595,13 +959,14 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
     backend = SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     backend = SIMD_BACKEND_NEON32;
-#elif defined(__i386__) || defined(__x86_64__)
-    backend = SIMD_BACKEND_SSE2;
-#if defined(__x86_64__)
+#elif defined(__x86_64__)
+    backend = SIMD_BACKEND_SSSE3;
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
-    if (level >= SIMD_AVX512) backend = SIMD_BACKEND_AVX512;
-#endif
+#elif defined(__i386__)
+    backend = SIMD_BACKEND_SSSE3;
+    const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
 #endif
 
     applyVector(pix, out, width, height,

@@ -16,18 +16,6 @@
 
 #include "asm_macros.S"
 
-#ifdef __APPLE__
-#define CFI_START
-#define CFI_DEF_CFA_OFFSET(x)
-#define CFI_OFFSET(x,y)
-#define CFI_ENDPROC
-#else
-#define CFI_START .cfi_startproc
-#define CFI_DEF_CFA_OFFSET(x) .cfi_def_cfa_offset x
-#define CFI_OFFSET(x,y) .cfi_offset x,y
-#define CFI_ENDPROC .cfi_endproc
-#endif
-
 	.text
 	.file	"ksvgConvolveApplyInteriorSse2I386.cpp"
 	.p2align	2, 0x0                          # -- Begin function ksvgConvolveApplyInteriorSse2I386
@@ -464,11 +452,9 @@ CFI_DEF_CFA_OFFSET(192)
 	pand	%xmm4, %xmm1
 	jmp	.LBB0_25
 .Lfunc_end0:
-CFI_ENDPROC
+CFI_END
 SIZE(SYM(ksvgConvolveApplyInteriorSse2))
                                         # -- End function
-	.ident	"clang version 17.0.0 (https://github.com/swiftlang/llvm-project.git 10999b6d034fe318f3d56c83bddb6572593a8bb0)"
-#ifndef __APPLE__
-	.section	.note.GNU-stack,"",@progbits
-	.addrsig
-#endif
+	IDENT("clang version 17.0.0 (https://github.com/swiftlang/llvm-project.git 10999b6d034fe318f3d56c83bddb6572593a8bb0)")
+GNU_STACK
+ADDRSIG

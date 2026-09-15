@@ -23,9 +23,18 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_noise_x86_64_sse2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_noise_x86_64_avx2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting.cpp
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_sse2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_ssse3.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_avx2.S
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_x86_64_avx512.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_specular_x86_64_ssse3.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_specular_x86_64_avx2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_point_diffuse_x86_64_ssse3.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_point_diffuse_x86_64_avx2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_point_specular_x86_64_ssse3.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_point_specular_x86_64_avx2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_spot_diffuse_x86_64_ssse3.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_spot_diffuse_x86_64_avx2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_spot_specular_x86_64_ssse3.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_spot_specular_x86_64_avx2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_64_sse2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_64_avx2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_64_avx512.S

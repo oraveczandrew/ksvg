@@ -183,10 +183,23 @@ public object KernelBenchmarkMatrix {
 
     public val lightingConfigs: List<LightingBenchmarkConfig> = listOf(
         LightingBenchmarkConfig(
+            "Lighting (diffuse, distant, linear)",
+            LightType.DISTANT,
+            specular = false,
+            useLinear = true
+        ) { _, _ -> doubleArrayOf(45.0, 45.0) },
+        LightingBenchmarkConfig(
             "Lighting (diffuse, distant)",
             LightType.DISTANT,
             specular = false,
             useLinear = false
+        ) { _, _ -> doubleArrayOf(45.0, 45.0) },
+        LightingBenchmarkConfig(
+            "Lighting (specular, distant, linear)",
+            LightType.DISTANT,
+            specular = true,
+            exponent = 20f,
+            useLinear = true
         ) { _, _ -> doubleArrayOf(45.0, 45.0) },
         LightingBenchmarkConfig(
             "Lighting (specular, distant)",

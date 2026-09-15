@@ -483,11 +483,7 @@ SYM(ksvgConvolveApplyInteriorSse2):
 
 //// SIZE(SYM(ksvgConvolveApplyInteriorSse2))
 
-#if defined(__APPLE__)
-.section __TEXT,__const
-#else
-.section .rodata
-#endif
+RODATA
 .p2align 4
 .Lsse2_maskFF:
     .long 0xff,0xff,0xff,0xff

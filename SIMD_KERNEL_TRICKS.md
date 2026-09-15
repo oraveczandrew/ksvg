@@ -16,7 +16,7 @@ Marker legend as in `BENCHMARKS.md` (🚀 >9x, 🟢 >1x, 🔴 <1x).
 | ConvolveMatrix | arm64 17–19x, arm32 14–18x | 4px block, fused scaling consts, interior/edge split | `convolve/` |
 | Turbulence | arm64 20x | 2px interleave, branchless fabs, packed tail | `turbulence/turbulence_noise_aarch64_neon.S` |
 | ArithmeticComposite (non-linear) | arm64 18–19x, arm32 18–23x | register-resident LUT + whole-vector float math | `arithmetic_composite/arithmetic_composite_neon.cpp` |
-| Lighting | host 15–16x, x86-32 38–55x 🚀 (arm64 neon64 0.97x 🔴!) | 4px unroll, hoisted reciprocals, fused domain scale | `lighting/lighting_distant_diffuse_x86_64_sse2.S` |
+| Lighting | host 15–16x, x86-32 38–55x 🚀 (arm64 neon64 0.97x 🔴!) | 4px unroll, hoisted reciprocals, fused domain scale | `lighting/lighting_distant_diffuse_x86_64_ssse3.S` |
 
 The last row is the most instructive warning in the table: an AArch64 NEON
 kernel that does *exactly scalar-speed* work is usually a broken or
@@ -71,11 +71,11 @@ float/numeric per channel.
 
 ## 3. Fold the domain conversion and rounding bias into constants
 
-Lighting (`lighting_distant_diffuse_x86_64_sse2.S`) and ArithmeticComposite
+Lighting (`lighting_distant_diffuse_x86_64_ssse3.S`) and ArithmeticComposite
 both move *every* per-pixel scale into pre-computed, `dup`'d scalars:
 
 - `1/invDx` and `1/invDy` are computed with **one `fdiv` before the loop**
-  (`:41-48`) instead of per pixel.
+  (`:34-42`) instead of per pixel.
 - The `/255` domain scale is algebraically folded: `result = k1*in1*in2/255 +
   k2*in1 + k3*in2 + k4*255` — the compiler/AI passes `k1/255.0f` and `k4*255.0f`
   as scalars, so the loop body contains **no division** at all.

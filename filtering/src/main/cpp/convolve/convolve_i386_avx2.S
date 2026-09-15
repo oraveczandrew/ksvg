@@ -447,6 +447,6 @@ SYM(ksvgConvolveApplyInteriorAvx2):      # @ksvgConvolveApplyInteriorAvx2I386
 //// SIZE(SYM(ksvgConvolveApplyInteriorAvx2))
 	.cfi_endproc
                                         # -- End function
-	.ident	"clang version 17.0.0 (https://github.com/swiftlang/llvm-project.git 10999b6d034fe318f3d56c83bddb6572593a8bb0)"
-	.section	".note.GNU-stack","",@progbits
-	.addrsig
+	IDENT("clang version 17.0.0 (https://github.com/swiftlang/llvm-project.git 10999b6d034fe318f3d56c83bddb6572593a8bb0)")
+GNU_STACK
+ADDRSIG

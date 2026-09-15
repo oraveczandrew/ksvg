@@ -123,4 +123,17 @@ struct LightingParams {
     float invDx, invDy, k, lx, ly, lz, lr, lg, lb, ss;
 };
 
+// Point-light kernel parameter block.  The assembly rows compute the
+// per-pixel light direction from (lx,ly,lz) - (ux,uy,surfaceZ).
+struct PointLightingParams {
+    float invDx, invDy, k, lx, ly, lz, lr, lg, lb, ss, ux0, uy, dux;
+};
+
+// Spot-light kernel parameter block.  Extends PointLightingParams with the
+// normalised direction-to-target and cosine of the cutoff cone angle.
+struct SpotLightingParams {
+    float invDx, invDy, k, lx, ly, lz, lr, lg, lb, ss, ux0, uy, dux,
+          spotDirX, spotDirY, spotDirZ, spotCos;
+};
+
 #endif // KSVG_CPU_DISPATCH_H

@@ -16,32 +16,6 @@
 
 #include "asm_macros.S"
 
-#ifdef __APPLE__
-#define TEXT_SECTION .section __TEXT,__text,regular,pure_instructions
-#define CONST4_SECTION TEXT_SECTION
-#define CONST8_SECTION TEXT_SECTION
-#define CONST16_SECTION TEXT_SECTION
-#define CONST32_SECTION TEXT_SECTION
-#define CONST_SECTION TEXT_SECTION
-#ifdef __APPLE__
-#define CALL_SYM(x) calll SYM(x)
-#else
-#define CALL_SYM(x) calll SYM(x)@PLT
-#endif
-#else
-#define TEXT_SECTION .text
-#define CONST4_SECTION TEXT_SECTION
-#define CONST8_SECTION TEXT_SECTION
-#define CONST16_SECTION TEXT_SECTION
-#define CONST32_SECTION TEXT_SECTION
-#define CONST_SECTION TEXT_SECTION
-#ifdef __APPLE__
-#define CALL_SYM(x) calll SYM(x)
-#else
-#define CALL_SYM(x) calll SYM(x)@PLT
-#endif
-#endif
-
 .text
 TEXT_SECTION
 CONST4_SECTION

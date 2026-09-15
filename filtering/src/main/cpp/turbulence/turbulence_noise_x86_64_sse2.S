@@ -17,12 +17,6 @@
 #include "asm_macros.S"
 
 
-#ifdef __APPLE__
-#define RODATA .const
-#else
-#define RODATA .section .rodata
-#endif
-
 	.file	"turbulence_x86_sse2_optimized.cpp"
 	.text
 	.p2align 4
@@ -2071,9 +2065,5 @@ SYM(ksvgTurbulenceApplySse2_x86_64):
 .LC27:
 	.long	0
 	.long	1071644672
-#ifndef __APPLE__
-	.ident	"GCC: (Debian 14.2.0-19) 14.2.0"
-#endif
-#ifndef __APPLE__
-	.section	.note.GNU-stack,"",@progbits
-#endif
+IDENT("GCC: (Debian 14.2.0-19) 14.2.0")
+GNU_STACK

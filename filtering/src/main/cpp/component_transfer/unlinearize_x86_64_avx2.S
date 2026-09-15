@@ -236,11 +236,7 @@ SYM(ksvgUnlinearizeApplyAvx2):
     ret
 //// SIZE(SYM(ksvgUnlinearizeApplyAvx2))
 
-#ifdef __APPLE__
-.section __TEXT,__const
-#else
-.section .rodata
-#endif
+RODATA
 .p2align 5
 .L_nibble_mask:
     .byte 15

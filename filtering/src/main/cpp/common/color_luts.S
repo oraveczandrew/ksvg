@@ -23,11 +23,7 @@
 
 #include "asm_macros.S"
 
-#ifdef __APPLE__
-.section __TEXT,__const
-#else
-.section .rodata
-#endif
+RODATA
 .p2align 4
 
 # -------------------------------------------------------------------------

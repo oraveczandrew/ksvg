@@ -46,9 +46,17 @@ void ksvgMorphologyApplyRowAvx512(
         jint radiusX, jint radiusY, jboolean erode,
         jint y, jint xStart, jint xEnd, jint* scratch);
 
-// lighting.cpp — distant diffuse pass over ARGB rows.
+// lighting.cpp — distant diffuse/specular pass over ARGB rows.
 // count is number of output pixels. rows point at x-1 (start of 3x3 window).
-void ksvgLightingDistantDiffuseRowSse2(
+// On x86_64 and i386 the baseline rows are the SSSE3 kernels (the old SSE2
+// files were replaced by ssse3 variants that also carry the *Linear
+// linear->sRGB rows); i386 additionally ships AVX2 diffuse+specular rows.
+#if defined(__x86_64__)
+void ksvgLightingDistantDiffuseRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params);
+
+void ksvgLightingDistantDiffuseRowSsse3Linear(
         const jint* srcT, const jint* srcM, const jint* srcB,
         jint* dst, int count, const LightingParams* params);
 
@@ -56,9 +64,169 @@ void ksvgLightingDistantDiffuseRowAvx2(
         const jint* srcT, const jint* srcM, const jint* srcB,
         jint* dst, int count, const LightingParams* params);
 
-void ksvgLightingDistantDiffuseRowAvx512(
+void ksvgLightingDistantDiffuseRowAvx2Linear(
         const jint* srcT, const jint* srcM, const jint* srcB,
         jint* dst, int count, const LightingParams* params);
+
+// Specular distant-light kernels. exponent is the specular exponent (float;
+// on x86-64 it travels in xmm0, on i386 on the stack as the 7th cdecl arg).
+void ksvgLightingDistantSpecularRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params, float exponent);
+
+void ksvgLightingDistantSpecularRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params, float exponent);
+
+void ksvgLightingDistantSpecularRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params, float exponent);
+
+void ksvgLightingDistantSpecularRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params, float exponent);
+
+// Point-light diffuse/specular row kernels (x86_64).
+void ksvgLightingPointDiffuseRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params);
+void ksvgLightingPointDiffuseRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, const uint8_t* linearToSrgb);
+void ksvgLightingPointDiffuseRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params);
+void ksvgLightingPointDiffuseRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, const uint8_t* linearToSrgb);
+
+void ksvgLightingPointSpecularRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, float exponent);
+void ksvgLightingPointSpecularRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, float exponent);
+void ksvgLightingPointSpecularRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, float exponent);
+void ksvgLightingPointSpecularRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, float exponent);
+
+// Spot-light diffuse/specular row kernels (x86_64).
+void ksvgLightingSpotDiffuseRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params);
+void ksvgLightingSpotDiffuseRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params);
+void ksvgLightingSpotDiffuseRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params);
+void ksvgLightingSpotDiffuseRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params);
+
+void ksvgLightingSpotSpecularRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params, float exponent);
+void ksvgLightingSpotSpecularRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params, float exponent);
+void ksvgLightingSpotSpecularRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params, float exponent);
+void ksvgLightingSpotSpecularRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params, float exponent);
+
+#elif defined(__i386__)
+void ksvgLightingDistantDiffuseRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params);
+
+void ksvgLightingDistantDiffuseRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params);
+
+void ksvgLightingDistantDiffuseRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params);
+
+void ksvgLightingDistantDiffuseRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params);
+
+void ksvgLightingDistantSpecularRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params, float exponent);
+
+void ksvgLightingDistantSpecularRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params, float exponent);
+
+void ksvgLightingDistantSpecularRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params, float exponent);
+
+void ksvgLightingDistantSpecularRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const LightingParams* params, float exponent);
+
+// Point-light diffuse/specular row kernels (i386).
+void ksvgLightingPointDiffuseRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params);
+void ksvgLightingPointDiffuseRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params);
+void ksvgLightingPointDiffuseRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params);
+void ksvgLightingPointDiffuseRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params);
+
+void ksvgLightingPointSpecularRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, float exponent);
+void ksvgLightingPointSpecularRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, float exponent);
+void ksvgLightingPointSpecularRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, float exponent);
+void ksvgLightingPointSpecularRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const PointLightingParams* params, float exponent);
+
+// Spot-light diffuse/specular row kernels (i386).
+void ksvgLightingSpotDiffuseRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params);
+void ksvgLightingSpotDiffuseRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params);
+void ksvgLightingSpotDiffuseRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params);
+void ksvgLightingSpotDiffuseRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params);
+
+void ksvgLightingSpotSpecularRowSsse3(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params, float exponent);
+void ksvgLightingSpotSpecularRowSsse3Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params, float exponent);
+void ksvgLightingSpotSpecularRowAvx2(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params, float exponent);
+void ksvgLightingSpotSpecularRowAvx2Linear(
+        const jint* srcT, const jint* srcM, const jint* srcB,
+        jint* dst, int count, const SpotLightingParams* params, float exponent);
+#endif
 
 // convolve_matrix.cpp — duplicate-edge interior pass.
 void ksvgConvolveApplyInteriorAvx2(

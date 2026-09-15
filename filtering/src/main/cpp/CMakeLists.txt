@@ -16,7 +16,10 @@ if (ANDROID_ABI STREQUAL "arm64-v8a")
     set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_aarch64_neon.S)
     set(MORPHOLOGY_SOURCES morphology/morphology_aarch64_neon.S)
     set(TURBULENCE_SOURCES turbulence/turbulence_noise_aarch64_neon.S)
-    set(LIGHTING_SOURCES lighting/lighting_distant_diffuse_aarch64_neon.S)
+    set(LIGHTING_SOURCES
+            lighting/lighting_distant_diffuse_aarch64_neon.S
+            lighting/lighting_distant_specular_aarch64_neon.S
+    )
     set(DISPLACEMENT_MAP_SOURCES displacement_map/displacement_map_arm64_neon64.S)
 endif ()
 
@@ -24,7 +27,10 @@ if (ANDROID_ABI STREQUAL "armeabi-v7a")
     set(BLUR_SOURCES blur/blur_armv7a_neon.S)
     set(BLUR_NEEDS_NEON TRUE)
     set(MORPHOLOGY_SOURCES morphology/morphology_armv7a_neon.S)
-    set(LIGHTING_SOURCES lighting/lighting_distant_diffuse_armv7a_neon.S)
+    set(LIGHTING_SOURCES
+            lighting/lighting_distant_diffuse_armv7a_neon.S
+            lighting/lighting_distant_specular_armv7a_neon.S
+    )
     set(TURBULENCE_SOURCES turbulence/turbulence_noise_armv7a_neon.S)
     set(CONVOLVE_SOURCES convolve/convolve_armv7a_neon.S)
     set(DISPLACEMENT_MAP_SOURCES displacement_map/displacement_map_arm32_neon32.S)
@@ -42,9 +48,18 @@ if (ANDROID_ABI STREQUAL "x86_64")
             morphology/morphology_x86_64_avx512.S
     )
     set(LIGHTING_SOURCES
-            lighting/lighting_distant_diffuse_x86_64_sse2.S
+            lighting/lighting_distant_diffuse_x86_64_ssse3.S
             lighting/lighting_distant_diffuse_x86_64_avx2.S
-            lighting/lighting_distant_diffuse_x86_64_avx512.S
+            lighting/lighting_distant_specular_x86_64_ssse3.S
+            lighting/lighting_distant_specular_x86_64_avx2.S
+            lighting/lighting_point_diffuse_x86_64_ssse3.S
+            lighting/lighting_point_diffuse_x86_64_avx2.S
+            lighting/lighting_point_specular_x86_64_ssse3.S
+            lighting/lighting_point_specular_x86_64_avx2.S
+            lighting/lighting_spot_diffuse_x86_64_ssse3.S
+            lighting/lighting_spot_diffuse_x86_64_avx2.S
+            lighting/lighting_spot_specular_x86_64_ssse3.S
+            lighting/lighting_spot_specular_x86_64_avx2.S
     )
     set(UNLINEARIZE_SOURCES
             component_transfer/unlinearize_x86_64_ssse3.S
@@ -79,10 +94,21 @@ if (ANDROID_ABI STREQUAL "x86")
             morphology/morphology_i386_sse2.S
             morphology/morphology_i386_avx2.S
     )
-    # i386 AVX2/AVX-512 lighting rows are unfinished (WIP); x86-32 uses the
-    # SSE2 row only (dispatch is guarded to __x86_64__ in lighting.cpp).
+    # i386 lighting ships the SSSE3 baseline rows (4-lane) plus AVX2 rows
+    # (8-lane) for both diffuse and specular; the i386 AVX-512 row was removed.
     set(LIGHTING_SOURCES
-            lighting/lighting_distant_diffuse_i386_sse2.S
+            lighting/lighting_distant_diffuse_i386_ssse3.S
+            lighting/lighting_distant_diffuse_i386_avx2.S
+            lighting/lighting_distant_specular_i386_ssse3.S
+            lighting/lighting_distant_specular_i386_avx2.S
+            lighting/lighting_point_diffuse_i386_ssse3.S
+            lighting/lighting_point_diffuse_i386_avx2.S
+            lighting/lighting_point_specular_i386_ssse3.S
+            lighting/lighting_point_specular_i386_avx2.S
+            lighting/lighting_spot_diffuse_i386_ssse3.S
+            lighting/lighting_spot_diffuse_i386_avx2.S
+            lighting/lighting_spot_specular_i386_ssse3.S
+            lighting/lighting_spot_specular_i386_avx2.S
     )
     set(CONVOLVE_SOURCES
             convolve/convolve_i386_sse2.S

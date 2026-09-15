@@ -27,11 +27,7 @@ SYM(ksvgConvolveApplyInteriorAvx2):
     jmp     .Lbest_true
 //// SIZE(SYM(ksvgConvolveApplyInteriorAvx2))
 
-#if defined(__APPLE__)
-.section __TEXT,__const
-#else
-.section .rodata
-#endif
+RODATA
 .p2align 5
 .Lbest_maskB:
     .byte 0,128,128,128, 4,128,128,128, 8,128,128,128, 12,128,128,128

@@ -187,11 +187,7 @@ SYM(ksvgUnlinearizeApplySsse3):
 
 SIZE(SYM(ksvgUnlinearizeApplySsse3ApproxV12))
 
-#ifdef __APPLE__
-.section __TEXT,__const
-#else
-.section .rodata
-#endif
+RODATA
 .p2align 4
 .L_exact_low16:
     .byte 0,13,22,28,34,38,42,46,50,53,56,59,61,64,66,69

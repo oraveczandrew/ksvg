@@ -17,8 +17,6 @@
 #pragma once
 
 #include <cmath>
-#include <algorithm>
-#include <cstdint>
 
 namespace ksvg {
 

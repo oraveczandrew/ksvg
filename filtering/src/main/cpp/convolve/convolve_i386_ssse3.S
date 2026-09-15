@@ -19,11 +19,11 @@
 
 	.text
 	.file	"ksvgConvolveApplyInteriorSsse3I386.cpp"
-	.section	.rodata.cst4,"aM",@progbits,4
+	RODATA4
 	.p2align	2, 0x0                          # -- Begin function ksvgConvolveApplyInteriorSsse3I386
 .LCPI0_0:
 	.long	0x437f0000                      # float 255
-	.section	.rodata.cst16,"aM",@progbits,16
+	RODATA16
 	.p2align	4, 0x0
 .LCPI0_1:
 	.byte	255                             # 0xff
@@ -480,6 +480,6 @@ SYM(ksvgConvolveApplyInteriorSsse3I386):     # @ksvgConvolveApplyInteriorSsse3I3
 //// SIZE(SYM(ksvgConvolveApplyInteriorSsse3I386))
 	.cfi_endproc
                                         # -- End function
-	.ident	"clang version 17.0.0 (https://github.com/swiftlang/llvm-project.git 10999b6d034fe318f3d56c83bddb6572593a8bb0)"
-	.section	".note.GNU-stack","",@progbits
-	.addrsig
+	IDENT("clang version 17.0.0 (https://github.com/swiftlang/llvm-project.git 10999b6d034fe318f3d56c83bddb6572593a8bb0)")
+GNU_STACK
+ADDRSIG
