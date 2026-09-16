@@ -19,9 +19,43 @@
 .global ksvgLightingDistantDiffuseRowNeon64
 .type ksvgLightingDistantDiffuseRowNeon64, %function
 
-// 8 output pixels / main iteration: two independent 4-lane batches.
-// Each source row loads exactly 10 ARGB pixels (40 bytes) and derives
-// both 4-pixel stencil windows from the same extracted alpha vectors.
+// void ksvgLightingDistantDiffuseRowNeon64(
+//   const jint* srcT, const jint* srcM, const jint* srcB,
+//   jint* dst, jint count, const LightingParams* params)
+//
+// AAPCS64:
+//   x0 = srcT, x1 = srcM, x2 = srcB, x3 = dst, w4 = count, x5 = params
+//
+// LightingParams layout (lighting.cpp, hard contract):
+//   +0 invDx  +4 invDy  +8 k  +12 lx  +16 ly  +20 lz
+//   +24 lr    +28 lg    +32 lb +36 ss
+//
+// Processes 8 ARGB8888 pixels per iteration as two independent 4-lane
+// batches (A = outputs 0..3, B = outputs 4..7). Each source row loads
+// exactly 10 pixels (ld1 v0-v1 plus ldr d2 = 40 bytes); the two 4-pixel
+// stencil windows are derived from the same extracted alpha vectors via
+// ext, so no second load is needed. The 4-px tail (.Ltail4) instead uses
+// overlapping ldr triplets at [src+0]/[src+4]/[src+8].
+// C++ only calls this kernel with count > 0 (cbz guard) and a multiple
+// of 4 (the .Lloop8 fallthrough handles exactly the 4-px remainder).
+//
+// math (matches the Kotlin/scalar reference op order):
+//   h = (alpha >> 24) * ss          (ss is folded into the scales below)
+//   dxRel = (rT-lT) + 2*(rM-lM) + (rB-lB)
+//   dyRel = (lB+2*mB+rB) - (lT+2*mT+rT)
+//   nx = -dxRel*ss/invDx, ny = -dyRel*ss/invDy, nz = 1
+//   rec = rsqrt(nx^2+ny^2+1) with 2 Newton-Raphson refinements
+//   dot = lz - (dxRel*sx*lx + dyRel*sy*ly)   (negation folded into the dot)
+//   intensity = clamp(clamp(dot,0)*k, 0, 1)
+//   out = (round(lr*intensity)<<16) | (round(lg*intensity)<<8)
+//         | round(lb*intensity) | 0xFF000000
+//   round(x) for non-negative x is floor(x + 0.5) (v27 bias + fcvtzu).
+//
+// Register map (loop-invariant):
+//   v16 = ss/invDx   v17 = ss/invDy   v18 = k    v19 = lx   v20 = ly
+//   v21 = lz         v22 = lr         v23 = lg   v24 = lb
+//   v26 = 1.0f       v27 = 0.5f       v28 = 0.0f v29 = 0xFF000000 bytes
+//   v0-v15, v25, v30-v31 = scratch (v25/ss is dead after the ss fold)
 ksvgLightingDistantDiffuseRowNeon64:
     cbz     w4, .Ldone
 
@@ -182,45 +216,46 @@ ksvgLightingDistantDiffuseRowNeon64:
     // Apply invLen and k/clamp to A.
     fmul    v3.4s, v3.4s, v4.4s
     fmul    v3.4s, v3.4s, v18.4s
-    fmax    v3.4s, v3.4s, v28.4s
-    fmin    v3.4s, v3.4s, v26.4s
-    fmul    v6.4s, v3.4s, v22.4s
-    fmul    v7.4s, v3.4s, v23.4s
-    fmul    v8.4s, v3.4s, v24.4s
-    fadd    v6.4s, v6.4s, v27.4s
-    fadd    v7.4s, v7.4s, v27.4s
-    fadd    v8.4s, v8.4s, v27.4s
-    fcvtzu  v6.4s, v6.4s
-    fcvtzu  v7.4s, v7.4s
-    fcvtzu  v8.4s, v8.4s
-    shl     v6.4s, v6.4s, #16
-    shl     v7.4s, v7.4s, #8
-    orr     v8.16b, v8.16b, v7.16b
-    orr     v8.16b, v8.16b, v6.16b
-    orr     v8.16b, v8.16b, v29.16b
+    fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
+    fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
+    fmul    v6.4s, v3.4s, v22.4s      // outR = intensity*lr
+    fmul    v7.4s, v3.4s, v23.4s      // outG = intensity*lg
+    fmul    v8.4s, v3.4s, v24.4s      // outB = intensity*lb
+    fadd    v6.4s, v6.4s, v27.4s      // +0.5: round-half-up
+    fadd    v7.4s, v7.4s, v27.4s      // +0.5: round-half-up
+    fadd    v8.4s, v8.4s, v27.4s      // +0.5: round-half-up
+    fcvtzu  v6.4s, v6.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v7.4s, v7.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v8.4s, v8.4s          // floor(x+0.5): Kotlin roundToInt
+    shl     v6.4s, v6.4s, #16       // R << 16
+    shl     v7.4s, v7.4s, #8        // G << 8
+    orr     v8.16b, v8.16b, v7.16b   // B|G
+    orr     v8.16b, v8.16b, v6.16b   // B|G|R
+    orr     v8.16b, v8.16b, v29.16b  // alpha = 0xFF
     str     q8, [x3]
 
     // Apply invLen and k/clamp to B.
     fmul    v3.4s, v1.4s, v5.4s
     fmul    v3.4s, v3.4s, v18.4s
-    fmax    v3.4s, v3.4s, v28.4s
-    fmin    v3.4s, v3.4s, v26.4s
-    fmul    v6.4s, v3.4s, v22.4s
-    fmul    v7.4s, v3.4s, v23.4s
-    fmul    v8.4s, v3.4s, v24.4s
-    fadd    v6.4s, v6.4s, v27.4s
-    fadd    v7.4s, v7.4s, v27.4s
-    fadd    v8.4s, v8.4s, v27.4s
-    fcvtzu  v6.4s, v6.4s
-    fcvtzu  v7.4s, v7.4s
-    fcvtzu  v8.4s, v8.4s
-    shl     v6.4s, v6.4s, #16
-    shl     v7.4s, v7.4s, #8
-    orr     v8.16b, v8.16b, v7.16b
-    orr     v8.16b, v8.16b, v6.16b
-    orr     v8.16b, v8.16b, v29.16b
+    fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
+    fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
+    fmul    v6.4s, v3.4s, v22.4s      // outR = intensity*lr
+    fmul    v7.4s, v3.4s, v23.4s      // outG = intensity*lg
+    fmul    v8.4s, v3.4s, v24.4s      // outB = intensity*lb
+    fadd    v6.4s, v6.4s, v27.4s      // +0.5: round-half-up
+    fadd    v7.4s, v7.4s, v27.4s      // +0.5: round-half-up
+    fadd    v8.4s, v8.4s, v27.4s      // +0.5: round-half-up
+    fcvtzu  v6.4s, v6.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v7.4s, v7.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v8.4s, v8.4s          // floor(x+0.5): Kotlin roundToInt
+    shl     v6.4s, v6.4s, #16       // R << 16
+    shl     v7.4s, v7.4s, #8        // G << 8
+    orr     v8.16b, v8.16b, v7.16b   // B|G
+    orr     v8.16b, v8.16b, v6.16b   // B|G|R
+    orr     v8.16b, v8.16b, v29.16b  // alpha = 0xFF
     str     q8, [x3, #16]
 
+    // 8 pixels * 4 bytes; w4 stays a multiple of 4 (C++ contract).
     add     x0, x0, #32
     add     x1, x1, #32
     add     x2, x2, #32
@@ -230,8 +265,11 @@ ksvgLightingDistantDiffuseRowNeon64:
     b       .Ldone
 
 .Ltail4:
+    // 4-px tail: same Sobel/normalize/intensity math, one 4-lane batch
+    // (v4 = dx, v5 = dy). The 2.0 constant weights the middle tap.
     fmov    v30.4s, #2.0
 
+    // ---- Row T: overlapping l/m/r triplet; v3 = l+2m+r, v4 = r-l ----
     ldr     q0, [x0]
     ldr     q1, [x0, #4]
     ldr     q2, [x0, #8]
@@ -246,6 +284,8 @@ ksvgLightingDistantDiffuseRowNeon64:
     fadd    v3.4s, v3.4s, v2.4s
     fsub    v4.4s, v2.4s, v0.4s
 
+    // ---- Row M: middle row contributes 2*(r-l) to dx only (dy taps
+    // cancel), so only the l/r loads are needed ----
     ldr     q0, [x1]
     ldr     q2, [x1, #8]
     ushr    v0.4s, v0.4s, #24
@@ -256,6 +296,7 @@ ksvgLightingDistantDiffuseRowNeon64:
     fadd    v5.4s, v5.4s, v5.4s
     fadd    v4.4s, v4.4s, v5.4s
 
+    // ---- Row B: overlapping l/m/r triplet; v4 += r-l, v5 = sumB ----
     ldr     q0, [x2]
     ldr     q1, [x2, #4]
     ldr     q2, [x2, #8]
@@ -271,41 +312,41 @@ ksvgLightingDistantDiffuseRowNeon64:
     fsub    v2.4s, v2.4s, v0.4s
     fadd    v4.4s, v4.4s, v2.4s
 
-    fsub    v5.4s, v5.4s, v3.4s
-    fmul    v4.4s, v4.4s, v16.4s
-    fmul    v5.4s, v5.4s, v17.4s
+    fsub    v5.4s, v5.4s, v3.4s      // dy = sumB - sumT
+    fmul    v4.4s, v4.4s, v16.4s      // dx *= ss/invDx
+    fmul    v5.4s, v5.4s, v17.4s      // dy *= ss/invDy
 
     fmul    v0.4s, v4.4s, v4.4s
     fmla    v0.4s, v5.4s, v5.4s
     fadd    v0.4s, v0.4s, v26.4s
-    frsqrte v1.4s, v0.4s
+    frsqrte v1.4s, v0.4s          // single rsqrt chain, 2 refinements
     fmul    v3.4s, v1.4s, v1.4s
     frsqrts v2.4s, v0.4s, v3.4s
     fmul    v1.4s, v1.4s, v2.4s
     fmul    v3.4s, v1.4s, v1.4s
     frsqrts v2.4s, v0.4s, v3.4s
     fmul    v1.4s, v1.4s, v2.4s
-    fmul    v2.4s, v4.4s, v19.4s
+    fmul    v2.4s, v4.4s, v19.4s      // dot = lz - (dx*lx + dy*ly)
     fmla    v2.4s, v5.4s, v20.4s
     fsub    v2.4s, v21.4s, v2.4s
     fmul    v2.4s, v2.4s, v1.4s
     fmul    v2.4s, v2.4s, v18.4s
-    fmax    v2.4s, v2.4s, v28.4s
-    fmin    v2.4s, v2.4s, v26.4s
-    fmul    v0.4s, v2.4s, v22.4s
-    fmul    v1.4s, v2.4s, v23.4s
-    fmul    v3.4s, v2.4s, v24.4s
-    fadd    v0.4s, v0.4s, v27.4s
-    fadd    v1.4s, v1.4s, v27.4s
-    fadd    v3.4s, v3.4s, v27.4s
-    fcvtzu  v0.4s, v0.4s
-    fcvtzu  v1.4s, v1.4s
-    fcvtzu  v3.4s, v3.4s
-    shl     v0.4s, v0.4s, #16
-    shl     v1.4s, v1.4s, #8
-    orr     v3.16b, v3.16b, v1.16b
-    orr     v3.16b, v3.16b, v0.16b
-    orr     v3.16b, v3.16b, v29.16b
+    fmax    v2.4s, v2.4s, v28.4s      // clamp(dot*k) >= 0
+    fmin    v2.4s, v2.4s, v26.4s      // clamp <= 1 (intensity)
+    fmul    v0.4s, v2.4s, v22.4s      // outR = intensity*lr
+    fmul    v1.4s, v2.4s, v23.4s      // outG = intensity*lg
+    fmul    v3.4s, v2.4s, v24.4s      // outB = intensity*lb
+    fadd    v0.4s, v0.4s, v27.4s      // +0.5: round-half-up
+    fadd    v1.4s, v1.4s, v27.4s      // +0.5: round-half-up
+    fadd    v3.4s, v3.4s, v27.4s      // +0.5: round-half-up
+    fcvtzu  v0.4s, v0.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v1.4s, v1.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v3.4s, v3.4s          // floor(x+0.5): Kotlin roundToInt
+    shl     v0.4s, v0.4s, #16       // R << 16
+    shl     v1.4s, v1.4s, #8        // G << 8
+    orr     v3.16b, v3.16b, v1.16b   // B|G
+    orr     v3.16b, v3.16b, v0.16b   // B|G|R
+    orr     v3.16b, v3.16b, v29.16b  // alpha = 0xFF
     str     q3, [x3]
 
 .Ldone:
@@ -382,11 +423,19 @@ ksvgLightingDistantDiffuseRowNeon64:
 .global ksvgLightingDistantDiffuseRowNeon64Linear
 .type ksvgLightingDistantDiffuseRowNeon64Linear, %function
 
+// void ksvgLightingDistantDiffuseRowNeon64Linear(
+//   const jint* srcT, const jint* srcM, const jint* srcB,
+//   jint* dst, jint count, const LightingParams* params,
+//   const uint8_t* linearToSrgb)
+//
+// AAPCS64: x0-x5 as the non-linear kernel, x6 = linearToSrgb
+// (ksvg_linear_to_srgb_lut).
+//
 // 8 output pixels / main iteration, mirror of the non-linear kernel: the
 // Sobel/normalize/intensity block is identical, then the linear-light pack
 // (0xFF alpha OR'd on, kept as linear bytes) is converted via the table at
-// x6 (ksvg_linear_to_srgb_lut). LUT256_16 clobbers v16-v31, so params are
-// reloaded at the top of every iteration (and at tail entry).
+// x6. LUT256_16 clobbers v16-v31, so params are reloaded via LOAD_PARAMS
+// at the top of every iteration (and at tail entry).
 ksvgLightingDistantDiffuseRowNeon64Linear:
     cbz     w4, .Llin_done
 
@@ -512,43 +561,43 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
     // Apply invLen and k/clamp to A.
     fmul    v3.4s, v3.4s, v4.4s
     fmul    v3.4s, v3.4s, v18.4s
-    fmax    v3.4s, v3.4s, v28.4s
-    fmin    v3.4s, v3.4s, v26.4s
-    fmul    v6.4s, v3.4s, v22.4s
-    fmul    v7.4s, v3.4s, v23.4s
-    fmul    v8.4s, v3.4s, v24.4s
-    fadd    v6.4s, v6.4s, v27.4s
-    fadd    v7.4s, v7.4s, v27.4s
-    fadd    v8.4s, v8.4s, v27.4s
-    fcvtzu  v6.4s, v6.4s
-    fcvtzu  v7.4s, v7.4s
-    fcvtzu  v8.4s, v8.4s
-    shl     v6.4s, v6.4s, #16
-    shl     v7.4s, v7.4s, #8
-    orr     v8.16b, v8.16b, v7.16b
-    orr     v8.16b, v8.16b, v6.16b
-    orr     v8.16b, v8.16b, v29.16b
+    fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
+    fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
+    fmul    v6.4s, v3.4s, v22.4s      // outR = intensity*lr
+    fmul    v7.4s, v3.4s, v23.4s      // outG = intensity*lg
+    fmul    v8.4s, v3.4s, v24.4s      // outB = intensity*lb
+    fadd    v6.4s, v6.4s, v27.4s      // +0.5: round-half-up
+    fadd    v7.4s, v7.4s, v27.4s      // +0.5: round-half-up
+    fadd    v8.4s, v8.4s, v27.4s      // +0.5: round-half-up
+    fcvtzu  v6.4s, v6.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v7.4s, v7.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v8.4s, v8.4s          // floor(x+0.5): Kotlin roundToInt
+    shl     v6.4s, v6.4s, #16       // R << 16
+    shl     v7.4s, v7.4s, #8        // G << 8
+    orr     v8.16b, v8.16b, v7.16b   // B|G
+    orr     v8.16b, v8.16b, v6.16b   // B|G|R
+    orr     v8.16b, v8.16b, v29.16b  // alpha = 0xFF
     mov     v0.16b, v8.16b          // stash batch A (linear ARGB)
 
     // Apply invLen and k/clamp to B.
     fmul    v3.4s, v1.4s, v5.4s
     fmul    v3.4s, v3.4s, v18.4s
-    fmax    v3.4s, v3.4s, v28.4s
-    fmin    v3.4s, v3.4s, v26.4s
-    fmul    v6.4s, v3.4s, v22.4s
-    fmul    v7.4s, v3.4s, v23.4s
-    fmul    v8.4s, v3.4s, v24.4s
-    fadd    v6.4s, v6.4s, v27.4s
-    fadd    v7.4s, v7.4s, v27.4s
-    fadd    v8.4s, v8.4s, v27.4s
-    fcvtzu  v6.4s, v6.4s
-    fcvtzu  v7.4s, v7.4s
-    fcvtzu  v8.4s, v8.4s
-    shl     v6.4s, v6.4s, #16
-    shl     v7.4s, v7.4s, #8
-    orr     v8.16b, v8.16b, v7.16b
-    orr     v8.16b, v8.16b, v6.16b
-    orr     v8.16b, v8.16b, v29.16b
+    fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
+    fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
+    fmul    v6.4s, v3.4s, v22.4s      // outR = intensity*lr
+    fmul    v7.4s, v3.4s, v23.4s      // outG = intensity*lg
+    fmul    v8.4s, v3.4s, v24.4s      // outB = intensity*lb
+    fadd    v6.4s, v6.4s, v27.4s      // +0.5: round-half-up
+    fadd    v7.4s, v7.4s, v27.4s      // +0.5: round-half-up
+    fadd    v8.4s, v8.4s, v27.4s      // +0.5: round-half-up
+    fcvtzu  v6.4s, v6.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v7.4s, v7.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v8.4s, v8.4s          // floor(x+0.5): Kotlin roundToInt
+    shl     v6.4s, v6.4s, #16       // R << 16
+    shl     v7.4s, v7.4s, #8        // G << 8
+    orr     v8.16b, v8.16b, v7.16b   // B|G
+    orr     v8.16b, v8.16b, v6.16b   // B|G|R
+    orr     v8.16b, v8.16b, v29.16b  // alpha = 0xFF
 
     // v0/v8 = linear-light ARGB batches (A/B). Load the 256-byte L2S LUT
     // into v16-v31 (clobbers the params; reloaded next iteration), convert.
@@ -563,6 +612,7 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
     str     q0, [x3]
     str     q8, [x3, #16]
 
+    // 8 pixels * 4 bytes; w4 stays a multiple of 4 (C++ contract).
     add     x0, x0, #32
     add     x1, x1, #32
     add     x2, x2, #32
@@ -574,8 +624,11 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
 .Llin_tail4:
     // Params were clobbered by the last LUT load; reload for the 4-px tail.
     LOAD_PARAMS
+    // 4-px tail: same Sobel/normalize/intensity math, one 4-lane batch
+    // (v4 = dx, v5 = dy). The 2.0 constant weights the middle tap.
     fmov    v30.4s, #2.0
 
+    // ---- Row T: overlapping l/m/r triplet; v3 = l+2m+r, v4 = r-l ----
     ldr     q0, [x0]
     ldr     q1, [x0, #4]
     ldr     q2, [x0, #8]
@@ -590,6 +643,8 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
     fadd    v3.4s, v3.4s, v2.4s
     fsub    v4.4s, v2.4s, v0.4s
 
+    // ---- Row M: middle row contributes 2*(r-l) to dx only (dy taps
+    // cancel), so only the l/r loads are needed ----
     ldr     q0, [x1]
     ldr     q2, [x1, #8]
     ushr    v0.4s, v0.4s, #24
@@ -600,6 +655,7 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
     fadd    v5.4s, v5.4s, v5.4s
     fadd    v4.4s, v4.4s, v5.4s
 
+    // ---- Row B: overlapping l/m/r triplet; v4 += r-l, v5 = sumB ----
     ldr     q0, [x2]
     ldr     q1, [x2, #4]
     ldr     q2, [x2, #8]
@@ -615,41 +671,41 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
     fsub    v2.4s, v2.4s, v0.4s
     fadd    v4.4s, v4.4s, v2.4s
 
-    fsub    v5.4s, v5.4s, v3.4s
-    fmul    v4.4s, v4.4s, v16.4s
-    fmul    v5.4s, v5.4s, v17.4s
+    fsub    v5.4s, v5.4s, v3.4s      // dy = sumB - sumT
+    fmul    v4.4s, v4.4s, v16.4s      // dx *= ss/invDx
+    fmul    v5.4s, v5.4s, v17.4s      // dy *= ss/invDy
 
     fmul    v0.4s, v4.4s, v4.4s
     fmla    v0.4s, v5.4s, v5.4s
     fadd    v0.4s, v0.4s, v26.4s
-    frsqrte v1.4s, v0.4s
+    frsqrte v1.4s, v0.4s          // single rsqrt chain, 2 refinements
     fmul    v3.4s, v1.4s, v1.4s
     frsqrts v2.4s, v0.4s, v3.4s
     fmul    v1.4s, v1.4s, v2.4s
     fmul    v3.4s, v1.4s, v1.4s
     frsqrts v2.4s, v0.4s, v3.4s
     fmul    v1.4s, v1.4s, v2.4s
-    fmul    v2.4s, v4.4s, v19.4s
+    fmul    v2.4s, v4.4s, v19.4s      // dot = lz - (dx*lx + dy*ly)
     fmla    v2.4s, v5.4s, v20.4s
     fsub    v2.4s, v21.4s, v2.4s
     fmul    v2.4s, v2.4s, v1.4s
     fmul    v2.4s, v2.4s, v18.4s
-    fmax    v2.4s, v2.4s, v28.4s
-    fmin    v2.4s, v2.4s, v26.4s
-    fmul    v0.4s, v2.4s, v22.4s
-    fmul    v1.4s, v2.4s, v23.4s
-    fmul    v3.4s, v2.4s, v24.4s
-    fadd    v0.4s, v0.4s, v27.4s
-    fadd    v1.4s, v1.4s, v27.4s
-    fadd    v3.4s, v3.4s, v27.4s
-    fcvtzu  v0.4s, v0.4s
-    fcvtzu  v1.4s, v1.4s
-    fcvtzu  v3.4s, v3.4s
-    shl     v0.4s, v0.4s, #16
-    shl     v1.4s, v1.4s, #8
-    orr     v3.16b, v3.16b, v1.16b
-    orr     v3.16b, v3.16b, v0.16b
-    orr     v3.16b, v3.16b, v29.16b
+    fmax    v2.4s, v2.4s, v28.4s      // clamp(dot*k) >= 0
+    fmin    v2.4s, v2.4s, v26.4s      // clamp <= 1 (intensity)
+    fmul    v0.4s, v2.4s, v22.4s      // outR = intensity*lr
+    fmul    v1.4s, v2.4s, v23.4s      // outG = intensity*lg
+    fmul    v3.4s, v2.4s, v24.4s      // outB = intensity*lb
+    fadd    v0.4s, v0.4s, v27.4s      // +0.5: round-half-up
+    fadd    v1.4s, v1.4s, v27.4s      // +0.5: round-half-up
+    fadd    v3.4s, v3.4s, v27.4s      // +0.5: round-half-up
+    fcvtzu  v0.4s, v0.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v1.4s, v1.4s          // floor(x+0.5): Kotlin roundToInt
+    fcvtzu  v3.4s, v3.4s          // floor(x+0.5): Kotlin roundToInt
+    shl     v0.4s, v0.4s, #16       // R << 16
+    shl     v1.4s, v1.4s, #8        // G << 8
+    orr     v3.16b, v3.16b, v1.16b   // B|G
+    orr     v3.16b, v3.16b, v0.16b   // B|G|R
+    orr     v3.16b, v3.16b, v29.16b  // alpha = 0xFF
 
     mov     x9, x6
     ld1     {v16.16b-v19.16b}, [x9], #64
