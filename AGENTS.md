@@ -26,6 +26,7 @@ the render tree. Bounds unions are refreshed bottom-up.
 - **`BENCHMARKS.md`**: Kernel benchmark tables (native SIMD vs scalar C++ vs Kotlin reference). Rows follow the ISA superset order (see "Benchmark table conventions").
 - **`native-docs/`**: Low-level native docs — `ASSEMBLY_CONVENTIONS.md` (ABI/argument/register/PIC contract plus parity gate), `SIMD_KERNEL_TRICKS.md` (transferable SIMD optimization checklist distilled from the top-performing filter kernels), and per-ISA implicit-register-clobber tables (`X86_IMPLICIT_REGISTER_CLOBBERS.md`, `AARCH64_IMPLICIT_REGISTER_CLOBBERS.md`, `ARM32_IMPLICIT_REGISTER_CLOBBERS.md`): reference lists of which instructions read/write registers or architectural state implicitly (e.g. `MUL`/`DIV` clobbering `EDX`, `CPUID` clobbering `EBX`, string/SP/flags state, pointer-auth/exclusive-monitor state) so hand-written assembly never relies on value survival that the ISA does not guarantee.
 - **`README.md`**: Public project overview, key enhancements, and usage.
+- **qemu-trace-bridge** (external repo, https://github.com/oraveczandrew/qemu-trace-bridge): instruction-by-instruction tracer for native assembly kernels under QEMU (i386+AVX2 with full 256-bit YMM via a patched GDB stub, ARM32/ARM64 NEON on stock QEMU). Use it to observe exact before/after machine state when static audit (§5) is inconclusive.
 
 ## Critical Development Conventions
 
@@ -66,6 +67,8 @@ AArch64: native-docs/AARCH64_IMPLICIT_REGISTER_CLOBBERS.md
 ARM32: native-docs/ARM32_IMPLICIT_REGISTER_CLOBBERS.md
 
 Use the grep results to verify whether any instruction has implicit register/state inputs or outputs that could invalidate the suspected register-liveness assumptions.
+
+If static audit is inconclusive, trace one instruction live with qemu-trace-bridge and compare before/after state.
 
 ### 6. Benchmark table conventions
 *   `BENCHMARKS.md` kernel rows follow the ISA superset order (each ISA builds on the previous): x86 `scalar → sse2 → ssse3 → avx2 → avx512`; ARM `scalar → neon32 → neon64`. Keep this ordering when adding or re-measuring rows — never append `sse2` after `avx512`.
