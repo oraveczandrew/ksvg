@@ -122,6 +122,48 @@ conditions in §4.
 
 ---
 
+## 6. Case study: i386 AVX2 feTurbulence parity (2026-09-16) — differential probing
+
+When a vector kernel produces wrong-but-structured output (not zeros, not a
+crash), bisect it with **differential probes**: instrument the kernel to dump
+intermediate vectors per pixel into `.bss` record buffers (written via a
+PC-relative `calll get_pc_edx` / `leal (Sym-1b)(%edx)` block that touches no
+live state), log them after the call returns, and diff each stage against a
+host recomputation of the reference algorithm for the same inputs. Narrow
+stage by stage — coordinates → lattice indices → tables → corner dots →
+weights → accumulator → conversion → pack — until one stage diverges; the bug
+is at or immediately before the first divergent stage. What this caught:
+
+- **Permutation table with dupes** (`0(x4)`, missing 1,2,3): the identity
+  `memcpy` ran inside `pushl %edx`, so its `1216(%esp)`-style stores landed
+  4 bytes low. Rule: any esp-relative store between a push and its pop must
+  be compensated by the push depth. Verify table validity (sort/uniqueness
+  over 0..255) directly, don't assume the shuffle preserves it.
+- **Frame collision (ebp-constants vs esp-spills)**: a 69 KB frame using both
+  addressing modes can alias Hot constants with per-row/per-pixel scratch
+  depending on stack alignment — here the channel structs clobbered the
+  ratio source (`[0,+1]` became `[0,-1]`, negating every accumulator) and
+  the pack shift counts (zeroed). Symptoms flip across runs/devices when the
+  alignment changes, which looks like flakiness but is deterministic per
+  stack layout. Rule: map every ebp-constant to its esp-alias
+  (`ebp-X` = `esp+(ebp-esp-X)`); any alias inside a region the kernel writes
+  per row/pixel must move (here: struct base 192→336, into dead byte-table
+  space) or be loaded PC-relative (here: shifts from `LCPI0_25`).
+- **Packed-pair constant loads**: `vaddpd`/`vmulpd` with a memory operand
+  reads 16 bytes, so a single-double Hot constant drags in its neighbor
+  (G lane got `+1.0` instead of `+0.5`; fractal R/G got wrong offset/scale/
+  rounding the same way). Rule: packed FP mem-ops need a true 16-byte pair
+  constant (e.g. `LCPI0_17` `[0.5,0.5]`); otherwise `vmovddup`-broadcast the
+  single double first. Scalar (`vaddsd`/`vmulsd`) paths are immune.
+- **Probe hygiene** (instrumentation must not perturb the kernel): guards
+  must use provably-dead registers (a `movl 32(%esp), %eax` guard destroyed
+  the live `bx1`, varying corner indices per pixel — only pixel 1 matched by
+  coincidence); every clobbered vector/GPR must be saved or reloaded
+  (`ymm0/ymm1` needed explicit restore); `calll` leaves esp unchanged (thunk
+  ends in `ret`), so post-call esp offsets are unshifted but post-push ones
+  are not; C++ log offsets/strides must match asm slot math exactly;
+  uninitialized `char[]` log buffers with `%s` crash when empty.
+
 ## Quick checklist for touching a new filter
 
 1. Read `ASSEMBLY_CONVENTIONS.md` + per-ISA clobber tables first.

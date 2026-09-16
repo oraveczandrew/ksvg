@@ -419,21 +419,24 @@ LBB0_12:
     calll   .Lksvg_pcrel_get_pc_edx
 1:
     vmovaps (LCPI0_3-1b)(%edx), %ymm0
-    vmovups %ymm0, 1216(%esp)
+    # Permutation-identity stores below run with esp 4 bytes low (inside the
+    # pushl %edx above), so each destination is compensated by +4 (1220, not
+    # 1216); otherwise the table lands shifted and the shuffle corrupts it.
+    vmovups %ymm0, 1220(%esp)
     vmovaps (LCPI0_3+32-1b)(%edx), %ymm0
-    vmovups %ymm0, 1248(%esp)
+    vmovups %ymm0, 1252(%esp)
     vmovaps (LCPI0_3+64-1b)(%edx), %ymm0
-    vmovups %ymm0, 1280(%esp)
+    vmovups %ymm0, 1284(%esp)
     vmovaps (LCPI0_3+96-1b)(%edx), %ymm0
-    vmovups %ymm0, 1312(%esp)
+    vmovups %ymm0, 1316(%esp)
     vmovaps (LCPI0_3+128-1b)(%edx), %ymm0
-    vmovups %ymm0, 1344(%esp)
+    vmovups %ymm0, 1348(%esp)
     vmovaps (LCPI0_3+160-1b)(%edx), %ymm0
-    vmovups %ymm0, 1376(%esp)
+    vmovups %ymm0, 1380(%esp)
     vmovaps (LCPI0_3+192-1b)(%edx), %ymm0
-    vmovups %ymm0, 1408(%esp)
+    vmovups %ymm0, 1412(%esp)
     vmovapd (LCPI0_3+224-1b)(%edx), %ymm0
-    vmovupd %ymm0, 1440(%esp)
+    vmovupd %ymm0, 1444(%esp)
     popl    %edx
     movl    $256, %esi  # # imm = 0x100
     movl    $-2092037281, %ebx  # # imm = 0x834E0B5F
@@ -572,7 +575,11 @@ LBB0_20:  # # =>This Loop Header: Depth=1
     vaddsd  92(%ebp), %xmm0, %xmm0
     vdivsd  124(%ebp), %xmm0, %xmm0
     vmulsd  %xmm1, %xmm0, %xmm5
-    leal    192(%esp), %eax
+    # Channel/generator structs relocated 192->336: at 192 they overlap the
+    # ebp-addressed Hot frame constants for some stack alignments, letting
+    # the per-row struct build corrupt the ratio/pack inputs. [336,1360)
+    # is free (byte tables there are dead during pixels).
+    leal    336(%esp), %eax
     movl    28(%esp), %ebx  # # 4-byte Reload
     movl    56(%ebp), %edi
     jmp     LBB0_22
@@ -643,9 +650,14 @@ LBB0_25:
     jmp     LBB0_27
 .p2align 4, 0x90
 LBB0_39:
-    vaddpd  -69440(%ebp), %xmm2, %xmm0
-    vmulpd  -69472(%ebp), %xmm0, %xmm0
-    vaddpd  -69456(%ebp), %xmm0, %xmm0
+    # Fractal R/G: broadcast single-double constants (packed mem loads would
+    # also pick up neighboring constants for the second lane).
+    vmovddup -69440(%ebp), %xmm1  # # [+1.0,+1.0] fractal offset (xmm1 dead)
+    vaddpd  %xmm1, %xmm2, %xmm0
+    vmovddup -69472(%ebp), %xmm1  # # [127.5,127.5] fractal scale
+    vmulpd  %xmm1, %xmm0, %xmm0
+    vmovddup -69456(%ebp), %xmm1  # # [+0.5,+0.5] rounding offset
+    vaddpd  %xmm1, %xmm0, %xmm0
     vroundpd $9, %xmm0, %xmm0
     vcvttpd2dq %xmm0, %xmm0
     vextractf128 $1, %ymm2, %xmm1
@@ -673,7 +685,15 @@ LBB0_39:
     vmulsd  %xmm4, %xmm0, %xmm0
 LBB0_40:
     movl    32(%esp), %edi  # # 4-byte Reload
-    vmovd   -69504(%ebp), %xmm1
+    # Pack shifts [16,8,0,0] via LCPI0_25 (PC-relative): the old frame slot
+    # `vmovd -69504(%ebp)` reads a clobbered slot (channel structs overlap
+    # the Hot frame constants) and only sets lane0 (dropping G's <<8).
+    pushl   %edx  # # save 255 (live as cmov source below)
+    calll   .Lksvg_pcrel_get_pc_edx
+    22:
+    leal    (LCPI0_25-22b)(%edx), %edx
+    vmovdqu (%edx), %xmm1  # # [16,8,0,0] shift counts
+    popl    %edx  # # restore 255
     vpsllvd %xmm1, %xmm5, %xmm1
     vaddsd  %xmm2, %xmm0, %xmm0
     vroundsd $9, %xmm0, %xmm0, %xmm0
@@ -713,7 +733,8 @@ LBB0_27:  # #   Parent Loop BB0_20 Depth=1
     vmulsd  %xmm1, %xmm0, %xmm0
     vblendpd $2, -69488(%ebp), %xmm0, %xmm4  # # xmm4 = xmm0[0],mem[1]
     vxorpd  %xmm2, %xmm2, %xmm2
-    leal    192(%esp), %ecx
+    # (struct base relocated 192->336; see note at the row-setup leal above.)
+    leal    336(%esp), %ecx
     movl    28(%esp), %eax  # # 4-byte Reload
     jmp     LBB0_32
 .p2align 4, 0x90
@@ -834,7 +855,11 @@ LBB0_37:
     je      LBB0_39
     vmovddup -69400(%ebp), %xmm1
     vmulpd  %xmm1, %xmm2, %xmm0
-    vaddpd  -69456(%ebp), %xmm0, %xmm0
+    # Rounding offset +0.5 for BOTH lanes: broadcast the single double
+    # (a packed vaddpd here would also add the neighboring +1.0 constant
+    # to the G lane).
+    vmovddup -69456(%ebp), %xmm1
+    vaddpd  %xmm1, %xmm0, %xmm0
     vroundpd $9, %xmm0, %xmm0
     vcvttpd2dq %xmm0, %xmm0
     vpcmpeqd %xmm1, %xmm1, %xmm1
