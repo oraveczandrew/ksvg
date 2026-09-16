@@ -38,7 +38,6 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_x86_64_avx2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_x86_64_sse2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_x86_64_avx2.S
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_x86_64_avx512.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_64_ssse3.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_x86_64_avx2.S
 )

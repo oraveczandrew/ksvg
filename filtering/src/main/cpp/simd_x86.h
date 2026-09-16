@@ -21,7 +21,7 @@
 #include "cpu_dispatch.h"
 
 // Entry points implemented in wide-ISA translation units.
-// Those translation units are compiled with -mavx2 / -mavx512f,-mavx512bw so
+// Those translation units are compiled with -mavx2 so
 // the intrinsics headers expose the wide ISA; the baseline TUs stay SSE2 and
 // call these only after detectSimdLevel() reports support. All kernels are
 // bit-exact widenings of the SSE2/scalar reference loops.
@@ -37,11 +37,6 @@ void ksvgMorphologyApplyRowSse2(
         jint y, jint xStart, jint xEnd, jint* scratch);
 
 void ksvgMorphologyApplyRowAvx2(
-        const jint* src, jint* dst, jint width,
-        jint radiusX, jint radiusY, jboolean erode,
-        jint y, jint xStart, jint xEnd, jint* scratch);
-
-void ksvgMorphologyApplyRowAvx512(
         const jint* src, jint* dst, jint width,
         jint radiusX, jint radiusY, jboolean erode,
         jint y, jint xStart, jint xEnd, jint* scratch);
@@ -237,11 +232,6 @@ void ksvgConvolveApplyInteriorAvx2(
         jint targetX, jint targetY,
         jfloat divisor, jfloat bias, jboolean preserveAlpha);
 void ksvgConvolveApplyInteriorSse2(
-        jint* dst, const jint* src, jint width, jint height,
-        const float* kernel, jint orderX, jint orderY,
-        jint targetX, jint targetY,
-        jfloat divisor, jfloat bias, jboolean preserveAlpha);
-void ksvgConvolveApplyInteriorAvx512(
         jint* dst, const jint* src, jint width, jint height,
         const float* kernel, jint orderX, jint orderY,
         jint targetX, jint targetY,

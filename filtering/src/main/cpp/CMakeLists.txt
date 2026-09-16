@@ -45,7 +45,6 @@ if (ANDROID_ABI STREQUAL "x86_64")
     set(MORPHOLOGY_SOURCES
             morphology/morphology_x86_64_sse2.S
             morphology/morphology_x86_64_avx2.S
-            morphology/morphology_x86_64_avx512.S
     )
     set(LIGHTING_SOURCES
             lighting/lighting_distant_diffuse_x86_64_ssse3.S
@@ -72,7 +71,6 @@ if (ANDROID_ABI STREQUAL "x86_64")
     set(CONVOLVE_SOURCES
             convolve/convolve_x86_64_sse2.S
             convolve/convolve_x86_64_avx2.S
-            convolve/convolve_x86_64_avx512.S
     )
     set(TURBULENCE_SOURCES
             turbulence/turbulence_noise_x86_64_sse2.S
@@ -171,9 +169,6 @@ if (ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
     if (FALSE)
         target_link_options(ksvgblur PRIVATE "-Wl,-z,notext")
     endif ()
-    # Per-file flags make <immintrin.h> declare the AVX2/AVX-512 intrinsics
-    # (invalid options on ARM ABIs, hence the guard).
-    set_source_files_properties(${AVX512_SOURCES} PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw")
 endif ()
 
 # The ARM32 kernels use NEON instructions; enable the FPU for the C++ side too.

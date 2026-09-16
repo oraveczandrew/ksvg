@@ -29,7 +29,6 @@ enum SimdLevel {
     SIMD_SSE2 = 0,
     SIMD_SSSE3 = 1,
     SIMD_AVX2 = 2,
-    SIMD_AVX512 = 3,
 };
 
 #if defined(__x86_64__) || defined(__i386__)
@@ -82,12 +81,6 @@ inline bool cpuHasAvx2Raw() {
 inline SimdLevel detectSimdLevel() {
 #if defined(__x86_64__) || defined(__i386__)
     static const SimdLevel level = []() {
-        // AVX-512 stays on __builtin_cpu_supports: the emulator masks the
-        // AVX-512 CPUID bits and never enables the ZMM XCR0 state, so raw
-        // detection must NOT unlock a backend that would #UD there.
-        if (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw")) {
-            return SIMD_AVX512;
-        }
         // OR short-circuit: on real silicon the one-time builtin flag is the
         // fast path and the raw CPUID sequence never runs; only in environments
         // that clear OSXSAVE (Android emulator HVF) does the raw fallback run.
@@ -113,7 +106,6 @@ enum SimdBackend {
     SIMD_BACKEND_SCALAR = 1 << 0,
     SIMD_BACKEND_SSSE3  = 1 << 1,
     SIMD_BACKEND_AVX2   = 1 << 2,
-    SIMD_BACKEND_AVX512 = 1 << 3,
     SIMD_BACKEND_NEON64 = 1 << 4,
     SIMD_BACKEND_NEON32 = 1 << 5,
     SIMD_BACKEND_SSE2   = 1 << 6,

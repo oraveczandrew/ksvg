@@ -348,7 +348,6 @@ Java_hu_oandras_ksvg_filtering_MorphologyNative_apply(
             jint *spanBuf = new jint[span];
 #if defined(__x86_64__)
             switch (level) {
-                case SIMD_AVX512:
                 case SIMD_AVX2:
                     ksvgMorphologyApplyRowAvx2(src, dst, width, radiusX, radiusY, erode, y, vxLo, vxHi, spanBuf);
                     break;

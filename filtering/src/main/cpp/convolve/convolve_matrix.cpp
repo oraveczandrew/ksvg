@@ -115,19 +115,10 @@ void applyX86(
         jint backend = forcedBackend;
         if (backend == -1) {
             const SimdLevel level = detectSimdLevel();
-#if defined(__x86_64__)
-            if (level >= SIMD_AVX512) backend = SIMD_BACKEND_AVX512;
-            else
-#endif
             if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
             else backend = SIMD_BACKEND_SSE2;
         }
 
-#if defined(__x86_64__)
-        if (backend == SIMD_BACKEND_AVX512) {
-            ksvgConvolveApplyInteriorAvx512(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha);
-        } else
-#endif
         if (backend == SIMD_BACKEND_AVX2) {
             ksvgConvolveApplyInteriorAvx2(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha);
         } else {
@@ -138,7 +129,7 @@ void applyX86(
         // asmEnd is the start of the last full vector-width block. Fill the
         // scalar remainder [asmEnd, xHi) explicitly so no interior pixel is
         // left unwritten.
-        const jint vecWidth = (backend == SIMD_BACKEND_AVX512) ? 16 : (backend == SIMD_BACKEND_AVX2 ? 8 : 4);
+        const jint vecWidth = (backend == SIMD_BACKEND_AVX2 ? 8 : 4);
         const jint asmEnd = targetX + ((xHi - targetX) & ~(vecWidth - 1));
         for (jint y = yLo; y < yHi; y++) {
             for (jint x = asmEnd; x < xHi; x++)
@@ -153,9 +144,6 @@ jint nativeBackendForAbi() {
     const SimdLevel level = detectSimdLevel();
     backends |= SIMD_BACKEND_SSE2;
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
-#if defined(__x86_64__)
-    if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
-#endif
 #elif defined(__aarch64__)
     backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
@@ -177,9 +165,6 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_nativeBackend(
     const SimdLevel level = detectSimdLevel();
     backends |= SIMD_BACKEND_SSE2;
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
-#if defined(__x86_64__)
-    if (level >= SIMD_AVX512) backends |= SIMD_BACKEND_AVX512;
-#endif
 #elif defined(__aarch64__)
     backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
