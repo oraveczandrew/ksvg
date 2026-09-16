@@ -18,7 +18,6 @@ add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology_x86_64_sse2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology_x86_64_avx2.S
-  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology_x86_64_avx512.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_noise_x86_64_sse2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_noise_x86_64_avx2.S

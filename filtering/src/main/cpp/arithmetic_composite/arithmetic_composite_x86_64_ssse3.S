@@ -531,7 +531,7 @@ SYM(ksvgArithmeticApplySse):
     andl $255, %r11d
 
     /* A */
-    movl (%rsi), %r8d              /* R extraction shifted p2; reload it */
+    movl    (%rsi), %r8d              /* R extraction shifted p2; reload it */
     shrl $24, %eax
     shrl $24, %r8d
     movd %eax, %xmm6

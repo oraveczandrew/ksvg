@@ -107,7 +107,7 @@ LBB3_2:  # =>This Inner Loop Header: Depth=1
     // the final L2S conversion inside core4's scalar packs).
     callq        SYM(core4)
     movq         -64(%rbp), %r9  # 8-byte Reload
-    vmovss       -44(%rbp), %xmm0  # 4-byte Reload; xmm0 = mem[0],zero,zero,zero
+    vmovss       -44(%rbp), %xmm0
     addq         $4, %rbx
     addq         $16, %r14
     addq         $16, %r15
@@ -288,7 +288,7 @@ LBB4_1:
     vxorps       %xmm5, %xmm5, %xmm5
     vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
     vmovaps      -96(%rbp), %xmm10  # 16-byte Reload
-    vmovss       -48(%rbp), %xmm13  # 4-byte Reload; xmm13 = mem[0],zero,zero,zero
+    vmovss       -48(%rbp), %xmm13
     vmulss       8(%r15), %xmm0, %xmm0
 LBB4_2:
     vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
@@ -307,7 +307,7 @@ LBB4_3:
     vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
     vmovaps      -96(%rbp), %xmm10  # 16-byte Reload
-    vmovss       -48(%rbp), %xmm13  # 4-byte Reload; xmm13 = mem[0],zero,zero,zero
+    vmovss       -48(%rbp), %xmm13
     vmulss       8(%r15), %xmm0, %xmm5
 LBB4_4:
     vminss       %xmm5, %xmm3, %xmm0
@@ -329,7 +329,7 @@ LBB4_5:
     vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
     vmovaps      -96(%rbp), %xmm10  # 16-byte Reload
     vmovaps      -64(%rbp), %xmm8  # 16-byte Reload
-    vmovss       -48(%rbp), %xmm13  # 4-byte Reload; xmm13 = mem[0],zero,zero,zero
+    vmovss       -48(%rbp), %xmm13
     vmulss       8(%r15), %xmm0, %xmm0
 LBB4_6:
     vminss       %xmm0, %xmm3, %xmm1
@@ -613,7 +613,7 @@ LBB5_2:  # =>This Inner Loop Header: Depth=1
     vzeroupper
     callq        SYM(core4)
     movq         -64(%rbp), %r9  # 8-byte Reload
-    vmovss       -44(%rbp), %xmm0  # 4-byte Reload; xmm0 = mem[0],zero,zero,zero
+    vmovss       -44(%rbp), %xmm0
     addq         $4, %rbx
     addq         $16, %r14
     addq         $16, %r15
