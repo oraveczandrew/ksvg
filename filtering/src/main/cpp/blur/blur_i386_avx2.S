@@ -135,7 +135,7 @@ SYM(ksvgBlurVerticalAvx2_i386):
     vmovups %xmm3, 112(%edi)
 
     movl 132(%esp), %esi
-    addl $8, %esi
+    addl $32, %esi
     addl $128, %edi
     addl $8, %ebp
     cmpl 128(%esp), %ebp
@@ -186,7 +186,7 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     vbroadcastss (%edx), %ymm0
     vmulps (%esi), %ymm0, %ymm1
     addl $4, %edx
-    addl $32, %esi
+    addl $16, %esi
     decl %eax
     jz .AH_pair_store
 .AH_row:

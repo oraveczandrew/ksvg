@@ -29,7 +29,6 @@ public fun getBackendsFor(@SimdBackend flags: Int): IntArray {
         SIMD_SCALAR,
         SIMD_SSSE3,
         SIMD_AVX2,
-        SIMD_AVX512,
         SIMD_NEON64,
         SIMD_NEON32,
         SIMD_SSE2,

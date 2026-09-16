@@ -181,7 +181,7 @@ void blurScalar(jint* pix, const int w, const int h,
 // premultiplied-ARGB byte buffer. Returns true if a kernel backend ran.
 bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
                           const std::vector<float>& weights,
-                          GaussianScratch& s) {
+                          GaussianScratch& s, const int forcedBackend = -1) {
 #if defined(__aarch64__) || defined(__arm__) || defined(__i386__) || defined(__x86_64__)
     const int pad = r;
     const int pw = w + 2 * pad;
@@ -218,6 +218,8 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
 #else
     const float* gptr = weights.data();   // gptr[k] = weight at offset k
     const int rct = 2 * r + 1;
+    const bool useAvx2 = forcedBackend == -1 ? detectSimdLevel() >= SIMD_AVX2
+                                            : forcedBackend == SIMD_BACKEND_AVX2;
     const size_t fn = static_cast<size_t>(pw + 2 * r) * 4;
     if (s.fbuf.size() < fn) s.fbuf.resize(fn);
     float* fbuf0 = s.fbuf.data();             // valid pointer for pin = fbuf0
@@ -230,7 +232,7 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
         // AVX2 path handles 8 columns per iteration; the SSSE3 kernel covers
         // pairs; the remaining <=7 tail runs scalar either way.
         int vEnd;
-        if (detectSimdLevel() >= SIMD_AVX2) {
+        if (useAvx2) {
             vEnd = pw & ~7;
             if (vEnd > 0) {
 #if defined(__x86_64__)
@@ -269,12 +271,12 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
         const int hx2 = pw - r;
         if (hx2 > 0) {
 #if defined(__x86_64__)
-            if (detectSimdLevel() >= SIMD_AVX2)
+            if (useAvx2)
                 ksvgBlurHorizontalAvx2_x86_64(outRow, fbuf0, gptr, rct, 0, hx2);
             else
                 rsdIntrinsicBlurHFU4_K_x86_64_ssse3(outRow, fbuf0, gptr, rct, 0, hx2);
 #else
-            if (detectSimdLevel() >= SIMD_AVX2)
+            if (useAvx2)
                 ksvgBlurHorizontalAvx2_i386(outRow, fbuf0, gptr, rct, 0, hx2);
             else
                 rsdIntrinsicBlurHFU4_K_i386_ssse3(outRow, fbuf0, gptr, rct, 0, hx2);
@@ -342,9 +344,9 @@ void runForced(GaussianScratch* s, jint* pix, const int w, const int h, const fl
     assert(backend == SIMD_BACKEND_NEON32);
     blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s);
 #elif defined(__i386__) || defined(__x86_64__)
-    // Gaussian Blur has hybrid SSE/AVX2 logic inside blurIsotropicKernel.
-    // We'll just run it.
-    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s);
+    // Gaussian Blur has hybrid SSE/AVX2 logic inside blurIsotropicKernel;
+    // forward the forced backend so each advertised path is actually exercised.
+    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s, backend);
 #else
     blurScalar(pix, w, h, wx, rx, wy, ry, *s);
 #endif
