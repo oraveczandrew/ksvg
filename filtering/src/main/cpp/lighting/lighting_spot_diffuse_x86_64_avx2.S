@@ -490,8 +490,8 @@ SYM(ksvgLightingSpotDiffuseRowAvx2Linear):  # @SYM(ksvgLightingSpotDiffuseRowAvx
     addq         $8, %rsp
     popq         %rbx
     popq         %r12
-    popq         %r13
     popq         %r14
+    popq         %r13
     popq         %r15
     popq         %rbp
 .LBB1_4:
