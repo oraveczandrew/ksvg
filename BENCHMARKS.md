@@ -211,11 +211,11 @@ Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
 | UnLinearize | kotlin | 512x512 | 0.431 | 607.84 | 4.86 | 0.66x |  |  |
 | UnLinearize | scalar | 512x512 | 0.285 | 920.87 | 7.37 | 1.00x |  |  |
 | UnLinearize | ssse3 | 512x512 | 0.262 | 999.71 | 8.00 | 1.09x | 🟢 |  |
-| UnLinearize | avx2 | 512x512 | 0.290 | 905.03 | 7.24 | 0.98x | 🔴 |  |
+| UnLinearize | avx2 | 512x512 | 0.290 | 905.03 | 7.24 | 0.98x | 🔴 | forced-only; production AVX2 runs the ssse3 approx kernel |
 | UnLinearize | kotlin | 2048x2048 | 6.895 | 608.34 | 4.87 | 0.72x |  |  |
 | UnLinearize | scalar | 2048x2048 | 4.960 | 845.59 | 6.76 | 1.00x |  |  |
 | UnLinearize | ssse3 | 2048x2048 | 4.283 | 979.39 | 7.84 | 1.16x | 🟢 |  |
-| UnLinearize | avx2 | 2048x2048 | 4.890 | 857.77 | 6.86 | 1.01x | 🟢 |  |
+| UnLinearize | avx2 | 2048x2048 | 4.890 | 857.77 | 6.86 | 1.01x | 🟢 | forced-only; production AVX2 runs the ssse3 approx kernel |
 
 ## Host Results (x86-64, Android emulator)
 

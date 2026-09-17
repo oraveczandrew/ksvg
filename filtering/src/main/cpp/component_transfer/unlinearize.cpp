@@ -303,7 +303,11 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
         const SimdLevel level = detectSimdLevel();
         if (level >= SIMD_AVX2) {
 #if defined(__x86_64__)
-            ksvgUnlinearizeApplyAvx2(buf, buf, width, height, table);
+            // The AVX2 kernel below is the exact 256-entry LUT cascade; the
+            // SSSE3 approximation is bit-exact for the production (std sRGB)
+            // table and measurably faster, so AVX2 machines run it too. The
+            // exact kernel stays reachable via applyForced for validation.
+            ksvgUnlinearizeApplySsse3(buf, buf, width, height, table);
 #else
             ksvgUnlinearizeApplyAvx2ApproxV26(buf, buf, width, height, table);
 #endif
@@ -337,7 +341,9 @@ Java_hu_oandras_ksvg_filtering_UnLinearizeNative_apply(
     const SimdLevel level = detectSimdLevel();
     if (level >= SIMD_AVX2) {
 #if defined(__x86_64__)
-        ksvgUnlinearizeApplyAvx2(src, dst, width, height, table);
+        // Same dispatch as the in-place path above: the SSSE3 approximation
+        // is bit-exact for the production table and faster than exact AVX2.
+        ksvgUnlinearizeApplySsse3(src, dst, width, height, table);
 #else
         ksvgUnlinearizeApplyAvx2ApproxV26(src, dst, width, height, table);
 #endif
