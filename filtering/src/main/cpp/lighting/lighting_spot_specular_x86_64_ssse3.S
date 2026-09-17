@@ -15,6 +15,7 @@
  */
 
 #include "asm_macros.S"
+#include "math_pow_macros.S"
 #include "lighting_x86_64_ssse3_macros.S"
 
 /*
@@ -41,7 +42,7 @@
  * Clobbers:
  *   %xmm0, %xmm1, %xmm2
  *   %eax, %ecx, %edx, %edi
- *   all SysV caller-saved registers via CALL(powf)
+ *   %rax, %rcx (via POW1_X64; all other SysV caller-saved regs survive)
  *   (flags)
  *
  * Depends on the file-local .Lspot_zero/.Lspot_one/.Lspot_255/.Lspot_half
@@ -50,7 +51,7 @@
 .macro SPOT_SPEC_PIXEL intens_off, spot_off, out_off, l2s
     movss     \intens_off(%rsp), %xmm0
     movd      %r13d, %xmm1
-    CALL(powf)
+    POW1_X64
     mulss     8(%rbp), %xmm0
     mulss     \spot_off(%rsp), %xmm0
     maxss     .Lspot_zero(%rip), %xmm0
@@ -157,6 +158,9 @@ SPOT_LIT4
 .Lspot_one: .long 0x3f800000
 .Lspot_255: .long 0x437f0000
 .Lspot_half: .long 0x3f000000
+EMIT_LOG2_POLY_8
+EMIT_EXP2_POLY_8
+EMIT_POW_COMMON_CONSTANTS
 
 SPOT_TEXT
 

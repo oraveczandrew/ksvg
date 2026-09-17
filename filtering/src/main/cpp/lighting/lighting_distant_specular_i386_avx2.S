@@ -18,31 +18,7 @@
 #include "lighting_i386_ssse3_macros.S"
 
 .text
-/* Scalar-pow tables for POW1_SSE (same coefficients as the SSSE3 kernel). */
-.p2align 2
-.Ldss_one: .long 0x3f800000
-.p2align 5
-.Ldss_log2:
-    .long 0xbc14e99e
-    .long 0x3d517250
-    .long 0xbe0b306b
-    .long 0x3e762e19
-    .long 0xbeb16ed0
-    .long 0x3ef4f943
-    .long 0xbf389c1f
-    .long 0x3fb8a9fd
-    .long 0x3335bce7
-.p2align 5
-.Ldss_exp2:
-    .long 0x35fbc4c2
-    .long 0x376d5f0a
-    .long 0x3922b9a8
-    .long 0x3aaeacc9
-    .long 0x3c1d965e
-    .long 0x3d63583b
-    .long 0x3e75fdf0
-    .long 0x3f317218
-    .long 0x3f800000
+EMIT_POW1_I386_TABLES
 
 .text
 

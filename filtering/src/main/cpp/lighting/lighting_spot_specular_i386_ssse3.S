@@ -27,6 +27,7 @@ POINT_LIT4
 .Lsps_zero: .long 0
 .Lsps_one: .long 0x3f800000
 .Lsps_half: .long 0x3f000000
+EMIT_POW1_I386_TABLES
 
 .globl SYM(ksvgLightingSpotSpecularRowSsse3)
 TYPE(SYM(ksvgLightingSpotSpecularRowSsse3), @function)
@@ -231,13 +232,11 @@ SYM(ksvgLightingSpotSpecularRowSsse3Linear):
     xorps         %xmm0, %xmm0
     maxss         %xmm0, %xmm3
 
-    # p = powf(ndoth, exponent)
-    pushl         -20(%ebp)
-    subl          $4, %esp
-    movss         %xmm3, (%esp)
-    calll         powf@PLT
-    addl          $8, %esp
-    fstps         -160(%ebp)
+    # p = powf(ndoth, exponent): inline scalar minimax, no PLT call.
+    movaps        %xmm3, %xmm1  # pow base
+    movss         -20(%ebp), %xmm2  # exponent (y)
+    POW1_SSE
+    movss         %xmm0, -160(%ebp)
     movss         -160(%ebp), %xmm0
 
     # intensity = k * factor * p

@@ -30,6 +30,7 @@
  */
 
 #include "asm_macros.S"
+#include "math_pow_macros.S"
 #include "lighting_x86_64_avx2_macros.S"
 
 /*
@@ -192,6 +193,9 @@ LCPI1_4:
 .long	8  # 0x8
 .long	16  # 0x10
 .long	8  # 0x8
+EMIT_LOG2_POLY_8
+EMIT_EXP2_POLY_8
+EMIT_POW_COMMON_CONSTANTS
 POINT_TEXT
 .p2align 4, 0x90
 SYM(core8):
@@ -326,7 +330,7 @@ LBB1_1:
     vmovss       16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero,zero,zero
     vzeroupper
-    CALL(powf)
+    POW1_X64
     vxorps       %xmm1, %xmm1, %xmm1
     vmovaps      160(%rsp), %ymm10  # 32-byte Reload
     vmulss       8(%r15), %xmm0, %xmm0
@@ -343,7 +347,7 @@ LBB1_3:
     vmovss       16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero,zero,zero
     vzeroupper
-    CALL(powf)
+    POW1_X64
     vmovaps      160(%rsp), %ymm10  # 32-byte Reload
     vmulss       8(%r15), %xmm0, %xmm0
 LBB1_4:
@@ -360,7 +364,7 @@ LBB1_5:
     vmovss       16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero,zero,zero
     vzeroupper
-    CALL(powf)
+    POW1_X64
     vxorps       %xmm4, %xmm4, %xmm4
     vmovaps      160(%rsp), %ymm10  # 32-byte Reload
     vmulss       8(%r15), %xmm0, %xmm5
@@ -377,7 +381,7 @@ LBB1_7:
 # xmm1 = mem[0],zero,zero,zero
     vmovss       %xmm5, 32(%rsp)  # 4-byte Spill
     vzeroupper
-    CALL(powf)
+    POW1_X64
     vmovss       32(%rsp), %xmm5  # 4-byte Reload
 # xmm5 = mem[0],zero,zero,zero
     vxorps       %xmm4, %xmm4, %xmm4
@@ -400,7 +404,7 @@ LBB1_9:
     vmovss       %xmm5, 32(%rsp)  # 4-byte Spill
     vmovss       %xmm6, 48(%rsp)  # 4-byte Spill
     vzeroupper
-    CALL(powf)
+    POW1_X64
     vmovss       48(%rsp), %xmm6  # 4-byte Reload
 # xmm6 = mem[0],zero,zero,zero
     vxorps       %xmm7, %xmm7, %xmm7
@@ -446,7 +450,7 @@ LBB1_11:
     vmovaps      %xmm14, 224(%rsp)  # 16-byte Spill
     vmovaps      %xmm15, 208(%rsp)  # 16-byte Spill
     vzeroupper
-    CALL(powf)
+    POW1_X64
     vmovaps      208(%rsp), %xmm15  # 16-byte Reload
     vmovaps      224(%rsp), %xmm14  # 16-byte Reload
     vmovaps      240(%rsp), %xmm13  # 16-byte Reload
@@ -488,7 +492,7 @@ LBB1_13:
     vmovaps      %xmm11, 112(%rsp)  # 16-byte Spill
     vmovaps      %xmm6, 96(%rsp)  # 16-byte Spill
     vzeroupper
-    CALL(powf)
+    POW1_X64
     vxorps       %xmm4, %xmm4, %xmm4
     vmovaps      160(%rsp), %xmm3  # 16-byte Reload
     vmovaps      96(%rsp), %xmm6  # 16-byte Reload
@@ -521,7 +525,7 @@ LBB1_15:
     vmovaps      %xmm6, 96(%rsp)  # 16-byte Spill
     vmovaps      %xmm5, 16(%rsp)  # 16-byte Spill
     vzeroupper
-    CALL(powf)
+    POW1_X64
     vmovaps      16(%rsp), %xmm5  # 16-byte Reload
     vmovaps      128(%rsp), %xmm1  # 16-byte Reload
     vmovaps      96(%rsp), %xmm6  # 16-byte Reload

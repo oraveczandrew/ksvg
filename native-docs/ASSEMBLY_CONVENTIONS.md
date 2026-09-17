@@ -11,6 +11,7 @@ Priority: **ABI → register liveness → PIC → FP op order → rounding → l
 3. **Register clobbers**: look up every value survival in the matching per-ISA `.md` table. Watch `MUL`/`DIV`/`IDIV`→`EDX`, `CPUID`→`EBX`, string ops, `CALL`/`RET`→`RSP`/flags, AArch64 `BL`→`X30`, `PACIASP`, ARMv7 `d8–d15`.
 4. **Rounding**: compare with the Kotlin reference. Missing `+0.5f` (`## 6`) or altered FP op order (`## 7`) = ~half the pixels off by 1 LSB. `0.5f` ≠ `0.5`; `* (1/255.0f)` ≠ `/255.0f`.
 5. **VEX FMA has no broadcast**: `vfmadd213ps m32, %ymm, %ymm` reads a full `m256`, not a scalar (broadcast is EVEX-only). Horner-style coefficient steps need an explicit `vbroadcastss` + register-form FMA (see `POW8_FMA_STEP`); lane 0 stays accidentally correct, hiding the bug from narrow tests.
+6. **Bare `$N` immediates in parameter-less macros**: Apple/LLVM replaces `$N` (N followed by a non-digit, e.g. `subl $1,` or `andl $0xff,`) with the Nth macro argument — empty for parameter-less macros, so the operand silently vanishes (`subl , %ecx`). Named-parameter macros are unaffected. In parameter-less macro bodies use `decl` instead of `subl $1`, and multi-digit/decimal literals (`$255`, `$8388607`) instead of `$0x..` hex.
 
 ---
 

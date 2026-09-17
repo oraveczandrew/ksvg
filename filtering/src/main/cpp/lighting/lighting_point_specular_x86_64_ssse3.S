@@ -30,6 +30,8 @@
  */
 
 #include "asm_macros.S"
+#include "math_pow_macros.S"
+#include "lighting_x86_64_ssse3_macros.S"
 
 /*
  * Description:
@@ -155,6 +157,9 @@ LCPI4_6:
 .long	0x3f000000  # float 0.5
 .long	0x3f000000  # float 0.5
 .long	0x3f000000  # float 0.5
+EMIT_LOG2_POLY_8
+EMIT_EXP2_POLY_8
+EMIT_POW_COMMON_CONSTANTS
 POINT_TEXT
 .p2align 4, 0x90
 SYM(core4):
@@ -284,7 +289,7 @@ SYM(core4):
 LBB4_1:
     vmovaps      %xmm2, %xmm0
     vmovaps      %xmm13, %xmm1
-    CALL(powf)
+    POW1_X64
     vxorps       %xmm5, %xmm5, %xmm5
     vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
     vmovaps      -96(%rbp), %xmm10  # 16-byte Reload
@@ -303,7 +308,7 @@ LBB4_2:
 LBB4_3:
     vmovshdup    %xmm2, %xmm0  # xmm0 = xmm2[1,1,3,3]
     vmovaps      %xmm13, %xmm1
-    CALL(powf)
+    POW1_X64
     vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
     vmovaps      -96(%rbp), %xmm10  # 16-byte Reload
@@ -323,7 +328,7 @@ LBB4_5:
     vshufpd      $1, %xmm2, %xmm2, %xmm0  # xmm0 = xmm2[1,0]
     vmovaps      %xmm13, %xmm1
     vmovaps      %xmm8, -64(%rbp)  # 16-byte Spill
-    CALL(powf)
+    POW1_X64
     vxorps       %xmm4, %xmm4, %xmm4
     vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
@@ -344,7 +349,7 @@ LBB4_7:
     vmovaps      %xmm13, %xmm1
     vmovaps      %xmm7, -48(%rbp)  # 16-byte Spill
     vmovaps      %xmm8, -64(%rbp)  # 16-byte Spill
-    CALL(powf)
+    POW1_X64
     vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovaps      -64(%rbp), %xmm8  # 16-byte Reload
     vmovaps      -48(%rbp), %xmm7  # 16-byte Reload

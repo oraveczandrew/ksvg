@@ -215,6 +215,103 @@
     movaps   %xmm11, \x
 .endm
 
+/*
+ * Description:
+ *   Scalar powf approximation: %xmm0 = %xmm0 ^ %xmm1 (low lanes only) via
+ *   8th-degree log2/exp2 minimax Horner with plain mulss/addss. Drop-in
+ *   replacement for CALL(powf): no calls, no spills forced by the ABI.
+ *
+ *   Requires the caller file to EMIT_LOG2_POLY_8 / EMIT_EXP2_POLY_8 /
+ *   EMIT_POW_COMMON_CONSTANTS (labels .Lpoly_log2 / .Lpoly_exp2 /
+ *   .Lfloat_1_bits), as the distant kernel does.
+ *
+ * Inputs:
+ *   %xmm0 = base (ndoth, may be 0)
+ *   %xmm1 = exponent (preserved)
+ *
+ * Output:
+ *   %xmm0 = pow approximation (exactly 0.0f for base <= 0)
+ *
+ * Clobbers:
+ *   %rax, %rcx, %xmm0, %xmm2
+ *   %xmm1 preserved. Callee-saved GPRs untouched.
+ */
+.macro POW1_X64
+    xorps   %xmm2, %xmm2
+    ucomiss %xmm2, %xmm0
+    jbe     77f
+    movd    %xmm0, %eax
+    movl    %eax, %ecx
+    shrl    $23, %ecx
+    andl    $255, %ecx  # NOT $0xff: Apple LLVM eats $0 in param-less macros
+    subl    $127, %ecx
+    andl    $8388607, %eax  # = 0x007fffff (see above)
+    orl     $1065353216, %eax  # = 0x3f800000 (see above)
+    movd    %eax, %xmm2
+    subss   .Lfloat_1_bits(%rip), %xmm2  # f = m - 1
+    movss   .Lpoly_log2(%rip), %xmm0     # c8
+    mulss   %xmm2, %xmm0
+    addss   .Lpoly_log2+4(%rip), %xmm0
+    mulss   %xmm2, %xmm0
+    addss   .Lpoly_log2+8(%rip), %xmm0
+    mulss   %xmm2, %xmm0
+    addss   .Lpoly_log2+12(%rip), %xmm0
+    mulss   %xmm2, %xmm0
+    addss   .Lpoly_log2+16(%rip), %xmm0
+    mulss   %xmm2, %xmm0
+    addss   .Lpoly_log2+20(%rip), %xmm0
+    mulss   %xmm2, %xmm0
+    addss   .Lpoly_log2+24(%rip), %xmm0
+    mulss   %xmm2, %xmm0
+    addss   .Lpoly_log2+28(%rip), %xmm0
+    mulss   %xmm2, %xmm0
+    addss   .Lpoly_log2+32(%rip), %xmm0
+    cvtsi2ss %ecx, %xmm2                 # e
+    addss   %xmm2, %xmm0                 # log2x = e + P(f)
+    mulss   %xmm1, %xmm0                 # t = y * log2x
+    cvttss2si %xmm0, %ecx                # trunc
+    cvtsi2ss %ecx, %xmm2
+    ucomiss %xmm0, %xmm2
+    jbe     78f
+    decl    %ecx  # NOT subl $1: Apple LLVM substitutes bare $N inside
+    cvtsi2ss %ecx, %xmm2  # parameter-less macros (see macrotest); decl is exact
+78:
+    subss   %xmm2, %xmm0                 # tf = t - ti
+    movss   .Lpoly_exp2(%rip), %xmm2     # c8
+    mulss   %xmm0, %xmm2
+    addss   .Lpoly_exp2+4(%rip), %xmm2
+    mulss   %xmm0, %xmm2
+    addss   .Lpoly_exp2+8(%rip), %xmm2
+    mulss   %xmm0, %xmm2
+    addss   .Lpoly_exp2+12(%rip), %xmm2
+    mulss   %xmm0, %xmm2
+    addss   .Lpoly_exp2+16(%rip), %xmm2
+    mulss   %xmm0, %xmm2
+    addss   .Lpoly_exp2+20(%rip), %xmm2
+    mulss   %xmm0, %xmm2
+    addss   .Lpoly_exp2+24(%rip), %xmm2
+    mulss   %xmm0, %xmm2
+    addss   .Lpoly_exp2+28(%rip), %xmm2
+    mulss   %xmm0, %xmm2
+    addss   .Lpoly_exp2+32(%rip), %xmm2
+    cmpl    $127, %ecx
+    jg      79f
+    cmpl    $-126, %ecx
+    jl      77f
+    addl    $127, %ecx
+    shll    $23, %ecx
+    movd    %ecx, %xmm0
+    mulss   %xmm2, %xmm0
+    jmp     80f
+79:
+    movl    $2139095039, %ecx  # = 0x7f7fffff FLT_MAX (see above)
+    movd    %ecx, %xmm0
+    jmp     80f
+77:
+    xorps   %xmm0, %xmm0
+80:
+.endm
+
 RODATA
 .p2align 5
 .Lspot_l2s_data:

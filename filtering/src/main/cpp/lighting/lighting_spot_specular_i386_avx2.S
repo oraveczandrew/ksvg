@@ -15,6 +15,7 @@
  */
 
 #include "asm_macros.S"
+#include "lighting_i386_pow_macros.S"
 
 /*
  * Description:
@@ -37,6 +38,8 @@
     shrl     $24, %eax
     movl     %eax, \dst_off(%ebp)
 .endm
+.text
+EMIT_POW1_I386_TABLES
 RODATA
 .p2align 4
 .Lsp_zero: .long 0
@@ -344,11 +347,11 @@ SYM(ksvgLightingSpotSpecularRowAvx2Linear):
     xorps    %xmm4, %xmm4
     maxss    %xmm4, %xmm3
     movss    %xmm3, -160(%ebp)
-    pushl    -20(%ebp)
-    pushl    -160(%ebp)
-    calll    powf@PLT
-    addl     $8, %esp
-    fstps    -160(%ebp)
+    # p = powf(ndoth, exponent): inline scalar minimax, no PLT call.
+    movss    -160(%ebp), %xmm1  # pow base
+    movss    -20(%ebp), %xmm2  # exponent
+    POW1_SSE
+    movss    %xmm0, -160(%ebp)
     movss    -160(%ebp), %xmm0
     movl     -16(%ebp), %eax
     mulss    8(%eax), %xmm0
