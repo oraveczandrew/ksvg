@@ -44,6 +44,14 @@ extern "C" void ksvgLightingPointDiffuseRowNeon64Linear(
     const jint* srcT, const jint* srcM, const jint* srcB,
     jint* dst, jint count, const PointLightingParams* params,
     const uint8_t* linearToSrgb);
+// Hand-written AArch64/AdvSIMD spot-light diffuse kernel (lighting_spot_diffuse_aarch64_neon.S).
+extern "C" void ksvgLightingSpotDiffuseRowNeon64(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const SpotLightingParams* params);
+extern "C" void ksvgLightingSpotDiffuseRowNeon64Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const SpotLightingParams* params,
+    const uint8_t* linearToSrgb);
 #elif defined(__arm__)
 // Hand-written ARM32/AdvSIMD distant-light diffuse kernel (lighting_distant_diffuse_armv7a_neon.S).
 extern "C" void ksvgLightingDistantDiffuseRowNeon32(
@@ -836,6 +844,33 @@ void applyVector(
                     }
                     default:
                         break;
+                }
+#elif defined(__aarch64__)
+                // Spot-specular stays on the scalar fallback until its
+                // NEON kernel lands; only diffuse is wired.
+                if (!isSpecular) {
+                    assert(backend == SIMD_BACKEND_NEON64);
+                    const jint c4 = (ixHi - x) & ~3;
+                    if (c4 > 0) {
+                        if (tLen == 0.0) {
+                            // Degenerate spot (target == position): the
+                            // scalar reference forces factor == 1, which
+                            // is exactly the point kernel. SpotLightingParams
+                            // shares the PointLightingParams prefix.
+                            const PointLightingParams* plp =
+                                reinterpret_cast<const PointLightingParams*>(&slp);
+                            if (useLinear) {
+                                ksvgLightingPointDiffuseRowNeon64Linear(srcT, srcM, srcB, rowOut, c4, plp, ksvg_linear_to_srgb_lut);
+                            } else {
+                                ksvgLightingPointDiffuseRowNeon64(srcT, srcM, srcB, rowOut, c4, plp);
+                            }
+                        } else if (useLinear) {
+                            ksvgLightingSpotDiffuseRowNeon64Linear(srcT, srcM, srcB, rowOut, c4, &slp, ksvg_linear_to_srgb_lut);
+                        } else {
+                            ksvgLightingSpotDiffuseRowNeon64(srcT, srcM, srcB, rowOut, c4, &slp);
+                        }
+                        x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
+                    }
                 }
 #endif
             }
