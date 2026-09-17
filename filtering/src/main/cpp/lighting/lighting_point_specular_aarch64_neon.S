@@ -434,6 +434,7 @@ ksvgLightingPointSpecularRowNeon64:
     dup     v0.4s, v0.s[0]      // y = exponent broadcast
     POW4_NEON v3, v0
     POW4_NEON v1, v0
+    mov     v2.16b, v1.16b      // park p_B: pack A clobbers v1
     movi    v30.4s, #0xff       // 0x000000ff byte mask (dux dead past pow)
 
     // ------------------------- PACK A (p in v3) -------------
@@ -465,8 +466,8 @@ ksvgLightingPointSpecularRowNeon64:
     orr     v4.16b, v4.16b, v0.16b
     str     q4, [x22]
 
-    // ------------------------- PACK B (p in v1) -------------
-    fmul    v3.4s, v1.4s, v18.4s
+    // ------------------------- PACK B (p in v2, parked) -------------
+    fmul    v3.4s, v2.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
     fmul    v6.4s, v3.4s, v22.4s
@@ -923,6 +924,7 @@ ksvgLightingPointSpecularRowNeon64Linear:
     dup     v0.4s, v0.s[0]      // y = exponent broadcast
     POW4_NEON v3, v0
     POW4_NEON v1, v0
+    mov     v2.16b, v1.16b      // park p_B: pack A clobbers v1
     movi    v30.4s, #0xff       // 0x000000ff byte mask (dux dead past pow)
 
     // ------------------- PACK A (linear, alpha = max(Rlin,Glin,Blin)) ----
@@ -954,8 +956,8 @@ ksvgLightingPointSpecularRowNeon64Linear:
     orr     v4.16b, v4.16b, v0.16b
     mov     v0.16b, v4.16b          // stash A
 
-    // ------------------- PACK B (p in v1) ----
-    fmul    v3.4s, v1.4s, v18.4s
+    // ------------------- PACK B (p in v2, parked) ----
+    fmul    v3.4s, v2.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
     fmul    v6.4s, v3.4s, v22.4s
