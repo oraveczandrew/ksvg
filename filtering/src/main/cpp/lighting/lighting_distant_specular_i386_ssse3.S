@@ -19,6 +19,7 @@
  */
 
 #include "asm_macros.S"
+#include "math_pow_macros.S"
 #include "lighting_i386_ssse3_macros.S"
 
 .text
@@ -27,6 +28,28 @@ POINT_LIT4
 .Ldss_zero: .long 0
 .Ldss_one: .long 0x3f800000
 .Ldss_half: .long 0x3f000000
+.p2align 5
+.Ldss_log2:
+    .long 0xbc14e99e
+    .long 0x3d517250
+    .long 0xbe0b306b
+    .long 0x3e762e19
+    .long 0xbeb16ed0
+    .long 0x3ef4f943
+    .long 0xbf389c1f
+    .long 0x3fb8a9fd
+    .long 0x3335bce7
+.p2align 5
+.Ldss_exp2:
+    .long 0x35fbc4c2
+    .long 0x376d5f0a
+    .long 0x3922b9a8
+    .long 0x3aaeacc9
+    .long 0x3c1d965e
+    .long 0x3d63583b
+    .long 0x3e75fdf0
+    .long 0x3f317218
+    .long 0x3f800000
 
 .globl SYM(ksvgLightingDistantSpecularRowSsse3)
 TYPE(SYM(ksvgLightingDistantSpecularRowSsse3), @function)
@@ -182,13 +205,10 @@ SYM(ksvgLightingDistantSpecularRowSsse3Linear):
     xorps         %xmm0, %xmm0
     maxss         %xmm0, %xmm1
 
-    # p = powf(ndoth, exponent)
-    pushl         -20(%ebp)
-    subl          $4, %esp
-    movss         %xmm1, (%esp)
-    calll         powf@PLT
-    addl          $8, %esp
-    fstps         -160(%ebp)
+    # p = powf(ndoth, exponent) — inline scalar minimax (no PLT call)
+    movss         -20(%ebp), %xmm2
+    POW1_SSE
+    movss         %xmm0, -160(%ebp)
     movss         -160(%ebp), %xmm0
 
     # intensity = k * p

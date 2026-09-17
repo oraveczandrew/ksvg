@@ -449,14 +449,64 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vmovdqu   %ymm1, 256(%rsp)
     jmp          .LBS1_21
 
-/* One 4-pixel linear->sRGB lane (in xmm0, out packed sRGB in xmm1, scratch
- * xmm2-xmm7). Straight VEX transliteration of the proven SSSE3 block:
- * nibble-split interpolation (base + slope*lo), per-bit correction, exact
- * low-16 select, then max-channel alpha. Bit-identical to 4x L2S1. */
-.macro L2S_VEC4
+/* The 4-pixel linear->sRGB lane lives in the file-local helper
+ * l2s_vec4_avx2 below (a .macro cannot hold shift immediates portably:
+ * single-digit $N inside a macro body is a macro-arg reference on newer
+ * LLVM and silently assembles to $0 on older LLVM). */
+.LBS1_21:
+    // Vector linear->sRGB for the completed 8-pixel block: two SSSE3-style
+    // 4-pixel lanes via vpshufb (same amortized tables as L2S1, same bytes),
+    // then max-channel pack (alpha = max(R,G,B)) + 32-byte store.
+    vmovdqu      256(%rsp), %ymm0
+    vextracti128 $1, %ymm0, %xmm1
+    vmovdqa      %xmm1, 304(%rsp)  # park lane1 input
+    call         l2s_vec4_avx2
+    vmovdqa      %xmm1, 288(%rsp)  # park lane0 result
+    vmovdqa      304(%rsp), %xmm0  # lane1 input
+    call         l2s_vec4_avx2
+    vmovdqa      288(%rsp), %xmm0  # lane0 result
+    vinserti128  $1, %xmm1, %ymm0, %ymm0
+    vmovdqu      %ymm0, (%r15)
+    jmp          .LBS1_19
+.LBS1_20:
+    leaq         -40(%rbp), %rsp
+    popq         %rbx
+    popq         %r12
+    popq         %r13
+    popq         %r14
+    popq         %r15
+    popq         %rbp
+    retq
+.Lfunc_end_linear:
+    // SIZE(ksvgLightingDistantSpecularRowAvx2Linear)
+
+/*
+ * Description:
+ *   One 4-pixel linear->sRGB lane. Straight VEX transliteration of the
+ *   proven SSSE3 block: nibble-split interpolation (base + slope*lo),
+ *   per-bit correction, exact low-16 select, then max-channel alpha.
+ *   Bit-identical to 4x L2S1.
+ *
+ *   File-local helper (not a .macro): single-digit shift immediates inside
+ *   a macro body misassemble on some LLVM versions, so this stays a plain
+ *   function. Called twice per 8-pixel block; the two direct calls cost
+ *   nothing measurable next to the polynomial above.
+ *
+ * Inputs:
+ *   %xmm0 = 4 linear dwords (0x00RRGGBB each, preserved)
+ *
+ * Output:
+ *   %xmm1 = 4 packed sRGB ARGB dwords
+ *
+ * Clobbers:
+ *   %xmm1-%xmm7. No GPRs touched, so the caller's loop state
+ *   (%rbx/%r12/%r13/%r15, all callee-saved) survives the call.
+ */
+.p2align 4
+l2s_vec4_avx2:
     vpxor        %xmm7, %xmm7, %xmm7
     vmovdqa      %xmm0, %xmm1
-    vpsrlw       $$4, %xmm1, %xmm1
+    vpsrlw       $4, %xmm1, %xmm1
     vpand        .Lvec_l2s_nibble(%rip), %xmm1, %xmm1
     vmovdqa      %xmm0, %xmm2
     vpand        .Lvec_l2s_nibble(%rip), %xmm2, %xmm2
@@ -475,22 +525,22 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vpunpckhbw   %xmm7, %xmm4, %xmm4
     vpmaddubsw   %xmm4, %xmm6, %xmm6
     vpaddw       .Lvec_l2s_rounding(%rip), %xmm5, %xmm5
-    vpsrlw       $$5, %xmm5, %xmm5
+    vpsrlw       $5, %xmm5, %xmm5
     vpaddw       .Lvec_l2s_rounding(%rip), %xmm6, %xmm6
-    vpsrlw       $$5, %xmm6, %xmm6
+    vpsrlw       $5, %xmm6, %xmm6
     vpackuswb    %xmm6, %xmm5, %xmm5
     vpaddb       %xmm3, %xmm5, %xmm5
     vmovdqa      %xmm0, %xmm3
-    vpsrlw       $$3, %xmm3, %xmm3
+    vpsrlw       $3, %xmm3, %xmm3
     vpand        .Lvec_l2s_group_mask(%rip), %xmm3, %xmm3
     vmovdqa      %xmm3, %xmm4
     vpsubb       .Lvec_l2s_group16(%rip), %xmm4, %xmm4
     vmovdqa      .Lspec_l2s_data+64(%rip), %xmm6
     vpshufb      %xmm4, %xmm6, %xmm6
     vmovdqa      %xmm3, %xmm4
-    vpsrlw       $$4, %xmm4, %xmm4
+    vpsrlw       $4, %xmm4, %xmm4
     vpand        .Lvec_l2s_one(%rip), %xmm4, %xmm4
-    vpsllw       $$7, %xmm4, %xmm4
+    vpsllw       $7, %xmm4, %xmm4
     vpor         %xmm3, %xmm4, %xmm4
     vmovdqa      .Lspec_l2s_data+48(%rip), %xmm3
     vpshufb      %xmm4, %xmm3, %xmm3
@@ -509,46 +559,19 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vpandn       %xmm5, %xmm1, %xmm1
     vpor         %xmm3, %xmm1, %xmm1
     vmovdqa      %xmm1, %xmm2
-    vpsrld       $$8, %xmm2, %xmm2
+    vpsrld       $8, %xmm2, %xmm2
     vpand        .Lvec_l2s_rgb_low_mask(%rip), %xmm2, %xmm2
     vmovdqa      %xmm1, %xmm3
-    vpsrld       $$16, %xmm3, %xmm3
+    vpsrld       $16, %xmm3, %xmm3
     vpand        .Lvec_l2s_rgb_low_mask(%rip), %xmm3, %xmm3
     vpmaxub      %xmm3, %xmm2, %xmm2
     vmovdqa      %xmm1, %xmm3
     vpand        .Lvec_l2s_rgb_low_mask(%rip), %xmm3, %xmm3
     vpmaxub      %xmm3, %xmm2, %xmm2
-    vpslld       $$24, %xmm2, %xmm2
+    vpslld       $24, %xmm2, %xmm2
     vpand        .Lvec_l2s_rgb_mask(%rip), %xmm1, %xmm1
     vpor         %xmm2, %xmm1, %xmm1
-.endm
-
-.LBS1_21:
-    // Vector linear->sRGB for the completed 8-pixel block: two SSSE3-style
-    // 4-pixel lanes via vpshufb (same amortized tables as L2S1, same bytes),
-    // then max-channel pack (alpha = max(R,G,B)) + 32-byte store.
-    vmovdqu      256(%rsp), %ymm0
-    vextracti128 $1, %ymm0, %xmm1
-    vmovdqa      %xmm1, 304(%rsp)  # park lane1 input
-    L2S_VEC4
-    vmovdqa      %xmm1, 288(%rsp)  # park lane0 result
-    vmovdqa      304(%rsp), %xmm0  # lane1 input
-    L2S_VEC4
-    vmovdqa      288(%rsp), %xmm0  # lane0 result
-    vinserti128  $1, %xmm1, %ymm0, %ymm0
-    vmovdqu      %ymm0, (%r15)
-    jmp          .LBS1_19
-.LBS1_20:
-    leaq         -40(%rbp), %rsp
-    popq         %rbx
-    popq         %r12
-    popq         %r13
-    popq         %r14
-    popq         %r15
-    popq         %rbp
     retq
-.Lfunc_end_linear:
-    // SIZE(ksvgLightingDistantSpecularRowAvx2Linear)
 
 .p2align 4
 .Lspec_l2s_data:

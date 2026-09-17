@@ -156,6 +156,9 @@
  *   then alpha = max(R,G,B) (SIGNED cmovl, matching the pre-existing blocks)
  *   shifted to A<<24 and OR-ed in, stored to the dst pointer. Registers are
  *   deliberately fixed (kernel contract, identical at both use sites).
+ *   NOTE: the max is computed on the UNSHIFTED channel bytes. (A prior
+ *   revision maxed the already-shifted values, which degenerates to A=B;
+ *   e.g. pure-red pixels packed alpha 0. Matches the x86_64 vpmaxsd path.)
  *
  * Output:
  *   packed 0xAARRGGBB pixel stored to the dst pointer
@@ -165,17 +168,121 @@
  *   %ecx (reloaded as dst pointer)
  */
 .macro PACK_MAX_ALPHA
-    shll  $16, %eax
-    shll  $8, %ecx
-    orl   %ecx, %eax
-    orl   %edx, %eax
     movl  %eax, %esi
     cmpl  %ecx, %esi
     cmovl %ecx, %esi
     cmpl  %edx, %esi
     cmovl %edx, %esi
+    shll  $16, %eax
+    shll  $8, %ecx
+    orl   %ecx, %eax
+    orl   %edx, %eax
     shll  $24, %esi
     orl   %esi, %eax
     movl  -8(%ebp), %ecx
     movl  %eax, (%ecx)
+.endm
+
+/*
+ * Description:
+ *   Scalar powf approximation: %xmm0 = %xmm1 ^ %xmm2 (all scalar floats,
+ *   low lanes only) via 8th-degree log2/exp2 minimax Horner. Drop-in
+ *   replacement for the `call powf@PLT` sequence: no calls, %ebx (GOT)
+ *   preserved, no stack-pointer juggling.
+ *
+ * Inputs:
+ *   %xmm1 = base (ndoth, already maxss-clamped to >= 0 by caller)
+ *   %xmm2 = exponent
+ *   %ebx  = GOT base (preserved)
+ *   Tables .Ldss_log2 / .Ldss_exp2 addressable via GOTOFF(%ebx)
+ *   (caller emits EMIT_LOG2_POLY_8 / EMIT_EXP2_POLY_8 with those labels;
+ *   see kernel file).
+ *
+ * Output:
+ *   %xmm0 = pow approximation (0.0f for base <= 0)
+ *
+ * Clobbers:
+ *   %eax, %ecx, %edx, %xmm0, %xmm1
+ *   %xmm2 preserved.
+ */
+.macro POW1_SSE
+    xorps   %xmm0, %xmm0
+    ucomiss %xmm0, %xmm1
+    jbe     77f
+    movd    %xmm1, %eax
+    movl    %eax, %ecx
+    shrl    $23, %ecx
+    andl    $0xff, %ecx
+    subl    $127, %ecx
+    cvtsi2ss %ecx, %xmm0
+    andl    $0x007fffff, %eax
+    orl     $0x3f800000, %eax
+    movd    %eax, %xmm1
+    subss   .Ldss_one@GOTOFF(%ebx), %xmm1  # f = m - 1
+    # Horner log2(1+f), c8..c0
+    movss   .Ldss_log2+0*4@GOTOFF(%ebx), %xmm0
+    mulss   %xmm1, %xmm0
+    addss   .Ldss_log2+1*4@GOTOFF(%ebx), %xmm0
+    mulss   %xmm1, %xmm0
+    addss   .Ldss_log2+2*4@GOTOFF(%ebx), %xmm0
+    mulss   %xmm1, %xmm0
+    addss   .Ldss_log2+3*4@GOTOFF(%ebx), %xmm0
+    mulss   %xmm1, %xmm0
+    addss   .Ldss_log2+4*4@GOTOFF(%ebx), %xmm0
+    mulss   %xmm1, %xmm0
+    addss   .Ldss_log2+5*4@GOTOFF(%ebx), %xmm0
+    mulss   %xmm1, %xmm0
+    addss   .Ldss_log2+6*4@GOTOFF(%ebx), %xmm0
+    mulss   %xmm1, %xmm0
+    addss   .Ldss_log2+7*4@GOTOFF(%ebx), %xmm0
+    mulss   %xmm1, %xmm0
+    addss   .Ldss_log2+8*4@GOTOFF(%ebx), %xmm0
+    cvtsi2ss %ecx, %xmm1
+    addss   %xmm1, %xmm0  # log2x = e + P(f)
+    mulss   %xmm2, %xmm0  # t = y * log2x
+    # ti = floor(t)
+    cvttss2si %xmm0, %ecx
+    cvtsi2ss %ecx, %xmm1
+    ucomiss %xmm0, %xmm1
+    jbe     78f
+    subl    $1, %ecx
+    cvtsi2ss %ecx, %xmm1
+78:
+    subss   %xmm1, %xmm0  # tf = t - ti
+    # Horner exp2(tf), c8..c0
+    movss   .Ldss_exp2+0*4@GOTOFF(%ebx), %xmm1
+    mulss   %xmm0, %xmm1
+    addss   .Ldss_exp2+1*4@GOTOFF(%ebx), %xmm1
+    mulss   %xmm0, %xmm1
+    addss   .Ldss_exp2+2*4@GOTOFF(%ebx), %xmm1
+    mulss   %xmm0, %xmm1
+    addss   .Ldss_exp2+3*4@GOTOFF(%ebx), %xmm1
+    mulss   %xmm0, %xmm1
+    addss   .Ldss_exp2+4*4@GOTOFF(%ebx), %xmm1
+    mulss   %xmm0, %xmm1
+    addss   .Ldss_exp2+5*4@GOTOFF(%ebx), %xmm1
+    mulss   %xmm0, %xmm1
+    addss   .Ldss_exp2+6*4@GOTOFF(%ebx), %xmm1
+    mulss   %xmm0, %xmm1
+    addss   .Ldss_exp2+7*4@GOTOFF(%ebx), %xmm1
+    mulss   %xmm0, %xmm1
+    addss   .Ldss_exp2+8*4@GOTOFF(%ebx), %xmm1
+    # scale by 2^ti
+    cmpl    $127, %ecx
+    jg      79f
+    cmpl    $-126, %ecx
+    jl      77f
+    addl    $127, %ecx
+    shll    $23, %ecx
+    movd    %ecx, %xmm0
+    mulss   %xmm1, %xmm0
+    jmp     80f
+79:
+    # overflow: +inf -> caller clamps intensity to 1.0f; emit FLT_MAX
+    movl    $0x7f7fffff, %ecx
+    movd    %ecx, %xmm0
+    jmp     80f
+77:
+    xorps   %xmm0, %xmm0
+80:
 .endm
