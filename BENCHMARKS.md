@@ -442,18 +442,18 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `arm64-v8a`; non-quick har
 | Lighting (diffuse, spot, linear) | kotlin | 2048x2048 | 1035.32 | 4.05 | 0.03 | 1.31x | ⬆️ |  |
 | Lighting (diffuse, spot, linear) | scalar | 2048x2048 | 1354.67 | 3.10 | 0.02 | 1.00x |  |  |
 | Lighting (diffuse, spot, linear) | neon64 | 2048x2048 | 38.35 | 109.38 | 0.88 | **35.33x** | 🚀 |  |
-| Lighting (specular, distant) | kotlin | 512x512 | 80.60 | 3.25 | 0.03 | 1.08x | ⬆️ |  |
-| Lighting (specular, distant) | scalar | 512x512 | 86.68 | 3.02 | 0.02 | 1.00x |  |  |
-| Lighting (specular, distant) | neon64 | 512x512 | 6.18 | 42.39 | 0.34 | **14.02x** | 🚀 |  |
-| Lighting (specular, distant) | kotlin | 2048x2048 | 1294.86 | 3.24 | 0.03 | 1.04x | ⬆️ |  |
-| Lighting (specular, distant) | scalar | 2048x2048 | 1348.68 | 3.11 | 0.02 | 1.00x |  |  |
-| Lighting (specular, distant) | neon64 | 2048x2048 | 85.78 | 48.90 | 0.39 | **15.72x** | 🚀 |  |
-| Lighting (specular, distant, linear) | kotlin | 512x512 | 80.31 | 3.26 | 0.03 | 1.09x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 512x512 | 87.49 | 3.00 | 0.02 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | neon64 | 512x512 | 6.59 | 39.79 | 0.32 | **13.28x** | 🚀 | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 1290.96 | 3.25 | 0.03 | 1.24x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 2048x2048 | 1599.85 | 2.62 | 0.02 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | neon64 | 2048x2048 | 109.12 | 38.44 | 0.31 | **14.66x** | 🚀 |  |
+| Lighting (specular, distant) | kotlin | 512x512 | 80.86 | 3.24 | 0.03 | 1.07x | ⬆️ |  |
+| Lighting (specular, distant) | scalar | 512x512 | 86.24 | 3.04 | 0.02 | 1.00x |  |  |
+| Lighting (specular, distant) | neon64 | 512x512 | 6.21 | 42.21 | 0.34 | **13.89x** | 🚀 |  |
+| Lighting (specular, distant) | kotlin | 2048x2048 | 1303.31 | 3.22 | 0.03 | 1.04x | ⬆️ |  |
+| Lighting (specular, distant) | scalar | 2048x2048 | 1355.43 | 3.09 | 0.02 | 1.00x |  |  |
+| Lighting (specular, distant) | neon64 | 2048x2048 | 85.70 | 48.94 | 0.39 | **15.82x** | 🚀 |  |
+| Lighting (specular, distant, linear) | kotlin | 512x512 | 81.07 | 3.23 | 0.03 | 1.07x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 512x512 | 87.04 | 3.01 | 0.02 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | neon64 | 512x512 | 6.61 | 39.67 | 0.32 | **13.17x** | 🚀 |  |
+| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 1301.89 | 3.22 | 0.03 | 1.05x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 2048x2048 | 1361.25 | 3.08 | 0.02 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | neon64 | 2048x2048 | 93.79 | 44.72 | 0.36 | **14.51x** | 🚀 |  |
 | Lighting (specular, point) | kotlin | 512x512 | 111.02 | 2.36 | 0.02 | 0.91x |  |  |
 | Lighting (specular, point) | scalar | 512x512 | 101.04 | 2.59 | 0.02 | 1.00x |  |  |
 | Lighting (specular, point) | neon64 | 512x512 | 8.02 | 32.70 | 0.26 | **12.61x** | 🚀 |  |
@@ -545,18 +545,18 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `armeabi-v7a`; non-quick h
 | GaussianBlur | kotlin | 2048x2048 | 501.422 | 8.36 | 0.07 | 12.00x | ⬆️ | StackBlur (approx) |
 | GaussianBlur | scalar | 2048x2048 | 6018.733 | 0.70 | 0.01 | 1.00x |  |  |
 | GaussianBlur | neon32 | 2048x2048 | 138.898 | 30.20 | 0.24 | **43.33x** | 🚀 |  |
-| Lighting (diffuse, distant) | kotlin | 512x512 | 105.31 | 2.49 | 0.02 | 0.30x |  |  |
-| Lighting (diffuse, distant) | scalar | 512x512 | 31.18 | 8.41 | 0.07 | 1.00x |  |  |
-| Lighting (diffuse, distant) | neon32 | 512x512 | 5.00 | 52.43 | 0.42 | 6.24x | 🟢 |  |
-| Lighting (diffuse, distant) | kotlin | 2048x2048 | 1658.94 | 2.53 | 0.02 | 0.27x |  |  |
-| Lighting (diffuse, distant) | scalar | 2048x2048 | 447.49 | 9.37 | 0.07 | 1.00x |  |  |
-| Lighting (diffuse, distant) | neon32 | 2048x2048 | 52.37 | 80.09 | 0.64 | 8.54x | 🟢 |  |
-| Lighting (diffuse, distant, linear) | kotlin | 512x512 | 108.69 | 2.41 | 0.02 | 1.00x |  |  |
-| Lighting (diffuse, distant, linear) | scalar | 512x512 | 108.44 | 2.42 | 0.02 | 1.00x |  |  |
-| Lighting (diffuse, distant, linear) | neon32 | 512x512 | 5.38 | 48.77 | 0.39 | **20.17x** | 🚀 |  |
-| Lighting (diffuse, distant, linear) | kotlin | 2048x2048 | 1721.65 | 2.44 | 0.02 | 0.92x |  |  |
-| Lighting (diffuse, distant, linear) | scalar | 2048x2048 | 1583.31 | 2.65 | 0.02 | 1.00x |  |  |
-| Lighting (diffuse, distant, linear) | neon32 | 2048x2048 | 58.12 | 72.17 | 0.58 | **27.24x** | 🚀 |  |
+| Lighting (diffuse, distant) | kotlin | 512x512 | 103.72 | 2.53 | 0.02 | 0.30x |  |  |
+| Lighting (diffuse, distant) | scalar | 512x512 | 31.10 | 8.43 | 0.07 | 1.00x |  |  |
+| Lighting (diffuse, distant) | neon32 | 512x512 | 4.98 | 52.69 | 0.42 | 6.25x | 🟢 |  |
+| Lighting (diffuse, distant) | kotlin | 2048x2048 | 1641.81 | 2.55 | 0.02 | 0.27x |  |  |
+| Lighting (diffuse, distant) | scalar | 2048x2048 | 448.72 | 9.35 | 0.07 | 1.00x |  |  |
+| Lighting (diffuse, distant) | neon32 | 2048x2048 | 51.43 | 81.56 | 0.65 | 8.73x | 🟢 |  |
+| Lighting (diffuse, distant, linear) | kotlin | 512x512 | 107.34 | 2.44 | 0.02 | 1.00x |  |  |
+| Lighting (diffuse, distant, linear) | scalar | 512x512 | 107.18 | 2.45 | 0.02 | 1.00x |  |  |
+| Lighting (diffuse, distant, linear) | neon32 | 512x512 | 5.39 | 48.60 | 0.39 | **19.87x** | 🚀 |  |
+| Lighting (diffuse, distant, linear) | kotlin | 2048x2048 | 1704.08 | 2.46 | 0.02 | 0.92x |  |  |
+| Lighting (diffuse, distant, linear) | scalar | 2048x2048 | 1562.68 | 2.68 | 0.02 | 1.00x |  |  |
+| Lighting (diffuse, distant, linear) | neon32 | 2048x2048 | 58.05 | 72.25 | 0.58 | **26.92x** | 🚀 |  |
 | Lighting (diffuse, point) | kotlin | 512x512 | 145.60 | 1.80 | 0.01 | 0.68x |  |  |
 | Lighting (diffuse, point) | scalar | 512x512 | 98.33 | 2.67 | 0.02 | 1.00x |  |  |
 | Lighting (diffuse, point) | neon32 | 512x512 | 6.47 | 40.54 | 0.32 | **15.20x** | 🚀 |  |
@@ -581,18 +581,18 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `armeabi-v7a`; non-quick h
 | Lighting (diffuse, spot, linear) | kotlin | 2048x2048 | 2389.77 | 1.76 | 0.01 | 0.67x |  |  |
 | Lighting (diffuse, spot, linear) | scalar | 2048x2048 | 1605.03 | 2.61 | 0.02 | 1.00x |  |  |
 | Lighting (diffuse, spot, linear) | neon32 | 2048x2048 | 102.65 | 40.86 | 0.33 | **15.64x** | 🚀 |  |
-| Lighting (specular, distant) | kotlin | 512x512 | 191.16 | 1.37 | 0.01 | 0.62x |  |  |
-| Lighting (specular, distant) | scalar | 512x512 | 118.38 | 2.21 | 0.02 | 1.00x |  |  |
-| Lighting (specular, distant) | neon32 | 512x512 | 118.73 | 2.21 | 0.02 | 1.00x | 🔴 |  |
-| Lighting (specular, distant) | kotlin | 2048x2048 | 3001.67 | 1.40 | 0.01 | 0.59x |  |  |
-| Lighting (specular, distant) | scalar | 2048x2048 | 1783.45 | 2.35 | 0.02 | 1.00x |  |  |
-| Lighting (specular, distant) | neon32 | 2048x2048 | 1794.20 | 2.34 | 0.02 | 0.99x | 🔴 |  |
-| Lighting (specular, distant, linear) | kotlin | 512x512 | 193.29 | 1.36 | 0.01 | 0.64x |  |  |
-| Lighting (specular, distant, linear) | scalar | 512x512 | 123.19 | 2.13 | 0.02 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | neon32 | 512x512 | 124.06 | 2.11 | 0.02 | 0.99x | 🔴 |  |
-| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 3037.52 | 1.38 | 0.01 | 0.61x |  |  |
-| Lighting (specular, distant, linear) | scalar | 2048x2048 | 1858.77 | 2.26 | 0.02 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | neon32 | 2048x2048 | 1871.71 | 2.24 | 0.02 | 0.99x | 🔴 |  |
+| Lighting (specular, distant) | kotlin | 512x512 | 191.05 | 1.37 | 0.01 | 0.61x |  |  |
+| Lighting (specular, distant) | scalar | 512x512 | 116.72 | 2.25 | 0.02 | 1.00x |  |  |
+| Lighting (specular, distant) | neon32 | 512x512 | 15.15 | 17.30 | 0.14 | 7.71x | 🟢 |  |
+| Lighting (specular, distant) | kotlin | 2048x2048 | 2942.18 | 1.43 | 0.01 | 0.60x |  |  |
+| Lighting (specular, distant) | scalar | 2048x2048 | 1760.65 | 2.38 | 0.02 | 1.00x |  |  |
+| Lighting (specular, distant) | neon32 | 2048x2048 | 210.09 | 19.96 | 0.16 | 8.38x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 512x512 | 190.67 | 1.37 | 0.01 | 0.64x |  |  |
+| Lighting (specular, distant, linear) | scalar | 512x512 | 122.07 | 2.15 | 0.02 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | neon32 | 512x512 | 17.36 | 15.10 | 0.12 | 7.03x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 3022.02 | 1.39 | 0.01 | 0.61x |  |  |
+| Lighting (specular, distant, linear) | scalar | 2048x2048 | 1839.51 | 2.28 | 0.02 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | neon32 | 2048x2048 | 244.11 | 17.18 | 0.14 | 7.54x | 🟢 |  |
 | Lighting (specular, point) | kotlin | 512x512 | 232.26 | 1.13 | 0.01 | 0.47x |  |  |
 | Lighting (specular, point) | scalar | 512x512 | 110.08 | 2.38 | 0.02 | 1.00x |  |  |
 | Lighting (specular, point) | neon32 | 512x512 | 19.26 | 13.61 | 0.11 | 5.72x | 🟢 |  |

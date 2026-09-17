@@ -170,6 +170,10 @@ tasks.matching { it.name == "connectedDebugAndroidTest" }
  * `benchmark.config` is `+`-separated, case-insensitive substrings matched
  * against the cell display name (e.g. "Lighting (diffuse, distant, linear)");
  * `benchmark.kernel` and `benchmark.config` are ANDed when both are given.
+ * NOTE: the `+` parts are ORed (any match keeps the cell), and full display
+ * names do NOT work here — AGP truncates `-P` values at the first comma, so
+ * use comma-free fragments (e.g. `benchmark.config=distant` for all four
+ * distant-lighting cells, never `specular+distant` to mean AND).
  *
  *   ./gradlew :filtering:runDeviceBenchmark \
  *       -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
