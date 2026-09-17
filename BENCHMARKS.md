@@ -28,194 +28,194 @@ Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
 
 | Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
-| ArithmeticComposite (linear) | kotlin | 512x512 | 9.780 | 26.80 | 0.32 | 0.40x |  |  |
-| ArithmeticComposite (linear) | scalar | 512x512 | 3.895 | 67.30 | 0.81 | 1.00x |  | linear → scalar fallback on all SIMD backends |
-| ArithmeticComposite (linear) | ssse3 | 512x512 | 3.054 | 85.83 | 1.03 | 1.28x | 🟢 |  |
-| ArithmeticComposite (linear) | avx2 | 512x512 | 3.068 | 85.44 | 1.03 | 1.27x | 🟢 |  |
-| ArithmeticComposite (linear) | kotlin | 2048x2048 | 155.571 | 26.96 | 0.32 | 0.40x |  |  |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 62.732 | 66.86 | 0.80 | 1.00x |  | linear → scalar fallback on all SIMD backends |
-| ArithmeticComposite (linear) | ssse3 | 2048x2048 | 48.768 | 86.01 | 1.03 | 1.29x | 🟢 |  |
-| ArithmeticComposite (linear) | avx2 | 2048x2048 | 47.409 | 88.47 | 1.06 | 1.32x | 🟢 |  |
-| ArithmeticComposite (non-linear) | kotlin | 512x512 | 10.510 | 24.94 | 0.30 | 0.08x |  |  |
-| ArithmeticComposite (non-linear) | scalar | 512x512 | 0.818 | 320.36 | 3.84 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | ssse3 | 512x512 | 0.465 | 563.43 | 6.76 | 1.76x | 🟢 |  |
-| ArithmeticComposite (non-linear) | avx2 | 512x512 | 0.287 | 913.22 | 10.96 | 2.85x | 🟢 |  |
-| ArithmeticComposite (non-linear) | kotlin | 2048x2048 | 168.711 | 24.86 | 0.30 | 0.08x |  |  |
-| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 13.065 | 321.03 | 3.85 | 1.00x |  |  |
-| ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 7.550 | 555.51 | 6.67 | 1.73x | 🟢 |  |
-| ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 4.943 | 848.61 | 10.18 | 2.64x | 🟢 |  |
-| ComponentTransfer | kotlin | 512x512 | 0.576 | 454.89 | 3.64 | 0.42x |  |  |
-| ComponentTransfer | scalar | 512x512 | 0.244 | 1074.81 | 8.60 | 1.00x |  |  |
-| ComponentTransfer | kotlin | 2048x2048 | 8.391 | 499.87 | 4.00 | 0.54x |  |  |
-| ComponentTransfer | scalar | 2048x2048 | 4.508 | 930.42 | 7.44 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 18.354 | 14.28 | 0.11 | 1.35x | ⬆️ |  |
-| ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 24.763 | 10.59 | 0.08 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, alpha) | sse2 | 512x512 | 4.381 | 59.84 | 0.48 | 5.65x | 🟢 |  |
-| ConvolveMatrix (duplicate, alpha) | avx2 | 512x512 | 2.257 | 116.15 | 0.93 | **10.97x** | 🚀 |  |
-| ConvolveMatrix (duplicate, alpha) | kotlin | 2048x2048 | 294.993 | 14.22 | 0.11 | 1.35x | ⬆️ |  |
-| ConvolveMatrix (duplicate, alpha) | scalar | 2048x2048 | 397.185 | 10.56 | 0.08 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, alpha) | sse2 | 2048x2048 | 66.940 | 62.66 | 0.50 | 5.93x | 🟢 |  |
-| ConvolveMatrix (duplicate, alpha) | avx2 | 2048x2048 | 30.855 | 135.93 | 1.09 | **12.87x** | 🚀 |  |
-| ConvolveMatrix (duplicate, no-alpha) | kotlin | 512x512 | 30.414 | 8.62 | 0.07 | 0.84x |  |  |
-| ConvolveMatrix (duplicate, no-alpha) | scalar | 512x512 | 25.464 | 10.29 | 0.08 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, no-alpha) | sse2 | 512x512 | 4.740 | 55.30 | 0.44 | 5.37x | 🟢 |  |
-| ConvolveMatrix (duplicate, no-alpha) | avx2 | 512x512 | 2.663 | 98.42 | 0.79 | **9.56x** | 🚀 |  |
-| ConvolveMatrix (duplicate, no-alpha) | kotlin | 2048x2048 | 484.381 | 8.66 | 0.07 | 0.84x |  |  |
-| ConvolveMatrix (duplicate, no-alpha) | scalar | 2048x2048 | 407.621 | 10.29 | 0.08 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, no-alpha) | sse2 | 2048x2048 | 69.227 | 60.59 | 0.48 | 5.89x | 🟢 |  |
-| ConvolveMatrix (duplicate, no-alpha) | avx2 | 2048x2048 | 35.963 | 116.63 | 0.93 | **11.33x** | 🚀 |  |
-| DisplacementMap | kotlin | 512x512 | 3.782 | 69.31 | 0.83 | 0.56x |  |  |
-| DisplacementMap | scalar | 512x512 | 2.128 | 123.21 | 1.48 | 1.00x |  |  |
-| DisplacementMap | sse2 | 512x512 | 0.944 | 277.61 | 3.33 | 2.25x | 🟢 |  |
-| DisplacementMap | avx2 | 512x512 | 0.638 | 410.66 | 4.93 | 3.33x | 🟢 |  |
-| DisplacementMap | kotlin | 2048x2048 | 59.588 | 70.39 | 0.84 | 0.60x |  |  |
-| DisplacementMap | scalar | 2048x2048 | 36.022 | 116.44 | 1.40 | 1.00x |  |  |
-| DisplacementMap | sse2 | 2048x2048 | 16.480 | 254.50 | 3.05 | 2.19x | 🟢 |  |
-| DisplacementMap | avx2 | 2048x2048 | 13.378 | 313.52 | 3.76 | 2.69x | 🟢 |  |
-| GaussianBlur | kotlin | 512x512 | 9.835 | 26.65 | 0.21 | 1.99x | ⬆️ | StackBlur (approx) vs true Gaussian (scalar) |
-| GaussianBlur | scalar | 512x512 | 19.559 | 13.40 | 0.11 | 1.00x |  |  |
-| GaussianBlur | ssse3 | 512x512 | 6.082 | 43.10 | 0.34 | 3.22x | 🟢 |  |
-| GaussianBlur | avx2 | 512x512 | 5.979 | 43.85 | 0.35 | 3.27x | 🟢 |  |
-| GaussianBlur | kotlin | 2048x2048 | 317.197 | 13.22 | 0.11 | 1.12x | ⬆️ |  |
-| GaussianBlur | scalar | 2048x2048 | 356.489 | 11.77 | 0.09 | 1.00x |  |  |
-| GaussianBlur | ssse3 | 2048x2048 | 94.821 | 44.23 | 0.35 | 3.76x | 🟢 |  |
-| GaussianBlur | avx2 | 2048x2048 | 97.079 | 43.21 | 0.35 | 3.67x | 🟢 |  |
-| Lighting (diffuse, distant) | kotlin | 512x512 | 7.789 | 33.66 | 0.27 | 0.20x |  |  |
-| Lighting (diffuse, distant) | scalar | 512x512 | 1.562 | 167.86 | 1.34 | 1.00x |  |  |
-| Lighting (diffuse, distant) | ssse3 | 512x512 | 1.151 | 227.79 | 1.82 | 1.36x | 🟢 |  |
-| Lighting (diffuse, distant) | avx2 | 512x512 | 0.912 | 287.58 | 2.30 | 1.71x | 🟢 |  |
-| Lighting (diffuse, distant) | kotlin | 2048x2048 | 125.483 | 33.43 | 0.27 | 0.21x |  |  |
-| Lighting (diffuse, distant) | scalar | 2048x2048 | 26.383 | 158.98 | 1.27 | 1.00x |  |  |
-| Lighting (diffuse, distant) | ssse3 | 2048x2048 | 20.165 | 208.00 | 1.66 | 1.31x | 🟢 |  |
-| Lighting (diffuse, distant) | avx2 | 2048x2048 | 15.146 | 276.93 | 2.22 | 1.74x | 🟢 |  |
-| Lighting (diffuse, distant, linear) | kotlin | 512x512 | 7.911 | 33.14 | 0.27 | 1.31x | ⬆️ |  |
-| Lighting (diffuse, distant, linear) | scalar | 512x512 | 10.349 | 25.33 | 0.20 | 1.00x |  |  |
-| Lighting (diffuse, distant, linear) | ssse3 | 512x512 | 2.163 | 121.21 | 0.97 | 4.78x | 🟢 |  |
-| Lighting (diffuse, distant, linear) | avx2 | 512x512 | 1.877 | 139.65 | 1.12 | 5.51x | 🟢 |  |
-| Lighting (diffuse, distant, linear) | kotlin | 2048x2048 | 125.710 | 33.36 | 0.27 | 1.32x | ⬆️ |  |
-| Lighting (diffuse, distant, linear) | scalar | 2048x2048 | 166.085 | 25.25 | 0.20 | 1.00x |  |  |
-| Lighting (diffuse, distant, linear) | ssse3 | 2048x2048 | 35.863 | 116.95 | 0.94 | 4.63x | 🟢 |  |
-| Lighting (diffuse, distant, linear) | avx2 | 2048x2048 | 30.688 | 136.68 | 1.09 | 5.41x | 🟢 |  |
-| Lighting (diffuse, point) | kotlin | 512x512 | 8.692 | 30.16 | 0.24 | 1.25x | ⬆️ |  |
-| Lighting (diffuse, point) | scalar | 512x512 | 10.903 | 24.04 | 0.19 | 1.00x |  |  |
-| Lighting (diffuse, point) | ssse3 | 512x512 | 2.015 | 130.07 | 1.04 | 5.41x | 🟢 |  |
-| Lighting (diffuse, point) | avx2 | 512x512 | 1.327 | 197.57 | 1.58 | 8.22x | 🟢 |  |
-| Lighting (diffuse, point) | kotlin | 2048x2048 | 137.667 | 30.47 | 0.24 | 1.27x | ⬆️ |  |
-| Lighting (diffuse, point) | scalar | 2048x2048 | 174.722 | 24.01 | 0.19 | 1.00x |  |  |
-| Lighting (diffuse, point) | ssse3 | 2048x2048 | 31.757 | 132.07 | 1.06 | 5.50x | 🟢 |  |
-| Lighting (diffuse, point) | avx2 | 2048x2048 | 19.490 | 215.20 | 1.72 | 8.96x | 🟢 |  |
-| Lighting (diffuse, point, linear) | kotlin | 512x512 | 8.830 | 29.69 | 0.24 | 1.28x | ⬆️ |  |
-| Lighting (diffuse, point, linear) | scalar | 512x512 | 11.319 | 23.16 | 0.19 | 1.00x |  |  |
-| Lighting (diffuse, point, linear) | ssse3 | 512x512 | 2.971 | 88.22 | 0.71 | 3.81x | 🟢 |  |
-| Lighting (diffuse, point, linear) | avx2 | 512x512 | 2.031 | 129.10 | 1.03 | 5.57x | 🟢 |  |
-| Lighting (diffuse, point, linear) | kotlin | 2048x2048 | 140.437 | 29.87 | 0.24 | 1.29x | ⬆️ |  |
-| Lighting (diffuse, point, linear) | scalar | 2048x2048 | 181.241 | 23.14 | 0.19 | 1.00x |  |  |
-| Lighting (diffuse, point, linear) | ssse3 | 2048x2048 | 47.336 | 88.61 | 0.71 | 3.83x | 🟢 |  |
-| Lighting (diffuse, point, linear) | avx2 | 2048x2048 | 30.875 | 135.85 | 1.09 | 5.87x | 🟢 |  |
-| Lighting (diffuse, spot) | kotlin | 512x512 | 12.865 | 20.38 | 0.16 | 0.92x |  |  |
-| Lighting (diffuse, spot) | scalar | 512x512 | 11.859 | 22.10 | 0.18 | 1.00x |  |  |
-| Lighting (diffuse, spot) | ssse3 | 512x512 | 2.221 | 118.03 | 0.94 | 5.34x | 🟢 |  |
-| Lighting (diffuse, spot) | avx2 | 512x512 | 1.463 | 179.24 | 1.43 | 8.11x | 🟢 |  |
-| Lighting (diffuse, spot) | kotlin | 2048x2048 | 133.027 | 31.53 | 0.25 | 1.41x | ⬆️ |  |
-| Lighting (diffuse, spot) | scalar | 2048x2048 | 187.991 | 22.31 | 0.18 | 1.00x |  |  |
-| Lighting (diffuse, spot) | ssse3 | 2048x2048 | 32.625 | 128.56 | 1.03 | 5.76x | 🟢 |  |
-| Lighting (diffuse, spot) | avx2 | 2048x2048 | 21.536 | 194.76 | 1.56 | 8.73x | 🟢 |  |
-| Lighting (diffuse, spot, linear) | kotlin | 512x512 | 8.924 | 29.38 | 0.24 | 1.37x | ⬆️ |  |
-| Lighting (diffuse, spot, linear) | scalar | 512x512 | 12.191 | 21.50 | 0.17 | 1.00x |  |  |
-| Lighting (diffuse, spot, linear) | ssse3 | 512x512 | 7.415 | 35.36 | 0.28 | 1.64x | 🟢 |  |
-| Lighting (diffuse, spot, linear) | avx2 | 512x512 | 7.781 | 33.69 | 0.27 | 1.57x | 🟢 |  |
-| Lighting (diffuse, spot, linear) | kotlin | 2048x2048 | 147.263 | 28.48 | 0.23 | 1.30x | ⬆️ |  |
-| Lighting (diffuse, spot, linear) | scalar | 2048x2048 | 191.988 | 21.85 | 0.17 | 1.00x |  |  |
-| Lighting (diffuse, spot, linear) | ssse3 | 2048x2048 | 111.967 | 37.46 | 0.30 | 1.71x | 🟢 |  |
-| Lighting (diffuse, spot, linear) | avx2 | 2048x2048 | 108.061 | 38.81 | 0.31 | 1.78x | 🟢 |  |
-| Lighting (specular, distant) | kotlin | 512x512 | 15.710 | 16.69 | 0.13 | 1.15x | ⬆️ |  |
-| Lighting (specular, distant) | scalar | 512x512 | 18.031 | 14.54 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant) | ssse3 | 512x512 | 10.745 | 24.40 | 0.20 | 1.68x | 🟢 |  |
-| Lighting (specular, distant) | avx2 | 512x512 | 9.730 | 26.94 | 0.22 | 1.85x | 🟢 |  |
-| Lighting (specular, distant) | kotlin | 2048x2048 | 240.439 | 17.44 | 0.14 | 1.16x | ⬆️ |  |
-| Lighting (specular, distant) | scalar | 2048x2048 | 279.078 | 15.03 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant) | ssse3 | 2048x2048 | 166.659 | 25.17 | 0.20 | 1.67x | 🟢 |  |
-| Lighting (specular, distant) | avx2 | 2048x2048 | 149.513 | 28.05 | 0.22 | 1.87x | 🟢 |  |
-| Lighting (specular, distant, linear) | kotlin | 512x512 | 15.195 | 17.25 | 0.14 | 1.18x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 512x512 | 17.951 | 14.60 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | ssse3 | 512x512 | 12.219 | 21.45 | 0.17 | 1.47x | 🟢 |  |
-| Lighting (specular, distant, linear) | avx2 | 512x512 | 13.876 | 18.89 | 0.15 | 1.29x | 🟢 |  |
-| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 247.038 | 16.98 | 0.14 | 1.16x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 2048x2048 | 287.515 | 14.59 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | ssse3 | 2048x2048 | 187.654 | 22.35 | 0.18 | 1.53x | 🟢 |  |
-| Lighting (specular, distant, linear) | avx2 | 2048x2048 | 213.951 | 19.60 | 0.16 | 1.34x | 🟢 |  |
-| Lighting (specular, point) | kotlin | 512x512 | 19.456 | 13.47 | 0.11 | 0.99x |  |  |
-| Lighting (specular, point) | scalar | 512x512 | 19.196 | 13.66 | 0.11 | 1.00x |  |  |
-| Lighting (specular, point) | ssse3 | 512x512 | 7.536 | 34.79 | 0.28 | 2.55x | 🟢 |  |
-| Lighting (specular, point) | avx2 | 512x512 | 7.561 | 34.67 | 0.28 | 2.54x | 🟢 |  |
-| Lighting (specular, point) | kotlin | 2048x2048 | 342.525 | 12.25 | 0.10 | 0.87x |  |  |
-| Lighting (specular, point) | scalar | 2048x2048 | 299.083 | 14.02 | 0.11 | 1.00x |  |  |
-| Lighting (specular, point) | ssse3 | 2048x2048 | 116.760 | 35.92 | 0.29 | 2.56x | 🟢 |  |
-| Lighting (specular, point) | avx2 | 2048x2048 | 100.869 | 41.58 | 0.33 | 2.97x | 🟢 |  |
-| Lighting (specular, point, linear) | kotlin | 512x512 | 19.820 | 13.23 | 0.11 | 1.18x | ⬆️ |  |
-| Lighting (specular, point, linear) | scalar | 512x512 | 23.480 | 11.16 | 0.09 | 1.00x |  |  |
-| Lighting (specular, point, linear) | ssse3 | 512x512 | 7.366 | 35.59 | 0.28 | 3.19x | 🟢 |  |
-| Lighting (specular, point, linear) | avx2 | 512x512 | 6.932 | 37.82 | 0.30 | 3.39x | 🟢 |  |
-| Lighting (specular, point, linear) | kotlin | 2048x2048 | 307.509 | 13.64 | 0.11 | 0.96x |  |  |
-| Lighting (specular, point, linear) | scalar | 2048x2048 | 294.861 | 14.22 | 0.11 | 1.00x |  |  |
-| Lighting (specular, point, linear) | ssse3 | 2048x2048 | 112.019 | 37.44 | 0.30 | 2.63x | 🟢 |  |
-| Lighting (specular, point, linear) | avx2 | 2048x2048 | 102.089 | 41.08 | 0.33 | 2.89x | 🟢 |  |
-| Lighting (specular, spot) | kotlin | 512x512 | 17.350 | 15.11 | 0.12 | 1.13x | ⬆️ |  |
-| Lighting (specular, spot) | scalar | 512x512 | 19.606 | 13.37 | 0.11 | 1.00x |  |  |
-| Lighting (specular, spot) | ssse3 | 512x512 | 8.796 | 29.80 | 0.24 | 2.23x | 🟢 |  |
-| Lighting (specular, spot) | avx2 | 512x512 | 10.360 | 25.30 | 0.20 | 1.89x | 🟢 |  |
-| Lighting (specular, spot) | kotlin | 2048x2048 | 348.916 | 12.02 | 0.10 | 0.91x |  |  |
-| Lighting (specular, spot) | scalar | 2048x2048 | 318.511 | 13.17 | 0.11 | 1.00x |  |  |
-| Lighting (specular, spot) | ssse3 | 2048x2048 | 143.220 | 29.29 | 0.23 | 2.22x | 🟢 |  |
-| Lighting (specular, spot) | avx2 | 2048x2048 | 159.745 | 26.26 | 0.21 | 1.99x | 🟢 |  |
-| Lighting (specular, spot, linear) | kotlin | 512x512 | 18.115 | 14.47 | 0.12 | 1.09x | ⬆️ |  |
-| Lighting (specular, spot, linear) | scalar | 512x512 | 19.796 | 13.24 | 0.11 | 1.00x |  |  |
-| Lighting (specular, spot, linear) | ssse3 | 512x512 | 9.293 | 28.21 | 0.23 | 2.13x | 🟢 |  |
-| Lighting (specular, spot, linear) | avx2 | 512x512 | 10.397 | 25.21 | 0.20 | 1.90x | 🟢 |  |
-| Lighting (specular, spot, linear) | kotlin | 2048x2048 | 285.183 | 14.71 | 0.12 | 1.09x | ⬆️ |  |
-| Lighting (specular, spot, linear) | scalar | 2048x2048 | 309.775 | 13.54 | 0.11 | 1.00x |  |  |
-| Lighting (specular, spot, linear) | ssse3 | 2048x2048 | 138.932 | 30.19 | 0.24 | 2.23x | 🟢 |  |
-| Lighting (specular, spot, linear) | avx2 | 2048x2048 | 153.827 | 27.27 | 0.22 | 2.01x | 🟢 |  |
-| Morphology (dilate, r=5) | kotlin | 512x512 | 55.615 | 4.71 | 0.04 | 0.50x |  |  |
-| Morphology (dilate, r=5) | scalar | 512x512 | 27.976 | 9.37 | 0.07 | 1.00x |  |  |
-| Morphology (dilate, r=5) | sse2 | 512x512 | 1.989 | 131.79 | 1.05 | **14.07x** | 🚀 |  |
-| Morphology (dilate, r=5) | avx2 | 512x512 | 1.965 | 133.38 | 1.07 | **14.24x** | 🚀 |  |
-| Morphology (dilate, r=5) | kotlin | 2048x2048 | 945.878 | 4.43 | 0.04 | 0.59x |  |  |
-| Morphology (dilate, r=5) | scalar | 2048x2048 | 555.188 | 7.55 | 0.06 | 1.00x |  |  |
-| Morphology (dilate, r=5) | sse2 | 2048x2048 | 24.643 | 170.20 | 1.36 | **22.53x** | 🚀 |  |
-| Morphology (dilate, r=5) | avx2 | 2048x2048 | 23.128 | 181.36 | 1.45 | **24.01x** | 🚀 |  |
-| Morphology (erode, r=1) | kotlin | 512x512 | 6.007 | 43.64 | 0.35 | 0.72x |  |  |
-| Morphology (erode, r=1) | scalar | 512x512 | 4.315 | 60.76 | 0.49 | 1.00x |  |  |
-| Morphology (erode, r=1) | sse2 | 512x512 | 0.948 | 276.63 | 2.21 | 4.55x | 🟢 |  |
-| Morphology (erode, r=1) | avx2 | 512x512 | 1.088 | 240.91 | 1.93 | 3.97x | 🟢 |  |
-| Morphology (erode, r=1) | kotlin | 2048x2048 | 99.202 | 42.28 | 0.34 | 0.72x |  |  |
-| Morphology (erode, r=1) | scalar | 2048x2048 | 71.845 | 58.38 | 0.47 | 1.00x |  |  |
-| Morphology (erode, r=1) | sse2 | 2048x2048 | 17.812 | 235.48 | 1.88 | 4.03x | 🟢 |  |
-| Morphology (erode, r=1) | avx2 | 2048x2048 | 19.926 | 210.49 | 1.68 | 3.61x | 🟢 |  |
-| Morphology (erode, r=5) | kotlin | 512x512 | 50.502 | 5.19 | 0.04 | 0.46x |  |  |
-| Morphology (erode, r=5) | scalar | 512x512 | 23.358 | 11.22 | 0.09 | 1.00x |  |  |
-| Morphology (erode, r=5) | sse2 | 512x512 | 1.331 | 196.88 | 1.58 | **17.55x** | 🚀 |  |
-| Morphology (erode, r=5) | avx2 | 512x512 | 1.281 | 204.71 | 1.64 | **18.24x** | 🚀 |  |
-| Morphology (erode, r=5) | kotlin | 2048x2048 | 870.119 | 4.82 | 0.04 | 0.57x |  |  |
-| Morphology (erode, r=5) | scalar | 2048x2048 | 492.863 | 8.51 | 0.07 | 1.00x |  |  |
-| Morphology (erode, r=5) | sse2 | 2048x2048 | 23.537 | 178.20 | 1.43 | **20.94x** | 🚀 |  |
-| Morphology (erode, r=5) | avx2 | 2048x2048 | 23.556 | 178.05 | 1.42 | **20.92x** | 🚀 |  |
-| Turbulence (turbulence, 1 oct) | kotlin | 512x512 | 20.931 | 12.52 | 0.05 | 0.72x |  |  |
-| Turbulence (turbulence, 1 oct) | scalar | 512x512 | 15.009 | 17.47 | 0.07 | 1.00x |  |  |
-| Turbulence (turbulence, 1 oct) | ssse3 | 512x512 | 10.980 | 23.87 | 0.10 | 1.37x | 🟢 |  |
-| Turbulence (turbulence, 1 oct) | avx2 | 512x512 | 7.176 | 36.53 | 0.15 | 2.09x | 🟢 |  |
-| Turbulence (turbulence, 1 oct) | kotlin | 2048x2048 | 334.122 | 12.55 | 0.05 | 0.74x |  |  |
-| Turbulence (turbulence, 1 oct) | scalar | 2048x2048 | 245.866 | 17.06 | 0.07 | 1.00x |  |  |
-| Turbulence (turbulence, 1 oct) | ssse3 | 2048x2048 | 176.978 | 23.70 | 0.09 | 1.39x | 🟢 |  |
-| Turbulence (turbulence, 1 oct) | avx2 | 2048x2048 | 118.167 | 35.49 | 0.14 | 2.08x | 🟢 |  |
-| UnLinearize | kotlin | 512x512 | 0.416 | 630.49 | 5.04 | 0.65x |  |  |
-| UnLinearize | scalar | 512x512 | 0.270 | 970.32 | 7.76 | 1.00x |  |  |
-| UnLinearize | ssse3 | 512x512 | 0.245 | 1070.72 | 8.57 | 1.10x | 🟢 |  |
-| UnLinearize | avx2 | 512x512 | 0.279 | 938.27 | 7.51 | 0.97x | 🔴 |  |
-| UnLinearize | kotlin | 2048x2048 | 6.398 | 655.54 | 5.24 | 0.71x |  |  |
-| UnLinearize | scalar | 2048x2048 | 4.544 | 923.14 | 7.39 | 1.00x |  |  |
-| UnLinearize | ssse3 | 2048x2048 | 4.174 | 1004.88 | 8.04 | 1.09x | 🟢 |  |
-| UnLinearize | avx2 | 2048x2048 | 4.697 | 893.05 | 7.14 | 0.97x | 🔴 |  |
+| ArithmeticComposite (linear) | kotlin | 512x512 | 10.144 | 25.84 | 0.31 | 0.42x |  |  |
+| ArithmeticComposite (linear) | scalar | 512x512 | 4.253 | 61.64 | 0.74 | 1.00x |  | linear → scalar fallback on all SIMD backends |
+| ArithmeticComposite (linear) | ssse3 | 512x512 | 3.158 | 83.02 | 1.00 | 1.35x | 🟢 |  |
+| ArithmeticComposite (linear) | avx2 | 512x512 | 3.149 | 83.25 | 1.00 | 1.35x | 🟢 |  |
+| ArithmeticComposite (linear) | kotlin | 2048x2048 | 162.348 | 25.84 | 0.31 | 0.40x |  |  |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 65.097 | 64.43 | 0.77 | 1.00x |  | linear → scalar fallback on all SIMD backends |
+| ArithmeticComposite (linear) | ssse3 | 2048x2048 | 50.569 | 82.94 | 1.00 | 1.29x | 🟢 |  |
+| ArithmeticComposite (linear) | avx2 | 2048x2048 | 49.884 | 84.08 | 1.01 | 1.30x | 🟢 |  |
+| ArithmeticComposite (non-linear) | kotlin | 512x512 | 10.971 | 23.89 | 0.29 | 0.08x |  |  |
+| ArithmeticComposite (non-linear) | scalar | 512x512 | 0.843 | 311.03 | 3.73 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | ssse3 | 512x512 | 0.475 | 551.48 | 6.62 | 1.77x | 🟢 |  |
+| ArithmeticComposite (non-linear) | avx2 | 512x512 | 0.310 | 846.05 | 10.15 | 2.72x | 🟢 |  |
+| ArithmeticComposite (non-linear) | kotlin | 2048x2048 | 174.912 | 23.98 | 0.29 | 0.08x |  |  |
+| ArithmeticComposite (non-linear) | scalar | 2048x2048 | 13.841 | 303.02 | 3.64 | 1.00x |  |  |
+| ArithmeticComposite (non-linear) | ssse3 | 2048x2048 | 7.946 | 527.82 | 6.33 | 1.74x | 🟢 |  |
+| ArithmeticComposite (non-linear) | avx2 | 2048x2048 | 5.484 | 764.86 | 9.18 | 2.52x | 🟢 |  |
+| ComponentTransfer | kotlin | 512x512 | 0.514 | 509.68 | 4.08 | 0.51x |  |  |
+| ComponentTransfer | scalar | 512x512 | 0.261 | 1005.67 | 8.05 | 1.00x |  |  |
+| ComponentTransfer | kotlin | 2048x2048 | 9.342 | 448.99 | 3.59 | 0.50x |  |  |
+| ComponentTransfer | scalar | 2048x2048 | 4.690 | 894.24 | 7.15 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 19.212 | 13.64 | 0.11 | 1.37x | ⬆️ |  |
+| ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 26.302 | 9.97 | 0.08 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, alpha) | sse2 | 512x512 | 4.655 | 56.31 | 0.45 | 5.65x | 🟢 |  |
+| ConvolveMatrix (duplicate, alpha) | avx2 | 512x512 | 2.505 | 104.66 | 0.84 | **10.50x** | 🚀 |  |
+| ConvolveMatrix (duplicate, alpha) | kotlin | 2048x2048 | 307.505 | 13.64 | 0.11 | 1.35x | ⬆️ |  |
+| ConvolveMatrix (duplicate, alpha) | scalar | 2048x2048 | 414.411 | 10.12 | 0.08 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, alpha) | sse2 | 2048x2048 | 70.602 | 59.41 | 0.48 | 5.87x | 🟢 |  |
+| ConvolveMatrix (duplicate, alpha) | avx2 | 2048x2048 | 34.264 | 122.41 | 0.98 | **12.09x** | 🚀 |  |
+| ConvolveMatrix (duplicate, no-alpha) | kotlin | 512x512 | 32.262 | 8.13 | 0.07 | 0.83x |  |  |
+| ConvolveMatrix (duplicate, no-alpha) | scalar | 512x512 | 26.800 | 9.78 | 0.08 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, no-alpha) | sse2 | 512x512 | 4.801 | 54.60 | 0.44 | 5.58x | 🟢 |  |
+| ConvolveMatrix (duplicate, no-alpha) | avx2 | 512x512 | 2.907 | 90.16 | 0.72 | **9.22x** | 🚀 |  |
+| ConvolveMatrix (duplicate, no-alpha) | kotlin | 2048x2048 | 515.487 | 8.14 | 0.07 | 0.82x |  |  |
+| ConvolveMatrix (duplicate, no-alpha) | scalar | 2048x2048 | 425.104 | 9.87 | 0.08 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, no-alpha) | sse2 | 2048x2048 | 73.575 | 57.01 | 0.46 | 5.78x | 🟢 |  |
+| ConvolveMatrix (duplicate, no-alpha) | avx2 | 2048x2048 | 39.750 | 105.52 | 0.84 | **10.69x** | 🚀 |  |
+| DisplacementMap | kotlin | 512x512 | 4.473 | 58.61 | 0.70 | 0.57x |  |  |
+| DisplacementMap | scalar | 512x512 | 2.538 | 103.30 | 1.24 | 1.00x |  |  |
+| DisplacementMap | sse2 | 512x512 | 1.206 | 217.43 | 2.61 | 2.10x | 🟢 |  |
+| DisplacementMap | avx2 | 512x512 | 0.945 | 277.43 | 3.33 | 2.69x | 🟢 |  |
+| DisplacementMap | kotlin | 2048x2048 | 71.714 | 58.49 | 0.70 | 0.53x |  |  |
+| DisplacementMap | scalar | 2048x2048 | 38.145 | 109.96 | 1.32 | 1.00x |  |  |
+| DisplacementMap | sse2 | 2048x2048 | 19.074 | 219.90 | 2.64 | 2.00x | 🟢 |  |
+| DisplacementMap | avx2 | 2048x2048 | 15.391 | 272.51 | 3.27 | 2.48x | 🟢 |  |
+| GaussianBlur | kotlin | 512x512 | 12.393 | 21.15 | 0.17 | 1.47x | ⬆️ | StackBlur (approx) vs true Gaussian (scalar) |
+| GaussianBlur | scalar | 512x512 | 18.226 | 14.38 | 0.12 | 1.00x |  |  |
+| GaussianBlur | ssse3 | 512x512 | 11.263 | 23.27 | 0.19 | 1.62x | 🟢 |  |
+| GaussianBlur | avx2 | 512x512 | 6.196 | 42.31 | 0.34 | 2.94x | 🟢 |  |
+| GaussianBlur | kotlin | 2048x2048 | 370.041 | 11.33 | 0.09 | 0.83x |  | StackBlur (approx) vs true Gaussian (scalar) |
+| GaussianBlur | scalar | 2048x2048 | 308.447 | 13.60 | 0.11 | 1.00x |  |  |
+| GaussianBlur | ssse3 | 2048x2048 | 175.753 | 23.86 | 0.19 | 1.76x | 🟢 |  |
+| GaussianBlur | avx2 | 2048x2048 | 99.440 | 42.18 | 0.34 | 3.10x | 🟢 |  |
+| Lighting (diffuse, distant) | kotlin | 512x512 | 7.898 | 33.19 | 0.27 | 0.23x |  |  |
+| Lighting (diffuse, distant) | scalar | 512x512 | 1.797 | 145.90 | 1.17 | 1.00x |  |  |
+| Lighting (diffuse, distant) | ssse3 | 512x512 | 1.358 | 192.99 | 1.54 | 1.32x | 🟢 |  |
+| Lighting (diffuse, distant) | avx2 | 512x512 | 1.119 | 234.34 | 1.87 | 1.61x | 🟢 |  |
+| Lighting (diffuse, distant) | kotlin | 2048x2048 | 126.049 | 33.28 | 0.27 | 0.22x |  |  |
+| Lighting (diffuse, distant) | scalar | 2048x2048 | 27.809 | 150.82 | 1.21 | 1.00x |  |  |
+| Lighting (diffuse, distant) | ssse3 | 2048x2048 | 21.039 | 199.36 | 1.59 | 1.32x | 🟢 |  |
+| Lighting (diffuse, distant) | avx2 | 2048x2048 | 15.644 | 268.11 | 2.14 | 1.78x | 🟢 |  |
+| Lighting (diffuse, distant, linear) | kotlin | 512x512 | 8.062 | 32.52 | 0.26 | 1.34x | ⬆️ |  |
+| Lighting (diffuse, distant, linear) | scalar | 512x512 | 10.840 | 24.18 | 0.19 | 1.00x |  |  |
+| Lighting (diffuse, distant, linear) | ssse3 | 512x512 | 2.357 | 111.21 | 0.89 | 4.60x | 🟢 |  |
+| Lighting (diffuse, distant, linear) | avx2 | 512x512 | 2.092 | 125.28 | 1.00 | 5.18x | 🟢 |  |
+| Lighting (diffuse, distant, linear) | kotlin | 2048x2048 | 127.749 | 32.83 | 0.26 | 1.33x | ⬆️ |  |
+| Lighting (diffuse, distant, linear) | scalar | 2048x2048 | 170.419 | 24.61 | 0.20 | 1.00x |  |  |
+| Lighting (diffuse, distant, linear) | ssse3 | 2048x2048 | 37.138 | 112.94 | 0.90 | 4.59x | 🟢 |  |
+| Lighting (diffuse, distant, linear) | avx2 | 2048x2048 | 31.848 | 131.70 | 1.05 | 5.35x | 🟢 |  |
+| Lighting (diffuse, point) | kotlin | 512x512 | 8.833 | 29.68 | 0.24 | 1.30x | ⬆️ |  |
+| Lighting (diffuse, point) | scalar | 512x512 | 11.447 | 22.90 | 0.18 | 1.00x |  |  |
+| Lighting (diffuse, point) | ssse3 | 512x512 | 2.303 | 113.80 | 0.91 | 4.97x | 🟢 |  |
+| Lighting (diffuse, point) | avx2 | 512x512 | 1.458 | 179.83 | 1.44 | 7.85x | 🟢 |  |
+| Lighting (diffuse, point) | kotlin | 2048x2048 | 141.406 | 29.66 | 0.24 | 1.31x | ⬆️ |  |
+| Lighting (diffuse, point) | scalar | 2048x2048 | 185.644 | 22.59 | 0.18 | 1.00x |  |  |
+| Lighting (diffuse, point) | ssse3 | 2048x2048 | 33.845 | 123.93 | 0.99 | 5.49x | 🟢 |  |
+| Lighting (diffuse, point) | avx2 | 2048x2048 | 21.394 | 196.05 | 1.57 | 8.68x | 🟢 |  |
+| Lighting (diffuse, point, linear) | kotlin | 512x512 | 9.169 | 28.59 | 0.23 | 1.30x | ⬆️ |  |
+| Lighting (diffuse, point, linear) | scalar | 512x512 | 11.934 | 21.97 | 0.18 | 1.00x |  |  |
+| Lighting (diffuse, point, linear) | ssse3 | 512x512 | 3.313 | 79.13 | 0.63 | 3.60x | 🟢 |  |
+| Lighting (diffuse, point, linear) | avx2 | 512x512 | 2.215 | 118.37 | 0.95 | 5.39x | 🟢 |  |
+| Lighting (diffuse, point, linear) | kotlin | 2048x2048 | 144.024 | 29.12 | 0.23 | 1.28x | ⬆️ |  |
+| Lighting (diffuse, point, linear) | scalar | 2048x2048 | 184.909 | 22.68 | 0.18 | 1.00x |  |  |
+| Lighting (diffuse, point, linear) | ssse3 | 2048x2048 | 48.785 | 85.98 | 0.69 | 3.79x | 🟢 |  |
+| Lighting (diffuse, point, linear) | avx2 | 2048x2048 | 33.251 | 126.14 | 1.01 | 5.56x | 🟢 |  |
+| Lighting (diffuse, spot) | kotlin | 512x512 | 15.750 | 16.64 | 0.13 | 0.79x |  |  |
+| Lighting (diffuse, spot) | scalar | 512x512 | 12.382 | 21.17 | 0.17 | 1.00x |  |  |
+| Lighting (diffuse, spot) | ssse3 | 512x512 | 2.410 | 108.76 | 0.87 | 5.14x | 🟢 |  |
+| Lighting (diffuse, spot) | avx2 | 512x512 | 1.575 | 166.46 | 1.33 | 7.86x | 🟢 |  |
+| Lighting (diffuse, spot) | kotlin | 2048x2048 | 139.230 | 30.12 | 0.24 | 1.38x | ⬆️ |  |
+| Lighting (diffuse, spot) | scalar | 2048x2048 | 192.741 | 21.76 | 0.17 | 1.00x |  |  |
+| Lighting (diffuse, spot) | ssse3 | 2048x2048 | 32.874 | 127.59 | 1.02 | 5.86x | 🟢 |  |
+| Lighting (diffuse, spot) | avx2 | 2048x2048 | 23.047 | 181.99 | 1.46 | 8.36x | 🟢 |  |
+| Lighting (diffuse, spot, linear) | kotlin | 512x512 | 9.025 | 29.05 | 0.23 | 1.40x | ⬆️ |  |
+| Lighting (diffuse, spot, linear) | scalar | 512x512 | 12.647 | 20.73 | 0.17 | 1.00x |  |  |
+| Lighting (diffuse, spot, linear) | ssse3 | 512x512 | 7.411 | 35.37 | 0.28 | 1.71x | 🟢 |  |
+| Lighting (diffuse, spot, linear) | avx2 | 512x512 | 7.232 | 36.25 | 0.29 | 1.75x | 🟢 |  |
+| Lighting (diffuse, spot, linear) | kotlin | 2048x2048 | 143.186 | 29.29 | 0.23 | 1.37x | ⬆️ |  |
+| Lighting (diffuse, spot, linear) | scalar | 2048x2048 | 196.435 | 21.35 | 0.17 | 1.00x |  |  |
+| Lighting (diffuse, spot, linear) | ssse3 | 2048x2048 | 114.218 | 36.72 | 0.29 | 1.72x | 🟢 |  |
+| Lighting (diffuse, spot, linear) | avx2 | 2048x2048 | 111.683 | 37.56 | 0.30 | 1.76x | 🟢 |  |
+| Lighting (specular, distant) | kotlin | 512x512 | 16.082 | 16.30 | 0.13 | 1.13x | ⬆️ |  |
+| Lighting (specular, distant) | scalar | 512x512 | 18.224 | 14.38 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant) | ssse3 | 512x512 | 11.131 | 23.55 | 0.19 | 1.64x | 🟢 |  |
+| Lighting (specular, distant) | avx2 | 512x512 | 10.067 | 26.04 | 0.21 | 1.81x | 🟢 |  |
+| Lighting (specular, distant) | kotlin | 2048x2048 | 247.380 | 16.95 | 0.14 | 1.16x | ⬆️ |  |
+| Lighting (specular, distant) | scalar | 2048x2048 | 286.288 | 14.65 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant) | ssse3 | 2048x2048 | 171.724 | 24.42 | 0.20 | 1.67x | 🟢 |  |
+| Lighting (specular, distant) | avx2 | 2048x2048 | 152.706 | 27.47 | 0.22 | 1.87x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 512x512 | 15.675 | 16.72 | 0.13 | 1.18x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 512x512 | 18.424 | 14.23 | 0.11 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | ssse3 | 512x512 | 12.250 | 21.40 | 0.17 | 1.50x | 🟢 |  |
+| Lighting (specular, distant, linear) | avx2 | 512x512 | 13.573 | 19.31 | 0.15 | 1.36x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 249.646 | 16.80 | 0.13 | 1.15x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 2048x2048 | 288.045 | 14.56 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | ssse3 | 2048x2048 | 188.601 | 22.24 | 0.18 | 1.53x | 🟢 |  |
+| Lighting (specular, distant, linear) | avx2 | 2048x2048 | 209.424 | 20.03 | 0.16 | 1.38x | 🟢 |  |
+| Lighting (specular, point) | kotlin | 512x512 | 19.326 | 13.56 | 0.11 | 1.00x |  |  |
+| Lighting (specular, point) | scalar | 512x512 | 19.281 | 13.60 | 0.11 | 1.00x |  |  |
+| Lighting (specular, point) | ssse3 | 512x512 | 7.602 | 34.48 | 0.28 | 2.54x | 🟢 |  |
+| Lighting (specular, point) | avx2 | 512x512 | 6.611 | 39.65 | 0.32 | 2.92x | 🟢 |  |
+| Lighting (specular, point) | kotlin | 2048x2048 | 309.544 | 13.55 | 0.11 | 0.98x |  |  |
+| Lighting (specular, point) | scalar | 2048x2048 | 303.098 | 13.84 | 0.11 | 1.00x |  |  |
+| Lighting (specular, point) | ssse3 | 2048x2048 | 112.875 | 37.16 | 0.30 | 2.69x | 🟢 |  |
+| Lighting (specular, point) | avx2 | 2048x2048 | 97.329 | 43.09 | 0.34 | 3.11x | 🟢 |  |
+| Lighting (specular, point, linear) | kotlin | 512x512 | 19.381 | 13.53 | 0.11 | 1.11x | ⬆️ |  |
+| Lighting (specular, point, linear) | scalar | 512x512 | 21.493 | 12.20 | 0.10 | 1.00x |  |  |
+| Lighting (specular, point, linear) | ssse3 | 512x512 | 8.556 | 30.64 | 0.25 | 2.51x | 🟢 |  |
+| Lighting (specular, point, linear) | avx2 | 512x512 | 8.191 | 32.01 | 0.26 | 2.62x | 🟢 |  |
+| Lighting (specular, point, linear) | kotlin | 2048x2048 | 308.663 | 13.59 | 0.11 | 0.98x |  |  |
+| Lighting (specular, point, linear) | scalar | 2048x2048 | 303.581 | 13.82 | 0.11 | 1.00x |  |  |
+| Lighting (specular, point, linear) | ssse3 | 2048x2048 | 113.825 | 36.85 | 0.29 | 2.67x | 🟢 |  |
+| Lighting (specular, point, linear) | avx2 | 2048x2048 | 105.977 | 39.58 | 0.32 | 2.86x | 🟢 |  |
+| Lighting (specular, spot) | kotlin | 512x512 | 17.558 | 14.93 | 0.12 | 1.12x | ⬆️ |  |
+| Lighting (specular, spot) | scalar | 512x512 | 19.629 | 13.35 | 0.11 | 1.00x |  |  |
+| Lighting (specular, spot) | ssse3 | 512x512 | 8.927 | 29.36 | 0.23 | 2.20x | 🟢 |  |
+| Lighting (specular, spot) | avx2 | 512x512 | 10.359 | 25.31 | 0.20 | 1.89x | 🟢 |  |
+| Lighting (specular, spot) | kotlin | 2048x2048 | 281.904 | 14.88 | 0.12 | 1.13x | ⬆️ |  |
+| Lighting (specular, spot) | scalar | 2048x2048 | 319.230 | 13.14 | 0.11 | 1.00x |  |  |
+| Lighting (specular, spot) | ssse3 | 2048x2048 | 139.447 | 30.08 | 0.24 | 2.29x | 🟢 |  |
+| Lighting (specular, spot) | avx2 | 2048x2048 | 158.062 | 26.54 | 0.21 | 2.02x | 🟢 |  |
+| Lighting (specular, spot, linear) | kotlin | 512x512 | 17.989 | 14.57 | 0.12 | 1.21x | ⬆️ |  |
+| Lighting (specular, spot, linear) | scalar | 512x512 | 21.803 | 12.02 | 0.10 | 1.00x |  |  |
+| Lighting (specular, spot, linear) | ssse3 | 512x512 | 10.464 | 25.05 | 0.20 | 2.08x | 🟢 |  |
+| Lighting (specular, spot, linear) | avx2 | 512x512 | 11.358 | 23.08 | 0.18 | 1.92x | 🟢 |  |
+| Lighting (specular, spot, linear) | kotlin | 2048x2048 | 309.415 | 13.56 | 0.11 | 1.27x | ⬆️ |  |
+| Lighting (specular, spot, linear) | scalar | 2048x2048 | 391.469 | 10.71 | 0.09 | 1.00x |  |  |
+| Lighting (specular, spot, linear) | ssse3 | 2048x2048 | 204.375 | 20.52 | 0.16 | 1.92x | 🟢 |  |
+| Lighting (specular, spot, linear) | avx2 | 2048x2048 | 157.963 | 26.55 | 0.21 | 2.48x | 🟢 |  |
+| Morphology (dilate, r=5) | kotlin | 512x512 | 10.852 | 24.16 | 0.19 | 2.76x | ⬆️ |  |
+| Morphology (dilate, r=5) | scalar | 512x512 | 29.993 | 8.74 | 0.07 | 1.00x |  |  |
+| Morphology (dilate, r=5) | sse2 | 512x512 | 2.660 | 98.56 | 0.79 | **11.28x** | 🚀 |  |
+| Morphology (dilate, r=5) | avx2 | 512x512 | 2.350 | 111.57 | 0.89 | **12.77x** | 🚀 |  |
+| Morphology (dilate, r=5) | kotlin | 2048x2048 | 184.449 | 22.74 | 0.18 | 3.18x | ⬆️ |  |
+| Morphology (dilate, r=5) | scalar | 2048x2048 | 586.341 | 7.15 | 0.06 | 1.00x |  |  |
+| Morphology (dilate, r=5) | sse2 | 2048x2048 | 27.107 | 154.73 | 1.24 | **21.63x** | 🚀 |  |
+| Morphology (dilate, r=5) | avx2 | 2048x2048 | 26.360 | 159.11 | 1.27 | **22.24x** | 🚀 |  |
+| Morphology (erode, r=1) | kotlin | 512x512 | 4.108 | 63.81 | 0.51 | 1.17x | ⬆️ |  |
+| Morphology (erode, r=1) | scalar | 512x512 | 4.804 | 54.57 | 0.44 | 1.00x |  |  |
+| Morphology (erode, r=1) | sse2 | 512x512 | 1.137 | 230.64 | 1.85 | 4.23x | 🟢 |  |
+| Morphology (erode, r=1) | avx2 | 512x512 | 1.358 | 193.03 | 1.54 | 3.54x | 🟢 |  |
+| Morphology (erode, r=1) | kotlin | 2048x2048 | 67.038 | 62.57 | 0.50 | 1.11x | ⬆️ |  |
+| Morphology (erode, r=1) | scalar | 2048x2048 | 74.127 | 56.58 | 0.45 | 1.00x |  |  |
+| Morphology (erode, r=1) | sse2 | 2048x2048 | 19.206 | 218.39 | 1.75 | 3.86x | 🟢 |  |
+| Morphology (erode, r=1) | avx2 | 2048x2048 | 22.151 | 189.35 | 1.51 | 3.35x | 🟢 |  |
+| Morphology (erode, r=5) | kotlin | 512x512 | 9.746 | 26.90 | 0.22 | 2.50x | ⬆️ |  |
+| Morphology (erode, r=5) | scalar | 512x512 | 24.378 | 10.75 | 0.09 | 1.00x |  |  |
+| Morphology (erode, r=5) | sse2 | 512x512 | 1.367 | 191.71 | 1.53 | **17.83x** | 🚀 |  |
+| Morphology (erode, r=5) | avx2 | 512x512 | 1.783 | 147.03 | 1.18 | **13.67x** | 🚀 |  |
+| Morphology (erode, r=5) | kotlin | 2048x2048 | 176.468 | 23.77 | 0.19 | 2.88x | ⬆️ |  |
+| Morphology (erode, r=5) | scalar | 2048x2048 | 508.319 | 8.25 | 0.07 | 1.00x |  |  |
+| Morphology (erode, r=5) | sse2 | 2048x2048 | 26.019 | 161.20 | 1.29 | **19.54x** | 🚀 |  |
+| Morphology (erode, r=5) | avx2 | 2048x2048 | 26.224 | 159.94 | 1.28 | **19.38x** | 🚀 |  |
+| Turbulence (turbulence, 1 oct) | kotlin | 512x512 | 21.148 | 12.40 | 0.05 | 0.76x |  |  |
+| Turbulence (turbulence, 1 oct) | scalar | 512x512 | 15.993 | 16.39 | 0.07 | 1.00x |  |  |
+| Turbulence (turbulence, 1 oct) | ssse3 | 512x512 | 11.376 | 23.04 | 0.09 | 1.41x | 🟢 |  |
+| Turbulence (turbulence, 1 oct) | avx2 | 512x512 | 7.913 | 33.13 | 0.13 | 2.02x | 🟢 |  |
+| Turbulence (turbulence, 1 oct) | kotlin | 2048x2048 | 332.323 | 12.62 | 0.05 | 0.78x |  |  |
+| Turbulence (turbulence, 1 oct) | scalar | 2048x2048 | 259.016 | 16.19 | 0.06 | 1.00x |  |  |
+| Turbulence (turbulence, 1 oct) | ssse3 | 2048x2048 | 183.870 | 22.81 | 0.09 | 1.41x | 🟢 |  |
+| Turbulence (turbulence, 1 oct) | avx2 | 2048x2048 | 126.561 | 33.14 | 0.13 | 2.05x | 🟢 |  |
+| UnLinearize | kotlin | 512x512 | 0.431 | 607.84 | 4.86 | 0.66x |  |  |
+| UnLinearize | scalar | 512x512 | 0.285 | 920.87 | 7.37 | 1.00x |  |  |
+| UnLinearize | ssse3 | 512x512 | 0.262 | 999.71 | 8.00 | 1.09x | 🟢 |  |
+| UnLinearize | avx2 | 512x512 | 0.290 | 905.03 | 7.24 | 0.98x | 🔴 |  |
+| UnLinearize | kotlin | 2048x2048 | 6.895 | 608.34 | 4.87 | 0.72x |  |  |
+| UnLinearize | scalar | 2048x2048 | 4.960 | 845.59 | 6.76 | 1.00x |  |  |
+| UnLinearize | ssse3 | 2048x2048 | 4.283 | 979.39 | 7.84 | 1.16x | 🟢 |  |
+| UnLinearize | avx2 | 2048x2048 | 4.890 | 857.77 | 6.86 | 1.01x | 🟢 |  |
 
 ## Host Results (x86-64, Android emulator)
 
