@@ -19,6 +19,7 @@
 .fpu neon
 .text
 .align 2
+#include "lighting_armv7a_pow_macros.S"
 .global ksvgLightingDistantSpecularRowNeon32
 .type ksvgLightingDistantSpecularRowNeon32, %function
 
@@ -304,64 +305,25 @@ ksvgLightingDistantSpecularRowNeon32:
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
     vst1.32 {q2}, [sp]           // stash ndoth at [sp,#0..#15]
+    // ---- 4-lane scalar VFP pow (no bl, invariants survive) ----
+    vldr    d1, [sp, #16]        // double exponent
+    vcvt.f32.f64 s1, d1          // s1 = exponent float
     vldr    s0, [sp, #0]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #0]
 
     vldr    s0, [sp, #4]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #4]
 
     vldr    s0, [sp, #8]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #8]
 
     vldr    s0, [sp, #12]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #12]
 
-    // ---- everything caller-saved died with pow; rebuild invariants ----
-    // h reload via GPR VDUP (no Qd/Dm overlap hazard, see prologue).
-    ldr     r12, [sp, #24]         // hx bits
-    vdup.32 q8, r12
-    ldr     r12, [sp, #28]         // hy bits
-    vdup.32 q9, r12
-    ldr     r12, [sp, #32]         // hz bits
-    vdup.32 q10, r12
-    // lr/lg/lb via d6/d7 (q3 is dead scratch post-pow: ndoth already lives
-    // on the stack, and the pack below rewrites q3 before reading it).
-    // d18/d19 MUST NOT be used here: they alias q9 and would destroy the
-    // just-reloaded hy needed by the next iteration's dot.
-    vldr    d6, [r5, #-8]        // lr | lg
-    vldr    d7, [r5, #0]         // lb | ss
-    vdup.32 q11, d6[0]           // lr
-    vdup.32 q12, d6[1]           // lg
-    vdup.32 q13, d7[0]           // lb
-    vmov.f32 q14, #1.0           // one
 
     // ---- intensity = clamp01(k * p) ----
     vld1.32 {q2}, [sp]           // q2 = p (in-place pow results)
@@ -698,64 +660,25 @@ ksvgLightingDistantSpecularRowNeon32Linear:
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
     vst1.32 {q2}, [sp]
+    // ---- 4-lane scalar VFP pow (no bl, invariants survive) ----
+    vldr    d1, [sp, #16]        // double exponent
+    vcvt.f32.f64 s1, d1          // s1 = exponent float
     vldr    s0, [sp, #0]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #0]
 
     vldr    s0, [sp, #4]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #4]
 
     vldr    s0, [sp, #8]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #8]
 
     vldr    s0, [sp, #12]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #12]
 
-    // ---- everything caller-saved died with pow; rebuild invariants ----
-    // h reload via GPR VDUP (no Qd/Dm overlap hazard, see prologue).
-    ldr     r12, [sp, #24]         // hx bits
-    vdup.32 q8, r12
-    ldr     r12, [sp, #28]         // hy bits
-    vdup.32 q9, r12
-    ldr     r12, [sp, #32]         // hz bits
-    vdup.32 q10, r12
-    // lr/lg/lb via d6/d7 (q3 is dead scratch post-pow: ndoth already lives
-    // on the stack, and the pack below rewrites q3 before reading it).
-    // d18/d19 MUST NOT be used here: they alias q9 and would destroy the
-    // just-reloaded hy needed by the next iteration's dot.
-    vldr    d6, [r5, #-8]        // lr | lg
-    vldr    d7, [r5, #0]         // lb | ss
-    vdup.32 q11, d6[0]           // lr
-    vdup.32 q12, d6[1]           // lg
-    vdup.32 q13, d7[0]           // lb
-    vmov.f32 q14, #1.0           // one
 
     // ---- intensity = clamp01(k * p) ----
     vld1.32 {q2}, [sp]

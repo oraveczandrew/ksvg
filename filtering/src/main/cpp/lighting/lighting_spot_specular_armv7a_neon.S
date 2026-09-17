@@ -19,6 +19,7 @@
 .fpu neon
 .text
 .align 2
+#include "lighting_armv7a_pow_macros.S"
 
 // Lane indices [0,1,2,3] for the per-pixel ux walk (integer, converted
 // with vcvt then scaled by dux). ADR-relative, stays in .text.
@@ -538,51 +539,29 @@ ksvgLightingSpotSpecularRowNeon32:
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
     vst1.32 {q2}, [sp]           // stash ndoth at [sp,#0..#15]
+    // ---- 4-lane scalar VFP pow (no bl, invariants survive) ----
+    vldr    d1, [sp, #16]        // double exponent
+    vcvt.f32.f64 s1, d1          // s1 = exponent float
     vldr    s0, [sp, #0]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #0]
 
     vldr    s0, [sp, #4]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #4]
 
     vldr    s0, [sp, #8]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #8]
 
     vldr    s0, [sp, #12]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #12]
 
-    // ---- everything caller-saved died with pow; rebuild invariants ----
-    // (q4-q7 survived in d8-d15 except q4/q5/q6 repurposed mid-loop —
-    // reloaded next iteration at loop top; k/lr/lg/lb/one rebuild here.)
+    // ---- rebuild regs repurposed mid-loop (no bl anymore, but q8/q11-q14
+    // do not survive the Sobel/normalize window).
     ldr     r12, [r5, #8]
-    vdup.32 q8, r12              // k (q8 = lx dead: reloaded per iter)
+    vdup.32 q8, r12              // k
     add     r12, r5, #24
     vld1.32 {d18, d19}, [r12]    // d18 = [lr, lg], d19 = [lb, ...]
     vdup.32 q11, d18[0]          // lr
@@ -590,7 +569,7 @@ ksvgLightingSpotSpecularRowNeon32:
     vdup.32 q13, d19[0]          // lb
     vmov.f32 q14, #1.0           // one
     add     r12, sp, #28
-    vld1.32 {q9}, [r12]          // cutoff vector (q9 scratch post-pow)
+    vld1.32 {q9}, [r12]          // cutoff vector (stack survives pow)
 
     // ---- intensity = clamp01(k * p * cutoff) ----
     vld1.32 {q2}, [sp]           // q2 = p (in-place pow results)
@@ -1157,51 +1136,29 @@ ksvgLightingSpotSpecularRowNeon32Linear:
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
     vst1.32 {q2}, [sp]           // stash ndoth at [sp,#0..#15]
+    // ---- 4-lane scalar VFP pow (no bl, invariants survive) ----
+    vldr    d1, [sp, #16]        // double exponent
+    vcvt.f32.f64 s1, d1          // s1 = exponent float
     vldr    s0, [sp, #0]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #0]
 
     vldr    s0, [sp, #4]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #4]
 
     vldr    s0, [sp, #8]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #8]
 
     vldr    s0, [sp, #12]
-    vcvt.f64.f32 d0, s0
-    vmov    r0, r1, d0
-    vldr    d1, [sp, #16]        // Read double exponent
-    vmov    r2, r3, d1
-    bl      pow
-    vmov    d0, r0, r1
-    vcvt.f32.f64 s0, d0
+    POW1_VFP
     vstr    s0, [sp, #12]
 
-    // ---- everything caller-saved died with pow; rebuild invariants ----
-    // (q4-q7 survived in d8-d15 except q4/q5/q6 repurposed mid-loop —
-    // reloaded next iteration at loop top; k/lr/lg/lb/one rebuild here.)
+    // ---- rebuild regs repurposed mid-loop (no bl anymore, but q8/q11-q14
+    // do not survive the Sobel/normalize window).
     ldr     r12, [r5, #8]
-    vdup.32 q8, r12              // k (q8 = lx dead: reloaded per iter)
+    vdup.32 q8, r12              // k
     add     r12, r5, #24
     vld1.32 {d18, d19}, [r12]    // d18 = [lr, lg], d19 = [lb, ...]
     vdup.32 q11, d18[0]          // lr
@@ -1209,7 +1166,7 @@ ksvgLightingSpotSpecularRowNeon32Linear:
     vdup.32 q13, d19[0]          // lb
     vmov.f32 q14, #1.0           // one
     add     r12, sp, #28
-    vld1.32 {q9}, [r12]          // cutoff vector (q9 scratch post-pow)
+    vld1.32 {q9}, [r12]          // cutoff vector (stack survives pow)
 
     // ---- intensity = clamp01(k * p * cutoff) ----
     vld1.32 {q2}, [sp]           // q2 = p (in-place pow results)

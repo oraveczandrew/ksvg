@@ -213,9 +213,9 @@ ksvgLightingSpotSpecularRowNeon64:
 
     // Loop-invariant params/helpers for the whole row (nothing in the sRGB
     // loop body clobbers them; the linear variant reloads per iteration
-    // because its L2S LUT loads clobber v16-v31).
+    // because its L2S LUT loads clobber v16-v31). NOTE: v30 = dux here;
+    // the 0xff alpha mask is set after each pow block, where dux is dead.
     LOAD_PARAMS_PT
-    movi    v30.4s, #0xff       // 0x000000ff byte mask for the alpha max
 
     b       .Lloop8
 
@@ -493,6 +493,7 @@ ksvgLightingSpotSpecularRowNeon64:
     dup     v0.4s, v0.s[0]      // y = exponent broadcast
     POW4_NEON v3, v0
     POW4_NEON v1, v0
+    movi    v30.4s, #0xff       // 0x000000ff byte mask (dux dead past pow)
 
     // ------------------------- PACK A (p in v3) -------------
     fmul    v3.4s, v3.4s, v18.4s     // k * p
@@ -565,7 +566,10 @@ ksvgLightingSpotSpecularRowNeon64:
     b       .Ldone
 
 .Ltail4:
-    // Params/helpers still live from the prologue hoist.
+    // Params/helpers still live from the prologue hoist — except v30 = dux,
+    // killed by the loop's post-pow mask setup; reload for the tail ux walk
+    // (runs at most once per row).
+    LOAD_PARAMS_PT
     // v6 = 2.0 weights the middle tap (v15 stays uy, v30 stays dux).
     fmov    v6.4s, #2.0
 
@@ -695,6 +699,7 @@ ksvgLightingSpotSpecularRowNeon64:
     fcvt    s0, d0
     dup     v0.4s, v0.s[0]      // y = exponent broadcast
     POW4_NEON v2, v0
+    movi    v30.4s, #0xff       // 0x000000ff byte mask (dux dead past pow)
 
     fmul    v3.4s, v2.4s, v18.4s     // k * p
     ldr     q10, [sp, #256]         // cutoffA (stashed pre-pow)
@@ -1046,6 +1051,7 @@ ksvgLightingSpotSpecularRowNeon64Linear:
     dup     v0.4s, v0.s[0]      // y = exponent broadcast
     POW4_NEON v3, v0
     POW4_NEON v1, v0
+    movi    v30.4s, #0xff       // 0x000000ff byte mask (dux dead past pow)
 
     // ------------------- PACK A (linear, alpha = max(Rlin,Glin,Blin)) ----
     fmul    v3.4s, v3.4s, v18.4s     // k * p
@@ -1262,6 +1268,7 @@ ksvgLightingSpotSpecularRowNeon64Linear:
     fcvt    s0, d0
     dup     v0.4s, v0.s[0]      // y = exponent broadcast
     POW4_NEON v2, v0
+    movi    v30.4s, #0xff       // 0x000000ff byte mask (dux dead past pow)
 
     fmul    v3.4s, v2.4s, v18.4s     // k * p
     ldr     q10, [sp, #256]         // cutoffA (stashed pre-pow)
