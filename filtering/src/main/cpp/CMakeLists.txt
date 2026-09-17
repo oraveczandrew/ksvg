@@ -19,6 +19,7 @@ if (ANDROID_ABI STREQUAL "arm64-v8a")
     set(LIGHTING_SOURCES
             lighting/lighting_distant_diffuse_aarch64_neon.S
             lighting/lighting_distant_specular_aarch64_neon.S
+            lighting/lighting_point_diffuse_aarch64_neon.S
     )
     set(DISPLACEMENT_MAP_SOURCES displacement_map/displacement_map_arm64_neon64.S)
 endif ()

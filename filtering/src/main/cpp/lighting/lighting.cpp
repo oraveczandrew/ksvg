@@ -36,6 +36,14 @@ extern "C" void ksvgLightingDistantSpecularRowNeon64Linear(
     const jint* srcT, const jint* srcM, const jint* srcB,
     jint* dst, jint count, const LightingParams* params,
     float exponent, const uint8_t* linearToSrgb);
+// Hand-written AArch64/AdvSIMD point-light diffuse kernel (lighting_point_diffuse_aarch64_neon.S).
+extern "C" void ksvgLightingPointDiffuseRowNeon64(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const PointLightingParams* params);
+extern "C" void ksvgLightingPointDiffuseRowNeon64Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const PointLightingParams* params,
+    const uint8_t* linearToSrgb);
 #elif defined(__arm__)
 // Hand-written ARM32/AdvSIMD distant-light diffuse kernel (lighting_distant_diffuse_armv7a_neon.S).
 extern "C" void ksvgLightingDistantDiffuseRowNeon32(
@@ -658,6 +666,21 @@ void applyVector(
                     }
                     default:
                         break;
+                }
+#elif defined(__aarch64__)
+                // Point-specular stays on the scalar fallback until its
+                // NEON kernel lands (kernels 4-5); only diffuse is wired.
+                if (!isSpecular) {
+                    assert(backend == SIMD_BACKEND_NEON64);
+                    const jint c4 = (ixHi - x) & ~3;
+                    if (c4 > 0) {
+                        if (useLinear) {
+                            ksvgLightingPointDiffuseRowNeon64Linear(srcT, srcM, srcB, rowOut, c4, &plp, ksvg_linear_to_srgb_lut);
+                        } else {
+                            ksvgLightingPointDiffuseRowNeon64(srcT, srcM, srcB, rowOut, c4, &plp);
+                        }
+                        x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
+                    }
                 }
 #endif
             }
