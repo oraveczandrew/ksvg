@@ -136,14 +136,14 @@ Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
 | Lighting (specular, distant) | scalar | 2048x2048 | 285.099 | 14.71 | 0.12 | 1.00x |  |  |
 | Lighting (specular, distant) | ssse3 | 2048x2048 | 138.699 | 30.24 | 0.24 | 2.06x | 🟢 |  |
 | Lighting (specular, distant) | avx2 | 2048x2048 | 120.949 | 34.68 | 0.28 | 2.36x | 🟢 |  |
-| Lighting (specular, distant, linear) | kotlin | 512x512 | 15.378 | 17.05 | 0.14 | 1.18x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 512x512 | 18.126 | 14.46 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | ssse3 | 512x512 | 9.787 | 26.78 | 0.21 | 1.85x | 🟢 |  |
-| Lighting (specular, distant, linear) | avx2 | 512x512 | 11.223 | 23.36 | 0.19 | 1.62x | 🟢 |  |
-| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 246.370 | 17.02 | 0.14 | 1.17x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 2048x2048 | 288.494 | 14.54 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | ssse3 | 2048x2048 | 155.308 | 27.01 | 0.22 | 1.86x | 🟢 |  |
-| Lighting (specular, distant, linear) | avx2 | 2048x2048 | 176.552 | 23.76 | 0.19 | 1.63x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 512x512 | 15.158 | 17.30 | 0.14 | 1.18x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 512x512 | 17.919 | 14.63 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | ssse3 | 512x512 | 10.325 | 25.39 | 0.20 | 1.74x | 🟢 |  |
+| Lighting (specular, distant, linear) | avx2 | 512x512 | 7.581 | 34.58 | 0.28 | 2.36x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 242.020 | 17.33 | 0.14 | 1.18x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 2048x2048 | 286.693 | 14.63 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | ssse3 | 2048x2048 | 161.141 | 26.02 | 0.21 | 1.78x | 🟢 |  |
+| Lighting (specular, distant, linear) | avx2 | 2048x2048 | 117.047 | 35.83 | 0.29 | 2.45x | 🟢 |  |
 | Lighting (specular, point) | kotlin | 512x512 | 19.326 | 13.56 | 0.11 | 1.00x |  |  |
 | Lighting (specular, point) | scalar | 512x512 | 19.281 | 13.60 | 0.11 | 1.00x |  |  |
 | Lighting (specular, point) | ssse3 | 512x512 | 7.602 | 34.48 | 0.28 | 2.54x | 🟢 |  |
