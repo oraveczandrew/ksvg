@@ -209,102 +209,60 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vmulps       128(%rsp), %ymm1, %ymm1  # 32-byte Folded Reload
     vaddps       %ymm0, %ymm1, %ymm0
     vmaxps       %ymm5, %ymm0, %ymm0
-    vmovaps      %ymm0, 64(%rsp)
-    xorl         %r14d, %r14d
-    jmp          .LBB1_3
-.LBB1_18:  #   in Loop: Header=BB1_3 Depth=2
-    // Max-channel pack + store (alpha = max(R, G, B)).
-    cmpl         %edx, %eax
-    movl         %edx, %eax
-    cmovgl       %ecx, %eax
-    cmpl         %esi, %eax
-    cmovbel      %esi, %eax
-    shll         $24, %eax
-    shll         $16, %ecx
-    shll         $8, %edx
-    orl          %ecx, %edx
-    orl          %esi, %edx
-    orl          %eax, %edx
-    movl         %edx, (%r15,%r14,4)
-    incq         %r14
-    cmpq         $8, %r14
-    je           .LBB1_19
-.LBB1_3:  #   Parent Loop BB1_2 Depth=1
-# =>  This Inner Loop Header: Depth=2
-    // Per-pixel specular: p = pow(ndoth, exp), intensity = k * p clamped to
-    // [0, 1], then R/G/B = intensity * lr/lg/lb (round-half-up + truncate).
-    vmovss       64(%rsp,%r14,4), %xmm0  # xmm0 = mem[0],zero,zero,zero
-    vmovss       56(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    vzeroupper
-    CALL(powf)
-    vmulss       8(%rbx), %xmm0, %xmm1
-    vxorps       %xmm0, %xmm0, %xmm0
-    vucomiss     %xmm1, %xmm0
-    ja           .LBB1_6
-# %bb.4:                                #   in Loop: Header=BB1_3 Depth=2
-    vucomiss     .LCPI1_0(%rip), %xmm1
-    vmovaps      %xmm1, %xmm0
-    jbe          .LBB1_6
-# %bb.5:                                #   in Loop: Header=BB1_3 Depth=2
-    vmovss       .LCPI1_0(%rip), %xmm0  # xmm0 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-.LBB1_6:  #   in Loop: Header=BB1_3 Depth=2
-    vmulss       24(%rbx), %xmm0, %xmm1
-    vroundss     $11, %xmm1, %xmm1, %xmm1
-    vcvttss2si   %xmm1, %eax
-    vmulss       28(%rbx), %xmm0, %xmm1
-    vmulss       32(%rbx), %xmm0, %xmm0
-    cmpl         $255, %eax
-    jge          .LBB1_7
-# %bb.8:                                #   in Loop: Header=BB1_3 Depth=2
-    movl         %eax, %ecx
-    testl        %eax, %eax
-    jle          .LBB1_9
-.LBB1_10:  #   in Loop: Header=BB1_3 Depth=2
-    vroundss     $11, %xmm1, %xmm1, %xmm1
-    vcvttss2si   %xmm1, %edx
-    cmpl         $255, %edx
-    jge          .LBB1_11
-.LBB1_12:  #   in Loop: Header=BB1_3 Depth=2
-    testl        %edx, %edx
-    jle          .LBB1_13
-.LBB1_14:  #   in Loop: Header=BB1_3 Depth=2
-    vroundss     $11, %xmm0, %xmm0, %xmm0
-    vcvttss2si   %xmm0, %esi
-    cmpl         $255, %esi
-    jge          .LBB1_15
-.LBB1_16:  #   in Loop: Header=BB1_3 Depth=2
-    testl        %esi, %esi
-    jg           .LBB1_18
-    jmp          .LBB1_17
-.LBB1_7:  #   in Loop: Header=BB1_3 Depth=2
-    movl         $255, %eax
-    movl         %eax, %ecx
-    testl        %eax, %eax
-    jg           .LBB1_10
-.LBB1_9:  #   in Loop: Header=BB1_3 Depth=2
-    xorl         %ecx, %ecx
-    vroundss     $11, %xmm1, %xmm1, %xmm1
-    vcvttss2si   %xmm1, %edx
-    cmpl         $255, %edx
-    jl           .LBB1_12
-.LBB1_11:  #   in Loop: Header=BB1_3 Depth=2
-    movl         $255, %edx
-    testl        %edx, %edx
-    jg           .LBB1_14
-.LBB1_13:  #   in Loop: Header=BB1_3 Depth=2
-    xorl         %edx, %edx
-    vroundss     $11, %xmm0, %xmm0, %xmm0
-    vcvttss2si   %xmm0, %esi
-    cmpl         $255, %esi
-    jl           .LBB1_16
-.LBB1_15:  #   in Loop: Header=BB1_3 Depth=2
-    movl         $255, %esi
-    testl        %esi, %esi
-    jg           .LBB1_18
-.LBB1_17:  #   in Loop: Header=BB1_3 Depth=2
-    xorl         %esi, %esi
-    jmp          .LBB1_18
+
+    // Full SIMD Specular Path (Fast Approximation)
+    vbroadcastss 56(%rsp), %ymm1 # exponent
+    POW8_AVX2 %ymm0, %ymm1
+
+    // intensity = k * p clamped to [0, 1]
+    vbroadcastss 8(%rbx), %ymm1 # k
+    vmulps    %ymm1, %ymm0, %ymm0
+    vxorps    %ymm1, %ymm1, %ymm1
+    vmaxps    %ymm1, %ymm0, %ymm0
+    vbroadcastss .LCPI1_0(%rip), %ymm1 # 1.0f
+    vminps    %ymm1, %ymm0, %ymm0
+
+    // R/G/B = intensity * lr/lg/lb
+    vbroadcastss 24(%rbx), %ymm1 # lr
+    vmulps    %ymm0, %ymm1, %ymm1
+    vbroadcastss 28(%rbx), %ymm2 # lg
+    vmulps    %ymm0, %ymm2, %ymm2
+    vbroadcastss 32(%rbx), %ymm3 # lb
+    vmulps    %ymm0, %ymm3, %ymm3
+
+    // Round-half-up and clamp to [0, 255]
+    vbroadcastss .Lhalf(%rip), %ymm4
+    vaddps    %ymm4, %ymm1, %ymm1
+    vaddps    %ymm4, %ymm2, %ymm2
+    vaddps    %ymm4, %ymm3, %ymm3
+
+    vcvttps2dq %ymm1, %ymm1
+    vcvttps2dq %ymm2, %ymm2
+    vcvttps2dq %ymm3, %ymm3
+
+    vpxor     %xmm4, %xmm4, %xmm4
+    vpmaxsd   %ymm4, %ymm1, %ymm1
+    vpmaxsd   %ymm4, %ymm2, %ymm2
+    vpmaxsd   %ymm4, %ymm3, %ymm3
+    vmovdqa   .L255_epi32(%rip), %ymm4
+    vpminsd   %ymm4, %ymm1, %ymm1
+    vpminsd   %ymm4, %ymm2, %ymm2
+    vpminsd   %ymm4, %ymm3, %ymm3
+
+    // Alpha = max(R, G, B)
+    vpmaxsd   %ymm1, %ymm2, %ymm4
+    vpmaxsd   %ymm4, %ymm3, %ymm4
+
+    // Pack: (A << 24) | (R << 16) | (G << 8) | B
+    vpslld    $24, %ymm4, %ymm4
+    vpslld    $16, %ymm1, %ymm1
+    vpslld    $8, %ymm2, %ymm2
+    vpor      %ymm4, %ymm1, %ymm1
+    vpor      %ymm2, %ymm3, %ymm2
+    vpor      %ymm1, %ymm2, %ymm1
+
+    vmovdqu   %ymm1, (%r15)
+    jmp          .LBB1_19
 .LBB1_20:
     leaq         -40(%rbp), %rsp
     popq         %rbx
@@ -443,9 +401,53 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vmulps       128(%rsp), %ymm1, %ymm1  # 32-byte Folded Reload
     vaddps       %ymm0, %ymm1, %ymm0
     vmaxps       %ymm5, %ymm0, %ymm0
-    vmovaps      %ymm0, 64(%rsp)
-    xorl         %r14d, %r14d
-    jmp          .LBS1_3
+
+    // Full SIMD Specular Path (Fast Approximation) - Linear
+    vbroadcastss 56(%rsp), %ymm1 # exponent
+    POW8_AVX2 %ymm0, %ymm1
+
+    // intensity = k * p clamped to [0, 1]
+    vbroadcastss 8(%rbx), %ymm1 # k
+    vmulps    %ymm1, %ymm0, %ymm0
+    vxorps    %ymm1, %ymm1, %ymm1
+    vmaxps    %ymm1, %ymm0, %ymm0
+    vbroadcastss .LCPI1_0(%rip), %ymm1 # 1.0f
+    vminps    %ymm1, %ymm0, %ymm0
+
+    // R/G/B = intensity * lr/lg/lb (Linear Light)
+    vbroadcastss 24(%rbx), %ymm1 # lr
+    vmulps    %ymm0, %ymm1, %ymm1
+    vbroadcastss 28(%rbx), %ymm2 # lg
+    vmulps    %ymm0, %ymm2, %ymm2
+    vbroadcastss 32(%rbx), %ymm3 # lb
+    vmulps    %ymm0, %ymm3, %ymm3
+
+    // Round-half-up and clamp to [0, 255]
+    vbroadcastss .Lhalf(%rip), %ymm4
+    vaddps    %ymm4, %ymm1, %ymm1
+    vaddps    %ymm4, %ymm2, %ymm2
+    vaddps    %ymm4, %ymm3, %ymm3
+
+    vcvttps2dq %ymm1, %ymm1
+    vcvttps2dq %ymm2, %ymm2
+    vcvttps2dq %ymm3, %ymm3
+
+    vpxor     %xmm4, %xmm4, %xmm4
+    vpmaxsd   %ymm4, %ymm1, %ymm1
+    vpmaxsd   %ymm4, %ymm2, %ymm2
+    vpmaxsd   %ymm4, %ymm3, %ymm3
+    vmovdqa   .L255_epi32(%rip), %ymm4
+    vpminsd   %ymm4, %ymm1, %ymm1
+    vpminsd   %ymm4, %ymm2, %ymm2
+    vpminsd   %ymm4, %ymm3, %ymm3
+
+    // Pack Linear bytes: (R << 16) | (G << 8) | B
+    vpslld    $16, %ymm1, %ymm1
+    vpslld    $8, %ymm2, %ymm2
+    vpor      %ymm1, %ymm2, %ymm1
+    vpor      %ymm1, %ymm3, %ymm1
+    vmovdqu   %ymm1, 256(%rsp)
+    jmp          .LBS1_21
 
 /* One 4-pixel linear->sRGB lane (in xmm0, out packed sRGB in xmm1, scratch
  * xmm2-xmm7). Straight VEX transliteration of the proven SSSE3 block:
@@ -520,12 +522,11 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vpand        .Lvec_l2s_rgb_mask(%rip), %xmm1, %xmm1
     vpor         %xmm2, %xmm1, %xmm1
 .endm
+
 .LBS1_21:
     // Vector linear->sRGB for the completed 8-pixel block: two SSSE3-style
     // 4-pixel lanes via vpshufb (same amortized tables as L2S1, same bytes),
     // then max-channel pack (alpha = max(R,G,B)) + 32-byte store.
-    // Fixes the old per-pixel tail, which packed the unconverted linear red
-    // and swapped G/B (invisible on white light only).
     vmovdqu      256(%rsp), %ymm0
     vextracti128 $1, %ymm0, %xmm1
     vmovdqa      %xmm1, 304(%rsp)  # park lane1 input
@@ -537,64 +538,6 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vinserti128  $1, %xmm1, %ymm0, %ymm0
     vmovdqu      %ymm0, (%r15)
     jmp          .LBS1_19
-.LBS1_3:  #   Parent Loop BB1_2 Depth=1
-# =>  This Inner Loop Header: Depth=2
-    // Per-pixel specular: p = pow(ndoth, exp), intensity = k * p clamped to
-    // [0, 1], then R/G/B = intensity * lr/lg/lb (round-half-up).
-    vmovss       64(%rsp,%r14,4), %xmm0  # xmm0 = mem[0],zero,zero,zero
-    vmovss       56(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    vzeroupper
-    CALL(powf)
-    vmulss       8(%rbx), %xmm0, %xmm1
-    vxorps       %xmm0, %xmm0, %xmm0
-    vucomiss     %xmm1, %xmm0
-    ja           .LBS1_6
-# %bb.4:                                #   in Loop: Header=BB1_3 Depth=2
-    vucomiss     .LCPI1_0(%rip), %xmm1
-    vmovaps      %xmm1, %xmm0
-    jbe          .LBS1_6
-# %bb.5:                                #   in Loop: Header=BB1_3 Depth=2
-    vmovss       .LCPI1_0(%rip), %xmm0  # xmm0 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-.LBS1_6:  #   in Loop: Header=BB1_3 Depth=2
-    // Round-half-up intensity*lrgb (matches scalar floor(v+0.5f) and the
-    // diffuse kernels), branchless clamp to [0,255], pack linear bytes to
-    // the 8-pixel scratch row at 256(%rsp). The vector block at .LBS1_21
-    // converts and stores them.
-    // NOTE: r10d/ecx are reloaded here (not hoisted): CALL(powf) clobbers
-    // all caller-saved registers every pixel.
-    movl         $255, %r10d
-    xorl         %ecx, %ecx
-    vmulss       24(%rbx), %xmm0, %xmm1
-    vaddss       .Lhalf(%rip), %xmm1, %xmm1
-    vcvttss2si   %xmm1, %eax
-    vmulss       28(%rbx), %xmm0, %xmm1
-    vmulss       32(%rbx), %xmm0, %xmm0
-    cmpl         $255, %eax
-    cmovgl       %r10d, %eax
-    testl        %eax, %eax
-    cmovs        %ecx, %eax
-    vaddss       .Lhalf(%rip), %xmm1, %xmm1
-    vcvttss2si   %xmm1, %edx
-    cmpl         $255, %edx
-    cmovgl       %r10d, %edx
-    testl        %edx, %edx
-    cmovs        %ecx, %edx
-    vaddss       .Lhalf(%rip), %xmm0, %xmm0
-    vcvttss2si   %xmm0, %esi
-    cmpl         $255, %esi
-    cmovgl       %r10d, %esi
-    testl        %esi, %esi
-    cmovs        %ecx, %esi
-    shll         $16, %eax
-    shll         $8, %edx
-    orl          %eax, %edx
-    orl          %esi, %edx
-    movl         %edx, 256(%rsp,%r14,4)
-    incq         %r14
-    cmpq         $8, %r14
-    je           .LBS1_21
-    jmp          .LBS1_3
 .LBS1_20:
     leaq         -40(%rbp), %rsp
     popq         %rbx
@@ -644,14 +587,14 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 .long 0x000000ff,0x000000ff,0x000000ff,0x000000ff
 .Lvec_l2s_rgb_mask:
 .long 0x00ffffff,0x00ffffff,0x00ffffff,0x00ffffff
+RODATA
+.p2align 5
 .Lhalf:
 .long 0x3f000000  # 0.5f round-half-up bias (matches scalar floor(v+0.5f))
 
 EMIT_LOG2_POLY_8
 EMIT_EXP2_POLY_8
 EMIT_POW_COMMON_CONSTANTS
-
-RODATA
 .p2align 4
 .LCPI1_0:
 .long	0x3f800000

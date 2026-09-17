@@ -83,6 +83,99 @@
     vmulps    \scale, \ch, \dst
 .endm
 
+/*
+ * Description:
+ *   One Horner step: acc = f * acc + coeff, with the scalar coefficient
+ *   broadcast to all lanes first.
+ *
+ *   WARNING: never fold the broadcast into the FMA memory operand
+ *   (vfmadd213ps mem, %ymm, %ymm). VEX.256 FMA has no broadcast semantics
+ *   (broadcast is EVEX-only); the mem operand is a full m256, so lanes 1-7
+ *   would silently consume neighboring table words. Lane 0 would stay
+ *   correct by accident, hiding the bug from narrow tests.
+ *
+ * Clobbers:
+ *   %ymm9 (broadcast scratch), \acc
+ */
+.macro POW8_FMA_STEP coeff, f, acc
+    vbroadcastss \coeff, %ymm9
+    vfmadd213ps %ymm9, \f, \acc
+.endm
+
+/*
+ * Description:
+ *   High-precision SIMD approximation of pow(x, y) = 2^(y * log2(x)).
+ *   Optimized for x in [0, 1] (dot products) and positive y (exponents).
+ *
+ * Inputs:
+ *   \x    = YMM register with base values (destroyed)
+ *   \y    = YMM register with exponents (preserved)
+ *
+ * Output:
+ *   \x    = Result of pow(\x, \y)
+ *
+ * Clobbers:
+ *   \x, %ymm9-%ymm15
+ *
+ *   %ymm9 is the Horner broadcast scratch: callers must have no live values
+ *   in %ymm9 across the macro (the lighting row kernels keep pixels in
+ *   %ymm0-%ymm8, so %ymm9 is free).
+ */
+.macro POW8_AVX2 x, y
+    vmovaps   .Lbiased_127(%rip), %ymm15
+    vmovaps   .Lmantissa_mask(%rip), %ymm14
+    vmovaps   .Lfloat_1_bits(%rip), %ymm13
+
+    # 1. log2(x) range reduction
+    # e = (bits >> 23) - 127; m = (bits & mask) | 1.0f
+    vpsrad    $23, \x, %ymm12            # Get biased exponent
+    vpsubd    %ymm15, %ymm12, %ymm12     # e = biased - 127
+    vcvtdq2ps %ymm12, %ymm12             # e_float
+
+    vpand     %ymm14, \x, %ymm11         # Get mantissa bits
+    vpor      %ymm13, %ymm11, %ymm11      # m in [1, 2)
+    vsubps    %ymm13, %ymm11, %ymm11      # f = m - 1.0 (in [0, 1))
+
+    # 2. Horner's method for P_log(f) ≈ log2(1+f)
+    vbroadcastss .Lpoly_log2+0(%rip), %ymm10 # c8
+    POW8_FMA_STEP .Lpoly_log2+4(%rip), %ymm11, %ymm10 # c8*f + c7
+    POW8_FMA_STEP .Lpoly_log2+8(%rip), %ymm11, %ymm10 # .. + c6
+    POW8_FMA_STEP .Lpoly_log2+12(%rip), %ymm11, %ymm10
+    POW8_FMA_STEP .Lpoly_log2+16(%rip), %ymm11, %ymm10
+    POW8_FMA_STEP .Lpoly_log2+20(%rip), %ymm11, %ymm10
+    POW8_FMA_STEP .Lpoly_log2+24(%rip), %ymm11, %ymm10
+    POW8_FMA_STEP .Lpoly_log2+28(%rip), %ymm11, %ymm10
+    POW8_FMA_STEP .Lpoly_log2+32(%rip), %ymm11, %ymm10 # .. + c0
+
+    vaddps    %ymm10, %ymm12, %ymm12     # log2(x) = e + P_log(f)
+
+    # 3. t = y * log2(x)
+    vmulps    \y, %ymm12, %ymm12          # t = y * log2(x)
+
+    # 4. exp2(t) range reduction
+    # t = t_i + t_f; t_i = floor(t); t_f = t - t_i
+    vroundps  $1, %ymm12, %ymm11         # t_i = floor(t)
+    vsubps    %ymm11, %ymm12, %ymm12      # t_f = t - t_i (in [0, 1))
+
+    # 5. Horner's method for P_exp(t_f) ≈ 2^t_f
+    vbroadcastss .Lpoly_exp2+0(%rip), %ymm10 # c8
+    POW8_FMA_STEP .Lpoly_exp2+4(%rip), %ymm12, %ymm10 # c8*t_f + c7
+    POW8_FMA_STEP .Lpoly_exp2+8(%rip), %ymm12, %ymm10
+    POW8_FMA_STEP .Lpoly_exp2+12(%rip), %ymm12, %ymm10
+    POW8_FMA_STEP .Lpoly_exp2+16(%rip), %ymm12, %ymm10
+    POW8_FMA_STEP .Lpoly_exp2+20(%rip), %ymm12, %ymm10
+    POW8_FMA_STEP .Lpoly_exp2+24(%rip), %ymm12, %ymm10
+    POW8_FMA_STEP .Lpoly_exp2+28(%rip), %ymm12, %ymm10
+    POW8_FMA_STEP .Lpoly_exp2+32(%rip), %ymm12, %ymm10 # .. + c0
+
+    # 6. Final scale by 2^t_i
+    vcvtps2dq %ymm11, %ymm11              # t_i_int
+    vpaddd    %ymm15, %ymm11, %ymm11      # biased_t_i = t_i + 127
+    vpmaxsd   .Lmin_exp_biased(%rip), %ymm11, %ymm11 # clamp to 0 (handle underflow)
+    vpslld    $23, %ymm11, %ymm11         # shift to exponent field
+    vmulps    %ymm10, %ymm11, \x          # Result = 2^t_f * 2^t_i
+.endm
+
 RODATA
 .p2align 5
 .Lspot_l2s_data:
