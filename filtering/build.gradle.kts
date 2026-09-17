@@ -156,7 +156,8 @@ tasks.matching { it.name == "connectedDebugAndroidTest" }
  * Device kernel benchmark wrapper.
  *
  * Runs the instrumented `KernelPerformanceDeviceBenchmark` on the connected
- * device, pulls the generated CSV files into `<repo>/tmp/`, and dumps them as
+ * device, pulls the generated CSV files into `<repo>/tmp/device-bench-<abi>/` (e.g.
+ * `tmp/device-bench-arm64-v8a/`, `tmp/device-bench-armeabi-v7a/`), and dumps them as
  * a Markdown table to the terminal.
  *
  * The benchmark reads a `kernel` (kernel name filter), `config` (config-name
@@ -209,7 +210,7 @@ tasks.matching { it.name == "connectedDebugAndroidTest" }
  */
 val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
     group = "verification"
-    description = "Runs the device kernel benchmark, pulls the CSV results into tmp/, and prints them as a flat table."
+    description = "Runs the device kernel benchmark, pulls the CSV results into tmp/device-bench-<abi>/, and prints them as a flat table."
 
     // Instrumentation arguments are forwarded the AGP-native way, on the
     // command line, e.g.:
@@ -226,28 +227,43 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
     dependsOn(uninstallBenchmarkApk, tasks.named("connectedDebugAndroidTest"))
 
     doLast {
-        // Clear previous results from the host's tmp directory so the Markdown
-        // report only reflects the current run.
-        if (tmpDir.exists()) {
-            tmpDir.listFiles { _, name ->
-                ((name.startsWith("benchmarks_device") || name.startsWith("benchmarks_harness_detail")) &&
-                    name.endsWith(".csv")) ||
-                    name.startsWith("simpleperf_benchmark")
-            }?.forEach { it.delete() }
-        }
-        tmpDir.mkdirs()
-
-        // The instrumented run leaves the adb server in a stale state that can
-        // return "error: device '' not found" for a freshly-spawned adb client.
-        // Restart the server, wait for the USB device to come back, then target
-        // its serial explicitly with -s for both the find and the pull.
+        // Clear previous results from the host's ABI result directory so the
+        // Markdown report only reflects the current run.
+        // The ABI is the one the benchmark process actually ran as: the
+        // installed test package's primary ABI. This covers both the default
+        // install (device primary ABI) and a 32-bit-only APK built with
+        // -PfilterAbis=armeabi-v7a. Falls back to the device primary ABI when
+        // the package dump is unavailable.
         val serial = Adb.waitForDevice(adb, maxAttempts = 10)
         if (serial == null) {
             logger.warn("runDeviceBenchmark: no adb device available after server restart (connect one and re-run)")
             return@doLast
         }
+        val abi = Adb.run(adb, "-s", serial, "shell", "pm", "dump", "hu.oandras.filtering.test")
+            .outputLineSequence()
+            .firstOrNull { it.startsWith("primaryCpuAbi=") }
+            ?.substringAfter("=")
+            ?.takeIf { it.isNotEmpty() && it != "null" }
+            ?: Adb.run(adb, "-s", serial, "shell", "getprop", "ro.product.cpu.abi")
+                .outputLineSequence()
+                .firstOrNull { it.isNotEmpty() }
+            ?: "unknown"
+        val abiDir: File = tmpDir.resolve("device-bench-$abi")
+        if (abiDir.exists()) {
+            abiDir.listFiles { _, name ->
+                ((name.startsWith("benchmarks_device") || name.startsWith("benchmarks_harness_detail")) &&
+                    name.endsWith(".csv")) ||
+                    name.startsWith("simpleperf_benchmark")
+            }?.forEach { it.delete() }
+        }
+        abiDir.mkdirs()
 
-        // Locate every benchmark CSV the run left behind and pull it into tmp/.
+        // The instrumented run leaves the adb server in a stale state that can
+        // return "error: device '' not found" for a freshly-spawned adb client;
+        // the server restart above (Adb.waitForDevice) already handled that, so
+        // target the resolved serial explicitly with -s for both find and pull.
+
+        // Locate every benchmark CSV the run left behind and pull it into tmp/device-bench-<abi>/.
         // The benchmark writes to Context.externalCacheDir, i.e. the canonical
         // /storage/emulated/0/Android/data/<pkg>/cache/ path. adb pull needs that
         // exact path, not the /sdcard symlink. `find` also prints "find: <path>:
@@ -256,13 +272,12 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
         val remote = Adb.run(
             adb, "-s", serial, "shell", "find", "/storage/emulated/0/Android/data",
             "-name", "benchmarks_device*.csv", "-type", "f",
-        ).output
+        )
         val pulled = mutableListOf<File>()
-        remote.lineSequence()
-            .map { it.trim() }
+        remote.outputLineSequence()
             .filter { it.startsWith("/storage/emulated/0/Android/data/") && it.endsWith(".csv") }
             .forEach { path ->
-                val dest = tmpDir.resolve(path.substringAfterLast('/'))
+                val dest = abiDir.resolve(path.substringAfterLast('/'))
                 val pull = Adb.run(adb, "-s", serial, "pull", path, dest.absolutePath).output
                 if ("1 file pulled" in pull || dest.exists()) {
                     pulled.add(dest)
@@ -282,26 +297,25 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
         val profileRemote = Adb.run(
             adb, "-s", serial, "shell", "find", "/storage/emulated/0/Android/data",
             "-name", "simpleperf_benchmark_*.csv", "-type", "f",
-        ).output
+        )
         val pulledProfiles = mutableListOf<File>()
-        profileRemote.lineSequence()
-            .map { it.trim() }
+        profileRemote.outputLineSequence()
             .filter { it.startsWith("/storage/emulated/0/Android/data/") && it.endsWith(".csv") }
             .distinctBy { it.substringAfterLast('/') }
             .forEach { path ->
                 val csvPath = path.trim()
                 val txtPath = csvPath.removeSuffix(".csv") + ".txt"
                 val base = csvPath.substringAfterLast('/').removeSuffix(".csv")
-                val destTxt = tmpDir.resolve("$base.txt")
+                val destTxt = abiDir.resolve("$base.txt")
                 Adb.run(adb, "-s", serial, "pull", txtPath, destTxt.absolutePath)
-                Adb.run(adb, "-s", serial, "pull", csvPath, tmpDir.resolve("$base.csv").absolutePath)
+                Adb.run(adb, "-s", serial, "pull", csvPath, abiDir.resolve("$base.csv").absolutePath)
                 logger.lifecycle("== Simpleperf profile: $base ==")
                 if (destTxt.exists() && destTxt.length() > 0L) {
                     logger.lifecycle(destTxt.readText().trim())
                 } else {
                     logger.lifecycle("(no raw profile text pulled)")
                 }
-                pulledProfiles.add(tmpDir.resolve("$base.csv"))
+                pulledProfiles.add(abiDir.resolve("$base.csv"))
             }
         if (pulledProfiles.isNotEmpty()) {
             pulledProfiles.forEach { p ->
@@ -342,7 +356,7 @@ val exportBenchmarkTable = tasks.register("exportBenchmarkTable") {
 
         val outMd = BenchmarkTableWriter.markdownTable(rows)
 
-        val outPath = propOut ?: propCsv.removeSuffix(".csv") + ".md"
+        val outPath = propOut ?: (propCsv.removeSuffix(".csv") + ".md")
         val outFile = File(rootDirFile, outPath)
         outFile.writeText(outMd)
         logger.lifecycle("exportBenchmarkTable: Generated Markdown table at ${outFile.absolutePath}")

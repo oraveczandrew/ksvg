@@ -3,7 +3,11 @@ package ksvg.bench
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-class AdbResult(val exitCode: Int, val output: String)
+class AdbResult(val exitCode: Int, val output: String) {
+    /** Merged stdout+stderr as a lazily-trimmed line sequence. */
+    fun outputLineSequence(): Sequence<String> =
+        output.lineSequence().map { it.trim() }
+}
 
 object Adb {
     /** Resolves the adb binary: $ANDROID_HOME/platform-tools/adb, falling back to PATH. */
@@ -44,9 +48,8 @@ object Adb {
         run(adb, "kill-server")
         run(adb, "start-server")
         for (attempt in 1..maxAttempts) {
-            val devices = run(adb, "devices").output
-            val serial = devices.lineSequence()
-                .map { it.trim() }
+            val devices = run(adb, "devices")
+            val serial = devices.outputLineSequence()
                 .firstOrNull { it.endsWith("\tdevice") }
                 .takeIf { it != null }?.substringBefore('\t')
             if (serial != null) return serial

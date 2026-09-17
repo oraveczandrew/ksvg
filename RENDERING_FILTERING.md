@@ -339,8 +339,9 @@ ISA progression, calculates speedup metrics vs scalar/Kotlin, and decorates rows
 status indicators (🚀, 🟢, 🔴, ⬆️) ready for pasting into `BENCHMARKS.md`.
 
 **Device (ARM64)** — `runDeviceBenchmark` wrapper (runs `connectedDebugAndroidTest`,
-auto-`adb pull`s the CSVs from the device's `externalCacheDir` into `tmp/`, then
-prints them as a Markdown table). The device benchmark
+auto-`adb pull`s the CSVs from the device's `externalCacheDir` into `tmp/device-bench-<abi>/`
+(`tmp/device-bench-arm64-v8a/`, `tmp/device-bench-armeabi-v7a/`, … — the ABI the benchmark process actually
+ran as), then prints them as a Markdown table). The device benchmark
 (`KernelPerformanceDeviceBenchmark`, src/androidTest) runs every kernel through the
 stable `nativeBenchmark { }` harness — see §6.2:
 
