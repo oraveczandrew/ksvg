@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.filtering
 
 import org.junit.Assert.assertTrue
+import kotlin.math.abs
 import kotlin.text.HexFormat
 
 /** Shared by the host JVM parity tests and the Android instrumented tests. */
@@ -40,6 +41,7 @@ public fun assertColorArrayEquals(
     expected: IntArray,
     actual: IntArray,
     sampleLimit: Int = 10,
+    maxDelta: Int = 0,
 ) {
     if (expected.size != actual.size) {
         throw AssertionError(
@@ -49,19 +51,39 @@ public fun assertColorArrayEquals(
     var mismatchCount = 0
     val samples = mutableListOf<String>()
     for (index in expected.indices) {
-        if (expected[index] != actual[index]) {
-            mismatchCount++
-            if (mismatchCount <= sampleLimit) {
-                samples.add(
-                    "  index $index: expected=0x${expected[index].toHexString(HexFormat.UpperCase)}, " +
-                        "actual=0x${actual[index].toHexString(HexFormat.UpperCase)}",
-                )
+        val expColor = expected[index]
+        val actColor = actual[index]
+        
+        if (expColor != actColor) {
+            val expA = (expColor ushr 24) and 0xFF
+            val expR = (expColor ushr 16) and 0xFF
+            val expG = (expColor ushr 8) and 0xFF
+            val expB = expColor and 0xFF
+
+            val actA = (actColor ushr 24) and 0xFF
+            val actR = (actColor ushr 16) and 0xFF
+            val actG = (actColor ushr 8) and 0xFF
+            val actB = actColor and 0xFF
+
+            val dA = abs(expA - actA)
+            val dR = abs(expR - actR)
+            val dG = abs(expG - actG)
+            val dB = abs(expB - actB)
+
+            if (dA > maxDelta || dR > maxDelta || dG > maxDelta || dB > maxDelta) {
+                mismatchCount++
+                if (mismatchCount <= sampleLimit) {
+                    samples.add(
+                        "  index $index: expected=0x${expColor.toHexString(HexFormat.UpperCase)}, " +
+                            "actual=0x${actColor.toHexString(HexFormat.UpperCase)} (deltas: A=$dA, R=$dR, G=$dG, B=$dB)",
+                    )
+                }
             }
         }
     }
     if (mismatchCount > 0) {
         val summary = buildString {
-            append("$message: $mismatchCount pixel mismatch(es)")
+            append("$message: $mismatchCount pixel mismatch(es) exceeding maxDelta=$maxDelta")
             if (mismatchCount > sampleLimit) {
                 append(" (first $sampleLimit listed)")
             }
@@ -71,3 +93,4 @@ public fun assertColorArrayEquals(
         throw AssertionError(summary)
     }
 }
+

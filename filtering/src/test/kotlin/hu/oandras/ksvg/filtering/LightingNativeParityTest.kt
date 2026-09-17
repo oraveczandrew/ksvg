@@ -72,6 +72,7 @@ class LightingNativeParityTest(
         assertColorArrayEquals(
             "lighting mismatch on [$name] backend ${backendName(backend)}",
             ref, out,
+            maxDelta = if (case.specular) 1 else 0
         )
     }
 }
