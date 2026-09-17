@@ -148,6 +148,45 @@ inline jint packPixel(const jint outA, const jint outR, const jint outG, const j
     return (outA << 24) | (outR << 16) | (outG << 8) | outB;
 }
 
+// Per-frame light data for the scalar pixel path: everything derived from
+// params[] alone (no per-pixel inputs), hoisted out of applyScalarPixel_full.
+// Bit-exact: the expressions below are character-identical to the ones they
+// replace; identical inputs through the same libm calls give identical bits.
+// NOTE the types: the distant direction is stored as float (it is cast to
+// float at every use site), but the spot axis/cosine stay double — the
+// per-pixel dot is double arithmetic and float rounding here would change
+// the last ulp.
+struct ScalarLightCtx {
+    float dlx = 0.f, dly = 0.f, dlz = 0.f;      // distant direction
+    double spotDirX = 0.0, spotDirY = 0.0, spotDirZ = 0.0;  // spot cone axis
+    double spotCos = -1.0;                       // spot cutoff cosine
+    bool hasSpotTarget = false;                  // spot tLen != 0
+};
+
+inline ScalarLightCtx makeScalarLightCtx(const jint lightType, const jdouble* params) {
+    ScalarLightCtx light;
+    if (lightType == 0) {
+        const double az = params[0] * M_PI / 180.0;
+        const double el = params[1] * M_PI / 180.0;
+        light.dlx = static_cast<float>(std::cos(az) * std::cos(el));
+        light.dly = static_cast<float>(std::sin(az) * std::cos(el));
+        light.dlz = static_cast<float>(std::sin(el));
+    } else if (lightType == 2) {
+        const double tx = params[3] - params[0];
+        const double ty = params[4] - params[1];
+        const double tz = params[5] - params[2];
+        const double tLen = std::sqrt(tx * tx + ty * ty + tz * tz);
+        light.hasSpotTarget = (tLen != 0.0);
+        if (light.hasSpotTarget) {
+            light.spotDirX = tx / tLen;
+            light.spotDirY = ty / tLen;
+            light.spotDirZ = tz / tLen;
+        }
+        light.spotCos = std::isnan(params[6]) ? -1.0 : std::cos(params[6] * M_PI / 180.0);
+    }
+    return light;
+}
+
 inline void applyScalarPixel_full(
         const jint* pix, jint* out, jint width, jint height,
         jint x, jint y,
@@ -157,20 +196,20 @@ inline void applyScalarPixel_full(
         jdouble unitSizeX, jdouble unitSizeY,
         jint lightType, bool isSpecular, float k, float exponent,
         float lr, float lg, float lb, const jdouble* params,
+        const ScalarLightCtx& light,
         bool premultiplied, bool useLinear) {
     const jdouble userY = userTop + y * invCanvasScaleY;
     const auto uy = static_cast<float>((userY - originY) / unitSizeY);
     const jdouble userX = userLeft + x * invCanvasScaleX;
     const auto ux = static_cast<float>((userX - originX) / unitSizeX);
-    const float surfaceZ = heightAt(pix, width, height, x, y, ss);
+    // Distant lights have no position dependence; skip the memory read.
+    const float surfaceZ = lightType == 0 ? 0.f : heightAt(pix, width, height, x, y, ss);
 
     float lx, ly, lz, factor;
     if (lightType == 0) {
-        const double az = params[0] * M_PI / 180.0;
-        const double el = params[1] * M_PI / 180.0;
-        lx = static_cast<float>(std::cos(az) * std::cos(el));
-        ly = static_cast<float>(std::sin(az) * std::cos(el));
-        lz = static_cast<float>(std::sin(el));
+        lx = light.dlx;
+        ly = light.dly;
+        lz = light.dlz;
         factor = 1.f;
     } else if (lightType == 1) {
         const float vx = static_cast<float>(params[0]) - ux;
@@ -187,18 +226,13 @@ inline void applyScalarPixel_full(
         if (len == 0.f) { lx = 0.f; ly = 0.f; lz = 0.f; factor = 0.f; }
         else {
             lx = vx / len; ly = vy / len; lz = vz / len; factor = 1.f;
-            const double tx = params[3] - params[0];
-            const double ty = params[4] - params[1];
-            const double tz = params[5] - params[2];
-            const double tLen = std::sqrt(tx * tx + ty * ty + tz * tz);
-            if (tLen == 0.0) {
+            if (!light.hasSpotTarget) {
                 factor = 1.f;
             } else {
-                const double dSx = tx / tLen, dSy = ty / tLen, dSz = tz / tLen;
-                double dot = dSx * -lx + dSy * -ly + dSz * -lz;
+                double dot = light.spotDirX * -lx + light.spotDirY * -ly + light.spotDirZ * -lz;
                 if (dot < -1.0) dot = -1.0; else if (dot > 1.0) dot = 1.0;
                 auto f = static_cast<float>(dot);
-                if (!std::isnan(params[6]) && static_cast<double>(f) < std::cos(params[6] * M_PI / 180.0)) f = 0.f;
+                if (static_cast<double>(f) < light.spotCos) f = 0.f;
                 factor = f < 0.f ? 0.f : f;
             }
         }
@@ -389,6 +423,9 @@ void applyScalar(
     const float invDx = 4.f / canvasScaleX;
     const float invDy = 4.f / canvasScaleY;
 
+    // Frame-invariant light data for the scalar pixel path below.
+    const ScalarLightCtx light = makeScalarLightCtx(lightType, params);
+
     if (lightType == 0 && !isSpecular && !useLinear) {
         applyScalarDistantDiffuse(pix, out, width, height,
                                   clipLeft, clipTop, clipRight, clipBottom,
@@ -402,7 +439,7 @@ void applyScalar(
                                  invCanvasScaleX, invCanvasScaleY, userLeft, userTop,
                                  originX, originY, unitSizeX, unitSizeY,
                                  lightType, isSpecular, k, exponent, lr, lg, lb, params,
-                                 premultiplied, useLinear);
+                                 light, premultiplied, useLinear);
         }
     }
 }
@@ -423,6 +460,9 @@ void applyVector(
 
     const float invDx = 4.f / canvasScaleX;
     const float invDy = 4.f / canvasScaleY;
+
+    // Frame-invariant light data for the scalar edge/tail pixels below.
+    const ScalarLightCtx light = makeScalarLightCtx(lightType, params);
 
     float lx = 0.f, ly = 0.f, lz = 0.f;
     if (lightType == 0) {
@@ -450,7 +490,7 @@ void applyVector(
                                      invCanvasScaleX, invCanvasScaleY, userLeft, userTop,
                                      originX, originY, unitSizeX, unitSizeY,
                                      lightType, isSpecular, k, exponent, lr, lg, lb, params,
-                                     premultiplied, useLinear);
+                                     light, premultiplied, useLinear);
             }
             continue;
         }
@@ -460,7 +500,7 @@ void applyVector(
                                  invCanvasScaleX, invCanvasScaleY, userLeft, userTop,
                                  originX, originY, unitSizeX, unitSizeY,
                                  lightType, isSpecular, k, exponent, lr, lg, lb, params,
-                                 premultiplied, useLinear);
+                                 light, premultiplied, useLinear);
         }
 
         jint x = ixLo;
@@ -1006,7 +1046,7 @@ void applyVector(
                                  invCanvasScaleX, invCanvasScaleY, userLeft, userTop,
                                  originX, originY, unitSizeX, unitSizeY,
                                  lightType, isSpecular, k, exponent, lr, lg, lb, params,
-                                 premultiplied, useLinear);
+                                 light, premultiplied, useLinear);
         }
 
         for (jint x = ixHi; x < clipRight; x++) {
@@ -1014,7 +1054,7 @@ void applyVector(
                                  invCanvasScaleX, invCanvasScaleY, userLeft, userTop,
                                  originX, originY, unitSizeX, unitSizeY,
                                  lightType, isSpecular, k, exponent, lr, lg, lb, params,
-                                 premultiplied, useLinear);
+                                 light, premultiplied, useLinear);
         }
     }
 }
