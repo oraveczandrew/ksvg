@@ -45,14 +45,19 @@
     movss          %xmm1, \spill_off(%rsp)
     movss          24(%rbx), %xmm0
     mulss          %xmm1, %xmm0
+    // Round-half-up (matches scalar floor(v+0.5f)); truncation here cost up
+    // to 1 linear LSB vs the reference on mid-range intensities.
+    addss          .Lhalf(%rip), %xmm0
     CALL(truncf)
     cvttss2si      %xmm0, %r15d
     movss          28(%rbx), %xmm0
     mulss          \spill_off(%rsp), %xmm0
+    addss          .Lhalf(%rip), %xmm0
     CALL(truncf)
     cvttss2si      %xmm0, %ebp
     movss          \spill_off(%rsp), %xmm0
     mulss          32(%rbx), %xmm0
+    addss          .Lhalf(%rip), %xmm0
     CALL(truncf)
     cvttss2si      %xmm0, %eax
     cmpl           $255, %r15d
@@ -631,6 +636,11 @@ RODATA
 .long	0x3f800000  # float 1
 .LCPI1_2:
 .zero	16
+
+RODATA
+.p2align 4
+.Lhalf:
+.long	0x3f000000  # 0.5f round-half-up bias (matches scalar floor(v+0.5f))
 
 RODATA
 .p2align 4
