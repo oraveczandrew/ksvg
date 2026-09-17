@@ -476,9 +476,9 @@ public object KotlinKernels {
                 readHeightColumn(colR, pix, width, surfaceScaleNormalized, minOf(width - 1, clipLeft + 1), topY, y, bottomY)
             }
             for (x in clipLeft until clipRight) {
-                val userX = userLeft + x * invCanvasScaleX
-                val ux = ((userX - originX) / unitSizeX).toFloat()
-
+                // userX/ux are only read by the point/spot branch below;
+                // computing them here would waste a Double division per
+                // distant pixel.
                 var lx = 0f
                 var ly = 0f
                 var lz = 0f
@@ -492,6 +492,8 @@ public object KotlinKernels {
                     }
 
                     else -> {
+                        val userX = userLeft + x * invCanvasScaleX
+                        val ux = ((userX - originX) / unitSizeX).toFloat()
                         // colM[1] is heightAt(x, y) by window construction
                         // (same address, same value); the center tap is free
                         // for point/spot, and distant never touches it.
