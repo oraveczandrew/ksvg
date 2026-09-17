@@ -38,7 +38,7 @@
     // +28 targetY    (jint)
     // +32 divisor    (float)
     // +36 bias       (float)
-    // +40 preserve   (jboolean; the interior path is preserveAlpha=true only)
+    // +40 preserve   (jboolean; 0 = convolve alpha, nonzero = preserve alpha)
     //
     // Processes the interior rectangle:
     // x in [targetX, width  - orderX  + targetX)
@@ -47,8 +47,10 @@
     // caller's edge handling. The kernel dimensions and anchor are fully
     // runtime-variable; only the interior-validity guarantee is required.
     //
-    // Alpha is preserved from the corresponding source pixel (preserveAlpha=true).
-    // The caller must route preserveAlpha=false through the scalar interior.
+    // Alpha handling is selected at runtime from the preserve flag: nonzero
+    // preserves alpha from the source pixel, zero convolves the alpha channel
+    // with the same normalize/round/clamp path as R/G/B. The alpha
+    // accumulator (v18) is always maintained so both modes share one loop.
     //
     // The routine never writes the 0..3 leftover interior pixels at the end of a
     // row.
@@ -80,6 +82,7 @@ ksvgConvolveGenericNeonAsm:
     ldr     w27, [x0, #28]  // targetY
     ldr     s0, [x0, #32]  // divisor
     ldr     s1, [x0, #36]  // bias
+    ldrb    w4, [x0, #40]  // preserve flag (0 = convolve alpha)
 
     // Constants.
     fmov    s2, #1.0
@@ -125,10 +128,11 @@ ksvgConvolveGenericNeonAsm:
     add     w7, w7, w8
     add     x10, x20, w7, uxtw #2  // x10 = block base (bytes)
 
-    // Accumulators (R, G, B).
+    // Accumulators (R, G, B, A).
     movi    v14.4s, #0
     movi    v15.4s, #0
     movi    v16.4s, #0
+    movi    v18.4s, #0
 
     mov     w9, #0  // ky
 .Lky:
@@ -149,16 +153,18 @@ ksvgConvolveGenericNeonAsm:
     add     x14, x11, w13, uxtw #2
     ld1     {v0.4s}, [x14]
 
-    // Extract B/G/R as uint32 vectors.
+    // Extract B/G/R/A as uint32 vectors.
     and     v1.16b, v0.16b, v27.16b  // B
     ushr    v2.4s, v0.4s, #8
     and     v2.16b, v2.16b, v27.16b  // G
     ushr    v3.4s, v0.4s, #16
     and     v3.16b, v3.16b, v27.16b  // R
+    ushr    v6.4s, v0.4s, #24  // A (0..255 after shift)
 
     ucvtf   v1.4s, v1.4s
     ucvtf   v2.4s, v2.4s
     ucvtf   v3.4s, v3.4s
+    ucvtf   v6.4s, v6.4s
 
     ldr     s4, [x12]  // kernel coefficient
     dup     v4.4s, v4.s[0]
@@ -166,6 +172,7 @@ ksvgConvolveGenericNeonAsm:
     fmla    v14.4s, v1.4s, v4.4s
     fmla    v15.4s, v2.4s, v4.4s
     fmla    v16.4s, v3.4s, v4.4s
+    fmla    v18.4s, v6.4s, v4.4s
 
     add     x12, x12, #4
     add     w13, w13, #1
@@ -179,19 +186,23 @@ ksvgConvolveGenericNeonAsm:
     fmul    v14.4s, v14.4s, v30.4s
     fmul    v15.4s, v15.4s, v30.4s
     fmul    v16.4s, v16.4s, v30.4s
+    fmul    v18.4s, v18.4s, v30.4s
 
     fadd    v14.4s, v14.4s, v31.4s
     fadd    v15.4s, v15.4s, v31.4s
     fadd    v16.4s, v16.4s, v31.4s
+    fadd    v18.4s, v18.4s, v31.4s
 
     // Match the scalar clamp255 rounding convention: add 0.5, floor (frintm),
     // then clamp to [0,255].
     fadd    v14.4s, v14.4s, v29.4s
     fadd    v15.4s, v15.4s, v29.4s
     fadd    v16.4s, v16.4s, v29.4s
+    fadd    v18.4s, v18.4s, v29.4s
     frintm  v14.4s, v14.4s
     frintm  v15.4s, v15.4s
     frintm  v16.4s, v16.4s
+    frintm  v18.4s, v18.4s
 
     movi    v5.4s, #0  // zero for clamp
     fmax    v14.4s, v14.4s, v5.4s
@@ -200,18 +211,28 @@ ksvgConvolveGenericNeonAsm:
     fmin    v15.4s, v15.4s, v28.4s
     fmax    v16.4s, v16.4s, v5.4s
     fmin    v16.4s, v16.4s, v28.4s
+    fmax    v18.4s, v18.4s, v5.4s
+    fmin    v18.4s, v18.4s, v28.4s
 
     fcvtzs  v14.4s, v14.4s
     fcvtzs  v15.4s, v15.4s
     fcvtzs  v16.4s, v16.4s
+    fcvtzs  v18.4s, v18.4s
 
-    // Preserve alpha from the four source pixels (x..x+3, y).
+    // Alpha: preserve from source pixels or use the convolved channel,
+    // selected by the preserve flag in w4.
+    cmp     w4, #0
+    b.eq    .Lalpha_convolved
     mul     w7, w29, w22
     add     w7, w7, w30
     add     x15, x20, w7, uxtw #2
     ld1     {v17.4s}, [x15]
     ushr    v17.4s, v17.4s, #24
     shl     v17.4s, v17.4s, #24
+    b       .Lpack
+.Lalpha_convolved:
+    shl     v17.4s, v18.4s, #24
+.Lpack:
 
     // Pack AARRGGBB.
     shl     v16.4s, v16.4s, #16  // R << 16

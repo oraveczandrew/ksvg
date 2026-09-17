@@ -119,34 +119,27 @@ namespace Convolve {
                     src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
         }
 
-        // Interior.
+        // Interior. The NEON kernel handles both preserve modes (selected via
+        // the preserve flag); the caller scalar-fills the 0..3 leftover
+        // pixels per row returned as tailX.
         if (xLo < xHi && yLo < yHi) {
-            if (preserve) {
 #if defined(__aarch64__)
-                const NeonConvolveParams params {
-                    width, height, kernel, orderX, orderY,
-                    targetX, targetY, divisor, bias, preserve,
-                };
-                const jint tailX = ksvgConvolveGenericNeonAsm(&params, dst, src);
+            const NeonConvolveParams params {
+                width, height, kernel, orderX, orderY,
+                targetX, targetY, divisor, bias, preserve,
+            };
+            const jint tailX = ksvgConvolveGenericNeonAsm(&params, dst, src);
 #else
-                const NeonConvolveParams32 params {
-                    width, height, kernel, orderX, orderY,
-                    targetX, targetY, divisor, bias, preserve,
-                };
-                const jint tailX = ksvgConvolveGenericNeonAsm32(&params, dst, src);
+            const NeonConvolveParams32 params {
+                width, height, kernel, orderX, orderY,
+                targetX, targetY, divisor, bias, preserve,
+            };
+            const jint tailX = ksvgConvolveGenericNeonAsm32(&params, dst, src);
 #endif
-                for (jint y = yLo; y < yHi; y++) {
-                    for (jint x = tailX; x < xHi; x++) {
-                        convolveScalarPixelEdged<EDGE_MODE>(
-                            src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
-                    }
-                }
-            } else {
-                for (jint y = yLo; y < yHi; y++) {
-                    for (jint x = xLo; x < xHi; x++) {
-                        convolveScalarPixelEdged<EDGE_MODE>(
-                            src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
-                    }
+            for (jint y = yLo; y < yHi; y++) {
+                for (jint x = tailX; x < xHi; x++) {
+                    convolveScalarPixelEdged<EDGE_MODE>(
+                        src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias255, preserve, x, y);
                 }
             }
         }

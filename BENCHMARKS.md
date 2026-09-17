@@ -523,18 +523,18 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `arm64-v8a`; non-quick har
 | ComponentTransfer | scalar | 512x512 | 1.510 | 173.63 | 1.39 | 1.00x |  |  |
 | ComponentTransfer | kotlin | 2048x2048 | 18.235 | 230.02 | 1.84 | 1.35x | ⬆️ |  |
 | ComponentTransfer | scalar | 2048x2048 | 24.614 | 170.40 | 1.36 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 77.071 | 3.40 | 0.03 | 1.46x | ⬆️ |  |
-| ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 112.591 | 2.33 | 0.02 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, alpha) | neon64 | 512x512 | 7.028 | 37.30 | 0.30 | **16.02x** | 🚀 |  |
-| ConvolveMatrix (duplicate, alpha) | kotlin | 2048x2048 | 1221.639 | 3.43 | 0.03 | 1.45x | ⬆️ |  |
-| ConvolveMatrix (duplicate, alpha) | scalar | 2048x2048 | 1777.191 | 2.36 | 0.02 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, alpha) | neon64 | 2048x2048 | 98.984 | 42.37 | 0.34 | **17.95x** | 🚀 |  |
-| ConvolveMatrix (duplicate, no-alpha) | kotlin | 512x512 | 101.962 | 2.57 | 0.02 | 1.12x | ⬆️ |  |
-| ConvolveMatrix (duplicate, no-alpha) | scalar | 512x512 | 113.857 | 2.30 | 0.02 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, no-alpha) | neon64 | 512x512 | 104.320 | 2.51 | 0.02 | 1.09x | 🟢 |  |
-| ConvolveMatrix (duplicate, no-alpha) | kotlin | 2048x2048 | 1584.696 | 2.65 | 0.02 | 1.14x | ⬆️ |  |
-| ConvolveMatrix (duplicate, no-alpha) | scalar | 2048x2048 | 1804.660 | 2.32 | 0.02 | 1.00x |  |  |
-| ConvolveMatrix (duplicate, no-alpha) | neon64 | 2048x2048 | 1652.203 | 2.54 | 0.02 | 1.09x | 🟢 |  |
+| ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 44.689 | 5.87 | 0.05 | 2.13x | ⬆️ |  |
+| ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 95.120 | 2.76 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, alpha) | neon64 | 512x512 | 7.071 | 37.07 | 0.30 | **13.45x** | 🚀 |  |
+| ConvolveMatrix (duplicate, alpha) | kotlin | 2048x2048 | 719.843 | 5.83 | 0.05 | 2.10x | ⬆️ |  |
+| ConvolveMatrix (duplicate, alpha) | scalar | 2048x2048 | 1510.285 | 2.78 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, alpha) | neon64 | 2048x2048 | 93.725 | 44.75 | 0.36 | **16.11x** | 🚀 |  |
+| ConvolveMatrix (duplicate, no-alpha) | kotlin | 512x512 | 58.946 | 4.45 | 0.04 | 1.63x | ⬆️ |  |
+| ConvolveMatrix (duplicate, no-alpha) | scalar | 512x512 | 95.987 | 2.73 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, no-alpha) | neon64 | 512x512 | 6.833 | 38.36 | 0.31 | **14.05x** | 🚀 |  |
+| ConvolveMatrix (duplicate, no-alpha) | kotlin | 2048x2048 | 942.178 | 4.45 | 0.04 | 1.62x | ⬆️ |  |
+| ConvolveMatrix (duplicate, no-alpha) | scalar | 2048x2048 | 1524.542 | 2.75 | 0.02 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, no-alpha) | neon64 | 2048x2048 | 94.148 | 44.55 | 0.36 | **16.19x** | 🚀 |  |
 | DisplacementMap | kotlin | 512x512 | 5.454 | 48.07 | 0.58 | 1.24x | ⬆️ |  |
 | DisplacementMap | scalar | 512x512 | 6.737 | 38.91 | 0.47 | 1.00x |  |  |
 | DisplacementMap | neon64 | 512x512 | 0.546 | 480.26 | 5.76 | **12.34x** | 🚀 |  |
@@ -670,10 +670,18 @@ Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `armeabi-v7a`; non-quick h
 | ComponentTransfer | scalar | 512x512 | 1.478 | 177.33 | 1.42 | 1.00x |  |  |
 | ComponentTransfer | kotlin | 2048x2048 | 31.822 | 131.81 | 1.05 | 0.76x |  |  |
 | ComponentTransfer | scalar | 2048x2048 | 24.316 | 172.49 | 1.38 | 1.00x |  |  |
-| ConvolveMatrix | kotlin | 512x512 | 181.112 | 1.45 | 0.01 | 1.06x | ⬆️ |  |
-| ConvolveMatrix | scalar | 512x512 | 191.301 | 1.37 | 0.01 | 1.00x |  |  |
-| ConvolveMatrix | kotlin | 2048x2048 | 2851.253 | 1.47 | 0.01 | 0.98x |  |  |
-| ConvolveMatrix | scalar | 2048x2048 | 2799.770 | 1.50 | 0.01 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 97.989 | 2.68 | 0.02 | 1.94x | ⬆️ |  |
+| ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 189.851 | 1.38 | 0.01 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, alpha) | neon32 | 512x512 | 16.636 | 15.76 | 0.13 | **11.41x** | 🚀 |  |
+| ConvolveMatrix (duplicate, alpha) | kotlin | 2048x2048 | 1528.437 | 2.74 | 0.02 | 1.85x | ⬆️ |  |
+| ConvolveMatrix (duplicate, alpha) | scalar | 2048x2048 | 2823.277 | 1.49 | 0.01 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, alpha) | neon32 | 2048x2048 | 191.187 | 21.94 | 0.18 | **14.77x** | 🚀 |  |
+| ConvolveMatrix (duplicate, no-alpha) | kotlin | 512x512 | 118.538 | 2.21 | 0.02 | 1.65x | ⬆️ |  |
+| ConvolveMatrix (duplicate, no-alpha) | scalar | 512x512 | 195.022 | 1.34 | 0.01 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, no-alpha) | neon32 | 512x512 | 16.050 | 16.33 | 0.13 | **12.15x** | 🚀 |  |
+| ConvolveMatrix (duplicate, no-alpha) | kotlin | 2048x2048 | 1870.232 | 2.24 | 0.02 | 1.57x | ⬆️ |  |
+| ConvolveMatrix (duplicate, no-alpha) | scalar | 2048x2048 | 2939.292 | 1.43 | 0.01 | 1.00x |  |  |
+| ConvolveMatrix (duplicate, no-alpha) | neon32 | 2048x2048 | 191.829 | 21.86 | 0.17 | **15.32x** | 🚀 |  |
 | DisplacementMap | kotlin | 512x512 | 10.025 | 26.15 | 0.31 | 1.05x | ⬆️ |  |
 | DisplacementMap | scalar | 512x512 | 10.481 | 25.01 | 0.30 | 1.00x |  |  |
 | DisplacementMap | neon32 | 512x512 | 0.966 | 271.40 | 3.26 | **10.85x** | 🚀 |  |

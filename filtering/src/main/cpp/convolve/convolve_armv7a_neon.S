@@ -38,7 +38,7 @@
     @       +24 targetY    (jint)
     @       +28 divisor    (float)
     @       +32 bias       (float)
-    @       +36 preserve   (jboolean; the interior path is preserveAlpha=true only)
+    @       +36 preserve   (jboolean; 0 = convolve alpha, nonzero = preserve)
     @
     @       Processes the interior rectangle:
     @       x in [targetX, width  - orderX  + targetX)
@@ -47,13 +47,16 @@
     @       caller's edge handling.  The kernel dimensions and anchor are fully
     @       runtime-variable; only the interior-validity guarantee is required.
     @
-    @       Alpha is preserved from the corresponding source pixel (preserveAlpha=true).
-    @       The caller must route preserveAlpha=false through the scalar interior.
+    @       Alpha is preserved from the corresponding source pixel when the
+    @       preserve flag is nonzero, otherwise the alpha channel is convolved
+    @       with the same normalize/round/clamp path as R/G/B. The alpha
+    @       accumulator (q9, with q8 as channel temp; both caller-saved d16-d19)
+    @       is always maintained so both modes share one loop.
     @
     @       The routine never writes the 0..3 leftover interior pixels at the end of a
     @       row.
     @
-    @       Q-register allocation (8 total, ARMv7 constraint):
+    @       Q-register allocation:
     @       q0 = source pixels / temp / broadcast
     @       q1 = B channel (uint32 -> float)
     @       q2 = G channel (uint32 -> float)
@@ -62,17 +65,21 @@
     @       q5 = G accumulator
     @       q6 = R accumulator
     @       q7 = 0xFF mask (constant)
+    @       q8 = A channel temp (uint32 -> float; caller-saved, no preserve needed)
+    @       q9 = A accumulator (caller-saved, no preserve needed)
     @
     @       Returns:
     @       r0 = first x NOT processed on an interior row (constant per row).
 
 ksvgConvolveGenericNeonAsm32:
     push    {r4-r11, lr}
-    sub     sp, sp, #28
+    sub     sp, sp, #32
 
     @       Save callee-saved GPRs.
     mov     r4, r1                  @ r4  = dst
     mov     r5, r2                  @ r5  = src
+    ldrb    r1, [r0, #36]           @ r1  = preserve flag
+    str     r1, [sp, #28]           @ sp+28 = preserve (params ptr reused below)
     ldr     r6, [r0, #0]            @ r6  = width
     ldr     r7, [r0, #8]            @ r7  = kernel base
     ldr     r8, [r0, #12]           @ r8  = orderX
@@ -80,7 +87,7 @@ ksvgConvolveGenericNeonAsm32:
     ldr     r10, [r0, #20]          @ r10 = targetX
     ldr     r11, [r0, #24]          @ r11 = targetY
 
-    @       Stack layout (28 bytes, 4-byte aligned):
+    @       Stack layout (32 bytes, 8-byte aligned for NEON spills):
     @       sp+0  = interiorXHi
     @       sp+4  = interiorYHi
     @       sp+8  = ky counter
@@ -88,6 +95,7 @@ ksvgConvolveGenericNeonAsm32:
     @       sp+16 = bias * 255.0f
     @       sp+20 = y counter
     @       sp+24 = x counter
+    @       sp+28 = preserve flag (0 = convolve alpha)
 
     @       interiorXHi = width - orderX + targetX + 1.
     sub     r1, r6, r8
@@ -148,10 +156,11 @@ ksvgConvolveGenericNeonAsm32:
     add     r2, r2, r0              @ r2 = linear offset
     add     r12, r5, r2, lsl #2    @ r12 = src block base (bytes)
 
-    @       Accumulators (B, G, R).
+    @       Accumulators (B, G, R, A).
     vmov.i32 q4, #0
     vmov.i32 q5, #0
     vmov.i32 q6, #0
+    vmov.i32 q9, #0
 
     @       ky = 0.
     mov     r0, #0
@@ -181,17 +190,19 @@ ksvgConvolveGenericNeonAsm32:
     add     r1, r3, r0, lsl #2    @ r1 = &src_row[kx] (byte address)
     vld1.32 {q0}, [r1]
 
-    @       Extract B, G, R channels.
+    @       Extract B, G, R, A channels.
     vand    q1, q0, q7              @ B
     vshr.u32 q2, q0, #8
     vand    q2, q2, q7              @ G
     vshr.u32 q3, q0, #16
     vand    q3, q3, q7              @ R
+    vshr.u32 q8, q0, #24            @ A (0..255 after shift)
 
     @       Convert to float.
     vcvt.f32.u32 q1, q1
     vcvt.f32.u32 q2, q2
     vcvt.f32.u32 q3, q3
+    vcvt.f32.u32 q8, q8
 
     @       Load kernel coefficient and broadcast to all lanes of q0.
     vldr    s0, [r2]
@@ -202,6 +213,7 @@ ksvgConvolveGenericNeonAsm32:
     vmla.f32 q4, q1, q0
     vmla.f32 q5, q2, q0
     vmla.f32 q6, q3, q0
+    vmla.f32 q9, q8, q0
 
     add     r0, r0, #1
     b       .Lkx
@@ -219,6 +231,7 @@ ksvgConvolveGenericNeonAsm32:
     vmul.f32 q4, q4, q0
     vmul.f32 q5, q5, q0
     vmul.f32 q6, q6, q0
+    vmul.f32 q9, q9, q0
 
     @       Add bias * 255.
     vldr    s0, [sp, #16]
@@ -226,6 +239,7 @@ ksvgConvolveGenericNeonAsm32:
     vadd.f32 q4, q4, q0
     vadd.f32 q5, q5, q0
     vadd.f32 q6, q6, q0
+    vadd.f32 q9, q9, q0
 
     @       +0.5 rounding bias.
     vmov.f32 s0, #0.5
@@ -233,6 +247,7 @@ ksvgConvolveGenericNeonAsm32:
     vadd.f32 q4, q4, q0
     vadd.f32 q5, q5, q0
     vadd.f32 q6, q6, q0
+    vadd.f32 q9, q9, q0
 
     @       Floor via FPSCR RMode manipulation (no frintm on ARMv7).
     @       Set round-toward-minus-infinity (bits 23:22 = 0b10).
@@ -244,6 +259,7 @@ ksvgConvolveGenericNeonAsm32:
     vcvt.s32.f32 q4, q4
     vcvt.s32.f32 q5, q5
     vcvt.s32.f32 q6, q6
+    vcvt.s32.f32 q9, q9
 
     @       Restore default FPSCR (round-to-nearest).
     bic     r0, r0, #(3 << 22)
@@ -257,8 +273,13 @@ ksvgConvolveGenericNeonAsm32:
     vmin.s32 q5, q5, q7
     vmax.s32 q6, q6, q0
     vmin.s32 q6, q6, q7
+    vmax.s32 q9, q9, q0
+    vmin.s32 q9, q9, q7
 
-    @       Preserve alpha from source pixels (x..x+3, y).
+    @       Alpha: preserve from source or use convolved channel (sp+28).
+    ldr     r0, [sp, #28]           @ r0 = preserve flag
+    cmp     r0, #0
+    beq     .Lalpha_convolved
     ldr     r0, [sp, #20]           @ r0 = y
     ldr     r2, [sp, #24]           @ r2 = x
     mla     r3, r0, r6, r2          @ r3 = y * width + x
@@ -268,6 +289,10 @@ ksvgConvolveGenericNeonAsm32:
     @       Extract alpha: (pixel >> 24) & 0xFF, then << 24.
     vshr.u32 q0, q0, #24
     vshl.i32 q0, q0, #24
+    b       .Lpack
+.Lalpha_convolved:
+    vshl.i32 q0, q9, #24
+.Lpack:
 
     @       Pack: (R << 16) | (G << 8) | B | A.
     vshl.i32 q6, q6, #16            @ R << 16
@@ -298,7 +323,7 @@ ksvgConvolveGenericNeonAsm32:
 
 .Ldone:
     ldr     r0, [sp, #24]           @ r0 = first unprocessed x
-    add     sp, sp, #28
+    add     sp, sp, #32
     pop     {r4-r11, pc}
 
 .size ksvgConvolveGenericNeonAsm32, .-ksvgConvolveGenericNeonAsm32
