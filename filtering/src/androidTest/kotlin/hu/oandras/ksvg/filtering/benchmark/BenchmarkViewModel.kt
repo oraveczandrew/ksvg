@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg.filtering.benchmark
 
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,33 @@ internal class BenchmarkViewModel : ViewModel() {
     }
 
     companion object {
+        /** Runtime ABI of this process (e.g. arm64-v8a, armeabi-v7a, x86_64, x86). */
+        private val runtimeAbi: String = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+
+        /**
+         * Architecture label matching the native kernel file naming
+         * (aarch64, armv7a, x86_64, i386).
+         *
+         * NOTE: this must come from `os.arch`, which is per-process. Device-level
+         * properties (`Build.SUPPORTED_ABIS[0]`, `Build.CPU_ABI`) always report the
+         * device primary ABI (e.g. arm64-v8a), even when this process runs 32-bit.
+         */
+        private val runtimeArch: String = run {
+            when (System.getProperty("os.arch")?.lowercase()) {
+                "aarch64", "arm64" -> "aarch64"
+                "armv7l", "armv8l", "arm", "armeabi-v7a" -> "armv7a"
+                "x86_64", "amd64" -> "x86_64"
+                "i686", "i586", "i386", "x86" -> "i386"
+                else -> when (runtimeAbi) {
+                    "arm64-v8a" -> "aarch64"
+                    "armeabi-v7a", "armeabi" -> "armv7a"
+                    "x86_64" -> "x86_64"
+                    "x86" -> "i386"
+                    else -> runtimeAbi
+                }
+            }
+        }
+
         private val progressFlow: MutableStateFlow<BenchmarkUiState> = MutableStateFlow(BenchmarkUiState())
         private val globalCurrentRun = AtomicInteger()
         private val globalRun = AtomicInteger()
@@ -110,7 +138,9 @@ internal class BenchmarkViewModel : ViewModel() {
             val sizeLabel = state.size.ifBlank { "-" }
             val phaseLabel = state.phase.ifBlank { "-" }
 
-            append("KSVG benchmark\n")
+            append("KSVG benchmark (")
+            append(runtimeArch)
+            append(")\n")
 
             append("Benchmark: ")
             append(benchName)
