@@ -54,7 +54,7 @@ public object KotlinKernels {
 
     @Suppress("SameParameterValue")
     private inline fun clamp(v: Int, min: Int, max: Int): Int =
-        v.coerceIn(min, max)
+        if (v < min) min else if (v > max) max else v
 
     private fun sampleCoordinate(coordinate: Int, limit: Int, edgeMode: Int): Int =
         if (coordinate in 0 until limit) coordinate else when (edgeMode) {
@@ -66,13 +66,6 @@ public object KotlinKernels {
 
             else -> if (coordinate < 0) 0 else limit - 1
         }
-
-    private fun channelValue(p: Int, ch: Int): Float = when (ch) {
-        0 -> ((p shr 16) and 0xFF) / 255f
-        1 -> ((p shr 8) and 0xFF) / 255f
-        2 -> (p and 0xFF) / 255f
-        else -> ((p shr 24) and 0xFF) / 255f
-    }
 
     // ---------------------------------------------------------------- convolve
 
@@ -835,6 +828,20 @@ public object KotlinKernels {
     ) {
         val widthDivisor = maxOf(width - 1, 1)
         val heightDivisor = maxOf(height - 1, 1)
+        // The channel when-dispatch depends only on call arguments: resolve the
+        // shift amounts once instead of per pixel (identical shifts and divides).
+        val xShift = when (xChannel) {
+            0 -> 16
+            1 -> 8
+            2 -> 0
+            else -> 24
+        }
+        val yShift = when (yChannel) {
+            0 -> 16
+            1 -> 8
+            2 -> 0
+            else -> 24
+        }
 
         for (y in 0 until height) {
             val rowOffset = y * width
@@ -844,8 +851,8 @@ public object KotlinKernels {
                 val mapX = if (mapWidth <= 1) 0 else (x.toFloat() / widthDivisor * (mapWidth - 1)).toInt()
                 val mapPixel = map[mapRowOffset + mapX]
 
-                val dx = (scale * (channelValue(mapPixel, xChannel) - 0.5f)).toInt()
-                val dy = (scale * (channelValue(mapPixel, yChannel) - 0.5f)).toInt()
+                val dx = (scale * (((mapPixel shr xShift) and 0xFF) / 255f - 0.5f)).toInt()
+                val dy = (scale * (((mapPixel shr yShift) and 0xFF) / 255f - 0.5f)).toInt()
 
                 val srcX = clamp(x + dx, 0, width - 1)
                 val srcY = clamp(y + dy, 0, height - 1)
