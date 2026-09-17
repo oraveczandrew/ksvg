@@ -111,6 +111,110 @@
     mulps    \scale, \ch
 .endm
 
+/*
+ * Description:
+ *   One Horner step without FMA: acc = f * acc + coeff, with the scalar
+ *   coefficient broadcast to all lanes first (SSSE3 has no broadcast load;
+ *   movss + shufps). The split mul/add costs ~1 extra ULP vs the AVX2 FMA
+ *   form, still far inside the specular +-1 byte parity gate.
+ *
+ * Clobbers:
+ *   %xmm13 (broadcast scratch), \acc
+ */
+.macro POW4_STEP coeff, f, acc
+    movss    \coeff, %xmm13
+    shufps   $0, %xmm13, %xmm13
+    mulps    \f, \acc
+    addps    %xmm13, \acc
+.endm
+
+/*
+ * Description:
+ *   SSSE3 (128-bit, no FMA) port of POW8_AVX2: pow(x, y) = 2^(y * log2(x))
+ *   via 8th-degree minimax polynomials from math_pow_macros.S. The caller
+ *   must EMIT_LOG2_POLY_8 / EMIT_EXP2_POLY_8 / EMIT_POW_COMMON_CONSTANTS in
+ *   its own file scope (labels are file-local).
+ *
+ *   Legacy-SSE notes: floor() is emulated (no roundps pre-SSE4.1) via
+ *   trunc + (t < trunc ? 1.0 : 0.0); the biased-exponent max(0, ..) clamp
+ *   avoids pmaxsd (SSE4.1) via pcmpgtd + pandn.
+ *
+ * Inputs:
+ *   \x    = XMM register with base values in [0, 1] (destroyed)
+ *   \y    = XMM register with broadcast exponent (preserved)
+ *
+ * Output:
+ *   \x    = Result of pow(\x, \y)
+ *
+ * Clobbers:
+ *   \x, %xmm10-%xmm15
+ */
+.macro POW4_SSSE3 x, y
+    movdqa   .Lbiased_127(%rip), %xmm15
+    movdqa   .Lmantissa_mask(%rip), %xmm13
+    movss    .Lfloat_1_bits(%rip), %xmm14
+    shufps   $0, %xmm14, %xmm14      # 1.0
+
+    # 1. log2(x) range reduction: e = (bits >> 23) - 127; f = m - 1.0
+    movdqa   \x, %xmm12
+    psrad    $23, %xmm12
+    psubd    %xmm15, %xmm12
+    cvtdq2ps %xmm12, %xmm12          # e_float
+    movdqa   \x, %xmm11
+    pand     %xmm13, %xmm11
+    por      %xmm14, %xmm11          # m in [1, 2)
+    subps    %xmm14, %xmm11          # f in [0, 1)
+
+    # 2. Horner for P_log(f)
+    movss    .Lpoly_log2+0(%rip), %xmm10
+    shufps   $0, %xmm10, %xmm10      # c8
+    POW4_STEP .Lpoly_log2+4(%rip), %xmm11, %xmm10
+    POW4_STEP .Lpoly_log2+8(%rip), %xmm11, %xmm10
+    POW4_STEP .Lpoly_log2+12(%rip), %xmm11, %xmm10
+    POW4_STEP .Lpoly_log2+16(%rip), %xmm11, %xmm10
+    POW4_STEP .Lpoly_log2+20(%rip), %xmm11, %xmm10
+    POW4_STEP .Lpoly_log2+24(%rip), %xmm11, %xmm10
+    POW4_STEP .Lpoly_log2+28(%rip), %xmm11, %xmm10
+    POW4_STEP .Lpoly_log2+32(%rip), %xmm11, %xmm10
+    addps    %xmm10, %xmm12          # log2(x)
+
+    # 3. t = y * log2(x)
+    mulps    \y, %xmm12
+
+    # 4. t_i = floor(t) (emulated), t_f = t - t_i
+    movaps   %xmm12, %xmm11
+    cvttps2dq %xmm11, %xmm11
+    cvtdq2ps %xmm11, %xmm11          # trunc(t)
+    movaps   %xmm12, %xmm13
+    cmpltps  %xmm11, %xmm13          # t < trunc
+    andps    %xmm14, %xmm13          # 1.0 where t non-integral negative
+    subps    %xmm13, %xmm11          # t_i
+    subps    %xmm11, %xmm12          # t_f in [0, 1)
+
+    # 5. Horner for P_exp(t_f)
+    movss    .Lpoly_exp2+0(%rip), %xmm10
+    shufps   $0, %xmm10, %xmm10      # c8
+    POW4_STEP .Lpoly_exp2+4(%rip), %xmm12, %xmm10
+    POW4_STEP .Lpoly_exp2+8(%rip), %xmm12, %xmm10
+    POW4_STEP .Lpoly_exp2+12(%rip), %xmm12, %xmm10
+    POW4_STEP .Lpoly_exp2+16(%rip), %xmm12, %xmm10
+    POW4_STEP .Lpoly_exp2+20(%rip), %xmm12, %xmm10
+    POW4_STEP .Lpoly_exp2+24(%rip), %xmm12, %xmm10
+    POW4_STEP .Lpoly_exp2+28(%rip), %xmm12, %xmm10
+    POW4_STEP .Lpoly_exp2+32(%rip), %xmm12, %xmm10
+
+    # 6. Scale by 2^t_i
+    cvtps2dq %xmm11, %xmm11          # t_i_int (exact: integral float)
+    paddd    %xmm15, %xmm11          # biased exponent
+    pxor     %xmm13, %xmm13
+    pcmpgtd  %xmm11, %xmm13          # 0 > biased (underflow lanes)
+    pandn    %xmm11, %xmm13          # max(biased, 0)
+    movdqa   %xmm13, %xmm11
+    pslld    $23, %xmm11
+    mulps    %xmm10, %xmm11
+    movaps   %xmm11, \x
+.endm
+
 RODATA
 .p2align 5
 .Lspot_l2s_data:

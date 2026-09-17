@@ -16,77 +16,7 @@
 
 #include "asm_macros.S"
 #include "lighting_x86_64_ssse3_macros.S"
-
-/*
- * Description:
- *   Per-pixel specular tail: spills the clamped intensity, scales R/G/B by
- *   lr/lg/lb, truncates toward zero (truncf), clamps each channel to
- *   [0, 255] via cmovs, max-channel-alpha cmov pack, and stores the pixel.
- *   Fixed-register form (all 8 core sites): intensity in %xmm1 on entry,
- *   255 in %r13d, 0 in %r14d, dst base reloaded from 24(%rsp) into %rax,
- *   pixel index in %r12. Contains 3 CALL(truncf) invocations.
- *
- * Inputs:
- *   \spill_off  = stack offset of the 4-byte intensity spill (12 or 32 —
- *                 pixel 3 uses 32 since 12 holds live data on that path)
- *   \store_off  = byte offset for the packed pixel store (0/4/8/12), i.e.
- *                 movl %ebp, \store_off(%rax,%r12)
- *
- * Output:
- *   packed ARGB stored at \store_off(%rax,%r12)
- *
- * Clobbers:
- *   %xmm0, %xmm1
- *   %eax, %ebp, %ecx, %edx, %r15d, %rax
- *   all SysV caller-saved registers via CALL(truncf)
- *   (flags)
- */
-.macro SPEC_PIXEL_TAIL spill_off, store_off
-    movss          %xmm1, \spill_off(%rsp)
-    movss          24(%rbx), %xmm0
-    mulss          %xmm1, %xmm0
-    // Round-half-up (matches scalar floor(v+0.5f)); truncation here cost up
-    // to 1 linear LSB vs the reference on mid-range intensities.
-    addss          .Lhalf(%rip), %xmm0
-    CALL(truncf)
-    cvttss2si      %xmm0, %r15d
-    movss          28(%rbx), %xmm0
-    mulss          \spill_off(%rsp), %xmm0
-    addss          .Lhalf(%rip), %xmm0
-    CALL(truncf)
-    cvttss2si      %xmm0, %ebp
-    movss          \spill_off(%rsp), %xmm0
-    mulss          32(%rbx), %xmm0
-    addss          .Lhalf(%rip), %xmm0
-    CALL(truncf)
-    cvttss2si      %xmm0, %eax
-    cmpl           $255, %r15d
-    cmovgel        %r13d, %r15d
-    testl          %r15d, %r15d
-    movl           $0, %ecx
-    cmovgl         %r15d, %ecx
-    cmpl           $255, %ebp
-    cmovgel        %r13d, %ebp
-    testl          %ebp, %ebp
-    cmovlel        %r14d, %ebp
-    cmpl           $255, %eax
-    cmovgel        %r13d, %eax
-    testl          %eax, %eax
-    cmovlel        %r14d, %eax
-    cmpl           %ebp, %r15d
-    movl           %ebp, %edx
-    cmovgl         %ecx, %edx
-    cmpl           %eax, %edx
-    cmovbel        %eax, %edx
-    shll           $24, %edx
-    shll           $16, %ecx
-    shll           $8, %ebp
-    orl            %ecx, %ebp
-    orl            %eax, %ebp
-    orl            %edx, %ebp
-    movq           24(%rsp), %rax
-    movl           %ebp, \store_off(%rax,%r12)
-.endm
+#include "math_pow_macros.S"
 
 .text
 .p2align 4
@@ -160,12 +90,9 @@ CFI_START
     shlq           $4, %rax
     addq           $16, %rax
     movq           %rax, 48(%rsp)  # 8-byte Spill
-    xorl           %r14d, %r14d
-    movl           $255, %r13d
     xorl           %r12d, %r12d
     jmp            .LBB1_2
 .LBB1_14:  #   in Loop: Header=BB1_2 Depth=1
-    SPEC_PIXEL_TAIL 32, 12
     addq           $16, %r12
     cmpq           %r12, 48(%rsp)  # 8-byte Folded Reload
     je             .LBB1_15
@@ -231,72 +158,63 @@ CFI_START
     mulps          80(%rsp), %xmm4  # 16-byte Folded Reload
     addps          %xmm1, %xmm4
     maxps          .LCPI1_2(%rip), %xmm4
-    movaps         %xmm4, 32(%rsp)  # 16-byte Spill
-    movaps         %xmm4, %xmm0
-    movss          16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    CALL(powf)
-    mulss          8(%rbx), %xmm0
-    xorps          %xmm1, %xmm1
-    ucomiss        %xmm0, %xmm1
-    ja             .LBB1_5
-# %bb.3:                                #   in Loop: Header=BB1_2 Depth=1
-    ucomiss        .LCPI1_0(%rip), %xmm0
-    movaps         %xmm0, %xmm1
-    jbe            .LBB1_5
-# %bb.4:                                #   in Loop: Header=BB1_2 Depth=1
-    movss          .LCPI1_0(%rip), %xmm1  # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-.LBB1_5:  #   in Loop: Header=BB1_2 Depth=1
-    SPEC_PIXEL_TAIL 12, 0
-    movaps         32(%rsp), %xmm0  # 16-byte Reload
-    shufps         $85, %xmm0, %xmm0  # xmm0 = xmm0[1,1,1,1]
-    movss          16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    CALL(powf)
-    mulss          8(%rbx), %xmm0
-    xorps          %xmm1, %xmm1
-    ucomiss        %xmm0, %xmm1
-    ja             .LBB1_8
-# %bb.6:                                #   in Loop: Header=BB1_2 Depth=1
-    ucomiss        .LCPI1_0(%rip), %xmm0
-    movaps         %xmm0, %xmm1
-    jbe            .LBB1_8
-# %bb.7:                                #   in Loop: Header=BB1_2 Depth=1
-    movss          .LCPI1_0(%rip), %xmm1  # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-.LBB1_8:  #   in Loop: Header=BB1_2 Depth=1
-    SPEC_PIXEL_TAIL 12, 4
-    movaps         32(%rsp), %xmm0  # 16-byte Reload
-    movhlps        %xmm0, %xmm0  # xmm0 = xmm0[1,1]
-    movss          16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    CALL(powf)
-    mulss          8(%rbx), %xmm0
-    xorps          %xmm1, %xmm1
-    ucomiss        %xmm0, %xmm1
-    ja             .LBB1_11
-# %bb.9:                                #   in Loop: Header=BB1_2 Depth=1
-    ucomiss        .LCPI1_0(%rip), %xmm0
-    movaps         %xmm0, %xmm1
-    jbe            .LBB1_11
-# %bb.10:                               #   in Loop: Header=BB1_2 Depth=1
-    movss          .LCPI1_0(%rip), %xmm1  # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-.LBB1_11:  #   in Loop: Header=BB1_2 Depth=1
-    SPEC_PIXEL_TAIL 12, 8
-    movaps         32(%rsp), %xmm0  # 16-byte Reload
-    shufps         $255, %xmm0, %xmm0  # xmm0 = xmm0[3,3,3,3]
-    movss          16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    CALL(powf)
-    mulss          8(%rbx), %xmm0
-    xorps          %xmm1, %xmm1
-    ucomiss        %xmm0, %xmm1
-    ja             .LBB1_14
-# %bb.12:                               #   in Loop: Header=BB1_2 Depth=1
-    ucomiss        .LCPI1_0(%rip), %xmm0
-    movaps         %xmm0, %xmm1
-    jbe            .LBB1_14
-# %bb.13:                               #   in Loop: Header=BB1_2 Depth=1
-    movss          .LCPI1_0(%rip), %xmm1  # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
+    // Full SIMD specular: p = pow(dot, exp), intensity, vector pack.
+    movss          16(%rsp), %xmm5  # 4-byte Reload (exponent)
+    shufps         $0, %xmm5, %xmm5
+    POW4_SSSE3     %xmm4, %xmm5
+    movss          8(%rbx), %xmm0
+    shufps         $0, %xmm0, %xmm0  # k
+    mulps          %xmm4, %xmm0      # k * p
+    xorps          %xmm1, %xmm1      # 0
+    maxps          %xmm1, %xmm0
+    movaps         .LCPI1_1(%rip), %xmm1  # 1.0
+    minps          %xmm1, %xmm0      # intensity
+    movss          24(%rbx), %xmm1
+    shufps         $0, %xmm1, %xmm1
+    mulps          %xmm0, %xmm1      # lr * I
+    movss          28(%rbx), %xmm2
+    shufps         $0, %xmm2, %xmm2
+    mulps          %xmm0, %xmm2      # lg * I
+    movss          32(%rbx), %xmm3
+    shufps         $0, %xmm3, %xmm3
+    mulps          %xmm0, %xmm3      # lb * I
+    movss          .Lhalf(%rip), %xmm5
+    shufps         $0, %xmm5, %xmm5
+    addps          %xmm5, %xmm1
+    addps          %xmm5, %xmm2
+    addps          %xmm5, %xmm3
+    xorps          %xmm0, %xmm0      # 0
+    maxps          %xmm0, %xmm1
+    maxps          %xmm0, %xmm2
+    maxps          %xmm0, %xmm3
+    movss          .Lfloat_255(%rip), %xmm5
+    shufps         $0, %xmm5, %xmm5  # 255.0
+    minps          %xmm5, %xmm1
+    minps          %xmm5, %xmm2
+    minps          %xmm5, %xmm3
+    cvttps2dq      %xmm1, %xmm1
+    cvttps2dq      %xmm2, %xmm2
+    cvttps2dq      %xmm3, %xmm3
+    pslld          $16, %xmm1
+    pslld          $8, %xmm2
+    por            %xmm2, %xmm1
+    por            %xmm3, %xmm1
+    // Alpha = max(R, G, B), same byte sequence as the linear block below.
+    movdqa         %xmm1, %xmm2
+    psrld          $8, %xmm2
+    pand           .Ls_rgb_low_mask(%rip), %xmm2
+    movdqa         %xmm1, %xmm3
+    psrld          $16, %xmm3
+    pand           .Ls_rgb_low_mask(%rip), %xmm3
+    pmaxub         %xmm3, %xmm2
+    movdqa         %xmm1, %xmm3
+    pand           .Ls_rgb_low_mask(%rip), %xmm3
+    pmaxub         %xmm3, %xmm2
+    pslld          $24, %xmm2
+    pand           .Ls_rgb_mask(%rip), %xmm1
+    por            %xmm2, %xmm1
+    movq           24(%rsp), %rax  # 8-byte Reload (dst)
+    movdqu         %xmm1, (%rax,%r12)
     jmp            .LBB1_14
 .LBB1_15:
     addq           $168, %rsp
@@ -390,14 +308,9 @@ CFI_START
     shlq           $4, %rax
     addq           $16, %rax
     movq           %rax, 48(%rsp)  # 8-byte Spill
-    xorl           %r14d, %r14d
-    movl           $255, %r13d
     xorl           %r12d, %r12d
     jmp            .LBB2_2
 .LBB2_14:  #   in Loop: Header=BB1_2 Depth=1
-	/* Complete the fourth pixel before converting the finished 4-pixel block. */
-    SPEC_PIXEL_TAIL 32, 12
-
 	/* Inline SSSE3 amortized linear->sRGB for the completed 4-pixel block. */
     movdqu         (%rax,%r12), %xmm0
     pxor           %xmm7, %xmm7
@@ -537,72 +450,50 @@ CFI_START
     mulps          80(%rsp), %xmm4  # 16-byte Folded Reload
     addps          %xmm1, %xmm4
     maxps          .LCPI1_2(%rip), %xmm4
-    movaps         %xmm4, 32(%rsp)  # 16-byte Spill
-    movaps         %xmm4, %xmm0
-    movss          16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    CALL(powf)
-    mulss          8(%rbx), %xmm0
-    xorps          %xmm1, %xmm1
-    ucomiss        %xmm0, %xmm1
-    ja             .LBB2_5
-# %bb.3:                                #   in Loop: Header=BB1_2 Depth=1
-    ucomiss        .LCPI1_0(%rip), %xmm0
-    movaps         %xmm0, %xmm1
-    jbe            .LBB2_5
-# %bb.4:                                #   in Loop: Header=BB1_2 Depth=1
-    movss          .LCPI1_0(%rip), %xmm1  # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-.LBB2_5:  #   in Loop: Header=BB1_2 Depth=1
-    SPEC_PIXEL_TAIL 12, 0
-    movaps         32(%rsp), %xmm0  # 16-byte Reload
-    shufps         $85, %xmm0, %xmm0  # xmm0 = xmm0[1,1,1,1]
-    movss          16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    CALL(powf)
-    mulss          8(%rbx), %xmm0
-    xorps          %xmm1, %xmm1
-    ucomiss        %xmm0, %xmm1
-    ja             .LBB2_8
-# %bb.6:                                #   in Loop: Header=BB1_2 Depth=1
-    ucomiss        .LCPI1_0(%rip), %xmm0
-    movaps         %xmm0, %xmm1
-    jbe            .LBB2_8
-# %bb.7:                                #   in Loop: Header=BB1_2 Depth=1
-    movss          .LCPI1_0(%rip), %xmm1  # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-.LBB2_8:  #   in Loop: Header=BB1_2 Depth=1
-    SPEC_PIXEL_TAIL 12, 4
-    movaps         32(%rsp), %xmm0  # 16-byte Reload
-    movhlps        %xmm0, %xmm0  # xmm0 = xmm0[1,1]
-    movss          16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    CALL(powf)
-    mulss          8(%rbx), %xmm0
-    xorps          %xmm1, %xmm1
-    ucomiss        %xmm0, %xmm1
-    ja             .LBB2_11
-# %bb.9:                                #   in Loop: Header=BB1_2 Depth=1
-    ucomiss        .LCPI1_0(%rip), %xmm0
-    movaps         %xmm0, %xmm1
-    jbe            .LBB2_11
-# %bb.10:                               #   in Loop: Header=BB1_2 Depth=1
-    movss          .LCPI1_0(%rip), %xmm1  # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-.LBB2_11:  #   in Loop: Header=BB1_2 Depth=1
-    SPEC_PIXEL_TAIL 12, 8
-    movaps         32(%rsp), %xmm0  # 16-byte Reload
-    shufps         $255, %xmm0, %xmm0  # xmm0 = xmm0[3,3,3,3]
-    movss          16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero
-    CALL(powf)
-    mulss          8(%rbx), %xmm0
-    xorps          %xmm1, %xmm1
-    ucomiss        %xmm0, %xmm1
-    ja             .LBB2_14
-# %bb.12:                               #   in Loop: Header=BB1_2 Depth=1
-    ucomiss        .LCPI1_0(%rip), %xmm0
-    movaps         %xmm0, %xmm1
-    jbe            .LBB2_14
-# %bb.13:                               #   in Loop: Header=BB1_2 Depth=1
-    movss          .LCPI1_0(%rip), %xmm1  # xmm1 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
+    // Full SIMD specular (linear light): p = pow(dot, exp), intensity,
+    // vector linear pack; the amortized LUT block below converts in place.
+    movss          16(%rsp), %xmm5  # 4-byte Reload (exponent)
+    shufps         $0, %xmm5, %xmm5
+    POW4_SSSE3     %xmm4, %xmm5
+    movss          8(%rbx), %xmm0
+    shufps         $0, %xmm0, %xmm0  # k
+    mulps          %xmm4, %xmm0      # k * p
+    xorps          %xmm1, %xmm1      # 0
+    maxps          %xmm1, %xmm0
+    movaps         .LCPI1_1(%rip), %xmm1  # 1.0
+    minps          %xmm1, %xmm0      # intensity
+    movss          24(%rbx), %xmm1
+    shufps         $0, %xmm1, %xmm1
+    mulps          %xmm0, %xmm1      # lr * I
+    movss          28(%rbx), %xmm2
+    shufps         $0, %xmm2, %xmm2
+    mulps          %xmm0, %xmm2      # lg * I
+    movss          32(%rbx), %xmm3
+    shufps         $0, %xmm3, %xmm3
+    mulps          %xmm0, %xmm3      # lb * I
+    movss          .Lhalf(%rip), %xmm5
+    shufps         $0, %xmm5, %xmm5
+    addps          %xmm5, %xmm1
+    addps          %xmm5, %xmm2
+    addps          %xmm5, %xmm3
+    xorps          %xmm0, %xmm0      # 0
+    maxps          %xmm0, %xmm1
+    maxps          %xmm0, %xmm2
+    maxps          %xmm0, %xmm3
+    movss          .Lfloat_255(%rip), %xmm5
+    shufps         $0, %xmm5, %xmm5  # 255.0
+    minps          %xmm5, %xmm1
+    minps          %xmm5, %xmm2
+    minps          %xmm5, %xmm3
+    cvttps2dq      %xmm1, %xmm1
+    cvttps2dq      %xmm2, %xmm2
+    cvttps2dq      %xmm3, %xmm3
+    pslld          $16, %xmm1
+    pslld          $8, %xmm2
+    por            %xmm2, %xmm1
+    por            %xmm3, %xmm1      # (R << 16) | (G << 8) | B
+    movq           24(%rsp), %rax  # 8-byte Reload (dst)
+    movdqu         %xmm1, (%rax,%r12)
     jmp            .LBB2_14
 .LBB2_15:
     addq           $168, %rsp
@@ -641,6 +532,10 @@ RODATA
 .p2align 4
 .Lhalf:
 .long	0x3f000000  # 0.5f round-half-up bias (matches scalar floor(v+0.5f))
+
+EMIT_LOG2_POLY_8
+EMIT_EXP2_POLY_8
+EMIT_POW_COMMON_CONSTANTS
 
 RODATA
 .p2align 4
