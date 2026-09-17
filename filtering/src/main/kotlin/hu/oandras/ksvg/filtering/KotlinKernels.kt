@@ -453,15 +453,31 @@ public object KotlinKernels {
         val dzdxScale = canvasScaleX * 0.25f
         val dzdyScale = canvasScaleY * 0.25f
 
+        // Sliding 3-column Sobel tap window, reused across all rows (no
+        // per-row or per-pixel allocation; rotation swaps references only).
+        // Column invariant at pixel x: colL = max(x-1,0), colM = x,
+        // colR = min(x+1,width-1); each holds (top, mid, bot) scaled heights.
+        var colL = FloatArray(3)
+        var colM = FloatArray(3)
+        var colR = FloatArray(3)
+
         for (y in clipTop until clipBottom) {
             val userY = userTop + y * invCanvasScaleY
             val uy = ((userY - originY) / unitSizeY).toFloat()
             val rowOffset = y * width
+            // y-only edge rows: hoisted out of the x loop (same Ints, same addressing).
+            val topY = maxOf(0, y - 1)
+            val bottomY = minOf(height - 1, y + 1)
+            // Seed the tap window. Guarded by the same condition as the x loop
+            // below, so no read can go out of bounds on empty clip ranges.
+            if (clipLeft < clipRight) {
+                readHeightColumn(colL, pix, width, surfaceScaleNormalized, maxOf(0, clipLeft - 1), topY, y, bottomY)
+                readHeightColumn(colM, pix, width, surfaceScaleNormalized, clipLeft, topY, y, bottomY)
+                readHeightColumn(colR, pix, width, surfaceScaleNormalized, minOf(width - 1, clipLeft + 1), topY, y, bottomY)
+            }
             for (x in clipLeft until clipRight) {
                 val userX = userLeft + x * invCanvasScaleX
                 val ux = ((userX - originX) / unitSizeX).toFloat()
-
-                val surfaceZ = heightAt(pix, width, surfaceScaleNormalized, x, y)
 
                 var lx = 0f
                 var ly = 0f
@@ -476,6 +492,10 @@ public object KotlinKernels {
                     }
 
                     else -> {
+                        // colM[1] is heightAt(x, y) by window construction
+                        // (same address, same value); the center tap is free
+                        // for point/spot, and distant never touches it.
+                        val surfaceZ = colM[1]
                         val vx = lightX - ux
                         val vy = lightY - uy
                         val vz = lightZ - surfaceZ
@@ -488,7 +508,7 @@ public object KotlinKernels {
                                 factor = 1f
                             } else {
                                 var dot = (spotTargetX * -lx + spotTargetY * -ly + spotTargetZ * -lz)
-                                if (dot < -1.0) dot = -1.0 else if (dot > 1.0) dot = 1.0
+                                dot = dot.coerceIn(-1.0, 1.0)
                                 var f = dot.toFloat()
                                 if (f.toDouble() < spotConeCosine) f = 0f
                                 factor = f.coerceAtLeast(0f)
@@ -497,18 +517,17 @@ public object KotlinKernels {
                     }
                 }
 
-                val leftX = maxOf(0, x - 1)
-                val rightX = minOf(width - 1, x + 1)
-                val topY = maxOf(0, y - 1)
-                val bottomY = minOf(height - 1, y + 1)
-                val leftTop = heightAt(pix, width, surfaceScaleNormalized, leftX, topY)
-                val left = heightAt(pix, width, surfaceScaleNormalized, leftX, y)
-                val leftBottom = heightAt(pix, width, surfaceScaleNormalized, leftX, bottomY)
-                val rightTop = heightAt(pix, width, surfaceScaleNormalized, rightX, topY)
-                val right = heightAt(pix, width, surfaceScaleNormalized, rightX, y)
-                val rightBottom = heightAt(pix, width, surfaceScaleNormalized, rightX, bottomY)
-                val top = heightAt(pix, width, surfaceScaleNormalized, x, topY)
-                val bottom = heightAt(pix, width, surfaceScaleNormalized, x, bottomY)
+                // Sobel taps from the sliding window (same values, same formula
+                // text as the direct heightAt reads below; only the source
+                // of each named tap changed).
+                val leftTop = colL[0]
+                val left = colL[1]
+                val leftBottom = colL[2]
+                val rightTop = colR[0]
+                val right = colR[1]
+                val rightBottom = colR[2]
+                val top = colM[0]
+                val bottom = colM[2]
                 val dzdx = (rightTop + 2 * right + rightBottom -
                         (leftTop + 2 * left + leftBottom)) * dzdxScale
                 val dzdy = (leftBottom + 2 * bottom + rightBottom -
@@ -559,6 +578,14 @@ public object KotlinKernels {
                 } else {
                     argb(outA, outR, outG, outB)
                 }
+                // Slide the window: rotate the buffers (reference swap only,
+                // no copy, no allocation) and read the single new right column.
+                // Runs only inside the x loop, so minOf keeps every read in bounds.
+                val tmpCol = colL
+                colL = colM
+                colM = colR
+                colR = tmpCol
+                readHeightColumn(colR, pix, width, surfaceScaleNormalized, minOf(width - 1, x + 2), topY, y, bottomY)
             }
         }
     }
@@ -630,6 +657,24 @@ public object KotlinKernels {
         x: Int,
         y: Int,
     ): Float = (pix[y * width + x] ushr 24) * surfaceScaleNormalized
+
+    // Reads one full tap column (top/mid/bot scaled heights) for the sliding
+    // Sobel window. Private inline like heightAt: zero call overhead, explicit
+    // parameters so nothing is captured and nothing is allocated.
+    private inline fun readHeightColumn(
+        dst: FloatArray,
+        pix: IntArray,
+        width: Int,
+        surfaceScaleNormalized: Float,
+        cx: Int,
+        topY: Int,
+        y: Int,
+        bottomY: Int,
+    ) {
+        dst[0] = heightAt(pix, width, surfaceScaleNormalized, cx, topY)
+        dst[1] = heightAt(pix, width, surfaceScaleNormalized, cx, y)
+        dst[2] = heightAt(pix, width, surfaceScaleNormalized, cx, bottomY)
+    }
 
     /**
      * feComposite operator="arithmetic". [useLinear] applies the
