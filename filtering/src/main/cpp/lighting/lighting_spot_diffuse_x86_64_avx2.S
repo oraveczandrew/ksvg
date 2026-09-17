@@ -114,6 +114,8 @@ RODATA8
 TYPE(SYM(ksvgLightingSpotDiffuseRowAvx2), @function)
 SYM(ksvgLightingSpotDiffuseRowAvx2):  # @ksvgLightingSpotDiffuseRowAvx2
 # %bb.0:
+    // Caller contract: count is a multiple of 8 (C++ passes (ixHi-x)&~7);
+    // there is no sub-8px tail here, scalar C++ covers row edges/tails.
     testl        %r8d, %r8d
     jle          LSPOTAVX2_DONE
 # %bb.1:
@@ -292,6 +294,8 @@ RODATA16
 TYPE(SYM(ksvgLightingSpotDiffuseRowAvx2Linear), @function)
 SYM(ksvgLightingSpotDiffuseRowAvx2Linear):  # @SYM(ksvgLightingSpotDiffuseRowAvx2Linear)
 # %bb.0:
+    // Caller contract: count is a multiple of 8 (C++ passes (ixHi-x)&~7);
+    // there is no sub-8px tail here, scalar C++ covers row edges/tails.
     testl        %r8d, %r8d
     jle          .LBB1_4
 # %bb.1:

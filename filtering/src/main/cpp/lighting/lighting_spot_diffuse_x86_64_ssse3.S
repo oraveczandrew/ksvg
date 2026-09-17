@@ -141,6 +141,8 @@ RODATA4
 TYPE(SYM(ksvgLightingSpotDiffuseRowSsse3), @function)
 SYM(ksvgLightingSpotDiffuseRowSsse3):
 # %bb.0:
+    // Caller contract: count is a multiple of 4 (C++ passes (ixHi-x)&~3);
+    // there is no 1-3px tail here, scalar C++ covers row edges/tails.
     testl          %r8d, %r8d
     jle            LSPOTSSSE3_DONE
 # %bb.1:
@@ -356,6 +358,8 @@ RODATA4
 TYPE(SYM(ksvgLightingSpotDiffuseRowSsse3Linear), @function)
 SYM(ksvgLightingSpotDiffuseRowSsse3Linear):
 # %bb.0:
+    // Caller contract: count is a multiple of 4 (C++ passes (ixHi-x)&~3);
+    // there is no 1-3px tail here, scalar C++ covers row edges/tails.
     testl          %r8d, %r8d
     jle            .LBB1_4
 # %bb.1:
