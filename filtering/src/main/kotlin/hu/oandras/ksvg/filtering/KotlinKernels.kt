@@ -193,6 +193,12 @@ public object KotlinKernels {
         clipBottom: Int,
     ) {
         dst.fill(0)
+        // Separable min/max: a 2D window min/max equals the column pass over
+        // row-pass results (min/max are associative), so (2r+1)^2 taps become
+        // ~2*(2r+1). The packed intermediate round-trips exactly (channels live
+        // in disjoint bits, values stay masked), and the clamped index sets
+        // below are identical to the original 2D windows.
+        val tmp = IntArray(width * height)
         if (erode) {
             val rInit = 255 shl 16
             val gInit = 255 shl 8
@@ -200,57 +206,95 @@ public object KotlinKernels {
             val lastY = minOf(clipBottom, height - radiusY)
             val firstX = maxOf(clipLeft, radiusX)
             val lastX = minOf(clipRight, width - radiusX)
+            // Phase 1 covers every row phase 2 will read: the column pass
+            // reaches radiusY above/below the interior rows, and unwritten
+            // tmp rows would read as zero. Bounds hold by construction of
+            // firstY/lastY (0 <= firstY-radiusY, lastY+radiusY <= height).
+            for (y in firstY - radiusY until lastY + radiusY) {
+                val rowOffset = y * width
+                for (x in firstX until lastX) {
+                    // Phase 1 (rows): per-channel min over the in-bounds
+                    // horizontal segment [x-radiusX, x+radiusX].
+                    var a = 255
+                    var r = rInit
+                    var g = gInit
+                    var b = 255
+                    for (kx in x - radiusX..x + radiusX) {
+                        val color = src[rowOffset + kx]
+                        a = minOf(a, color ushr 24)
+                        r = minOf(r, color and 0xFF0000)
+                        g = minOf(g, color and 0xFF00)
+                        b = minOf(b, color and 0xFF)
+                    }
+                    tmp[rowOffset + x] = (a shl 24) or r or g or b
+                }
+            }
             for (y in firstY until lastY) {
                 val rowOffset = y * width
                 val top = y - radiusY
                 val bottom = y + radiusY
                 for (x in firstX until lastX) {
+                    // Phase 2 (columns): per-channel min over the in-bounds
+                    // vertical segment of phase-1 results.
                     var a = 255
                     var r = rInit
                     var g = gInit
                     var b = 255
-                    val left = x - radiusX
-                    val right = x + radiusX
                     for (ky in top..bottom) {
-                        val kRowOffset = ky * width
-                        for (kx in left..right) {
-                            val color = src[kRowOffset + kx]
-                            a = minOf(a, color ushr 24)
-                            r = minOf(r, color and 0xFF0000)
-                            g = minOf(g, color and 0xFF00)
-                            b = minOf(b, color and 0xFF)
-                        }
+                        val color = tmp[ky * width + x]
+                        a = minOf(a, color ushr 24)
+                        r = minOf(r, color and 0xFF0000)
+                        g = minOf(g, color and 0xFF00)
+                        b = minOf(b, color and 0xFF)
                     }
                     dst[rowOffset + x] = (a shl 24) or r or g or b
                 }
             }
         } else {
-            val interiorFirstY = maxOf(clipTop, radiusY)
-            val interiorLastY = minOf(clipBottom, height - radiusY)
-            val interiorFirstX = maxOf(clipLeft, radiusX)
-            val interiorLastX = minOf(clipRight, width - radiusX)
-            for (y in clipTop until clipBottom) {
+            // Dilate covers the full clip rect with per-pixel clamped windows.
+            // Phase 1 must span every row phase 2 reads (radiusY beyond the
+            // clip rows on both sides, clamped into the image).
+            val phaseTop = maxOf(0, clipTop - radiusY)
+            val phaseBottom = minOf(height, clipBottom + radiusY)
+            for (y in phaseTop until phaseBottom) {
                 val rowOffset = y * width
-                val interiorY = y in interiorFirstY until interiorLastY
-                val top = if (interiorY) y - radiusY else maxOf(0, y - radiusY)
-                val bottom = if (interiorY) y + radiusY else minOf(height - 1, y + radiusY)
                 for (x in clipLeft until clipRight) {
+                    // Phase 1 (rows): per-channel max over the clamped
+                    // horizontal segment (identical indices to the original
+                    // interior fast path where it applied).
                     var a = 0
                     var r = 0
                     var g = 0
                     var b = 0
-                    val interiorX = x in interiorFirstX until interiorLastX
-                    val left = if (interiorY && interiorX) x - radiusX else maxOf(0, x - radiusX)
-                    val right = if (interiorY && interiorX) x + radiusX else minOf(width - 1, x + radiusX)
+                    val left = maxOf(0, x - radiusX)
+                    val right = minOf(width - 1, x + radiusX)
+                    for (kx in left..right) {
+                        val color = src[rowOffset + kx]
+                        a = maxOf(a, color ushr 24)
+                        r = maxOf(r, color and 0xFF0000)
+                        g = maxOf(g, color and 0xFF00)
+                        b = maxOf(b, color and 0xFF)
+                    }
+                    tmp[rowOffset + x] = (a shl 24) or r or g or b
+                }
+            }
+            for (y in clipTop until clipBottom) {
+                val rowOffset = y * width
+                val top = maxOf(0, y - radiusY)
+                val bottom = minOf(height - 1, y + radiusY)
+                for (x in clipLeft until clipRight) {
+                    // Phase 2 (columns): per-channel max over the clamped
+                    // vertical segment of phase-1 results.
+                    var a = 0
+                    var r = 0
+                    var g = 0
+                    var b = 0
                     for (ky in top..bottom) {
-                        val kRowOffset = ky * width
-                        for (kx in left..right) {
-                            val color = src[kRowOffset + kx]
-                            a = maxOf(a, color ushr 24)
-                            r = maxOf(r, color and 0xFF0000)
-                            g = maxOf(g, color and 0xFF00)
-                            b = maxOf(b, color and 0xFF)
-                        }
+                        val color = tmp[ky * width + x]
+                        a = maxOf(a, color ushr 24)
+                        r = maxOf(r, color and 0xFF0000)
+                        g = maxOf(g, color and 0xFF00)
+                        b = maxOf(b, color and 0xFF)
                     }
                     dst[rowOffset + x] = (a shl 24) or r or g or b
                 }
