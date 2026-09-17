@@ -15,6 +15,34 @@
  */
 
 #include "asm_macros.S"
+#include "lighting_i386_ssse3_macros.S"
+
+.text
+/* Scalar-pow tables for POW1_SSE (same coefficients as the SSSE3 kernel). */
+.p2align 2
+.Ldss_one: .long 0x3f800000
+.p2align 5
+.Ldss_log2:
+    .long 0xbc14e99e
+    .long 0x3d517250
+    .long 0xbe0b306b
+    .long 0x3e762e19
+    .long 0xbeb16ed0
+    .long 0x3ef4f943
+    .long 0xbf389c1f
+    .long 0x3fb8a9fd
+    .long 0x3335bce7
+.p2align 5
+.Ldss_exp2:
+    .long 0x35fbc4c2
+    .long 0x376d5f0a
+    .long 0x3922b9a8
+    .long 0x3aaeacc9
+    .long 0x3c1d965e
+    .long 0x3d63583b
+    .long 0x3e75fdf0
+    .long 0x3f317218
+    .long 0x3f800000
 
 .text
 
@@ -222,17 +250,15 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vaddss       %xmm1, %xmm0, %xmm0
     vxorps       %xmm1, %xmm1, %xmm1
     vmaxss       %xmm0, %xmm1, %xmm0
-    vcvtss2sd    %xmm0, %xmm0, %xmm0
-    vmovsd       40(%esp), %xmm1  # 8-byte Reload
-    # xmm1 = mem[0],zero
-    vmovsd       %xmm1, 8(%esp)
-    vmovsd       %xmm0, (%esp)
+    # p = pow(ndoth, exponent): inline scalar minimax, no PLT call.
+    vmovaps      %xmm0, %xmm1  # pow base
+    vmovss       32(%ebp), %xmm2  # exponent
     vzeroupper
-    calll        pow@PLT
+    POW1_SSE
     vxorps       %xmm1, %xmm1, %xmm1
     vmovss       32(%esp), %xmm7  # 4-byte Reload
     # xmm7 = mem[0],zero,zero,zero
-    fstps        36(%esp)
+    movss        %xmm0, 36(%esp)
     vmovss       8(%edi), %xmm0  # xmm0 = mem[0],zero,zero,zero
     vmulss       36(%esp), %xmm0, %xmm0
     vucomiss     %xmm0, %xmm1
@@ -456,18 +482,16 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vaddss       %xmm1, %xmm0, %xmm0
     vxorps       %xmm1, %xmm1, %xmm1
     vmaxss       %xmm0, %xmm1, %xmm0
-    vcvtss2sd    %xmm0, %xmm0, %xmm0
-    vmovsd       56(%esp), %xmm1  # 8-byte Reload
-    # xmm1 = mem[0],zero
-    vmovsd       %xmm1, 8(%esp)
-    vmovsd       %xmm0, (%esp)
-    movl         28(%esp), %ebx  # 4-byte Reload
+    # p = pow(ndoth, exponent): inline scalar minimax, no PLT call.
+    vmovaps      %xmm0, %xmm1  # pow base
+    vmovss       32(%ebp), %xmm2  # exponent
+    movl         28(%esp), %ebx  # 4-byte Reload (GOT base for GOTOFF)
     vzeroupper
-    calll        pow@PLT
+    POW1_SSE
     vxorps       %xmm2, %xmm2, %xmm2
     vmovss       48(%esp), %xmm7  # 4-byte Reload
     # xmm7 = mem[0],zero,zero,zero
-    fstps        52(%esp)
+    movss        %xmm0, 52(%esp)
     vmovss       8(%edi), %xmm0  # xmm0 = mem[0],zero,zero,zero
     vmulss       52(%esp), %xmm0, %xmm0
     vucomiss     %xmm0, %xmm2
