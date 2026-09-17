@@ -60,6 +60,14 @@ extern "C" void ksvgLightingPointSpecularRowNeon64Linear(
     const jint* srcT, const jint* srcM, const jint* srcB,
     jint* dst, jint count, const PointLightingParams* params,
     float exponent, const uint8_t* linearToSrgb);
+// Hand-written AArch64/AdvSIMD spot-light specular kernel (lighting_spot_specular_aarch64_neon.S).
+extern "C" void ksvgLightingSpotSpecularRowNeon64(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const SpotLightingParams* params, float exponent);
+extern "C" void ksvgLightingSpotSpecularRowNeon64Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const SpotLightingParams* params,
+    float exponent, const uint8_t* linearToSrgb);
 #elif defined(__arm__)
 // Hand-written ARM32/AdvSIMD distant-light diffuse kernel (lighting_distant_diffuse_armv7a_neon.S).
 extern "C" void ksvgLightingDistantDiffuseRowNeon32(
@@ -887,10 +895,11 @@ void applyVector(
                         break;
                 }
 #elif defined(__aarch64__)
-                // Spot-specular stays on the scalar fallback until its
-                // NEON kernel lands; only diffuse is wired.
-                if (!isSpecular) {
-                    assert(backend == SIMD_BACKEND_NEON64);
+                // Spot-specular now wired (NEON kernel landed); premultiplied
+                // specular still takes the scalar fallback via the outer
+                // guard, so specular here is always straight.
+                assert(backend == SIMD_BACKEND_NEON64);
+                {
                     const jint c4 = (ixHi - x) & ~3;
                     if (c4 > 0) {
                         if (tLen == 0.0) {
@@ -900,10 +909,22 @@ void applyVector(
                             // shares the PointLightingParams prefix.
                             const PointLightingParams* plp =
                                 reinterpret_cast<const PointLightingParams*>(&slp);
-                            if (useLinear) {
+                            if (isSpecular) {
+                                if (useLinear) {
+                                    ksvgLightingPointSpecularRowNeon64Linear(srcT, srcM, srcB, rowOut, c4, plp, exponent, ksvg_linear_to_srgb_lut);
+                                } else {
+                                    ksvgLightingPointSpecularRowNeon64(srcT, srcM, srcB, rowOut, c4, plp, exponent);
+                                }
+                            } else if (useLinear) {
                                 ksvgLightingPointDiffuseRowNeon64Linear(srcT, srcM, srcB, rowOut, c4, plp, ksvg_linear_to_srgb_lut);
                             } else {
                                 ksvgLightingPointDiffuseRowNeon64(srcT, srcM, srcB, rowOut, c4, plp);
+                            }
+                        } else if (isSpecular) {
+                            if (useLinear) {
+                                ksvgLightingSpotSpecularRowNeon64Linear(srcT, srcM, srcB, rowOut, c4, &slp, exponent, ksvg_linear_to_srgb_lut);
+                            } else {
+                                ksvgLightingSpotSpecularRowNeon64(srcT, srcM, srcB, rowOut, c4, &slp, exponent);
                             }
                         } else if (useLinear) {
                             ksvgLightingSpotDiffuseRowNeon64Linear(srcT, srcM, srcB, rowOut, c4, &slp, ksvg_linear_to_srgb_lut);
