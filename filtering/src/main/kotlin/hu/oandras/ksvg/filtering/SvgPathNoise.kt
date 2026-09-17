@@ -37,9 +37,12 @@ public class SvgPathNoise(
     @JvmField public val p: IntArray
 ) {
 
-    @JvmField public val g2: Array<DoubleArray> = Array(B_SIZE + B_SIZE + 2) {
-        DoubleArray(2)
-    }
+    // Flat gradient tables (one DoubleArray per component). Previously an
+    // Array<DoubleArray>; the flat form halves noise2's loads and removes
+    // ~500 tiny allocations per generator. Values are bit-identical to the
+    // old layout (same doubles, same indices, including the wrapped tail).
+    @JvmField public val gx: DoubleArray = DoubleArray(B_SIZE + B_SIZE + 2)
+    @JvmField public val gy: DoubleArray = DoubleArray(B_SIZE + B_SIZE + 2)
 
     init {
         for (i in 0 until B_SIZE) {
@@ -49,27 +52,27 @@ public class SvgPathNoise(
                 a = (lcg.next() % (B_SIZE + B_SIZE)) - B_SIZE
                 b = (lcg.next() % (B_SIZE + B_SIZE)) - B_SIZE
             } while (a == 0 && b == 0)
-            g2[i][0] = a.toDouble() / B_SIZE
-            g2[i][1] = b.toDouble() / B_SIZE
-            normalize2(g2[i])
+            // Same op order as the old normalize2(row): round a/B and b/B
+            // first, then normalize the rounded values.
+            var gx0 = a.toDouble() / B_SIZE
+            var gy0 = b.toDouble() / B_SIZE
+            val s = sqrt(gx0 * gx0 + gy0 * gy0)
+            if (s != 0.0) {
+                gx0 /= s
+                gy0 /= s
+            }
+            gx[i] = gx0
+            gy[i] = gy0
         }
 
         for (i in 0 until B_SIZE + 2) {
-            g2[B_SIZE + i][0] = g2[i][0]
-            g2[B_SIZE + i][1] = g2[i][1]
+            gx[B_SIZE + i] = gx[i]
+            gy[B_SIZE + i] = gy[i]
         }
     }
 
-    private fun normalize2(v: DoubleArray) {
-        val s = sqrt(v[0] * v[0] + v[1] * v[1])
-        if (s != 0.0) {
-            v[0] /= s
-            v[1] /= s
-        }
-    }
-
-    private fun sCurve(t: Double): Double = t * t * (3.0 - 2.0 * t)
-    private fun lerp(t: Double, a: Double, b: Double): Double = a + t * (b - a)
+    private inline fun sCurve(t: Double): Double = t * t * (3.0 - 2.0 * t)
+    private inline fun lerp(t: Double, a: Double, b: Double): Double = a + t * (b - a)
 
     /**
      * Samples 2D Perlin noise.
@@ -119,12 +122,12 @@ public class SvgPathNoise(
         val sx = sCurve(rx0)
         val sy = sCurve(ry0)
 
-        val u = rx0 * g2[b00][0] + ry0 * g2[b00][1]
-        val v = rx1 * g2[b10][0] + ry0 * g2[b10][1]
+        val u = rx0 * gx[b00] + ry0 * gy[b00]
+        val v = rx1 * gx[b10] + ry0 * gy[b10]
         val a = lerp(sx, u, v)
 
-        val u2 = rx0 * g2[b01][0] + ry1 * g2[b01][1]
-        val v2 = rx1 * g2[b11][0] + ry1 * g2[b11][1]
+        val u2 = rx0 * gx[b01] + ry1 * gy[b01]
+        val v2 = rx1 * gx[b11] + ry1 * gy[b11]
         val b = lerp(sx, u2, v2)
 
         return lerp(sy, a, b)

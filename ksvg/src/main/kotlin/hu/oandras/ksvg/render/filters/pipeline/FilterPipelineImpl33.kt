@@ -825,16 +825,16 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             val p3 = generators[3].p[i] and 0xFF
             pixels[i] = (p3 shl 24) or (p0 shl 16) or (p1 shl 8) or p2
 
-            val g0x = packG(generators[0].g2[i][0])
-            val g1x = packG(generators[1].g2[i][0])
-            val g2x = packG(generators[2].g2[i][0])
-            val g3x = packG(generators[3].g2[i][0])
+            val g0x = packG(generators[0].gx[i])
+            val g1x = packG(generators[1].gx[i])
+            val g2x = packG(generators[2].gx[i])
+            val g3x = packG(generators[3].gx[i])
             pixels[256 + i] = (g3x shl 24) or (g0x shl 16) or (g1x shl 8) or g2x
 
-            val g0y = packG(generators[0].g2[i][1])
-            val g1y = packG(generators[1].g2[i][1])
-            val g2y = packG(generators[2].g2[i][1])
-            val g3y = packG(generators[3].g2[i][1])
+            val g0y = packG(generators[0].gy[i])
+            val g1y = packG(generators[1].gy[i])
+            val g2y = packG(generators[2].gy[i])
+            val g3y = packG(generators[3].gy[i])
             pixels[512 + i] = (g3y shl 24) or (g0y shl 16) or (g1y shl 8) or g2y
         }
         bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 3)
