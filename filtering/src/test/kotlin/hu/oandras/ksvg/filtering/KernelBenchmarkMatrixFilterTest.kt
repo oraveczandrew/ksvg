@@ -27,7 +27,7 @@ class KernelBenchmarkMatrixFilterTest {
     fun noFilterRunsEveryCase() {
         val cases = KernelBenchmarkMatrix.cases(kernels = null, sizes = sizes512)
 
-        assertEquals(16, cases.size)
+        assertEquals(24, cases.size)
         assertEquals("ArithmeticComposite (linear)", cases.first().config.name)
     }
 
@@ -35,7 +35,7 @@ class KernelBenchmarkMatrixFilterTest {
     fun emptyConfigFilterIsIgnored() {
         val cases = KernelBenchmarkMatrix.cases(kernels = null, configs = emptySet(), sizes = sizes512)
 
-        assertEquals(16, cases.size)
+        assertEquals(24, cases.size)
     }
 
     @Test
@@ -47,7 +47,11 @@ class KernelBenchmarkMatrixFilterTest {
                 "ArithmeticComposite (linear)",
                 "ArithmeticComposite (non-linear)",
                 "Lighting (diffuse, distant, linear)",
+                "Lighting (diffuse, point, linear)",
+                "Lighting (diffuse, spot, linear)",
                 "Lighting (specular, distant, linear)",
+                "Lighting (specular, point, linear)",
+                "Lighting (specular, spot, linear)",
                 "UnLinearize",
             ),
             cases.map { it.config.name },
@@ -100,6 +104,10 @@ class KernelBenchmarkMatrixFilterTest {
             listOf(
                 "Lighting (specular, distant)",
                 "Lighting (specular, distant, linear)",
+                "Lighting (specular, point)",
+                "Lighting (specular, point, linear)",
+                "Lighting (specular, spot)",
+                "Lighting (specular, spot, linear)",
             ),
             cases.map { it.config.name },
         )
