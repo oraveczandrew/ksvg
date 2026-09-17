@@ -57,7 +57,7 @@ fun readBenchmarkRows(file: File): List<BenchRow> {
  */
 object BenchmarkTableWriter {
 
-    val isaOrder = listOf("kotlin", "scalar", "sse2", "ssse3", "avx2", "avx512", "neon32", "neon64")
+    val isaOrder = listOf("kotlin", "scalar", "sse2", "ssse3", "avx2", "neon32", "neon64")
 
     fun backendRank(backend: String): Int {
         val lower = backend.lowercase()

@@ -261,7 +261,7 @@ void ksvgUnlinearizeApplyAvx2(
 
 // displacement_map.cpp — full frame displacement.
 // x86_64 baseline is the SSSE3 kernel (the old SSE2 file was replaced by a
-// hand-written ssse3 variant); AVX512 was dropped from this filter.
+// hand-written ssse3 variant)
 #if defined(__x86_64__)
 void ksvgDisplacementMapApplySsse3(
         const jint* src, const jint* map, jint* dst, jint width, jint height,

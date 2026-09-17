@@ -62,7 +62,7 @@ class BenchmarkTableWriterTest {
 
     @Test
     fun ranksBackendsInIsaOrder() {
-        val order = listOf("kotlin", "scalar", "sse2", "ssse3", "avx2", "avx512", "neon32", "neon64")
+        val order = listOf("kotlin", "scalar", "sse2", "ssse3", "avx2", "neon32", "neon64")
         for ((i, b) in order.withIndex()) {
             assertEquals(i, BenchmarkTableWriter.backendRank(b))
         }
@@ -113,7 +113,6 @@ class BenchmarkTableWriterTest {
                     row("K", "scalar", "512x512", "10.0"),
                     row("K", "sse2", "512x512", "1.0"),
                     row("K", "avx2", "512x512", "12.0"),
-                    row("K", "avx512", "512x512", "8.0"),
                 ),
             ),
         )
