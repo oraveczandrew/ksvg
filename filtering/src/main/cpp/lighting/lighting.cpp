@@ -60,6 +60,14 @@ extern "C" void ksvgLightingDistantSpecularRowNeon32Linear(
     const jint* srcT, const jint* srcM, const jint* srcB,
     jint* dst, jint count, const LightingParams* params,
     const uint8_t* linearToSrgb, float exponent);
+// Hand-written ARM32/AdvSIMD point-light diffuse kernel (lighting_point_diffuse_armv7a_neon.S).
+extern "C" void ksvgLightingPointDiffuseRowNeon32(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const PointLightingParams* params);
+extern "C" void ksvgLightingPointDiffuseRowNeon32Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const PointLightingParams* params,
+    const uint8_t* linearToSrgb);
 #elif defined(__i386__) || defined(__x86_64__)
 #include "simd_x86.h"
 #endif
@@ -678,6 +686,21 @@ void applyVector(
                             ksvgLightingPointDiffuseRowNeon64Linear(srcT, srcM, srcB, rowOut, c4, &plp, ksvg_linear_to_srgb_lut);
                         } else {
                             ksvgLightingPointDiffuseRowNeon64(srcT, srcM, srcB, rowOut, c4, &plp);
+                        }
+                        x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
+                    }
+                }
+#elif defined(__arm__)
+                // Point-specular stays on the scalar fallback until its
+                // NEON kernel lands (kernels 4-5); only diffuse is wired.
+                if (!isSpecular) {
+                    assert(backend == SIMD_BACKEND_NEON32);
+                    const jint c4 = (ixHi - x) & ~3;
+                    if (c4 > 0) {
+                        if (useLinear) {
+                            ksvgLightingPointDiffuseRowNeon32Linear(srcT, srcM, srcB, rowOut, c4, &plp, ksvg_linear_to_srgb_lut);
+                        } else {
+                            ksvgLightingPointDiffuseRowNeon32(srcT, srcM, srcB, rowOut, c4, &plp);
                         }
                         x += c4; srcT += c4; srcM += c4; srcB += c4; rowOut += c4;
                     }
