@@ -15,6 +15,7 @@
  */
 
 #include "asm_macros.S"
+#include "math_pow_macros.S"
 #include "lighting_x86_64_avx2_macros.S"
 
 /*
@@ -645,6 +646,10 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 .long 0x00ffffff,0x00ffffff,0x00ffffff,0x00ffffff
 .Lhalf:
 .long 0x3f000000  # 0.5f round-half-up bias (matches scalar floor(v+0.5f))
+
+EMIT_LOG2_POLY_8
+EMIT_EXP2_POLY_8
+EMIT_POW_COMMON_CONSTANTS
 
 RODATA
 .p2align 4
