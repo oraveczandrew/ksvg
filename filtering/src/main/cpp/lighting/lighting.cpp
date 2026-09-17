@@ -83,7 +83,7 @@ extern "C" void ksvgLightingDistantSpecularRowNeon32(
 extern "C" void ksvgLightingDistantSpecularRowNeon32Linear(
     const jint* srcT, const jint* srcM, const jint* srcB,
     jint* dst, jint count, const LightingParams* params,
-    const uint8_t* linearToSrgb, float exponent);
+    float exponent, const uint8_t* linearToSrgb);
 // Hand-written ARM32/AdvSIMD point-light diffuse kernel (lighting_point_diffuse_armv7a_neon.S).
 extern "C" void ksvgLightingPointDiffuseRowNeon32(
     const jint* srcT, const jint* srcM, const jint* srcB,
@@ -496,8 +496,20 @@ void applyVector(
                     x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
                 }
 #elif defined(__arm__)
-                if (!isSpecular) {
-                    assert(backend == SIMD_BACKEND_NEON32);
+                // Distant-specular now wired (NEON kernel landed); premultiplied
+                // specular still takes the scalar fallback via the outer
+                // guard, so specular here is always straight.
+                assert(backend == SIMD_BACKEND_NEON32);
+                if (isSpecular) {
+                    if (!premultiplied) {
+                        if (useLinear) {
+                            ksvgLightingDistantSpecularRowNeon32Linear(srcT, srcM, srcB, rowOut, count, &lp, exponent, ksvg_linear_to_srgb_lut);
+                        } else {
+                            ksvgLightingDistantSpecularRowNeon32(srcT, srcM, srcB, rowOut, count, &lp, exponent);
+                        }
+                        x += count; srcT += count; srcM += count; srcB += count; rowOut += count;
+                    }
+                } else {
                     if (useLinear) {
                         ksvgLightingDistantDiffuseRowNeon32Linear(srcT, srcM, srcB, rowOut, count, &lp, ksvg_linear_to_srgb_lut);
                     } else {

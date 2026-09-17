@@ -79,6 +79,7 @@ ksvgLightingDistantSpecularRowNeon32:
 
     ldr     r4, [sp, #104]         // count
     ldr     r5, [sp, #108]         // params
+    vldr    s0, [sp, #112]         // exponent (entry offset, pre-sub!)
     cmp     r4, #0
     beq     .Lexit0
 
@@ -92,9 +93,8 @@ ksvgLightingDistantSpecularRowNeon32:
     mov     r10, r2                 // srcB
     mov     r11, r3                 // dst
 
-    // Exponent (softfp stack argument) -> double on the stack, before the
-    // param loads below clobber q0 (d0/s0 holder).
-    vldr    s0, [sp, #112]
+    // Exponent (softfp stack argument, loaded pre-sub above) -> double on
+    // the stack, before the param loads below clobber q0 (d0/s0 holder).
     vcvt.f64.f32 d0, s0
     vstr    d0, [sp, #16]
 
@@ -143,12 +143,15 @@ ksvgLightingDistantSpecularRowNeon32:
     vdup.32 q13, d4[0]    // lb
     vmov.f32 q14, #1.0    // one
 
-    // hx/hy/hz come from the stack (the definitive h values).
-    vldr    d16, [sp, #24]
-    vdup.32 q8, d16[0]
-    vdup.32 q9, d16[1]
-    vldr    d17, [sp, #32]
-    vdup.32 q10, d17[0]
+    // hx/hy/hz come from the stack (the definitive h values). GPR-based
+    // VDUP (no Qd/Dm overlap hazard: VDUP Qd,Dm[x] with overlapping
+    // registers is UNPREDICTABLE, cf. the point-diffuse armv7a findings).
+    ldr     r12, [sp, #24]         // hx bits
+    vdup.32 q8, r12
+    ldr     r12, [sp, #28]         // hy bits
+    vdup.32 q9, r12
+    ldr     r12, [sp, #32]         // hz bits
+    vdup.32 q10, r12
 
 .Lloop:
     // ---- Row T ----
@@ -342,16 +345,22 @@ ksvgLightingDistantSpecularRowNeon32:
     vstr    s0, [sp, #12]
 
     // ---- everything caller-saved died with pow; rebuild invariants ----
-    vldr    d16, [sp, #24]
-    vdup.32 q8, d16[0]
-    vdup.32 q9, d16[1]
-    vldr    d17, [sp, #32]
-    vdup.32 q10, d17[0]
-    vldr    d18, [r5, #-8]       // lr | lg
-    vldr    d19, [r5, #0]        // lb | ss
-    vdup.32 q11, d18[0]          // lr
-    vdup.32 q12, d18[1]          // lg
-    vdup.32 q13, d19[0]          // lb
+    // h reload via GPR VDUP (no Qd/Dm overlap hazard, see prologue).
+    ldr     r12, [sp, #24]         // hx bits
+    vdup.32 q8, r12
+    ldr     r12, [sp, #28]         // hy bits
+    vdup.32 q9, r12
+    ldr     r12, [sp, #32]         // hz bits
+    vdup.32 q10, r12
+    // lr/lg/lb via d6/d7 (q3 is dead scratch post-pow: ndoth already lives
+    // on the stack, and the pack below rewrites q3 before reading it).
+    // d18/d19 MUST NOT be used here: they alias q9 and would destroy the
+    // just-reloaded hy needed by the next iteration's dot.
+    vldr    d6, [r5, #-8]        // lr | lg
+    vldr    d7, [r5, #0]         // lb | ss
+    vdup.32 q11, d6[0]           // lr
+    vdup.32 q12, d6[1]           // lg
+    vdup.32 q13, d7[0]           // lb
     vmov.f32 q14, #1.0           // one
 
     // ---- intensity = clamp01(k * p) ----
@@ -421,12 +430,15 @@ ksvgLightingDistantSpecularRowNeon32:
 // void ksvgLightingDistantSpecularRowNeon32Linear(
 //   const jint* srcT, const jint* srcM, const jint* srcB,
 //   jint* dst, jint count, const LightingParams* params,
-//   const uint8_t* linearToSrgb, float exponent)
+//   float exponent, const uint8_t* linearToSrgb)
 //
 // AAPCS32 (softfp armeabi-v7a):
 //   r0 = srcT, r1 = srcM, r2 = srcB, r3 = dst
-//   [sp, #0] = count, [sp, #4] = params, [sp, #8] = linearToSrgb,
-//   [sp, #12] = exponent (8th arg, float).
+//   [sp, #0] = count, [sp, #4] = params, [sp, #8] = exponent (float),
+//   [sp, #12] = linearToSrgb.
+// NOTE: this (exponent, LUT) order matches the shared C++ dispatch and the
+// aarch64 twin (an earlier revision used the (LUT, exponent) order while the
+// kernel was never dispatched; fixed when wiring it up).
 //
 // Register map (loop-invariant): same as Neon32, plus:
 //   r6 = linearToSrgb LUT base (r7 and r12 remain the only closure scratch).
@@ -472,8 +484,8 @@ ksvgLightingDistantSpecularRowNeon32Linear:
 
     ldr     r4, [sp, #104]         // count
     ldr     r5, [sp, #108]         // params
-    ldr     r6, [sp, #112]         // linearToSrgb LUT
-    vldr    s0, [sp, #116]         // exponent (softfp stack argument)
+    vldr    s0, [sp, #112]         // exponent (entry offset, pre-sub!)
+    ldr     r6, [sp, #116]         // linearToSrgb LUT (entry offset, pre-sub!)
     cmp     r4, #0
     beq     .Llin_exit0
 
@@ -531,11 +543,13 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vdup.32 q13, d4[0]    // lb
     vmov.f32 q14, #1.0    // one
 
-    vldr    d16, [sp, #24]
-    vdup.32 q8, d16[0]
-    vdup.32 q9, d16[1]
-    vldr    d17, [sp, #32]
-    vdup.32 q10, d17[0]
+    // h reload via GPR VDUP (no Qd/Dm overlap hazard, see prologue).
+    ldr     r12, [sp, #24]         // hx bits
+    vdup.32 q8, r12
+    ldr     r12, [sp, #28]         // hy bits
+    vdup.32 q9, r12
+    ldr     r12, [sp, #32]         // hz bits
+    vdup.32 q10, r12
 
 .Llin_loop:
     // ---- Row T ----
@@ -725,16 +739,22 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vstr    s0, [sp, #12]
 
     // ---- everything caller-saved died with pow; rebuild invariants ----
-    vldr    d16, [sp, #24]
-    vdup.32 q8, d16[0]
-    vdup.32 q9, d16[1]
-    vldr    d17, [sp, #32]
-    vdup.32 q10, d17[0]
-    vldr    d18, [r5, #-8]       // lr | lg
-    vldr    d19, [r5, #0]        // lb | ss
-    vdup.32 q11, d18[0]          // lr
-    vdup.32 q12, d18[1]          // lg
-    vdup.32 q13, d19[0]          // lb
+    // h reload via GPR VDUP (no Qd/Dm overlap hazard, see prologue).
+    ldr     r12, [sp, #24]         // hx bits
+    vdup.32 q8, r12
+    ldr     r12, [sp, #28]         // hy bits
+    vdup.32 q9, r12
+    ldr     r12, [sp, #32]         // hz bits
+    vdup.32 q10, r12
+    // lr/lg/lb via d6/d7 (q3 is dead scratch post-pow: ndoth already lives
+    // on the stack, and the pack below rewrites q3 before reading it).
+    // d18/d19 MUST NOT be used here: they alias q9 and would destroy the
+    // just-reloaded hy needed by the next iteration's dot.
+    vldr    d6, [r5, #-8]        // lr | lg
+    vldr    d7, [r5, #0]         // lb | ss
+    vdup.32 q11, d6[0]           // lr
+    vdup.32 q12, d6[1]           // lg
+    vdup.32 q13, d7[0]           // lb
     vmov.f32 q14, #1.0           // one
 
     // ---- intensity = clamp01(k * p) ----
