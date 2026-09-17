@@ -149,8 +149,7 @@ CFI_START
     movaps         %xmm5, 96(%rsp)  # 16-byte Spill
     divps          %xmm1, %xmm6
     movaps         %xmm6, 80(%rsp)  # 16-byte Spill
-    cvtss2sd       %xmm0, %xmm0
-    movsd          %xmm0, 16(%rsp)  # 8-byte Spill
+    movss          %xmm0, 16(%rsp)  # 4-byte Spill
     decl           %eax
     shrl           $2, %eax
     shlq           $4, %rax
@@ -228,12 +227,10 @@ CFI_START
     addps          %xmm1, %xmm4
     maxps          .LCPI1_2(%rip), %xmm4
     movaps         %xmm4, 32(%rsp)  # 16-byte Spill
-    xorps          %xmm0, %xmm0
-    cvtss2sd       %xmm4, %xmm0
-    movsd          16(%rsp), %xmm1  # 8-byte Reload
+    movaps         %xmm4, %xmm0
+    movss          16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
-    CALL(pow)
-    cvtsd2ss       %xmm0, %xmm0
+    CALL(powf)
     mulss          8(%rbx), %xmm0
     xorps          %xmm1, %xmm1
     ucomiss        %xmm0, %xmm1
@@ -248,11 +245,9 @@ CFI_START
     SPEC_PIXEL_TAIL 12, 0
     movaps         32(%rsp), %xmm0  # 16-byte Reload
     shufps         $85, %xmm0, %xmm0  # xmm0 = xmm0[1,1,1,1]
-    cvtss2sd       %xmm0, %xmm0
-    movsd          16(%rsp), %xmm1  # 8-byte Reload
+    movss          16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
-    CALL(pow)
-    cvtsd2ss       %xmm0, %xmm0
+    CALL(powf)
     mulss          8(%rbx), %xmm0
     xorps          %xmm1, %xmm1
     ucomiss        %xmm0, %xmm1
@@ -267,11 +262,9 @@ CFI_START
     SPEC_PIXEL_TAIL 12, 4
     movaps         32(%rsp), %xmm0  # 16-byte Reload
     movhlps        %xmm0, %xmm0  # xmm0 = xmm0[1,1]
-    cvtss2sd       %xmm0, %xmm0
-    movsd          16(%rsp), %xmm1  # 8-byte Reload
+    movss          16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
-    CALL(pow)
-    cvtsd2ss       %xmm0, %xmm0
+    CALL(powf)
     mulss          8(%rbx), %xmm0
     xorps          %xmm1, %xmm1
     ucomiss        %xmm0, %xmm1
@@ -286,11 +279,9 @@ CFI_START
     SPEC_PIXEL_TAIL 12, 8
     movaps         32(%rsp), %xmm0  # 16-byte Reload
     shufps         $255, %xmm0, %xmm0  # xmm0 = xmm0[3,3,3,3]
-    cvtss2sd       %xmm0, %xmm0
-    movsd          16(%rsp), %xmm1  # 8-byte Reload
+    movss          16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
-    CALL(pow)
-    cvtsd2ss       %xmm0, %xmm0
+    CALL(powf)
     mulss          8(%rbx), %xmm0
     xorps          %xmm1, %xmm1
     ucomiss        %xmm0, %xmm1
@@ -388,8 +379,7 @@ CFI_START
     movaps         %xmm5, 96(%rsp)  # 16-byte Spill
     divps          %xmm1, %xmm6
     movaps         %xmm6, 80(%rsp)  # 16-byte Spill
-    cvtss2sd       %xmm0, %xmm0
-    movsd          %xmm0, 16(%rsp)  # 8-byte Spill
+    movss          %xmm0, 16(%rsp)  # 4-byte Spill
     decl           %eax
     shrl           $2, %eax
     shlq           $4, %rax
@@ -543,12 +533,10 @@ CFI_START
     addps          %xmm1, %xmm4
     maxps          .LCPI1_2(%rip), %xmm4
     movaps         %xmm4, 32(%rsp)  # 16-byte Spill
-    xorps          %xmm0, %xmm0
-    cvtss2sd       %xmm4, %xmm0
-    movsd          16(%rsp), %xmm1  # 8-byte Reload
+    movaps         %xmm4, %xmm0
+    movss          16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
-    CALL(pow)
-    cvtsd2ss       %xmm0, %xmm0
+    CALL(powf)
     mulss          8(%rbx), %xmm0
     xorps          %xmm1, %xmm1
     ucomiss        %xmm0, %xmm1
@@ -563,11 +551,9 @@ CFI_START
     SPEC_PIXEL_TAIL 12, 0
     movaps         32(%rsp), %xmm0  # 16-byte Reload
     shufps         $85, %xmm0, %xmm0  # xmm0 = xmm0[1,1,1,1]
-    cvtss2sd       %xmm0, %xmm0
-    movsd          16(%rsp), %xmm1  # 8-byte Reload
+    movss          16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
-    CALL(pow)
-    cvtsd2ss       %xmm0, %xmm0
+    CALL(powf)
     mulss          8(%rbx), %xmm0
     xorps          %xmm1, %xmm1
     ucomiss        %xmm0, %xmm1
@@ -582,11 +568,9 @@ CFI_START
     SPEC_PIXEL_TAIL 12, 4
     movaps         32(%rsp), %xmm0  # 16-byte Reload
     movhlps        %xmm0, %xmm0  # xmm0 = xmm0[1,1]
-    cvtss2sd       %xmm0, %xmm0
-    movsd          16(%rsp), %xmm1  # 8-byte Reload
+    movss          16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
-    CALL(pow)
-    cvtsd2ss       %xmm0, %xmm0
+    CALL(powf)
     mulss          8(%rbx), %xmm0
     xorps          %xmm1, %xmm1
     ucomiss        %xmm0, %xmm1
@@ -601,11 +585,9 @@ CFI_START
     SPEC_PIXEL_TAIL 12, 8
     movaps         32(%rsp), %xmm0  # 16-byte Reload
     shufps         $255, %xmm0, %xmm0  # xmm0 = xmm0[3,3,3,3]
-    cvtss2sd       %xmm0, %xmm0
-    movsd          16(%rsp), %xmm1  # 8-byte Reload
+    movss          16(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
-    CALL(pow)
-    cvtsd2ss       %xmm0, %xmm0
+    CALL(powf)
     mulss          8(%rbx), %xmm0
     xorps          %xmm1, %xmm1
     ucomiss        %xmm0, %xmm1

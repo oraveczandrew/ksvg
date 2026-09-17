@@ -128,22 +128,22 @@ Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
 | Lighting (diffuse, spot, linear) | scalar | 2048x2048 | 196.435 | 21.35 | 0.17 | 1.00x |  |  |
 | Lighting (diffuse, spot, linear) | ssse3 | 2048x2048 | 114.218 | 36.72 | 0.29 | 1.72x | 🟢 |  |
 | Lighting (diffuse, spot, linear) | avx2 | 2048x2048 | 111.683 | 37.56 | 0.30 | 1.76x | 🟢 |  |
-| Lighting (specular, distant) | kotlin | 512x512 | 16.082 | 16.30 | 0.13 | 1.13x | ⬆️ |  |
-| Lighting (specular, distant) | scalar | 512x512 | 18.224 | 14.38 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant) | ssse3 | 512x512 | 11.131 | 23.55 | 0.19 | 1.64x | 🟢 |  |
-| Lighting (specular, distant) | avx2 | 512x512 | 10.067 | 26.04 | 0.21 | 1.81x | 🟢 |  |
-| Lighting (specular, distant) | kotlin | 2048x2048 | 247.380 | 16.95 | 0.14 | 1.16x | ⬆️ |  |
-| Lighting (specular, distant) | scalar | 2048x2048 | 286.288 | 14.65 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant) | ssse3 | 2048x2048 | 171.724 | 24.42 | 0.20 | 1.67x | 🟢 |  |
-| Lighting (specular, distant) | avx2 | 2048x2048 | 152.706 | 27.47 | 0.22 | 1.87x | 🟢 |  |
-| Lighting (specular, distant, linear) | kotlin | 512x512 | 15.675 | 16.72 | 0.13 | 1.18x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 512x512 | 18.424 | 14.23 | 0.11 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | ssse3 | 512x512 | 12.250 | 21.40 | 0.17 | 1.50x | 🟢 |  |
-| Lighting (specular, distant, linear) | avx2 | 512x512 | 13.573 | 19.31 | 0.15 | 1.36x | 🟢 |  |
-| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 249.646 | 16.80 | 0.13 | 1.15x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 2048x2048 | 288.045 | 14.56 | 0.12 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | ssse3 | 2048x2048 | 188.601 | 22.24 | 0.18 | 1.53x | 🟢 |  |
-| Lighting (specular, distant, linear) | avx2 | 2048x2048 | 209.424 | 20.03 | 0.16 | 1.38x | 🟢 |  |
+| Lighting (specular, distant) | kotlin | 512x512 | 15.336 | 17.09 | 0.14 | 1.17x | ⬆️ |  |
+| Lighting (specular, distant) | scalar | 512x512 | 17.987 | 14.57 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant) | ssse3 | 512x512 | 8.757 | 29.94 | 0.24 | 2.05x | 🟢 |  |
+| Lighting (specular, distant) | avx2 | 512x512 | 7.635 | 34.33 | 0.27 | 2.36x | 🟢 |  |
+| Lighting (specular, distant) | kotlin | 2048x2048 | 246.027 | 17.05 | 0.14 | 1.16x | ⬆️ |  |
+| Lighting (specular, distant) | scalar | 2048x2048 | 285.099 | 14.71 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant) | ssse3 | 2048x2048 | 138.699 | 30.24 | 0.24 | 2.06x | 🟢 |  |
+| Lighting (specular, distant) | avx2 | 2048x2048 | 120.949 | 34.68 | 0.28 | 2.36x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 512x512 | 15.378 | 17.05 | 0.14 | 1.18x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 512x512 | 18.126 | 14.46 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | ssse3 | 512x512 | 9.787 | 26.78 | 0.21 | 1.85x | 🟢 |  |
+| Lighting (specular, distant, linear) | avx2 | 512x512 | 11.223 | 23.36 | 0.19 | 1.62x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 246.370 | 17.02 | 0.14 | 1.17x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 2048x2048 | 288.494 | 14.54 | 0.12 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | ssse3 | 2048x2048 | 155.308 | 27.01 | 0.22 | 1.86x | 🟢 |  |
+| Lighting (specular, distant, linear) | avx2 | 2048x2048 | 176.552 | 23.76 | 0.19 | 1.63x | 🟢 |  |
 | Lighting (specular, point) | kotlin | 512x512 | 19.326 | 13.56 | 0.11 | 1.00x |  |  |
 | Lighting (specular, point) | scalar | 512x512 | 19.281 | 13.60 | 0.11 | 1.00x |  |  |
 | Lighting (specular, point) | ssse3 | 512x512 | 7.602 | 34.48 | 0.28 | 2.54x | 🟢 |  |

@@ -130,8 +130,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vmovaps      %ymm1, 128(%rsp)  # 32-byte Spill
     vbroadcastss 4(%r9), %ymm1
     vmovaps      %ymm1, 96(%rsp)  # 32-byte Spill
-    vcvtss2sd    %xmm0, %xmm0, %xmm0
-    vmovsd       %xmm0, 56(%rsp)  # 8-byte Spill
+    vextractps     $0, %xmm0, 56(%rsp)  # 4-byte Spill
     decl         %eax
     shrl         $3, %eax
     incl         %eax
@@ -234,12 +233,10 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     // Per-pixel specular: p = pow(ndoth, exp), intensity = k * p clamped to
     // [0, 1], then R/G/B = intensity * lr/lg/lb (round-half-up + truncate).
     vmovss       64(%rsp,%r14,4), %xmm0  # xmm0 = mem[0],zero,zero,zero
-    vcvtss2sd    %xmm0, %xmm0, %xmm0
-    vmovsd       56(%rsp), %xmm1  # 8-byte Reload
+    vmovss       56(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
     vzeroupper
-    CALL(pow)
-    vcvtsd2ss    %xmm0, %xmm0, %xmm0
+    CALL(powf)
     vmulss       8(%rbx), %xmm0, %xmm1
     vxorps       %xmm0, %xmm0, %xmm0
     vucomiss     %xmm1, %xmm0
@@ -368,8 +365,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vmovaps      %ymm1, 128(%rsp)  # 32-byte Spill
     vbroadcastss 4(%r9), %ymm1
     vmovaps      %ymm1, 96(%rsp)  # 32-byte Spill
-    vcvtss2sd    %xmm0, %xmm0, %xmm0
-    vmovsd       %xmm0, 56(%rsp)  # 8-byte Spill
+    vextractps     $0, %xmm0, 56(%rsp)  # 4-byte Spill
     decl         %eax
     shrl         $3, %eax
     incl         %eax
@@ -476,12 +472,10 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     // Per-pixel specular: p = pow(ndoth, exp), intensity = k * p clamped to
     // [0, 1], then R/G/B = intensity * lr/lg/lb (round-half-up + truncate).
     vmovss       64(%rsp,%r14,4), %xmm0  # xmm0 = mem[0],zero,zero,zero
-    vcvtss2sd    %xmm0, %xmm0, %xmm0
-    vmovsd       56(%rsp), %xmm1  # 8-byte Reload
+    vmovss       56(%rsp), %xmm1  # 4-byte Reload
 # xmm1 = mem[0],zero
     vzeroupper
-    CALL(pow)
-    vcvtsd2ss    %xmm0, %xmm0, %xmm0
+    CALL(powf)
     vmulss       8(%rbx), %xmm0, %xmm1
     vxorps       %xmm0, %xmm0, %xmm0
     vucomiss     %xmm1, %xmm0
