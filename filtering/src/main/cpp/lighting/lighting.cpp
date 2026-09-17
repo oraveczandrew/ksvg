@@ -84,6 +84,17 @@ extern "C" void ksvgLightingPointDiffuseRowNeon32Linear(
     const jint* srcT, const jint* srcM, const jint* srcB,
     jint* dst, jint count, const PointLightingParams* params,
     const uint8_t* linearToSrgb);
+// Hand-written ARM32/AdvSIMD point-light specular kernel (lighting_point_specular_armv7a_neon.S).
+// NOTE: (params, exponent, linearToSrgb) order — matches the shared dispatch
+// and the aarch64 twin, NOT the (params, linearToSrgb, exponent) order of the
+// never-dispatched distant-specular armv7a reference.
+extern "C" void ksvgLightingPointSpecularRowNeon32(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const PointLightingParams* params, float exponent);
+extern "C" void ksvgLightingPointSpecularRowNeon32Linear(
+    const jint* srcT, const jint* srcM, const jint* srcB,
+    jint* dst, jint count, const PointLightingParams* params,
+    float exponent, const uint8_t* linearToSrgb);
 // Hand-written ARM32/AdvSIMD spot-light diffuse kernel (lighting_spot_diffuse_armv7a_neon.S).
 extern "C" void ksvgLightingSpotDiffuseRowNeon32(
     const jint* srcT, const jint* srcM, const jint* srcB,
@@ -722,13 +733,20 @@ void applyVector(
                     }
                 }
 #elif defined(__arm__)
-                // Point-specular stays on the scalar fallback until its
-                // NEON kernel lands (kernels 4-5); only diffuse is wired.
-                if (!isSpecular) {
-                    assert(backend == SIMD_BACKEND_NEON32);
+                assert(backend == SIMD_BACKEND_NEON32);
+                {
+                    // Premultiplied specular never reaches here (scalar
+                    // fallback via the outer guard); specular here is
+                    // always straight.
                     const jint c4 = (ixHi - x) & ~3;
                     if (c4 > 0) {
-                        if (useLinear) {
+                        if (isSpecular) {
+                            if (useLinear) {
+                                ksvgLightingPointSpecularRowNeon32Linear(srcT, srcM, srcB, rowOut, c4, &plp, exponent, ksvg_linear_to_srgb_lut);
+                            } else {
+                                ksvgLightingPointSpecularRowNeon32(srcT, srcM, srcB, rowOut, c4, &plp, exponent);
+                            }
+                        } else if (useLinear) {
                             ksvgLightingPointDiffuseRowNeon32Linear(srcT, srcM, srcB, rowOut, c4, &plp, ksvg_linear_to_srgb_lut);
                         } else {
                             ksvgLightingPointDiffuseRowNeon32(srcT, srcM, srcB, rowOut, c4, &plp);
