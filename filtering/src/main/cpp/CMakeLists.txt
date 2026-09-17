@@ -37,6 +37,7 @@ if (ANDROID_ABI STREQUAL "armeabi-v7a")
             lighting/lighting_point_diffuse_armv7a_neon.S
             lighting/lighting_spot_diffuse_armv7a_neon.S
             lighting/lighting_point_specular_armv7a_neon.S
+            lighting/lighting_spot_specular_armv7a_neon.S
     )
     set(TURBULENCE_SOURCES turbulence/turbulence_noise_armv7a_neon.S)
     set(CONVOLVE_SOURCES convolve/convolve_armv7a_neon.S)
