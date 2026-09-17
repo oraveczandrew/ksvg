@@ -16,6 +16,7 @@
 
 .text
 .align 2
+#include "lighting_aarch64_pow_macros.S"
 .global ksvgLightingDistantSpecularRowNeon64
 .type ksvgLightingDistantSpecularRowNeon64, %function
 
@@ -34,20 +35,21 @@
 // validated distant-diffuse kernel body bit-for-bit (Sobel gradients,
 // frsqrte+2NR reciprocal sqrt, dot op order), only the light operand is the
 // loop-invariant half vector h = normalize(lx, ly, lz + 1) instead of l, and
-// the clamped ndoth feeds a per-lane scalar DOUBLE libm pow (the reference
-// uses Kotlin Math.pow / C++ std::pow double math — see NSERA plan §3). The
-// multiply-by-k / clamp01 / round-pack is then identical to diffuse, but the
-// alpha byte is max(R, G, B) instead of 0xFF.
+// the clamped ndoth feeds the 4-lane NEON pow approximation (POW4_NEON;
+// the reference uses Kotlin Math.pow / C++ std::pow double math — the ±1
+// byte gate absorbs the approximation delta). The multiply-by-k / clamp01 /
+// round-pack is then identical to diffuse, but the alpha byte is
+// max(R, G, B) instead of 0xFF.
 //
-//   p     = pow(ndoth, exponent)          (scalar double per lane)
+//   p     = pow(ndoth, exponent)          (4-lane NEON approximation)
 //   I     = clamp01(k * p)
 //   R/G/B = round(lr/lg/lb * I)           (floor(x+0.5) for non-negative)
 //   A     = max(R, G, B)
 //
-// 8 output pixels / main iteration (two 4-lane batches), 4-px tail. Because
-// outer call `pow` clobbers ALL caller-saved registers (x0-x17, v0-v7,
-// v16-v31), every loop invariant lives in a callee-saved GPR (x19-x24) or on
-// the stack, and v16-v31 are reloaded between the pow block and the pack.
+// 8 output pixels / main iteration (two 4-lane batches), 4-px tail. With no
+// libm calls left, loop invariants live in registers across the whole row:
+// params/helpers are loaded once per row (sRGB; the linear variant reloads
+// at the top of every iteration because its L2S LUT loads clobber v16-v31).
 //
 // Stack frame (224 bytes, 16-aligned):
 //   [sp, #0]    x19 srcT        [sp,#40] x24 params
@@ -70,8 +72,9 @@
 
 // Reload + broadcast LightingParams from x24 into v16-v25 (s25 = ss folded
 // into the gradient scales s16/s17, then dead), plus the float helpers:
-// v26 = 1.0, v27 = 0.5, v28 = 0, v29 = 0xFF000000. Clobbers the caller-saved
-// v16-v31 set — pow clobbers these anyway, so call it after every pow block.
+// v26 = 1.0, v27 = 0.5, v28 = 0, v29 = 0xFF000000. Loop-invariant: issued
+// once per row (sRGB) or at the top of every iteration (linear, where the
+// L2S LUT loads clobber v16-v31).
 .macro LOAD_PARAMS
     ldr     s16, [x24]
     ldr     s17, [x24, #4]
@@ -112,37 +115,9 @@
     dup     v21.4s, v21.s[0]
 .endm
 
-// Read the 4 ndoth floats at [sp, #srcOff], run one scalar double libm pow per
-// lane (exponent double at [sp, #56]; result of the reference's Math.pow), and
-// write the 4 float results to [sp, #dstOff]. Bl clobbers v0-v7/v16-v31, but
-// the stack and the callee-saved GPRs survive, so lanes can be re-read from
-// memory across the calls.
-.macro POW4_STACK srcOff, dstOff
-    ldr     s0, [sp, #\srcOff]
-    fcvt    d0, s0
-    ldr     d1, [sp, #56]
-    bl      pow
-    fcvt    s0, d0
-    str     s0, [sp, #\dstOff]
-    ldr     s0, [sp, #(\srcOff+4)]
-    fcvt    d0, s0
-    ldr     d1, [sp, #56]
-    bl      pow
-    fcvt    s0, d0
-    str     s0, [sp, #(\dstOff+4)]
-    ldr     s0, [sp, #(\srcOff+8)]
-    fcvt    d0, s0
-    ldr     d1, [sp, #56]
-    bl      pow
-    fcvt    s0, d0
-    str     s0, [sp, #(\dstOff+8)]
-    ldr     s0, [sp, #(\srcOff+12)]
-    fcvt    d0, s0
-    ldr     d1, [sp, #56]
-    bl      pow
-    fcvt    s0, d0
-    str     s0, [sp, #(\dstOff+12)]
-.endm
+// 4-lane vector pow (POW4_NEON, lighting_aarch64_pow_macros.S) replaced the
+// old per-lane scalar double libm pow (POW4_STACK + bl pow); the stack stash
+// and param reloads around it are gone.
 
 // Lookup 16 bytes in a 256-byte table resident in v16..v31 (byte lanes, so
 // mapping 0..255). Alpha is preserved by construction: the 0xFF alpha lane
@@ -218,14 +193,17 @@ ksvgLightingDistantSpecularRowNeon64:
     stp     s16, s17, [sp, #64]
     str     s18, [sp, #72]
 
+    // Loop-invariant params/helpers for the whole row (nothing in the sRGB
+    // loop body clobbers v16-v30).
+    LOAD_PARAMS
+    H_RELOAD
+    movi    v30.4s, #0xff       // 0x000000ff byte mask for the alpha max
+
     b       .Lloop8
 
 .Lloop8:
     cmp     w23, #8
     b.lo    .Ltail4
-
-    LOAD_PARAMS
-    H_RELOAD
 
     // ------------------------------ TOP ---------------------------
     ld1     {v0.4s-v1.4s}, [x19]
@@ -348,19 +326,14 @@ ksvgLightingDistantSpecularRowNeon64:
     fmax    v3.4s, v3.4s, v28.4s
     fmax    v1.4s, v1.4s, v28.4s
 
-    // Per-lane scalar pow; stash both batches first (pow clobbers v0-v31).
-    str     q3, [sp, #80]
-    str     q1, [sp, #96]
-    POW4_STACK 80, 112
-    POW4_STACK 96, 128
+    // ndoth A/B -> vector pow in place (no bl, no stash, params survive).
+    ldr     d0, [sp, #56]
+    fcvt    s0, d0
+    dup     v0.4s, v0.s[0]      // y = exponent broadcast
+    POW4_NEON v3, v0
+    POW4_NEON v1, v0
 
-    // Everything caller-saved is dead; reload for the pack.
-    LOAD_PARAMS
-    H_RELOAD
-    movi    v30.4s, #0xff       // 0x000000ff byte mask for the alpha max
-
-    // ------------------------- PACK A (p in [sp,#112]) -------------
-    ldr     q3, [sp, #112]
+    // ------------------------- PACK A (p in v3) -------------
     fmul    v3.4s, v3.4s, v18.4s     // k * p
     fmax    v3.4s, v3.4s, v28.4s     // clamp >= 0
     fmin    v3.4s, v3.4s, v26.4s     // clamp <= 1
@@ -389,9 +362,8 @@ ksvgLightingDistantSpecularRowNeon64:
     orr     v4.16b, v4.16b, v0.16b
     str     q4, [x22]
 
-    // ------------------------- PACK B (p in [sp,#128]) -------------
-    ldr     q3, [sp, #128]
-    fmul    v3.4s, v3.4s, v18.4s
+    // ------------------------- PACK B (p in v1) -------------
+    fmul    v3.4s, v1.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
     fmul    v6.4s, v3.4s, v22.4s
@@ -427,10 +399,8 @@ ksvgLightingDistantSpecularRowNeon64:
     b       .Ldone
 
 .Ltail4:
-    // Params/helpers were clobbered by the last pow block.
-    LOAD_PARAMS
-    H_RELOAD
-    movi    v30.4s, #0xff
+    // Params/helpers still live from the prologue hoist (nothing in the
+    // sRGB loop clobbers them).
     fmov    v15.4s, #2.0
 
     ldr     q0, [x19]
@@ -492,15 +462,13 @@ ksvgLightingDistantSpecularRowNeon64:
     fmul    v2.4s, v2.4s, v1.4s
     fmax    v2.4s, v2.4s, v28.4s
 
-    str     q2, [sp, #80]
-    POW4_STACK 80, 112
+    // ndoth -> vector pow in place (params survive, no reload).
+    ldr     d0, [sp, #56]
+    fcvt    s0, d0
+    dup     v0.4s, v0.s[0]      // y = exponent broadcast
+    POW4_NEON v2, v0
 
-    LOAD_PARAMS
-    H_RELOAD
-    movi    v30.4s, #0xff
-
-    ldr     q3, [sp, #112]
-    fmul    v3.4s, v3.4s, v18.4s
+    fmul    v3.4s, v2.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
     fmul    v0.4s, v3.4s, v22.4s
@@ -730,17 +698,15 @@ ksvgLightingDistantSpecularRowNeon64Linear:
     fmax    v3.4s, v3.4s, v28.4s
     fmax    v1.4s, v1.4s, v28.4s
 
-    str     q3, [sp, #80]
-    str     q1, [sp, #96]
-    POW4_STACK 80, 112
-    POW4_STACK 96, 128
-
-    LOAD_PARAMS
-    H_RELOAD
-    movi    v30.4s, #0xff
+    // ndoth A/B -> vector pow in place (params survive for the pack;
+    // the next iteration reloads them after the LUT anyway).
+    ldr     d0, [sp, #56]
+    fcvt    s0, d0
+    dup     v0.4s, v0.s[0]      // y = exponent broadcast
+    POW4_NEON v3, v0
+    POW4_NEON v1, v0
 
     // ------------------- PACK A (linear, alpha = max(Rlin,Glin,Blin)) ----
-    ldr     q3, [sp, #112]
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
@@ -769,9 +735,8 @@ ksvgLightingDistantSpecularRowNeon64Linear:
     orr     v4.16b, v4.16b, v0.16b
     mov     v0.16b, v4.16b          // stash A
 
-    // ------------------- PACK B ----
-    ldr     q3, [sp, #128]
-    fmul    v3.4s, v3.4s, v18.4s
+    // ------------------- PACK B (p in v1) ----
+    fmul    v3.4s, v1.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
     fmul    v6.4s, v3.4s, v22.4s
@@ -883,15 +848,13 @@ ksvgLightingDistantSpecularRowNeon64Linear:
     fmul    v2.4s, v2.4s, v1.4s
     fmax    v2.4s, v2.4s, v28.4s
 
-    str     q2, [sp, #80]
-    POW4_STACK 80, 112
+    // ndoth -> vector pow in place (params live from the tail-top reload).
+    ldr     d0, [sp, #56]
+    fcvt    s0, d0
+    dup     v0.4s, v0.s[0]      // y = exponent broadcast
+    POW4_NEON v2, v0
 
-    LOAD_PARAMS
-    H_RELOAD
-    movi    v30.4s, #0xff
-
-    ldr     q3, [sp, #112]
-    fmul    v3.4s, v3.4s, v18.4s
+    fmul    v3.4s, v2.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
     fmul    v0.4s, v3.4s, v22.4s
@@ -940,3 +903,5 @@ ksvgLightingDistantSpecularRowNeon64Linear:
     ret
 
 .size ksvgLightingDistantSpecularRowNeon64Linear, .-ksvgLightingDistantSpecularRowNeon64Linear
+
+EMIT_POW4_NEON_TABLES
