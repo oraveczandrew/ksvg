@@ -60,7 +60,16 @@ canvas type/API level:
 | Software (CPU) | `SoftwareFilterBackend` | software `Canvas` | The reference. Every primitive claims it. |
 | Hardware (GPU) | `FilterPipelineImpl31`/`FilterPipelineImpl33` | hardware canvas, API 31+/33+ | RenderEffect chain; shares region semantics with software via `RegionUtils`. |
 
-The two MUST agree (parity). The committed subregion-defaulting work (see
+The two must agree **closely, not bit-exactly**. The software path and its
+native kernels are compared byte-for-byte by default (parity gate, see §6.3 —
+with documented per-kernel tolerances: ±1 LSB SIMD-tail tolerance of the RIR
+Toolkit Gaussian blur port, `maxDelta = 1` for specular lighting). The GPU path instead goes through Skia
+`RenderEffect` implementations and AGSL `float` (fp32) shaders with different
+rounding/fused-math, premultiplied intermediates and dithering, so ±1-2 LSB
+per-channel differences are expected and normal. GPU parity is therefore a
+**tolerance-based near-match** (`maxAbsDiff ≤ 2` per channel, outlier ratio
+< 0.1%, plus `meanAbsErr`), never a byte-for-byte comparison.
+The committed subregion-defaulting work (see
 commit `fb6d299a`) mirrored the software region semantics into the HW chain;
 the one known residual gap is the `feMerge` HW clamp.
 **Caution**: HW pixels cannot be verified in Robolectric (software canvas is
@@ -524,9 +533,13 @@ trusting long bench runs on this device:
 These are implementation invariants, not benchmark-specific optimizations:
 
 - Native kernels are compared against the scalar/Kotlin reference
-  byte-for-byte wherever the parity suite requires it. Keep reference
+  byte-for-byte by default wherever the parity suite requires it (documented
+  per-kernel tolerances excepted: Gaussian-blur SIMD tails ±1 LSB,
+  specular lighting `maxDelta = 1`). Keep reference
   operation order; rewrites such as `x / 255.0f` → `x * (1 / 255.0f)` can
-  change the final rounded byte.
+  change the final rounded byte. (Scope note: this near-exact gate covers
+  CPU scalar/Kotlin vs CPU native/SIMD only — it does NOT apply to the
+  GPU/RenderEffect/AGSL path, which is tolerance-based per §2.)
 - Production dispatch may fall back to scalar when a SIMD backend loses on its
   target. The forced executor is intentionally separate so disabled candidates
   can still be parity-tested and measured.

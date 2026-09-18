@@ -99,7 +99,9 @@ conditions in §4.
 ## 4. Methodology — what evidence is valid
 
 - **Parity is the gate.** Deterministic corpus (LCG `state*1664525+1013904223`,
-  seed `0x9E3779B9`, height/alpha = `(state>>24)&0xFF`), bit-exact vs Kotlin,
+  seed `0x9E3779B9`, height/alpha = `(state>>24)&0xFF`), byte-for-byte vs Kotlin
+  by default with documented per-kernel tolerances (Gaussian-blur SIMD tails
+  ±1 LSB, specular lighting `maxDelta = 1`),
   aborts on first mismatch. Compile/assemble/link success and faster benchmarks
   are **not** proof. Fix → full parity → next mismatch → fix.
 - **Benchmark validity is part of the result**: compare backends in the same
