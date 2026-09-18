@@ -163,8 +163,9 @@ EMIT_POW_COMMON_CONSTANTS
 POINT_TEXT
 .p2align 4, 0x90
 SYM(core4):
-    // Shared 4-pixel kernel: Sobel window, normalize, per-lane powf for the
-    // specular exponent, then scalar L2S packs (or the vector-pack path).
+    // Shared 4-pixel kernel: Sobel window, normalize, one 4-wide POW4_SSSE3
+    // for the specular exponent (result in -80(%rbp), consumed lane by lane
+    // below), then scalar L2S packs (or the vector-pack path).
 .cfi_startproc
     pushq        %rbp
 .cfi_def_cfa_offset 16
@@ -284,12 +285,28 @@ SYM(core4):
     vmovss       %xmm13, -48(%rbp)
     vmovaps      %xmm10, -96(%rbp)
     vmovaps      %xmm2, -80(%rbp)
+    # Vector specular head: 4-wide pow(intensity, exp); the powered vector
+    # overwrites -80(%rbp) and is consumed lane by lane below (each lane
+    # block keeps its k-mul + clamp; the zero-skip branches are unchanged —
+    # POW4 yields 0.0 for zero lanes via its underflow clamp, same as the
+    # skip paths). Spills %xmm10/%xmm13 to -128/-112(%rbp): spent param-copy
+    # slots (params were consumed at entry), both restored below before any
+    # later use. %xmm0/%xmm1 are dead here. Same polynomials and Horner
+    # order as POW1_X64, so lanes stay inside the specular +-1 byte gate.
+    vmovaps      %xmm10, -128(%rbp)
+    vmovaps      %xmm13, -112(%rbp)
+    vmovaps      -80(%rbp), %xmm0
+    vmovss       -48(%rbp), %xmm1
+    vbroadcastss %xmm1, %xmm1
+    POW4_SSSE3 %xmm0, %xmm1
+    vmovaps      %xmm0, -80(%rbp)
+    vmovaps      -128(%rbp), %xmm10
+    vmovaps      -112(%rbp), %xmm13
     jne          LBB4_1
     jnp          LBB4_2
 LBB4_1:
-    vmovaps      %xmm2, %xmm0
+    vmovaps      -80(%rbp), %xmm0
     vmovaps      %xmm13, %xmm1
-    POW1_X64
     vxorps       %xmm5, %xmm5, %xmm5
     vmovaps      -80(%rbp), %xmm2
     vmovaps      -96(%rbp), %xmm10
@@ -308,7 +325,6 @@ LBB4_2:
 LBB4_3:
     vmovshdup    %xmm2, %xmm0  // xmm0 = xmm2[1,1,3,3]
     vmovaps      %xmm13, %xmm1
-    POW1_X64
     vmovss       LCPI4_1(%rip), %xmm3  // xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovaps      -80(%rbp), %xmm2
     vmovaps      -96(%rbp), %xmm10
@@ -328,7 +344,6 @@ LBB4_5:
     vshufpd      $1, %xmm2, %xmm2, %xmm0  // xmm0 = xmm2[1,0]
     vmovaps      %xmm13, %xmm1
     vmovaps      %xmm8, -64(%rbp)
-    POW1_X64
     vxorps       %xmm4, %xmm4, %xmm4
     vmovss       LCPI4_1(%rip), %xmm3  // xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovaps      -80(%rbp), %xmm2
@@ -349,7 +364,6 @@ LBB4_7:
     vmovaps      %xmm13, %xmm1
     vmovaps      %xmm7, -48(%rbp)
     vmovaps      %xmm8, -64(%rbp)
-    POW1_X64
     vmovss       LCPI4_1(%rip), %xmm3  // xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovaps      -64(%rbp), %xmm8
     vmovaps      -48(%rbp), %xmm7

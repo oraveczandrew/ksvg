@@ -20,19 +20,17 @@
 
 /*
  * Description:
- *   Per-pixel spot-specular: intensity[i] -> powf(specular exponent) -> x k
- *   -> x spot-factor segment -> clamp intensity to [0,1], then R/G/B =
- *   intensity x lr/lg/lb, per-channel max 0 / min 255 / round-nearest (+.5,
- *   roundss $11) / truncate, max-channel-alpha cmov pack, stored to
- *   out_off(%r14). With \l2s == 1 the three truncated bytes go through
- *   L2S_SPOT first (linear core, %r15 LUT base loaded by the caller).
- *   Fixed-register form (matches all 8 core sites): params via %rbp,
- *   exponent in %r13d, intensity/spot segments in the caller's (%rsp)
- *   scratch area, store base %r14.
+ *   Per-pixel spot-specular tail: powered+clamped intensity[i] (precomputed
+ *   4-wide by the caller's POW4_SSSE3 head) -> x lr/lg/lb, per-channel max 0
+ *   / min 255 / round-nearest (+.5, cvttss2si truncate),
+ *   max-channel-alpha cmov pack, stored to out_off(%r14). With \l2s == 1 the
+ *   three truncated bytes go through L2S_SPOT first (linear core, %r15 LUT
+ *   base loaded by the caller). Fixed-register form (matches all 8 core
+ *   sites): intensity segments in the caller's (%rsp) scratch area, store
+ *   base %r14.
  *
  * Inputs:
- *   \intens_off  = byte offset of intensity[i] in (%rsp) (e.g. 4*i)
- *   \spot_off    = byte offset of the spot-factor segment (e.g. 16+4*i)
+ *   \intens_off  = byte offset of powered intensity[i] in (%rsp) (e.g. 4*i)
  *   \out_off     = byte offset for the packed pixel store
  *   \l2s         = 1 to run L2S_SPOT on the three truncated bytes, 0 otherwise
  *
@@ -42,20 +40,13 @@
  * Clobbers:
  *   %xmm0, %xmm1, %xmm2
  *   %eax, %ecx, %edx, %edi
- *   %rax, %rcx (via POW1_X64; all other SysV caller-saved regs survive)
  *   (flags)
  *
  * Depends on the file-local .Lspot_zero/.Lspot_one/.Lspot_255/.Lspot_half
  * literals in the caller's RODATA.
  */
-.macro SPOT_SPEC_PIXEL intens_off, spot_off, out_off, l2s
+.macro SPOT_SPEC_PIXEL intens_off, out_off, l2s
     movss     \intens_off(%rsp), %xmm0
-    movd      %r13d, %xmm1
-    POW1_X64
-    mulss     8(%rbp), %xmm0
-    mulss     \spot_off(%rsp), %xmm0
-    maxss     .Lspot_zero(%rip), %xmm0
-    minss     .Lspot_one(%rip), %xmm0
     movaps    %xmm0, %xmm1
     movaps    %xmm0, %xmm2
     mulss     24(%rbp), %xmm0
@@ -447,11 +438,35 @@ SYM(ksvgLightingSpotSpecularRowSsse3):
     pxor      %xmm0, %xmm0
     maxps     %xmm0, %xmm11
     movups    %xmm11, 0(%rsp)
-    // Per-pixel specular blocks below (powf + intensity + RGB + pack).
-    SPOT_SPEC_PIXEL 0, 16, 0, 0
-    SPOT_SPEC_PIXEL 4, 20, 4, 0
-    SPOT_SPEC_PIXEL 8, 24, 8, 0
-    SPOT_SPEC_PIXEL 12, 28, 12, 0
+    // Vector specular head: 4-wide pow(dot, exp) + k + spot-factor,
+    // clamped to [0,1]. mulps/maxps/minps lanes are bit-identical to the
+    // scalar mulss/maxss/minss sequence this replaces; POW4_SSSE3 uses the
+    // same 8th-degree polynomials in the same Horner order as POW1_X64.
+    // Clobbers %xmm4-%xmm5, %xmm10-%xmm15 (all dead here: only (%rsp)
+    // segments, %r13d, %r14, %rbp are live).
+    movups    0(%rsp), %xmm4
+    movd      %r13d, %xmm5
+    shufps    $0, %xmm5, %xmm5
+    POW4_SSSE3 %xmm4, %xmm5
+    movss     8(%rbp), %xmm5
+    shufps    $0, %xmm5, %xmm5
+    mulps     %xmm5, %xmm4
+    // NOTE: (%rsp) is 8-mod-16 here (5 pushes + sub $40), so the spot-factor
+    // segment needs movups; a mem-operand mulps would fault (cf. distant,
+    // whose frame keeps 16B alignment).
+    movups    16(%rsp), %xmm5
+    mulps     %xmm5, %xmm4
+    xorps     %xmm5, %xmm5
+    maxps     %xmm5, %xmm4
+    movss     .Lspot_one(%rip), %xmm5
+    shufps    $0, %xmm5, %xmm5
+    minps     %xmm5, %xmm4
+    movups    %xmm4, 0(%rsp)
+    // Per-pixel specular tails below (intensity + RGB + pack).
+    SPOT_SPEC_PIXEL 0, 0, 0
+    SPOT_SPEC_PIXEL 4, 4, 0
+    SPOT_SPEC_PIXEL 8, 8, 0
+    SPOT_SPEC_PIXEL 12, 12, 0
     movd      %r13d, %xmm0
     addq      $40, %rsp
     popq      %r15
@@ -741,11 +756,27 @@ SYM(ksvgLightingSpotSpecularRowSsse3Linear):
     maxps     %xmm0, %xmm11
     movups    %xmm11, 0(%rsp)
     leaq      .Lspot_l2s_data(%rip), %r15
-    // Per-pixel specular blocks below (powf + intensity + RGB + L2S + pack).
-    SPOT_SPEC_PIXEL 0, 16, 0, 1
-    SPOT_SPEC_PIXEL 4, 20, 4, 1
-    SPOT_SPEC_PIXEL 8, 24, 8, 1
-    SPOT_SPEC_PIXEL 12, 28, 12, 1
+    // Vector specular head: see the non-linear core above (identical).
+    movups    0(%rsp), %xmm4
+    movd      %r13d, %xmm5
+    shufps    $0, %xmm5, %xmm5
+    POW4_SSSE3 %xmm4, %xmm5
+    movss     8(%rbp), %xmm5
+    shufps    $0, %xmm5, %xmm5
+    mulps     %xmm5, %xmm4
+    movups    16(%rsp), %xmm5
+    mulps     %xmm5, %xmm4
+    xorps     %xmm5, %xmm5
+    maxps     %xmm5, %xmm4
+    movss     .Lspot_one(%rip), %xmm5
+    shufps    $0, %xmm5, %xmm5
+    minps     %xmm5, %xmm4
+    movups    %xmm4, 0(%rsp)
+    // Per-pixel specular tails below (intensity + RGB + L2S + pack).
+    SPOT_SPEC_PIXEL 0, 0, 1
+    SPOT_SPEC_PIXEL 4, 4, 1
+    SPOT_SPEC_PIXEL 8, 8, 1
+    SPOT_SPEC_PIXEL 12, 12, 1
     movd      %r13d, %xmm0
     addq      $40, %rsp
     popq      %r15

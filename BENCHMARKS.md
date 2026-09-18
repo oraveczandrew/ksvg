@@ -146,35 +146,35 @@ Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
 | Lighting (specular, distant, linear) | avx2 | 2048x2048 | 49.584 | 84.59 | 0.68 | 6.79x | 🟢 |  |
 | Lighting (specular, point) | kotlin | 512x512 | 21.278 | 12.32 | 0.10 | 0.92x |  |  |
 | Lighting (specular, point) | scalar | 512x512 | 19.613 | 13.37 | 0.11 | 1.00x |  |  |
-| Lighting (specular, point) | ssse3 | 512x512 | 9.577 | 27.37 | 0.22 | 2.05x | 🟢 |  |
+| Lighting (specular, point) | ssse3 | 512x512 | 6.775 | 38.69 | 0.31 | 2.79x | 🟢 |  |
 | Lighting (specular, point) | avx2 | 512x512 | 3.443 | 76.15 | 0.61 | 5.70x | 🟢 |  |
 | Lighting (specular, point) | kotlin | 2048x2048 | 316.780 | 13.24 | 0.11 | 1.02x | ⬆️ |  |
 | Lighting (specular, point) | scalar | 2048x2048 | 322.960 | 12.99 | 0.10 | 1.00x |  |  |
-| Lighting (specular, point) | ssse3 | 2048x2048 | 152.354 | 27.53 | 0.22 | 2.12x | 🟢 |  |
+| Lighting (specular, point) | ssse3 | 2048x2048 | 105.284 | 39.84 | 0.32 | 2.81x | 🟢 |  |
 | Lighting (specular, point) | avx2 | 2048x2048 | 49.955 | 83.96 | 0.67 | 6.47x | 🟢 |  |
 | Lighting (specular, point, linear) | kotlin | 512x512 | 20.004 | 13.10 | 0.10 | 0.99x |  |  |
 | Lighting (specular, point, linear) | scalar | 512x512 | 19.903 | 13.17 | 0.11 | 1.00x |  |  |
-| Lighting (specular, point, linear) | ssse3 | 512x512 | 9.753 | 26.88 | 0.22 | 2.04x | 🟢 |  |
+| Lighting (specular, point, linear) | ssse3 | 512x512 | 7.060 | 37.13 | 0.30 | 2.72x | 🟢 |  |
 | Lighting (specular, point, linear) | avx2 | 512x512 | 4.590 | 57.12 | 0.46 | 4.34x | 🟢 |  |
 | Lighting (specular, point, linear) | kotlin | 2048x2048 | 321.572 | 13.04 | 0.10 | 0.98x |  |  |
 | Lighting (specular, point, linear) | scalar | 2048x2048 | 316.042 | 13.27 | 0.11 | 1.00x |  |  |
-| Lighting (specular, point, linear) | ssse3 | 2048x2048 | 152.612 | 27.48 | 0.22 | 2.07x | 🟢 |  |
+| Lighting (specular, point, linear) | ssse3 | 2048x2048 | 110.725 | 37.88 | 0.30 | 2.73x | 🟢 |  |
 | Lighting (specular, point, linear) | avx2 | 2048x2048 | 67.827 | 61.84 | 0.49 | 4.66x | 🟢 |  |
 | Lighting (specular, spot) | kotlin | 512x512 | 18.757 | 13.98 | 0.11 | 1.13x | ⬆️ |  |
 | Lighting (specular, spot) | scalar | 512x512 | 21.244 | 12.34 | 0.10 | 1.00x |  |  |
-| Lighting (specular, spot) | ssse3 | 512x512 | 12.245 | 21.41 | 0.17 | 1.73x | 🟢 |  |
+| Lighting (specular, spot) | ssse3 | 512x512 | 7.160 | 36.61 | 0.29 | 2.72x | 🟢 |  |
 | Lighting (specular, spot) | avx2 | 512x512 | 3.443 | 76.15 | 0.61 | 6.17x | 🟢 |  |
 | Lighting (specular, spot) | kotlin | 2048x2048 | 292.741 | 14.33 | 0.11 | 1.09x | ⬆️ |  |
 | Lighting (specular, spot) | scalar | 2048x2048 | 318.698 | 13.16 | 0.11 | 1.00x |  |  |
-| Lighting (specular, spot) | ssse3 | 2048x2048 | 189.393 | 22.15 | 0.18 | 1.68x | 🟢 |  |
+| Lighting (specular, spot) | ssse3 | 2048x2048 | 109.340 | 38.36 | 0.31 | 2.80x | 🟢 |  |
 | Lighting (specular, spot) | avx2 | 2048x2048 | 46.967 | 89.30 | 0.71 | 6.79x | 🟢 |  |
 | Lighting (specular, spot, linear) | kotlin | 512x512 | 18.728 | 14.00 | 0.11 | 1.11x | ⬆️ |  |
 | Lighting (specular, spot, linear) | scalar | 512x512 | 20.704 | 12.66 | 0.10 | 1.00x |  |  |
-| Lighting (specular, spot, linear) | ssse3 | 512x512 | 12.451 | 21.05 | 0.17 | 1.66x | 🟢 |  |
+| Lighting (specular, spot, linear) | ssse3 | 512x512 | 7.578 | 34.59 | 0.28 | 2.64x | 🟢 |  |
 | Lighting (specular, spot, linear) | avx2 | 512x512 | 12.199 | 21.49 | 0.17 | 1.70x | 🟢 |  |
 | Lighting (specular, spot, linear) | kotlin | 2048x2048 | 298.916 | 14.03 | 0.11 | 1.10x | ⬆️ |  |
 | Lighting (specular, spot, linear) | scalar | 2048x2048 | 327.969 | 12.79 | 0.10 | 1.00x |  |  |
-| Lighting (specular, spot, linear) | ssse3 | 2048x2048 | 193.416 | 21.69 | 0.17 | 1.70x | 🟢 |  |
+| Lighting (specular, spot, linear) | ssse3 | 2048x2048 | 113.026 | 37.11 | 0.30 | 2.85x | 🟢 |  |
 | Lighting (specular, spot, linear) | avx2 | 2048x2048 | 187.504 | 22.37 | 0.18 | 1.75x | 🟢 |  |
 | Morphology (dilate, r=5) | kotlin | 512x512 | 10.852 | 24.16 | 0.19 | 2.76x | ⬆️ |  |
 | Morphology (dilate, r=5) | scalar | 512x512 | 29.993 | 8.74 | 0.07 | 1.00x |  |  |
