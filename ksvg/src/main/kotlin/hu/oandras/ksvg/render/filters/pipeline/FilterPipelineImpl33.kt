@@ -545,7 +545,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             unitsAreUser = unitsAreUser,
             originalObjBBox = originalObjBBox,
             outRect = userRegion,
-            resolveInputRegion = { _ -> if (hasInput) inputUnion else null },
+            inputRegion = if (hasInput) inputUnion else null,
         )
         recordResultRegion(resultName, userRegion, lastResultRegion, hwResultRegion)
     }

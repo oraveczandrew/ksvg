@@ -56,7 +56,7 @@ internal fun calculatePrimitiveRegion(
     unitsAreUser: Boolean,
     originalObjBBox: Box,
     outRect: RectF,
-    resolveInputRegion: (String?) -> RectF? = { null },
+    inputRegion: RectF? = null,
 ) {
     val x: Float
     val y: Float
@@ -67,7 +67,8 @@ internal fun calculatePrimitiveRegion(
     // input is a referenced node's result defaults its subregion to the union of the
     // referenced node(s)' subregions (falling back to the filter region only for standard
     // inputs such as SourceGraphic/SourceAlpha or when there is no referenced subregion).
-    val inputRegion = resolveInputRegion(primitive.`in`)
+    // Callers precompute that union (it also feeds their result-region bookkeeping);
+    // this function deliberately takes the resolved rect, not a resolver callback.
 
     if (unitsAreUser) {
         x = primitive.x?.floatValueXInContext()

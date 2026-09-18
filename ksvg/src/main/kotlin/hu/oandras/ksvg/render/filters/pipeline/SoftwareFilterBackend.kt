@@ -381,9 +381,7 @@ internal class SoftwareFilterBackend internal constructor(
                             }
                         }
                     }
-                    val regionResolver: (String?) -> RectF? = { _ ->
-                        if (hasInputRegion) inputUnion else null
-                    }
+                    val inputRegion = if (hasInputRegion) inputUnion else null
 
                     val res = renderContext.rectFPool.withPooledObject { primitiveRegion ->
                         calculatePrimitiveRegion(
@@ -392,7 +390,7 @@ internal class SoftwareFilterBackend internal constructor(
                             unitsAreUser = primitiveUnitsAreUser,
                             originalObjBBox = originalObjBBox,
                             outRect = primitiveRegion,
-                            resolveInputRegion = regionResolver,
+                            inputRegion = inputRegion,
                         )
 
                         // Record the primitive's own user-space subregion (used by a following
