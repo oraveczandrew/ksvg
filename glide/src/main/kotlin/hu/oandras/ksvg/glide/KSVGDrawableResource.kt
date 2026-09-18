@@ -22,7 +22,8 @@ import hu.oandras.ksvg.KSVGDrawable
 
 public class KSVGDrawableResource(private val drawable: KSVGDrawable) : DrawableResource<Drawable>(drawable) {
     override fun getResourceClass(): Class<Drawable> = Drawable::class.java
-    override fun getSize(): Int = 1 // Not easily measurable
+    override fun getSize(): Int =
+        drawable.getMemorySizeBytes().coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     override fun recycle() {
         drawable.trimMemory()
     }

@@ -81,6 +81,20 @@ import hu.oandras.ksvg.utils.forEachElement
 import kotlin.math.abs
 import kotlin.math.max
 
+/**
+ * Retained native/heap bytes of a bitmap (its [Bitmap.getAllocationByteCount]),
+ * or 0 when null or recycled. Best-effort under concurrency: a bitmap recycled
+ * racing this read is skipped rather than reported.
+ */
+internal fun Bitmap?.retainedBytes(): Long {
+    if (this == null) return 0L
+    return try {
+        if (isRecycled) 0L else allocationByteCount.toLong()
+    } catch (_: Exception) {
+        0L
+    }
+}
+
 internal sealed class RenderNode<T: SvgObject>(
     @JvmField val sourceElement: T
 ) {
@@ -210,12 +224,32 @@ internal sealed class RenderNode<T: SvgObject>(
         filterNode?.recycle()
     }
 
+    /**
+     * Retained bitmap/pixel-buffer bytes in this subtree, for memory weighing
+     * (see `KSVGDrawable.getMemorySizeBytes`). Counts cached bitmaps and
+     * pixel-sized buckets; excludes DOM, geometry, paints and GPU display
+     * lists (not measurable via public APIs). Best-effort under concurrency.
+     */
+    internal open fun retainedByteCount(): Long {
+        var total = cachedFilterOutput.retainedBytes() + cachedSourceContent.retainedBytes()
+        total += filterNode?.retainedByteCount() ?: 0L
+        total += maskNode?.retainedByteCount() ?: 0L
+        total += clipPathNode?.retainedByteCount() ?: 0L
+        total += markerStartNode?.retainedByteCount() ?: 0L
+        total += markerMidNode?.retainedByteCount() ?: 0L
+        total += markerEndNode?.retainedByteCount() ?: 0L
+        return total
+    }
+
     override fun toString(): String {
         return "RenderNode(sourceElement=$sourceElement, transform=$transform, viewBoxTransform=$viewBoxTransform, opacity=$opacity, filterNode=$filterNode, maskNode=$maskNode, clipPathNode=$clipPathNode, markerStartNode=$markerStartNode, markerMidNode=$markerMidNode, markerEndNode=$markerEndNode, fillPatternNode=$fillPatternNode, strokePatternNode=$strokePatternNode, fillPaintRef=$fillPaintRef, strokePaintRef=$strokePaintRef, animationNodes=$animationNodes, renderState=$renderState, boundingBox=$boundingBox, version=$version, contentVersion=$contentVersion, cachedFilterOutput=$cachedFilterOutput, cachedSourceContent=$cachedSourceContent, lastSourceVersion=$lastSourceVersion, lastFilterVersion=$lastFilterVersion, lastScaleX=$lastScaleX, lastScaleY=$lastScaleY)"
     }
 }
 
-internal sealed interface TextNode
+internal sealed interface TextNode {
+    /** See [RenderNode.retainedByteCount]. */
+    fun retainedByteCount(): Long
+}
 
 internal class TextSequenceNode(
     @JvmField val text: String
@@ -223,6 +257,8 @@ internal class TextSequenceNode(
     // Per-node width buffer: sized once to this run's fixed text length and
     // reused every frame, so measuring it never resizes/reallocates.
     @JvmField val textWidthBuffer = FloatArrayBucket()
+
+    override fun retainedByteCount(): Long = textWidthBuffer.retainedBytes()
 }
 
 /**
@@ -277,6 +313,12 @@ internal open class GroupRenderNode<T: ConditionalContainer>(
     override fun recycle(bitmapPool: BitmapPool) {
         super.recycle(bitmapPool)
         children.forEachElement { it.recycle(bitmapPool) }
+    }
+
+    override fun retainedByteCount(): Long {
+        var total = super.retainedByteCount()
+        children.forEachElement { total += it.retainedByteCount() }
+        return total
     }
 
     override fun toString(): String {
@@ -339,6 +381,12 @@ internal class ClipPathRenderNode(
     override fun toString(): String {
         return "ClipPathRenderNode(${super.toString()}, children=$children)"
     }
+
+    override fun retainedByteCount(): Long {
+        var total = super.retainedByteCount()
+        children.forEachElement { total += it.retainedByteCount() }
+        return total
+    }
 }
 
 internal class SwitchRenderNode(
@@ -364,6 +412,9 @@ internal class SwitchRenderNode(
     override fun toString(): String {
         return "SwitchRenderNode(${super.toString()}, selectedChild=$selectedChild)"
     }
+
+    override fun retainedByteCount(): Long =
+        super.retainedByteCount() + (selectedChild?.retainedByteCount() ?: 0L)
 }
 
 internal class PathRenderNode(
@@ -380,6 +431,9 @@ internal class PathRenderNode(
     override fun render(renderer: Renderer, canvas: Canvas) {
         renderer.renderPathNode(canvas, this)
     }
+
+    override fun retainedByteCount(): Long =
+        super.retainedByteCount() + pointsBuffer.retainedBytes()
 
     override fun toString(): String {
         return "PathRenderNode(${super.toString()}, path=$path, markers=$markers)"
@@ -400,6 +454,12 @@ internal abstract class KSVGTextContainerRenderNode<T : TextContainer>(
 
     override fun hasFilters(): Boolean {
         return super.hasFilters() || children.anyElement { (it as? RenderNode<*>)?.hasFilters() == true }
+    }
+
+    override fun retainedByteCount(): Long {
+        var total = super.retainedByteCount()
+        children.forEachElement { total += it.retainedByteCount() }
+        return total
     }
 }
 
@@ -451,6 +511,9 @@ internal class TRefRenderNode(
     // Per-node width buffer (see TextSequenceNode.textWidthBuffer).
     @JvmField val textWidthBuffer = FloatArrayBucket()
 
+    override fun retainedByteCount(): Long =
+        super.retainedByteCount() + textWidthBuffer.retainedBytes()
+
     override fun render(renderer: Renderer, canvas: Canvas) {
         error("TRef is rendered via renderTRefNode(node, processor) during text traversal")
     }
@@ -465,6 +528,9 @@ internal class ImageRenderNode(
     override fun render(renderer: Renderer, canvas: Canvas) {
         renderer.renderImageNode(canvas, this)
     }
+
+    override fun retainedByteCount(): Long =
+        super.retainedByteCount() + bitmap.retainedBytes()
 }
 
 internal class PatternRenderNode(
@@ -497,6 +563,12 @@ internal class PatternRenderNode(
     override fun recycle(bitmapPool: BitmapPool) {
         super.recycle(bitmapPool)
         children.forEachElement { it.recycle(bitmapPool) }
+    }
+
+    override fun retainedByteCount(): Long {
+        var total = super.retainedByteCount()
+        children.forEachElement { total += it.retainedByteCount() }
+        return total
     }
 }
 
@@ -554,6 +626,14 @@ internal class FilterRenderNode(
         filterSourceMap = null
     }
 
+    /** See [RenderNode.retainedByteCount]. */
+    internal fun retainedByteCount(): Long {
+        var total = 0L
+        primitives.forEachElement { total += it.retainedByteCount() }
+        total += filterSourceMap?.retainedBytes() ?: 0L
+        return total
+    }
+
     /** Maximum extent (blur radius * 5 + offset) in device pixels for this filter. */
     fun computeMaxExtent(sx: Float, sy: Float): Float {
         var expandX = 0f
@@ -608,6 +688,9 @@ internal sealed class FilterPrimitiveRenderNode<T: FilterPrimitive>(
         version++
     }
 
+    /** See [RenderNode.retainedByteCount]; primitives without pixel state keep 0. */
+    internal open fun retainedByteCount(): Long = 0L
+
     /**
      * Precomputed animation nodes, built once. Non-null lets the renderer apply
      * animated styles without falling back to reading the DOM `animations`.
@@ -645,6 +728,11 @@ internal class FeBlendRenderNode(
         },
     ) : FilterPrimitiveRenderNode<FeDropShadow>(sourceElement) {
         override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_DROP_SHADOW
+
+        // blurNode/offsetNode are synthetic children built inline for this
+        // element (not separate entries in FilterRenderNode.primitives).
+        override fun retainedByteCount(): Long =
+            blurNode.retainedByteCount() + offsetNode.retainedByteCount()
     }
 
 internal class StopRenderNode(
@@ -672,6 +760,8 @@ internal class FeGaussianBlurRenderNode(
      * Caller-owned blur scratch (native true-Gaussian or Kotlin fallback), reused across renders.
      */
     @JvmField val blurScratch: StackBlurScratch = StackBlurScratch()
+
+    override fun retainedByteCount(): Long = pixels.retainedBytes()
 }
 
 internal class FeColorMatrixRenderNode(
@@ -719,6 +809,9 @@ internal class FeConvolveMatrixRenderNode(
      */
     @JvmField val srcPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
+
+    override fun retainedByteCount(): Long =
+        srcPixels.retainedBytes() + outPixels.retainedBytes()
 }
 
 internal class FeMorphologyRenderNode(
@@ -731,6 +824,9 @@ internal class FeMorphologyRenderNode(
      */
     @JvmField val srcPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val dstPixels: IntArrayBucket = IntArrayBucket()
+
+    override fun retainedByteCount(): Long =
+        srcPixels.retainedBytes() + dstPixels.retainedBytes()
 }
 
 internal class ComponentTransferFunctions(
@@ -758,6 +854,18 @@ internal class FeComponentTransferRenderNode(
     // [gpuLutBitmap] because GPU uploads premultiply, which would corrupt data
     // bytes packed into RGB wherever alpha < 255.
     @JvmField var gpuLutAlphaBitmap: Bitmap? = null
+
+    override fun retainedByteCount(): Long {
+        var total = srcPixels.retainedBytes() + outPixels.retainedBytes()
+        total += gpuLutBitmap.retainedBytes() + gpuLutAlphaBitmap.retainedBytes()
+        val tables = lutTables
+        if (tables != null) {
+            for (i in tables.indices) {
+                total += tables[i].size * 4L
+            }
+        }
+        return total
+    }
 }
 
 internal class FeCompositeRenderNode(
@@ -768,6 +876,9 @@ internal class FeCompositeRenderNode(
     @JvmField val inputPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val in2Pixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
+
+    override fun retainedByteCount(): Long =
+        inputPixels.retainedBytes() + in2Pixels.retainedBytes() + outPixels.retainedBytes()
 }
 
 internal class FeTurbulenceRenderNode(
@@ -785,6 +896,9 @@ internal class FeTurbulenceRenderNode(
     // Split for 16-bit gradient precision (see packLattice): 8-bit packing
     // leaves ~1-2 LSB of Perlin noise error, amplified by the terminal EOTF.
     @JvmField var gpuLatticeBitmapB: Bitmap? = null
+
+    override fun retainedByteCount(): Long =
+        pixels.retainedBytes() + gpuLatticeBitmap.retainedBytes() + gpuLatticeBitmapB.retainedBytes()
 }
 
 internal class FeDisplacementMapRenderNode(
@@ -794,6 +908,9 @@ internal class FeDisplacementMapRenderNode(
     @JvmField val inputPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val mapPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
+
+    override fun retainedByteCount(): Long =
+        inputPixels.retainedBytes() + mapPixels.retainedBytes() + outPixels.retainedBytes()
 }
 
 internal class FeDiffuseLightingRenderNode(
@@ -804,6 +921,9 @@ internal class FeDiffuseLightingRenderNode(
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val normal: NormalVector = NormalVector()
     @JvmField val lightVec: LightVector = LightVector()
+
+    override fun retainedByteCount(): Long =
+        pixels.retainedBytes() + outPixels.retainedBytes()
 }
 
 internal class FeSpecularLightingRenderNode(
@@ -814,6 +934,9 @@ internal class FeSpecularLightingRenderNode(
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val normal: NormalVector = NormalVector()
     @JvmField val lightVec: LightVector = LightVector()
+
+    override fun retainedByteCount(): Long =
+        pixels.retainedBytes() + outPixels.retainedBytes()
 }
 
 internal class FeImageRenderNode(
@@ -822,6 +945,9 @@ internal class FeImageRenderNode(
     @JvmField val referencedNode: RenderNode<*>?,
 ) : FilterPrimitiveRenderNode<FeImage>(sourceElement) {
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_IMAGE
+
+    override fun retainedByteCount(): Long =
+        image.retainedBytes() + (referencedNode?.retainedByteCount() ?: 0L)
 }
 
 internal class GenericFilterPrimitiveRenderNode(

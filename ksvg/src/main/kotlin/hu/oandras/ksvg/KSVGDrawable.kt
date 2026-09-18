@@ -292,4 +292,16 @@ public open class KSVGDrawable @JvmOverloads public constructor(
     public fun trimMemory() {
         pools.clear()
     }
+
+    /**
+     * Estimated retained memory in bytes: pooled bitmaps plus render-tree
+     * bitmaps and pixel-sized buffers (scene caches, filter LUTs/lattices,
+     * pixel buckets). Excludes the DOM, geometry, paints and GPU display
+     * lists (not measurable via public APIs, and small next to bitmaps).
+     * Best-effort under concurrency; intended for cache weighing
+     * (e.g. Glide's `Resource.getSize`).
+     */
+    public fun getMemorySizeBytes(): Long {
+        return pools.bitmapPool.retainedBytes() + (scene?.retainedByteCount() ?: 0L)
+    }
 }

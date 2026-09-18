@@ -32,4 +32,7 @@ internal class FloatArrayBucket {
         }
         return array
     }
+
+    /** Retained heap bytes of the current backing array (4 per float), or 0. */
+    internal fun retainedBytes(): Long = (array?.size ?: 0) * 4L
 }

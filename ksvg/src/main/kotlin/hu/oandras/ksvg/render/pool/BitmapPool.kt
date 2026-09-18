@@ -169,6 +169,31 @@ internal class BitmapPool {
         pools.clear()
     }
 
+    /**
+     * Sum of [Bitmap.getAllocationByteCount] over all pooled (retained)
+     * bitmaps. Best-effort under concurrency: bitmaps recycled or pool
+     * mutations racing this walk are skipped rather than reported.
+     */
+    internal fun retainedBytes(): Long {
+        var total = 0L
+        try {
+            pools.forEachValue { bitmaps ->
+                bitmaps.forEachElement { bitmap ->
+                    try {
+                        if (!bitmap.isRecycled) {
+                            total += bitmap.allocationByteCount.toLong()
+                        }
+                    } catch (_: Exception) {
+                        // Raced recycle/read: skip this bitmap.
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Raced pool mutation: return the partial sum.
+        }
+        return total
+    }
+
     override fun toString(): String {
         var imageCount = 0
         var imageBytes = 0

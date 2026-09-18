@@ -118,4 +118,24 @@ internal class FilterSourceMap(
         }
         resultRegion.clear()
     }
+
+    /**
+     * Retained bitmap bytes currently held (see `RenderNode.retainedByteCount`).
+     * Mirrors [recycle]: `sourceGraphic` is owned by the host element and
+     * excluded to avoid double counting. Best-effort under concurrency.
+     */
+    internal fun retainedBytes(): Long {
+        var total = 0L
+        try {
+            results.forEachValue { bitmap ->
+                if (bitmap !== sourceGraphic) {
+                    total += bitmap.retainedBytes()
+                }
+            }
+            resultsWithoutId.forEachElement { total += it.retainedBytes() }
+        } catch (_: Exception) {
+            // Raced map mutation: return the partial sum.
+        }
+        return total
+    }
 }

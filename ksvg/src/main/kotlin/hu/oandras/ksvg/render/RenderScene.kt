@@ -64,6 +64,14 @@ internal class RenderScene private constructor(
     var viewport: Rect? = null
 
     /**
+     * Retained bitmap/pixel-buffer bytes of the render tree, for memory
+     * weighing (see `KSVGDrawable.getMemorySizeBytes`).
+     */
+    internal fun retainedByteCount(): Long {
+        return rootNode?.retainedByteCount() ?: 0L
+    }
+
+    /**
      * Last [RenderOptionsImpl.viewPort] passed to [applyViewport], used by its
      * fast-path skip check. The resolved transforms only depend on the drawable
      * bounds and this override, so when both are unchanged there is nothing to do.
