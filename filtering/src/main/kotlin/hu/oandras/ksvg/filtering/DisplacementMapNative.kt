@@ -56,10 +56,11 @@ internal object DisplacementMapNative {
         scale: Float,
         xChannel: Int,
         yChannel: Int,
-        simdBackend: Int,
+        @SimdBackend simdBackend: Int,
     )
 
     /** Reports the backend the production dispatcher actually selects on this ABI. */
     @JvmStatic
+    @SimdBackend
     external fun nativeBackend(): Int
 }

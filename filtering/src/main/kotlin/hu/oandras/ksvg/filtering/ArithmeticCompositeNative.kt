@@ -97,7 +97,7 @@ internal object ArithmeticCompositeNative {
         k3: Float,
         k4: Float,
         useLinear: Boolean,
-        simdBackend: Int,
+        @SimdBackend simdBackend: Int,
     ) {
         applyForcedNative(
             src1 = src1,
@@ -132,10 +132,11 @@ internal object ArithmeticCompositeNative {
         k3: Float,
         k4: Float,
         useLinear: Boolean,
-        simdBackend: Int,
+        @SimdBackend simdBackend: Int,
     )
 
     /** Reports the backend the production dispatcher actually selects on this ABI. */
     @JvmStatic
+    @SimdBackend
     external fun nativeBackend(): Int
 }

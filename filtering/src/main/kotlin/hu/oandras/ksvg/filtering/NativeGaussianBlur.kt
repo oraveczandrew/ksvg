@@ -140,11 +140,12 @@ internal object NativeGaussianBlur {
         height: Int,
         stdDeviationX: Float,
         stdDeviationY: Float,
-        simdBackend: Int,
+        @SimdBackend simdBackend: Int,
     )
 
     /** Reports the backend the production dispatcher actually selects on this ABI. */
     @JvmStatic
+    @SimdBackend
     external fun nativeBackend(stdDeviationX: Float, stdDeviationY: Float): Int
 
     @JvmStatic

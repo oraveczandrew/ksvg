@@ -79,3 +79,11 @@ internal inline fun LoggerContext.logW(tag: String, message: () -> String) {
 internal inline fun LoggerContext.logE(tag: String, message: () -> String) {
     if (isLoggable(tag, LoggerContext.ERROR)) log(LoggerContext.ERROR, tag, message())
 }
+
+internal inline fun LoggerContext.logE(tag: String, throwable: Throwable, message: () -> String = { throwable.message ?: "Error" }) {
+    if (isLoggable(tag, LoggerContext.ERROR)) {
+        val msg = message()
+        val stackTrace = Log.getStackTraceString(throwable)
+        log(LoggerContext.ERROR, tag, "$msg\n$stackTrace")
+    }
+}

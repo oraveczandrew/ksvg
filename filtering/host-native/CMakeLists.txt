@@ -5,6 +5,7 @@ set(JAVA_HOME "$ENV{JAVA_HOME}")
 
 add_library(ksvgblur SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/common/color_luts.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/simd_capabilities.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/blur/gaussian_blur.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/blur/blur_x86_64_ssse3.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/blur/blur_x86_64_avx2.S

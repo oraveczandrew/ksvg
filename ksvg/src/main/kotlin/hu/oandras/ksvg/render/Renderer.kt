@@ -68,7 +68,10 @@ import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.RenderQuality
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.VectorEffect
+import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.logD
+import hu.oandras.ksvg.logE
+import hu.oandras.ksvg.logI
 import hu.oandras.ksvg.render.animation.AnimationContext
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.animation.applyAnimatedStyle
@@ -1219,6 +1222,21 @@ internal class Renderer internal constructor(
         deviceRegion: RectF,
         boundingBox: Box,
     ): FilterBackend {
+        // Log native status once per process when first needed.
+        if (!nativeLoadErrorLogged) {
+            nativeLoadErrorLogged = true
+            val error = SoftwareKernels.nativeLoadError
+            if (error != null) {
+                logE(TAG, error)
+            } else if (SoftwareKernels.isNativeAvailable) {
+                logI(TAG) {
+                    val backends = SoftwareKernels.supportedSimdBackends
+                    "Native filter library (libksvgblur) loaded successfully. " +
+                        "Supported SIMD execution sets: $backends"
+                }
+            }
+        }
+
         // GPU effect-chain attempt (RenderEffect + RenderNode recording).
         // Only for graphs Impl31 represents exactly, and only when the element
         // would not need a separate compositing layer for the result.
@@ -2395,6 +2413,8 @@ internal class Renderer internal constructor(
         const val LUMINANCE_TO_ALPHA_BLUE: Float = 0.0722f
 
         private const val DEBUG = false
+
+        private var nativeLoadErrorLogged = false
 
         private val maskPaintCombined: Paint = Paint().apply {
             xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)

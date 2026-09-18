@@ -18,10 +18,29 @@ package hu.oandras.ksvg.filtering
 
 internal object NativeBackend {
     @JvmField
+    internal var loadError: RuntimeException? = null
+
+    @JvmField
     val isAvailable: Boolean = try {
         System.loadLibrary("ksvgblur")
         true
-    } catch (_: Throwable) {
+    } catch (t: Throwable) {
+        loadError = RuntimeException(
+            "Failed to load native KSVG filter library (libksvgblur.so). " +
+                    "Falling back to slow Kotlin kernels. Performance will be significantly degraded. " +
+                    "Check if the APK contains the correct .so files for the current device ABI.",
+            t
+        )
         false
     }
+
+    /**
+     * Kernel-independent device capability mask ([SimdBackend] flags); see
+     * `simd_capabilities.cpp`. Plain (non-internal) member so the JNI symbol
+     * stays unmangled (see AGENTS.md); the surface stays internal via the
+     * enclosing object.
+     */
+    @JvmStatic
+    @SimdBackend
+    external fun supportedBackendsMask(): Int
 }

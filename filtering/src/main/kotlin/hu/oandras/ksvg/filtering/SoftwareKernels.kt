@@ -28,6 +28,54 @@ package hu.oandras.ksvg.filtering
  */
 public object SoftwareKernels {
 
+    /**
+     * The error encountered while loading the native filter library, or null if
+     * loaded successfully or not yet attempted.
+     */
+    @JvmStatic
+    public val nativeLoadError: RuntimeException?
+        get() = NativeBackend.loadError
+
+    /**
+     * True if the native filter library (libksvgblur) is loaded and available.
+     */
+    @JvmStatic
+    public val isNativeAvailable: Boolean
+        get() = NativeBackend.isAvailable
+
+    /**
+     * Supported SIMD execution sets on this device (e.g. "Scalar, SSSE3, AVX2"
+     * or "Scalar, NEON64"), reported by a kernel-independent native function.
+     * This is device *capability*, not the dispatched backend: production
+     * dispatch is per-kernel and may still fall back to scalar, and x86_64
+     * implies the SSE2 baseline without a dedicated flag bit. "None" when the
+     * native library failed to load (see [nativeLoadError]).
+     */
+    @JvmStatic
+    public val supportedSimdBackends: String
+        get() {
+            if (!isNativeAvailable) {
+                return "None"
+            }
+            val mask = NativeBackend.supportedBackendsMask()
+            val names = ArrayList<String>(6)
+            if (mask and SIMD_SCALAR != 0) names.add(backendName(SIMD_SCALAR))
+            if (mask and SIMD_SSSE3 != 0) names.add(backendName(SIMD_SSSE3))
+            if (mask and SIMD_AVX2 != 0) names.add(backendName(SIMD_AVX2))
+            if (mask and SIMD_NEON64 != 0) names.add(backendName(SIMD_NEON64))
+            if (mask and SIMD_NEON32 != 0) names.add(backendName(SIMD_NEON32))
+            if (mask and SIMD_SSE2 != 0) names.add(backendName(SIMD_SSE2))
+            val known = SIMD_SCALAR or SIMD_SSSE3 or SIMD_AVX2 or SIMD_NEON64 or SIMD_NEON32 or SIMD_SSE2
+            val unknown = mask and known.inv()
+            if (unknown != 0) {
+                names.add("unknown(0x" + unknown.toString(16) + ")")
+            }
+            if (names.isEmpty()) {
+                names.add("none(0x" + mask.toString(16) + ")")
+            }
+            return names.joinToString()
+        }
+
     // ----------------------------------------------------------- feConvolveMatrix
 
     @JvmStatic

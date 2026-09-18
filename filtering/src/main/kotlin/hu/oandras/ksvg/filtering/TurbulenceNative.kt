@@ -86,10 +86,12 @@ internal object TurbulenceNative {
         unitSizeX: Double,
         unitSizeY: Double,
         seed: Int,
+        @SimdBackend
         simdBackend: Int,
     )
 
     /** Reports the backend the production dispatcher actually selects on this ABI. */
     @JvmStatic
+    @SimdBackend
     external fun nativeBackend(): Int
 }

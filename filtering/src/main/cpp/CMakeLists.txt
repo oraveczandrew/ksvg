@@ -140,6 +140,7 @@ endif ()
 
 add_library(ksvgblur SHARED
         common/color_luts.S
+        simd_capabilities.cpp
         blur/gaussian_blur.cpp
         convolve/convolve_matrix.cpp convolve/convolve_matrix_neon.cpp
         morphology/morphology.cpp

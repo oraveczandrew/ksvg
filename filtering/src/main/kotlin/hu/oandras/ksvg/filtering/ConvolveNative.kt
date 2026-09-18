@@ -66,10 +66,11 @@ internal object ConvolveNative {
         bias: Float,
         preserveAlpha: Boolean,
         edgeMode: Int,
-        simdBackend: Int,
+        @SimdBackend simdBackend: Int,
     )
 
     /** Reports the backend the production dispatcher actually selects on this ABI. */
     @JvmStatic
+    @SimdBackend
     external fun nativeBackend(): Int
 }
