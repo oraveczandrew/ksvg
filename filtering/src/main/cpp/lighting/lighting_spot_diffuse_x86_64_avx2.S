@@ -289,210 +289,291 @@ RODATA16
 .globl SYM(ksvgLightingSpotDiffuseRowAvx2Linear)
 .p2align 4, 0x90
 TYPE(SYM(ksvgLightingSpotDiffuseRowAvx2Linear), @function)
-SYM(ksvgLightingSpotDiffuseRowAvx2Linear):  // @SYM(ksvgLightingSpotDiffuseRowAvx2Linear)
+SYM(ksvgLightingSpotDiffuseRowAvx2Linear):
     // Caller contract: count is a multiple of 8 (C++ passes (ixHi-x)&~7);
     // there is no sub-8px tail here, scalar C++ covers row edges/tails.
+    // 8px/iter vector loop: the proven sRGB front half through the R/G/B
+    // int converts, then exact L2S bytes via the scalar LUT (GPR lookups).
     testl        %r8d, %r8d
     jle          .LBB1_4
-    pushq        %rbp
-    pushq        %r15
-    pushq        %r13
-    pushq        %r14
-    pushq        %r12
-    pushq        %rbx
-    subq         $8, %rsp
-    // Spill scalar params (surface scale, invD, light pos, spot dir, k,
-    // colors) for the per-pixel loop below.
-    vmovss       36(%r9), %xmm0  // xmm0 = mem[0],zero,zero,zero
-    vmovss       (%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm1, -20(%rsp)
-    vmovss       4(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm1, -24(%rsp)
-    vmovss       40(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm1, -28(%rsp)
-    vmovss       48(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm1, -32(%rsp)
-    vmovss       16(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
-    vsubss       44(%r9), %xmm1, %xmm1
-    vmovss       12(%r9), %xmm2  // xmm2 = mem[0],zero,zero,zero
-    vmovss       %xmm2, -36(%rsp)
-    vmovss       20(%r9), %xmm2  // xmm2 = mem[0],zero,zero,zero
-    vmovss       %xmm2, -40(%rsp)
-    vmovaps      %xmm1, -16(%rsp)
-    vmulss       %xmm1, %xmm1, %xmm1
-    vmovss       %xmm1, -44(%rsp)
-    vmovss       52(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm1, -48(%rsp)
-    vmovss       56(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm1, -52(%rsp)
-    vmovss       60(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm1, -56(%rsp)
-    vmovss       64(%r9), %xmm12  // xmm12 = mem[0],zero,zero,zero
-    vmovss       8(%r9), %xmm13  // xmm13 = mem[0],zero,zero,zero
-    vmovsd       24(%r9), %xmm14  // xmm14 = mem[0],zero
-    vmovss       32(%r9), %xmm15  // xmm15 = mem[0],zero,zero,zero
-    movq         %rsi, %r13
-    movq         %rdx, %r14
-    movq         %r14, -64(%rsp)
-    movl         %r8d, %r8d
-    xorl         %r9d, %r9d
-    movl         $255, %r10d
-    vbroadcastss .LCPI1_0(%rip), %xmm1  // xmm1 = [-0.0E+0,-0.0E+0,-0.0E+0,-0.0E+0]
-    vmovss       .LCPI1_1(%rip), %xmm2  // xmm2 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vxorps       %xmm3, %xmm3, %xmm3
-.p2align 4, 0x90
-.LBB1_2:
-    // Per-pixel scalar loop: window heights, normalize, spot factor with
-    // cutoff, intensity, L2S conversion, pack, store.
-    movq         -64(%rsp), %r14
-    movzbl       3(%rdi,%r9,4), %r11d
-    vxorps       %xmm7, %xmm7, %xmm7
-    vcvtsi2ss    %r11d, %xmm7, %xmm4
-    vmulss       %xmm4, %xmm0, %xmm6
-    movzbl       7(%rdi,%r9,4), %r11d
-    vxorps       %xmm7, %xmm7, %xmm7
-    vcvtsi2ss    %r11d, %xmm7, %xmm4
-    vmulss       %xmm4, %xmm0, %xmm4
-    movzbl       11(%rdi,%r9,4), %r11d
-    vxorps       %xmm7, %xmm7, %xmm7
-    vcvtsi2ss    %r11d, %xmm7, %xmm7
-    movzbl       3(%r13,%r9,4), %r11d
-    vxorps       %xmm8, %xmm8, %xmm8
-    vcvtsi2ss    %r11d, %xmm8, %xmm8
-    movzbl       11(%r13,%r9,4), %r11d
-    vxorps       %xmm9, %xmm9, %xmm9
-    vcvtsi2ss    %r11d, %xmm9, %xmm9
-    vmulss       %xmm7, %xmm0, %xmm7
-    vmulss       %xmm0, %xmm8, %xmm8
-    vmulss       %xmm0, %xmm9, %xmm9
-    movzbl       3(%r14,%r9,4), %r11d
-    vxorps       %xmm11, %xmm11, %xmm11
-    vcvtsi2ss    %r11d, %xmm11, %xmm10
-    vmulss       %xmm0, %xmm10, %xmm10
-    movzbl       7(%r14,%r9,4), %r11d
-    vxorps       %xmm11, %xmm11, %xmm11
-    vcvtsi2ss    %r11d, %xmm11, %xmm5
-    movzbl       11(%r14,%r9,4), %r11d
-    vxorps       %xmm11, %xmm11, %xmm11
-    vcvtsi2ss    %r11d, %xmm11, %xmm11
-    vmulss       %xmm5, %xmm0, %xmm5
-    vmulss       %xmm0, %xmm11, %xmm11
-    vaddss       %xmm9, %xmm9, %xmm9
-    vaddss       %xmm7, %xmm9, %xmm9
-    vaddss       %xmm11, %xmm9, %xmm9
-    vaddss       %xmm8, %xmm8, %xmm8
-    vaddss       %xmm6, %xmm8, %xmm8
-    vaddss       %xmm10, %xmm8, %xmm8
-    vsubss       %xmm8, %xmm9, %xmm8
-    vaddss       %xmm5, %xmm5, %xmm5
-    vaddss       %xmm5, %xmm10, %xmm5
-    vaddss       %xmm5, %xmm11, %xmm5
-    vaddss       %xmm4, %xmm4, %xmm9
-    vaddss       %xmm6, %xmm9, %xmm6
-    vaddss       %xmm7, %xmm6, %xmm6
-    vsubss       %xmm6, %xmm5, %xmm5
-    vxorps       %xmm1, %xmm8, %xmm6
-    vdivss       -20(%rsp), %xmm6, %xmm6
-    vxorps       %xmm1, %xmm5, %xmm5
-    vdivss       -24(%rsp), %xmm5, %xmm5
-    vmulss       %xmm5, %xmm5, %xmm7
-    vmulss       %xmm6, %xmm6, %xmm8
-    vaddss       %xmm7, %xmm8, %xmm7
-    vaddss       %xmm2, %xmm7, %xmm7
-    vcvtsi2ss    %r9d, %xmm0, %xmm8
-    vmulss       -32(%rsp), %xmm8, %xmm8
-    vaddss       -28(%rsp), %xmm8, %xmm8
-    vmovss       -36(%rsp), %xmm9
-// xmm9 = mem[0],zero,zero,zero
-    vsubss       %xmm8, %xmm9, %xmm8
-    movzbl       7(%r13,%r9,4), %r11d  // center height (current pixel alpha)
-    vcvtsi2ss    %r11d, %xmm12, %xmm10
-    vmulss       %xmm0, %xmm10, %xmm10  // center * ss
-    vmovss       -40(%rsp), %xmm9
-// xmm9 = mem[0],zero,zero,zero
-    vsubss       %xmm10, %xmm9, %xmm4  // vz = lightZ - center*ss
-    vmulss       %xmm8, %xmm8, %xmm9
-    vaddss       -44(%rsp), %xmm9, %xmm9
-    vmulss       %xmm4, %xmm4, %xmm10
-    vaddss       %xmm9, %xmm10, %xmm9
-    vinsertps    $16, %xmm9, %xmm7, %xmm7  // xmm7 = xmm7[0],xmm9[0],xmm7[2,3]
-    vsqrtps      %xmm7, %xmm7
-    vbroadcastss .LCPI1_1(%rip), %xmm9  // xmm9 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0]
-    vdivps       %xmm7, %xmm9, %xmm7
-    vmovshdup    %xmm7, %xmm9  // xmm9 = xmm7[1,1,3,3]
-    vmulss       %xmm9, %xmm8, %xmm8
-    vinsertps    $16, -16(%rsp), %xmm5, %xmm5
-// xmm5 = xmm5[0],mem[0],xmm5[2,3]
-    vmulps       %xmm7, %xmm5, %xmm5
-    vmulss       %xmm4, %xmm9, %xmm4
-    vmovshdup    %xmm5, %xmm9  // xmm9 = xmm5[1,1,3,3]
-    vmulss       -52(%rsp), %xmm9, %xmm10
-    vmulss       -48(%rsp), %xmm8, %xmm11
-    vaddss       %xmm10, %xmm11, %xmm10
-    vmulss       -56(%rsp), %xmm4, %xmm11
-    vaddss       %xmm10, %xmm11, %xmm10
-    vxorps       %xmm1, %xmm10, %xmm11
-    vcmpltss     %xmm10, %xmm11, %xmm10
-    vandnps      %xmm11, %xmm10, %xmm10
-    vcmpltss     %xmm12, %xmm10, %xmm11
-    vandnps      %xmm10, %xmm11, %xmm10
-    vmulss       %xmm5, %xmm9, %xmm5
-    vmulss       %xmm7, %xmm6, %xmm6  // nx = ngx * (1/|n|)
-    vmulss       %xmm6, %xmm8, %xmm6
-    vaddss       %xmm5, %xmm6, %xmm5
-    vmulss       %xmm4, %xmm7, %xmm4  // nz*lz
-    vaddss       %xmm5, %xmm4, %xmm4
-    vmaxss       %xmm4, %xmm3, %xmm4
-    vmulss       %xmm4, %xmm13, %xmm4
-    vmulss       %xmm4, %xmm10, %xmm4
-    vminss       %xmm4, %xmm2, %xmm5
-    vcmpltss     %xmm3, %xmm4, %xmm4
-    vandnps      %xmm5, %xmm4, %xmm4
-    vbroadcastss %xmm4, %xmm5
-    vmulps       %xmm5, %xmm14, %xmm5
-    vxorps       %xmm6, %xmm6, %xmm6
-    vmaxps       %xmm5, %xmm6, %xmm5
-    vbroadcastss .LCPI1_4(%rip), %xmm6  // 0.5
-    vaddps       %xmm6, %xmm5, %xmm5  // round-half-up R/G
-    vmovshdup    %xmm5, %xmm6  // xmm6 = xmm5[1,1,3,3]
-    vcvttss2si   %xmm6, %r11d
-    vcvttss2si   %xmm5, %ebx
-    vbroadcastss .LCPI1_2(%rip), %xmm6  // xmm6 = [2.55E+2,2.55E+2,2.55E+2,2.55E+2]
-    vcmpltps     %xmm5, %xmm6, %xmm5
-    vshufps      $80, %xmm5, %xmm5, %xmm5  // xmm5 = xmm5[0,0,1,1]
-    vmovmskpd    %xmm5, %ebp
-    vmulss       %xmm4, %xmm15, %xmm4
-    vmaxss       %xmm4, %xmm3, %xmm4
-    vmovss       .LCPI1_2(%rip), %xmm5  // xmm5 = [2.55E+2,0.0E+0,0.0E+0,0.0E+0]
-    vminss       %xmm4, %xmm5, %xmm4
-    vaddss       .LCPI1_4(%rip), %xmm4, %xmm4  // round-half-up B
-    vcvttss2si   %xmm4, %r14d
-    movl         %ebx, %eax
-    movl         %r11d, %esi
-    movl         %r14d, %edx
+    pushq        %r15                  // LUT base; single push keeps rsp 16B-aligned
     leaq         .Lspot_l2s_data(%rip), %r15
-    L2S_SPOT     %eax
-    L2S_SPOT     %esi
-    L2S_SPOT     %edx
-    shll         $16, %eax
-    shll         $8, %esi
-    orl          %eax, %esi
-    orl          %edx, %esi
-    movl         %esi, %ebx
-    orl          $-16777216, %ebx
-    movl         %ebx, (%rcx,%r9,4)
-    leaq         1(%r9), %r11
-    movq         %r11, %r9
-    cmpq         %r11, %r8
-    jne          .LBB1_2
-    addq         $8, %rsp
-    popq         %rbx
-    popq         %r12
-    popq         %r14
-    popq         %r13
-    popq         %r15
-    popq         %rbp
+    vbroadcastss 36(%r9), %ymm0
+    movl         %r8d, %eax
+    xorl         %r8d, %r8d
+    vbroadcastss .LSPOTAVX2_C0(%rip), %ymm1  // ymm1 = [1.0E+0 x 8]
+    vxorps       %xmm2, %xmm2, %xmm2
+    vmovss       .LSPOTAVX2_C1(%rip), %xmm3  // xmm3 = [5.0E+0,0.0E+0,0.0E+0,0.0E+0]
+    vmovsd       .LSPOTAVX2_C6(%rip), %xmm4  // xmm4 = [6.0E+0,7.0E+0,0.0E+0,0.0E+0]
+    vmovaps      .LSPOTAVX2_C3(%rip), %xmm5  // xmm5 = [4.0E+0,1.0E+0,2.0E+0,3.0E+0]
+    vbroadcastss .LSPOTAVX2_C4(%rip), %ymm6  // ymm6 = [2.55E+2 x 8]
+    vpbroadcastq .LSPOTAVX2_C5(%rip), %ymm7  // ymm7 = [0xff000000ff000000 x 4]
+.p2align 4, 0x90
+.LSPOT_LINEAR8_LOOP:
+    // Sobel window: row alphas -> scaled heights, 1:2:1 sums + derivatives.
+    vmovdqu      (%rdi,%r8,4), %ymm8
+    vmovdqu      4(%rdi,%r8,4), %ymm9
+    vmovdqu      8(%rdi,%r8,4), %ymm10
+    ALPHA_FSCALE %ymm8, %ymm8, %ymm0, %ymm8
+    ALPHA_FSCALE %ymm9, %ymm9, %ymm0, %ymm9
+    ALPHA_FSCALE %ymm10, %ymm10, %ymm0, %ymm10
+    vsubps       %ymm8, %ymm10, %ymm12
+    vaddps       %ymm9, %ymm9, %ymm9
+    vaddps       %ymm9, %ymm8, %ymm8
+    vaddps       %ymm8, %ymm10, %ymm8
+    vsubps       %ymm8, %ymm2, %ymm8
+    vmovdqu      (%rsi,%r8,4), %ymm9
+    vmovdqu      4(%rsi,%r8,4), %ymm11
+    vmovdqu      8(%rsi,%r8,4), %ymm10
+    ALPHA_FSCALE %ymm9, %ymm9, %ymm0, %ymm9
+    ALPHA_FSCALE %ymm10, %ymm10, %ymm0, %ymm10
+    vaddps       %ymm10, %ymm10, %ymm10
+    vaddps       %ymm10, %ymm12, %ymm10
+    vaddps       %ymm9, %ymm9, %ymm9
+    vsubps       %ymm9, %ymm10, %ymm9
+    vmovdqu      (%rdx,%r8,4), %ymm10
+    vmovdqu      4(%rdx,%r8,4), %ymm12
+    vmovdqu      8(%rdx,%r8,4), %ymm13
+    ALPHA_FSCALE %ymm10, %ymm10, %ymm0, %ymm10
+    ALPHA_FSCALE %ymm12, %ymm12, %ymm0, %ymm12
+    ALPHA_FSCALE %ymm13, %ymm13, %ymm0, %ymm13
+    vsubps       %ymm10, %ymm13, %ymm14
+    vaddps       %ymm14, %ymm9, %ymm9
+    vaddps       %ymm12, %ymm12, %ymm12
+    vbroadcastss (%r9), %ymm14
+    vaddps       %ymm12, %ymm10, %ymm10
+    vdivps       %ymm14, %ymm9, %ymm9
+    vaddps       %ymm10, %ymm13, %ymm10
+    vaddps       %ymm10, %ymm8, %ymm8
+    vbroadcastss 4(%r9), %ymm10
+    vdivps       %ymm10, %ymm8, %ymm10
+    vsubps       %ymm9, %ymm2, %ymm8
+    vsubps       %ymm10, %ymm2, %ymm9
+    vmulps       %ymm8, %ymm8, %ymm10
+    vmulps       %ymm9, %ymm9, %ymm12
+    vaddps       %ymm12, %ymm10, %ymm10
+    vaddps       %ymm1, %ymm10, %ymm10
+    // Normalize + spot-cone factor (cutoff) + intensity = k * factor * dot.
+    vsqrtps      %ymm10, %ymm10
+    vdivps       %ymm10, %ymm8, %ymm8  // nx = nx0 / nLen
+    vdivps       %ymm10, %ymm9, %ymm9  // ny = ny0 / nLen
+    vpsrld       $24, %ymm11, %ymm11
+    vxorps       %xmm15, %xmm15, %xmm15
+    vcvtsi2ss    %r8d, %xmm15, %xmm12
+    vcvtdq2ps    %ymm11, %ymm11
+    vmulps       %ymm0, %ymm11, %ymm11
+    vaddss       %xmm3, %xmm12, %xmm13
+    vbroadcastss %xmm12, %xmm12
+    vaddps       %xmm5, %xmm12, %xmm14
+    vpermpd      $196, %ymm14, %ymm15  // ymm15 = ymm14[0,1,0,3]
+    vblendps     $1, %ymm12, %ymm15, %ymm15  // ymm15 = ymm12[0],ymm15[1..7]
+    vaddps       %xmm4, %xmm12, %xmm12
+    vbroadcastss %xmm13, %ymm13
+    vblendps     $32, %ymm13, %ymm15, %ymm13  // ymm13 = ymm15[0..4],ymm13[5],ymm15[6,7]
+    vinsertf128  $1, %xmm12, %ymm14, %ymm12
+    vshufpd      $2, %ymm12, %ymm13, %ymm12  // ymm12 = ymm13[0],ymm12[1],ymm13[2],ymm12[2]
+    vbroadcastss 40(%r9), %ymm13
+    vbroadcastss 48(%r9), %ymm14
+    vmulps       %ymm14, %ymm12, %ymm12
+    vaddps       %ymm12, %ymm13, %ymm12
+    vbroadcastss 12(%r9), %ymm13
+    vsubps       %ymm12, %ymm13, %ymm12
+    vmovss       16(%r9), %xmm13  // xmm13 = mem[0],zero,zero,zero
+    vsubss       44(%r9), %xmm13, %xmm13
+    vbroadcastss 20(%r9), %ymm14
+    vsubps       %ymm11, %ymm14, %ymm11
+    vmulps       %ymm12, %ymm12, %ymm14
+    vmulss       %xmm13, %xmm13, %xmm15
+    vbroadcastss %xmm15, %ymm15
+    vaddps       %ymm15, %ymm14, %ymm14
+    vmulps       %ymm11, %ymm11, %ymm15
+    vaddps       %ymm15, %ymm14, %ymm14
+    vsqrtps      %ymm14, %ymm15
+    vdivps       %ymm15, %ymm1, %ymm15
+    vcmpneq_oqps %ymm2, %ymm14, %ymm14
+    vandps       %ymm15, %ymm14, %ymm14
+    vbroadcastss %xmm13, %ymm13
+    vmulps       %ymm14, %ymm12, %ymm12
+    vmulps       %ymm14, %ymm13, %ymm13
+    vmulps       %ymm14, %ymm11, %ymm11
+    vmulps       %ymm12, %ymm8, %ymm8
+    vmulps       %ymm13, %ymm9, %ymm9
+    vaddps       %ymm9, %ymm8, %ymm8
+    vdivps       %ymm10, %ymm1, %ymm9
+    vmulps       %ymm11, %ymm9, %ymm9
+    vaddps       %ymm8, %ymm9, %ymm8
+    vbroadcastss 52(%r9), %ymm9
+    vmulps       %ymm12, %ymm9, %ymm9
+    vbroadcastss 56(%r9), %ymm10
+    vmulps       %ymm13, %ymm10, %ymm10
+    vmaxps       %ymm2, %ymm8, %ymm8
+    vaddps       %ymm10, %ymm9, %ymm9
+    vbroadcastss 60(%r9), %ymm10
+    vmulps       %ymm11, %ymm10, %ymm10
+    vaddps       %ymm9, %ymm10, %ymm9
+    vsubps       %ymm9, %ymm2, %ymm9
+    vmaxps       %ymm2, %ymm9, %ymm9
+    vbroadcastss 64(%r9), %ymm10
+    vcmpleps     %ymm9, %ymm10, %ymm10
+    vandps       %ymm9, %ymm10, %ymm9
+    vbroadcastss 8(%r9), %ymm10
+    vmulps       %ymm10, %ymm8, %ymm8
+    vmulps       %ymm9, %ymm8, %ymm8
+    vminps       %ymm1, %ymm8, %ymm8
+    // k<0 guard (cf. SSSE3 SIGSEGV): lower-clamp intensity before the LUT
+    // tail; mirrors the scalar cmpltss/andnps zeroing pair. Upper clamp is
+    // the vminps above, shared with the sRGB twin.
+    vmaxps       %ymm2, %ymm8, %ymm8
+    vbroadcastss 24(%r9), %ymm9   // lr
+    vmulps       %ymm9, %ymm8, %ymm9  // R = intensity * lr
+    vbroadcastss 28(%r9), %ymm10  // lg
+    vbroadcastss 32(%r9), %ymm11  // lb
+    vmulps       %ymm10, %ymm8, %ymm10  // G = intensity * lg
+    vmulps       %ymm11, %ymm8, %ymm8  // B = intensity * lb
+    vbroadcastss .LSPOTAVX2_HALF(%rip), %ymm11
+    vaddps       %ymm11, %ymm9, %ymm9  // round-half-up R
+    vminps       %ymm6, %ymm9, %ymm9
+    vcvttps2dq   %ymm9, %ymm9
+    vaddps       %ymm11, %ymm10, %ymm10  // round-half-up G
+    vminps       %ymm6, %ymm10, %ymm10
+    vcvttps2dq   %ymm10, %ymm10
+    // R/G int vectors are ready in ymm9/ymm10 (+ B floats in ymm8):
+    // int-convert B, split 128b lanes, then exact sRGB bytes via the scalar
+    // LUT (same table, same indices the 1px loop feeds L2S_SPOT).
+    vaddps       %ymm11, %ymm8, %ymm8  // round-half-up B
+    vminps       %ymm6, %ymm8, %ymm8
+    vcvttps2dq   %ymm8, %ymm8      // B ints
+    vextracti128 $1, %ymm9, %xmm11
+    vextracti128 $1, %ymm10, %xmm12
+    vextracti128 $1, %ymm8, %xmm13
+    // Pixels 0-3 (low lane).
+    vmovd        %xmm9, %r11d
+    L2S_SPOT     %r11d               // sRGB(R0)
+    shll         $16, %r11d
+    vmovd        %xmm10, %r10d
+    L2S_SPOT     %r10d               // sRGB(G0)
+    shll         $8, %r10d
+    orl          %r10d, %r11d
+    vmovd        %xmm8, %r10d
+    L2S_SPOT     %r10d               // sRGB(B0)
+    orl          %r10d, %r11d
+    orl          $-16777216, %r11d   // force alpha
+    movl         %r11d, (%rcx,%r8,4)
+    vpsrldq      $4, %xmm9, %xmm9
+    vpsrldq      $4, %xmm10, %xmm10
+    vpsrldq      $4, %xmm8, %xmm8
+    // Pixel 1.
+    vmovd        %xmm9, %r11d
+    L2S_SPOT     %r11d
+    shll         $16, %r11d
+    vmovd        %xmm10, %r10d
+    L2S_SPOT     %r10d
+    shll         $8, %r10d
+    orl          %r10d, %r11d
+    vmovd        %xmm8, %r10d
+    L2S_SPOT     %r10d
+    orl          %r10d, %r11d
+    orl          $-16777216, %r11d
+    movl         %r11d, 4(%rcx,%r8,4)
+    vpsrldq      $4, %xmm9, %xmm9
+    vpsrldq      $4, %xmm10, %xmm10
+    vpsrldq      $4, %xmm8, %xmm8
+    // Pixel 2.
+    vmovd        %xmm9, %r11d
+    L2S_SPOT     %r11d
+    shll         $16, %r11d
+    vmovd        %xmm10, %r10d
+    L2S_SPOT     %r10d
+    shll         $8, %r10d
+    orl          %r10d, %r11d
+    vmovd        %xmm8, %r10d
+    L2S_SPOT     %r10d
+    orl          %r10d, %r11d
+    orl          $-16777216, %r11d
+    movl         %r11d, 8(%rcx,%r8,4)
+    vpsrldq      $4, %xmm9, %xmm9
+    vpsrldq      $4, %xmm10, %xmm10
+    vpsrldq      $4, %xmm8, %xmm8
+    // Pixel 3.
+    vmovd        %xmm9, %r11d
+    L2S_SPOT     %r11d
+    shll         $16, %r11d
+    vmovd        %xmm10, %r10d
+    L2S_SPOT     %r10d
+    shll         $8, %r10d
+    orl          %r10d, %r11d
+    vmovd        %xmm8, %r10d
+    L2S_SPOT     %r10d
+    orl          %r10d, %r11d
+    orl          $-16777216, %r11d
+    movl         %r11d, 12(%rcx,%r8,4)
+    // Pixels 4-7 (high lane).
+    vmovd        %xmm11, %r11d
+    L2S_SPOT     %r11d               // sRGB(R4)
+    shll         $16, %r11d
+    vmovd        %xmm12, %r10d
+    L2S_SPOT     %r10d               // sRGB(G4)
+    shll         $8, %r10d
+    orl          %r10d, %r11d
+    vmovd        %xmm13, %r10d
+    L2S_SPOT     %r10d               // sRGB(B4)
+    orl          %r10d, %r11d
+    orl          $-16777216, %r11d   // force alpha
+    movl         %r11d, 16(%rcx,%r8,4)
+    vpsrldq      $4, %xmm11, %xmm11
+    vpsrldq      $4, %xmm12, %xmm12
+    vpsrldq      $4, %xmm13, %xmm13
+    // Pixel 5.
+    vmovd        %xmm11, %r11d
+    L2S_SPOT     %r11d
+    shll         $16, %r11d
+    vmovd        %xmm12, %r10d
+    L2S_SPOT     %r10d
+    shll         $8, %r10d
+    orl          %r10d, %r11d
+    vmovd        %xmm13, %r10d
+    L2S_SPOT     %r10d
+    orl          %r10d, %r11d
+    orl          $-16777216, %r11d
+    movl         %r11d, 20(%rcx,%r8,4)
+    vpsrldq      $4, %xmm11, %xmm11
+    vpsrldq      $4, %xmm12, %xmm12
+    vpsrldq      $4, %xmm13, %xmm13
+    // Pixel 6.
+    vmovd        %xmm11, %r11d
+    L2S_SPOT     %r11d
+    shll         $16, %r11d
+    vmovd        %xmm12, %r10d
+    L2S_SPOT     %r10d
+    shll         $8, %r10d
+    orl          %r10d, %r11d
+    vmovd        %xmm13, %r10d
+    L2S_SPOT     %r10d
+    orl          %r10d, %r11d
+    orl          $-16777216, %r11d
+    movl         %r11d, 24(%rcx,%r8,4)
+    vpsrldq      $4, %xmm11, %xmm11
+    vpsrldq      $4, %xmm12, %xmm12
+    vpsrldq      $4, %xmm13, %xmm13
+    // Pixel 7.
+    vmovd        %xmm11, %r11d
+    L2S_SPOT     %r11d
+    shll         $16, %r11d
+    vmovd        %xmm12, %r10d
+    L2S_SPOT     %r10d
+    shll         $8, %r10d
+    orl          %r10d, %r11d
+    vmovd        %xmm13, %r10d
+    L2S_SPOT     %r10d
+    orl          %r10d, %r11d
+    orl          $-16777216, %r11d
+    movl         %r11d, 28(%rcx,%r8,4)
+    addq         $8, %r8
+    cmpq         %rax, %r8
+    jb           .LSPOT_LINEAR8_LOOP
 .LBB1_4:
+    vzeroupper
+    popq         %r15
     retq
 .Lfunc_end1:
 SIZE(SYM(ksvgLightingSpotDiffuseRowAvx2Linear))

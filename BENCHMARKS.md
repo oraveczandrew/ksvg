@@ -120,14 +120,14 @@ Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
 | Lighting (diffuse, spot) | scalar | 2048x2048 | 234.720 | 17.87 | 0.14 | 1.00x |  |  |
 | Lighting (diffuse, spot) | ssse3 | 2048x2048 | 38.439 | 109.12 | 0.87 | 6.11x | 🟢 |  |
 | Lighting (diffuse, spot) | avx2 | 2048x2048 | 25.544 | 164.20 | 1.31 | **9.19x** | 🚀 |  |
-| Lighting (diffuse, spot, linear) | kotlin | 512x512 | 11.058 | 23.71 | 0.19 | 1.35x | ⬆️ |  |
-| Lighting (diffuse, spot, linear) | scalar | 512x512 | 14.888 | 17.61 | 0.14 | 1.00x |  |  |
-| Lighting (diffuse, spot, linear) | ssse3 | 512x512 | 8.142 | 32.20 | 0.26 | 1.83x | 🟢 |  |
-| Lighting (diffuse, spot, linear) | avx2 | 512x512 | 7.995 | 32.79 | 0.26 | 1.86x | 🟢 |  |
-| Lighting (diffuse, spot, linear) | kotlin | 2048x2048 | 159.497 | 26.30 | 0.21 | 1.34x | ⬆️ |  |
-| Lighting (diffuse, spot, linear) | scalar | 2048x2048 | 213.095 | 19.68 | 0.16 | 1.00x |  |  |
-| Lighting (diffuse, spot, linear) | ssse3 | 2048x2048 | 123.224 | 34.04 | 0.27 | 1.73x | 🟢 |  |
-| Lighting (diffuse, spot, linear) | avx2 | 2048x2048 | 119.785 | 35.02 | 0.28 | 1.78x | 🟢 |  |
+| Lighting (diffuse, spot, linear) | kotlin | 512x512 | 8.840 | 29.65 | 0.24 | 1.40x | ⬆️ |  |
+| Lighting (diffuse, spot, linear) | scalar | 512x512 | 12.334 | 21.25 | 0.17 | 1.00x |  |  |
+| Lighting (diffuse, spot, linear) | ssse3 | 512x512 | 2.969 | 88.29 | 0.71 | 4.15x | 🟢 |  |
+| Lighting (diffuse, spot, linear) | avx2 | 512x512 | 2.183 | 120.09 | 0.96 | 5.65x | 🟢 |  |
+| Lighting (diffuse, spot, linear) | kotlin | 2048x2048 | 139.530 | 30.06 | 0.24 | 1.40x | ⬆️ |  |
+| Lighting (diffuse, spot, linear) | scalar | 2048x2048 | 194.983 | 21.51 | 0.17 | 1.00x |  |  |
+| Lighting (diffuse, spot, linear) | ssse3 | 2048x2048 | 49.253 | 85.16 | 0.68 | 3.96x | 🟢 |  |
+| Lighting (diffuse, spot, linear) | avx2 | 2048x2048 | 34.772 | 120.62 | 0.96 | 5.61x | 🟢 |  |
 | Lighting (specular, distant) | kotlin | 512x512 | 17.464 | 15.01 | 0.12 | 1.09x | ⬆️ |  |
 | Lighting (specular, distant) | scalar | 512x512 | 19.113 | 13.72 | 0.11 | 1.00x |  |  |
 | Lighting (specular, distant) | ssse3 | 512x512 | 4.778 | 54.86 | 0.44 | 4.00x | 🟢 |  |
