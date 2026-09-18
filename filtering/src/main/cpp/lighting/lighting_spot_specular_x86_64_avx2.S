@@ -224,11 +224,15 @@ POINT_LIT4
 .Lspot_one: .long 0x3f800000
 .Lspot_255: .long 0x437f0000
 .Lspot_half: .long 0x3f000000
-.p2align 5
-.Lspot_255x8: .long 255,255,255,255,255,255,255,255
 EMIT_LOG2_POLY_8
 EMIT_EXP2_POLY_8
 EMIT_POW_COMMON_CONSTANTS
+# 8x255 int vector for vpminsd (must live in POINT_CONST, never in a
+# mergeable literal section: ld64 coalesces duplicate 4-byte literals,
+# which silently shortens multi-word tables - observed as
+# [255,0,0,0,255,255,255,255]).
+.p2align 5
+.Lspot_255x8: .long 255,255,255,255,255,255,255,255
 
 TEXT_SECTION
 
@@ -462,7 +466,9 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     vpmaxsd      %ymm4, %ymm1, %ymm1
     vpmaxsd      %ymm4, %ymm2, %ymm2
     vpmaxsd      %ymm4, %ymm3, %ymm3
-    vmovdqa      .Lspot_255x8(%rip), %ymm4
+    # NOTE: vmovdqu, not vmovdqa: .Lspot_255x8 sits in __literal4 whose
+    # section base is only 16-aligned, so a 32-byte aligned load faults.
+    vmovdqu      .Lspot_255x8(%rip), %ymm4
     vpminsd      %ymm4, %ymm1, %ymm1
     vpminsd      %ymm4, %ymm2, %ymm2
     vpminsd      %ymm4, %ymm3, %ymm3
