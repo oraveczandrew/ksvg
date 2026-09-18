@@ -202,7 +202,7 @@ internal fun doFeComponentTransferFilter(
  * sRGB->linear->transfer->sRGB folding used by the linearRGB color
  * interpolation path), so native output is bit-identical to the Kotlin loop.
  */
-private fun buildTransferLutTables(
+internal fun buildTransferLutTables(
     transferFunctions: ComponentTransferFunctions,
     useLinearRgb: Boolean,
 ): Array<IntArray> = arrayOf(

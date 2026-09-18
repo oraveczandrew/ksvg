@@ -123,16 +123,13 @@ internal const val TURBULENCE_SHADER: String = """
                     return half4(0.0);
                 }
 
-                // TEMPORARY parity debug: output the p-trajectory (expect ramp).
-                float2 local = fragCoord - uOffset;
-                float2 user = uUserLeftTop + local * uInvCanvasScale;
-                float2 p = ((user - uOrigin) / uPrimitiveUnitSize) * uBaseFrequency;
-                return half4(p.x / 12.0, p.y / 12.0, 0.0, 1.0);
-
                 // fragCoord is in gpuNode-local buffer space; uOffset maps it back to
                 // device-pixel coordinates relative to the filter region top-left.
+                // Sampled at integer pixel coordinates (local - 0.5): the CPU
+                // kernels address texel (x, y) at userLeft + x, not at pixel
+                // centers, and parity requires the same sampling phase.
                 float2 local = fragCoord - uOffset;
-                float2 user = uUserLeftTop + local * uInvCanvasScale;
+                float2 user = uUserLeftTop + (local - 0.5) * uInvCanvasScale;
                 float2 p = ((user - uOrigin) / uPrimitiveUnitSize) * uBaseFrequency;
                 float4 sums = float4(0.0);
                 float ratio = 1.0;
@@ -145,6 +142,10 @@ internal const val TURBULENCE_SHADER: String = """
                 }
                 float4 finalVal = (uIsFractal != 0) ? (sums + 1.0) * 0.5 : sums;
                 finalVal = clamp(finalVal, 0.0, 1.0);
-                return half4(finalVal.r * finalVal.a, finalVal.g * finalVal.a, finalVal.b * finalVal.a, finalVal.a);
+                // Straight (non-premultiplied) terminal output: the CPU kernel
+                // writes straight bytes into the result bitmap, and parity (plus
+                // the golden references pinning the CPU side) requires the same
+                // convention here.
+                return half4(finalVal.rgb, finalVal.a);
             }
         """

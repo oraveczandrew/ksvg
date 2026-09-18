@@ -421,6 +421,11 @@ internal open class FilterPipelineImpl31 internal constructor(
         canvas.withSave {
             @Suppress("DEPRECATION")
             canvas.setMatrix(null)
+            // The software backend composites a region-sized bitmap, so its output is
+            // inherently clipped to the filter effects region. Clip the GPU blit the
+            // same way: framework effects (offset/blur/…) carry no region of their own
+            // and would otherwise leak translated/spread content outside the region.
+            canvas.clipRect(deviceRegion)
             canvas.translate(deviceRegion.left - chain.padX, deviceRegion.top - chain.padY)
             canvas.drawRenderNode(gpuNode)
         }

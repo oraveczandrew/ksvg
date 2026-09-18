@@ -24,7 +24,9 @@ import android.graphics.PorterDuff
 import android.graphics.RenderNode
 import android.media.ImageReader
 import android.os.Build
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
+import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
 import hu.oandras.ksvg.test.renderWithLibrary
@@ -102,11 +104,11 @@ internal fun renderOnHardware(
 
 @RequiresApi(Build.VERSION_CODES.Q)
 private fun pollLatestImage(reader: ImageReader, width: Int, height: Int): android.media.Image {
-    val deadline = android.os.SystemClock.uptimeMillis() + 2000L
+    val deadline = SystemClock.uptimeMillis() + 2000L
     while (true) {
         val image = reader.acquireLatestImage()
         if (image != null) return image
-        if (android.os.SystemClock.uptimeMillis() >= deadline) {
+        if (SystemClock.uptimeMillis() >= deadline) {
             fail("GpuParityHarness: no frame arrived from HardwareRenderer within 2s (${width}x$height)")
         }
         Thread.sleep(10)
@@ -127,7 +129,7 @@ private fun imageToBitmap(image: android.media.Image, width: Int, height: Int): 
         if (pixelStride == 4) {
             for (x in 0 until width) {
                 val o = x * 4
-                // RGBA_8888 planes are R,G,B,A byte order; Bitmap expects ARGB int.
+                // RGBA_8888 planes are R, G, B, A byte order; Bitmap expects ARGB int.
                 val r = row[o].toInt() and 0xff
                 val g = row[o + 1].toInt() and 0xff
                 val b = row[o + 2].toInt() and 0xff
@@ -215,7 +217,7 @@ internal fun assertParity(
 internal fun dumpParityBitmaps(name: String, sw: Bitmap, hw: Bitmap, stats: ParityStats) {
     val safe = name.replace(Regex("[^A-Za-z0-9]+"), "_")
     val dir = try {
-        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        InstrumentationRegistry.getInstrumentation()
             .targetContext.getExternalFilesDir("parity") ?: return
     } catch (_: Exception) {
         return

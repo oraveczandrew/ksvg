@@ -753,6 +753,11 @@ internal class FeComponentTransferRenderNode(
     @JvmField var lutTables: Array<IntArray>? = null
 
     @JvmField var gpuLutBitmap: Bitmap? = null
+
+    // Second LUT texture holding the alpha table (opaque gray). Split from
+    // [gpuLutBitmap] because GPU uploads premultiply, which would corrupt data
+    // bytes packed into RGB wherever alpha < 255.
+    @JvmField var gpuLutAlphaBitmap: Bitmap? = null
 }
 
 internal class FeCompositeRenderNode(

@@ -864,14 +864,6 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         }
         bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 4)
         node.gpuLatticeBitmap = bitmap
-        // TEMPORARY parity debug (remove after turbulence diagnosis).
-        if (android.util.Log.isLoggable("GpuParity", android.util.Log.DEBUG)) {
-            android.util.Log.d(
-                "GpuParity",
-                "lattice seed=${node.sourceElement.seed} px0=${pixels[0].toUInt().toString(16)} " +
-                    "px1=${pixels[1].toUInt().toString(16)} px256=${pixels[256].toUInt().toString(16)}",
-            )
-        }
         return bitmap
     }
 
