@@ -22,14 +22,19 @@
  * dance around every pow block can go away.
  *
  * Method: pow(x,y) = 2^(y*log2(x)) with 8th-degree minimax polynomials
- * (coefficients match §4 of simd_scalar_pow_analysis; validated by float32
- * simulation over x in [0,1] x y in {1..128}: worst byte delta 1).
- * Horner steps use single-rounding FMLA with by-element coefficients.
+ * (coefficients match §4 of simd_scalar_pow_analysis; split mul+add Horner
+ * validated by float32 simulation over x in [0,1] x y in {1..128}: worst
+ * byte delta 1).
+ * Horner steps use dup+fmul+fadd, NOT indexed FMLA: ARM `FMLA Vd,Vn,Vm`
+ * computes Vd += Vn*Vm (dest is only the addend), which cannot express
+ * acc = acc*f + c in one instruction (it would compute acc += f*c).
+ * The x86 FMA form (vfmadd213) has different operand roles and is fine.
  * Domain note: bases are clamped ndoth in [0,1], exponents positive, so
  * t = y*log2(x) <= 0 always — overflow is impossible; x = 0 yields 0 via
  * the underflow clamp. No branches.
  *
  * Everything is position-independent (adrp + tables emitted per file).
+ * NOTE: this file's mtime may be preserved by tooling; touch after edit.
  */
 
 /*
@@ -103,16 +108,32 @@
     fsub    v5.4s, \x\().4s, v4.4s         // v5 = f in [0,1)
     // log2 Horner: acc = c8; acc = acc*f + ci
     ldp     q10, q11, [x9]                 // log c8..c5, c4..c1
-    ldr     s4, [x9, #32]                  // log c0
-    dup     v7.4s, v10.s[0]
-    fmla    v7.4s, v5.4s, v10.s[1]
-    fmla    v7.4s, v5.4s, v10.s[2]
-    fmla    v7.4s, v5.4s, v10.s[3]
-    fmla    v7.4s, v5.4s, v11.s[0]
-    fmla    v7.4s, v5.4s, v11.s[1]
-    fmla    v7.4s, v5.4s, v11.s[2]
-    fmla    v7.4s, v5.4s, v11.s[3]
-    fmla    v7.4s, v5.4s, v4.s[0]
+    dup     v7.4s, v10.s[0]                // c8
+    dup     v4.4s, v10.s[1]
+    fmul    v7.4s, v7.4s, v5.4s
+    fadd    v7.4s, v7.4s, v4.4s
+    dup     v4.4s, v10.s[2]
+    fmul    v7.4s, v7.4s, v5.4s
+    fadd    v7.4s, v7.4s, v4.4s
+    dup     v4.4s, v10.s[3]
+    fmul    v7.4s, v7.4s, v5.4s
+    fadd    v7.4s, v7.4s, v4.4s
+    dup     v4.4s, v11.s[0]
+    fmul    v7.4s, v7.4s, v5.4s
+    fadd    v7.4s, v7.4s, v4.4s
+    dup     v4.4s, v11.s[1]
+    fmul    v7.4s, v7.4s, v5.4s
+    fadd    v7.4s, v7.4s, v4.4s
+    dup     v4.4s, v11.s[2]
+    fmul    v7.4s, v7.4s, v5.4s
+    fadd    v7.4s, v7.4s, v4.4s
+    dup     v4.4s, v11.s[3]
+    fmul    v7.4s, v7.4s, v5.4s
+    fadd    v7.4s, v7.4s, v4.4s
+    ldr     s4, [x9, #32]
+    dup     v4.4s, v4.s[0]            // broadcast log c0 (ldr sets lane 0 only)
+    fmul    v7.4s, v7.4s, v5.4s
+    fadd    v7.4s, v7.4s, v4.4s
     fadd    v6.4s, v6.4s, v7.4s            // v6 = log2(x) = e + P(f)
     fmul    v6.4s, \y\().4s, v6.4s         // v6 = t
     mov     v4.16b, v6.16b                 // v4 = t copy
@@ -120,16 +141,32 @@
     fsub    v7.4s, v4.4s, v6.4s            // v7 = tf in [0,1)
     // exp2 Horner into \x
     ldp     q10, q11, [x9, #48]           // exp c8..c5, c4..c1
-    ldr     s4, [x9, #80]                 // exp c0
-    dup     \x\().4s, v10.s[0]
-    fmla    \x\().4s, v7.4s, v10.s[1]
-    fmla    \x\().4s, v7.4s, v10.s[2]
-    fmla    \x\().4s, v7.4s, v10.s[3]
-    fmla    \x\().4s, v7.4s, v11.s[0]
-    fmla    \x\().4s, v7.4s, v11.s[1]
-    fmla    \x\().4s, v7.4s, v11.s[2]
-    fmla    \x\().4s, v7.4s, v11.s[3]
-    fmla    \x\().4s, v7.4s, v4.s[0]
+    dup     \x\().4s, v10.s[0]                // c8
+    dup     v4.4s, v10.s[1]
+    fmul    \x\().4s, \x\().4s, v7.4s
+    fadd    \x\().4s, \x\().4s, v4.4s
+    dup     v4.4s, v10.s[2]
+    fmul    \x\().4s, \x\().4s, v7.4s
+    fadd    \x\().4s, \x\().4s, v4.4s
+    dup     v4.4s, v10.s[3]
+    fmul    \x\().4s, \x\().4s, v7.4s
+    fadd    \x\().4s, \x\().4s, v4.4s
+    dup     v4.4s, v11.s[0]
+    fmul    \x\().4s, \x\().4s, v7.4s
+    fadd    \x\().4s, \x\().4s, v4.4s
+    dup     v4.4s, v11.s[1]
+    fmul    \x\().4s, \x\().4s, v7.4s
+    fadd    \x\().4s, \x\().4s, v4.4s
+    dup     v4.4s, v11.s[2]
+    fmul    \x\().4s, \x\().4s, v7.4s
+    fadd    \x\().4s, \x\().4s, v4.4s
+    dup     v4.4s, v11.s[3]
+    fmul    \x\().4s, \x\().4s, v7.4s
+    fadd    \x\().4s, \x\().4s, v4.4s
+    ldr     s4, [x9, #80]
+    dup     v4.4s, v4.s[0]            // broadcast exp c0
+    fmul    \x\().4s, \x\().4s, v7.4s
+    fadd    \x\().4s, \x\().4s, v4.4s
     // scale by 2^ti with underflow clamp
     fcvtzs  v6.4s, v6.4s
     movi    v4.4s, #127

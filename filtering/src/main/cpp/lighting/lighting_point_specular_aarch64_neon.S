@@ -191,17 +191,16 @@ ksvgLightingPointSpecularRowNeon64:
     mov     w26, #0                 // pixel index
     adr     x27, .Llane_idx
 
-    // Loop-invariant params/helpers for the whole row (nothing in the sRGB
-    // loop body clobbers them; the linear variant reloads per iteration
-    // because its L2S LUT loads clobber v16-v31). NOTE: v30 = dux here;
-    // the 0xff alpha mask is set after each pow block, where dux is dead.
-    LOAD_PARAMS_PT
-
     b       .Lloop8
 
 .Lloop8:
     cmp     w23, #8
     b.lo    .Ltail4
+
+    // Per-iteration reload: the ux walk consumes dux from v30 every
+    // iteration, and the post-pow mask setup kills it — so unlike distant
+    // (no dux), the sRGB loop cannot hoist this to the prologue.
+    LOAD_PARAMS_PT
 
     // ------------------------------ TOP ---------------------------
     ld1     {v0.4s-v1.4s}, [x19]

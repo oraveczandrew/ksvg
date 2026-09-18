@@ -707,6 +707,7 @@ ksvgLightingDistantSpecularRowNeon64Linear:
     POW4_NEON v3, v0
     POW4_NEON v1, v0
     mov     v2.16b, v1.16b      // park p_B: pack A clobbers v1
+    movi    v30.4s, #0xff       // 0x000000ff byte mask for the alpha max
 
     // ------------------- PACK A (linear, alpha = max(Rlin,Glin,Blin)) ----
     fmul    v3.4s, v3.4s, v18.4s
@@ -744,6 +745,11 @@ ksvgLightingDistantSpecularRowNeon64Linear:
     fmul    v6.4s, v3.4s, v22.4s
     fmul    v7.4s, v3.4s, v23.4s
     fmul    v4.4s, v3.4s, v24.4s
+    fmax    v3.4s, v3.4s, v28.4s
+    fmin    v3.4s, v3.4s, v26.4s
+    fmul    v6.4s, v3.4s, v22.4s
+    fmul    v7.4s, v3.4s, v23.4s
+    fmul    v4.4s, v3.4s, v24.4s
     fadd    v6.4s, v6.4s, v27.4s
     fadd    v7.4s, v7.4s, v27.4s
     fadd    v4.4s, v4.4s, v27.4s
@@ -763,8 +769,9 @@ ksvgLightingDistantSpecularRowNeon64Linear:
     umax    v9.16b, v9.16b, v11.16b
     shl     v9.4s, v9.4s, #24
     orr     v4.16b, v4.16b, v9.16b
+    mov     v8.16b, v4.16b          // stash B (v4 is LUT scratch below)
 
-    // v0/v4 = packed linear ARGB batches (alpha = max linear). Load the
+    // v0/v8 = packed linear ARGB batches (alpha = max linear). Load the
     // 256-byte L2S LUT into v16-v31 (clobbers params; reloaded next iters).
     mov     x9, x25
     ld1     {v16.16b-v19.16b}, [x9], #64
@@ -773,9 +780,9 @@ ksvgLightingDistantSpecularRowNeon64Linear:
     ld1     {v28.16b-v31.16b}, [x9], #64
     movi    v12.16b, #63
     LUT256_16 v0, v0
-    LUT256_16 v4, v4
+    LUT256_16 v8, v8
     str     q0, [x22]
-    str     q4, [x22, #16]
+    str     q8, [x22, #16]
 
     add     x19, x19, #32
     add     x20, x20, #32
