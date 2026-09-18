@@ -29,11 +29,11 @@ Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
 | Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
 | ArithmeticComposite (linear) | kotlin | 512x512 | 10.144 | 25.84 | 0.31 | 0.42x |  |  |
-| ArithmeticComposite (linear) | scalar | 512x512 | 4.253 | 61.64 | 0.74 | 1.00x |  | linear → scalar fallback on all SIMD backends |
+| ArithmeticComposite (linear) | scalar | 512x512 | 4.253 | 61.64 | 0.74 | 1.00x |  |  |
 | ArithmeticComposite (linear) | ssse3 | 512x512 | 3.158 | 83.02 | 1.00 | 1.35x | 🟢 |  |
 | ArithmeticComposite (linear) | avx2 | 512x512 | 3.149 | 83.25 | 1.00 | 1.35x | 🟢 |  |
 | ArithmeticComposite (linear) | kotlin | 2048x2048 | 162.348 | 25.84 | 0.31 | 0.40x |  |  |
-| ArithmeticComposite (linear) | scalar | 2048x2048 | 65.097 | 64.43 | 0.77 | 1.00x |  | linear → scalar fallback on all SIMD backends |
+| ArithmeticComposite (linear) | scalar | 2048x2048 | 65.097 | 64.43 | 0.77 | 1.00x |  |  |
 | ArithmeticComposite (linear) | ssse3 | 2048x2048 | 50.569 | 82.94 | 1.00 | 1.29x | 🟢 |  |
 | ArithmeticComposite (linear) | avx2 | 2048x2048 | 49.884 | 84.08 | 1.01 | 1.30x | 🟢 |  |
 | ArithmeticComposite (non-linear) | kotlin | 512x512 | 10.971 | 23.89 | 0.29 | 0.08x |  |  |
