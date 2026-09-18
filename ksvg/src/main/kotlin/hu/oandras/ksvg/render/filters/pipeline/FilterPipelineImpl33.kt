@@ -64,9 +64,21 @@ import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.calculatePrimitiveRegion
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.resolvePrimitiveInputRegion
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.render.filters.buildColorMatrix
+import hu.oandras.ksvg.render.filters.buildTransferLutTables
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
+import hu.oandras.ksvg.render.filters.pipeline.shaders.COLOR_MATRIX_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.COMPONENT_TRANSFER_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.COMPOSITE_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.CONVOLVE_MATRIX_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.DISPLACEMENT_MAP_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.FLOOD_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.LIGHTING_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.MORPHOLOGY_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.TILE_SHADER
+import hu.oandras.ksvg.render.filters.pipeline.shaders.TURBULENCE_SHADER
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.blue
@@ -648,6 +660,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         canvas.withSave {
             @Suppress("DEPRECATION")
             canvas.setMatrix(null)
+            // Same region clip as Impl31.drawFiltered: the software backend composites
+            // a region-sized bitmap, so framework effects must not leak outside.
+            canvas.clipRect(deviceRegion)
             canvas.translate(deviceRegion.left - chain.padX, deviceRegion.top - chain.padY)
             canvas.drawRenderNode(gpuNode)
         }
@@ -723,18 +738,37 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
     private fun buildComponentTransferShader(node: FeComponentTransferRenderNode): RuntimeShader {
         val shader = RuntimeShader(COMPONENT_TRANSFER_SHADER)
-        val lut = node.lutTables ?: Array(4) { IntArray(256) { i -> i } }
-        var bitmap = node.gpuLutBitmap
-        if (bitmap == null || bitmap.isRecycled) {
-            bitmap = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
-            node.gpuLutBitmap = bitmap
+        // NB: lutTables is lazily built by the CPU path; on a pure-GPU render it
+        // is still null here, so build the real tables (same as the CPU kernel
+        // uses) instead of falling back to zeros (which would zero the alpha).
+        val lut = node.lutTables ?: buildTransferLutTables(
+            node.transferFunctions,
+            node.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
+        ).also { node.lutTables = it }
+        // Two opaque textures (RGB tables + alpha table as gray): data bitmaps
+        // MUST stay opaque because GPU uploads premultiply, corrupting any data
+        // byte packed into RGB wherever alpha < 255.
+        var rgb = node.gpuLutBitmap
+        if (rgb == null || rgb.isRecycled) {
+            rgb = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
+            node.gpuLutBitmap = rgb
         }
-        val pixels = IntArray(256)
+        var alpha = node.gpuLutAlphaBitmap
+        if (alpha == null || alpha.isRecycled) {
+            alpha = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
+            node.gpuLutAlphaBitmap = alpha
+        }
+        val rgbPixels = IntArray(256)
+        val alphaPixels = IntArray(256)
         for (i in 0 until 256) {
-            pixels[i] = lut[0][i] or lut[1][i] or lut[2][i] or lut[3][i]
+            val a = (lut[0][i] ushr 24) and 0xFF
+            rgbPixels[i] = -0x1000000 or lut[1][i] or lut[2][i] or lut[3][i]
+            alphaPixels[i] = -0x1000000 or (a shl 16) or (a shl 8) or a
         }
-        bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 1)
-        shader.setInputShader("uLut", BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
+        rgb.setPixels(rgbPixels, 0, 256, 0, 0, 256, 1)
+        alpha.setPixels(alphaPixels, 0, 256, 0, 0, 256, 1)
+        shader.setInputShader("uLutRgb", BitmapShader(rgb, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
+        shader.setInputShader("uLutA", BitmapShader(alpha, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
         return shader
     }
 
@@ -816,30 +850,33 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             return cached
         }
         val generators = node.generators
-        val bitmap = createBitmap(256, 3)
-        val pixels = IntArray(256 * 3)
+        // 256x4 data texture: row k holds channel k's (permutation, gradientX,
+        // gradientY) in RGB with opaque alpha. Data bitmaps MUST stay opaque:
+        // the GPU backend uploads textures premultiplied, which corrupts any
+        // data byte packed into RGB wherever alpha < 255.
+        val bitmap = createBitmap(256, 4)
+        val pixels = IntArray(256 * 4)
         for (i in 0 until 256) {
-            val p0 = generators[0].p[i] and 0xFF
-            val p1 = generators[1].p[i] and 0xFF
-            val p2 = generators[2].p[i] and 0xFF
-            val p3 = generators[3].p[i] and 0xFF
-            pixels[i] = (p3 shl 24) or (p0 shl 16) or (p1 shl 8) or p2
-
-            val g0x = packG(generators[0].gx[i])
-            val g1x = packG(generators[1].gx[i])
-            val g2x = packG(generators[2].gx[i])
-            val g3x = packG(generators[3].gx[i])
-            pixels[256 + i] = (g3x shl 24) or (g0x shl 16) or (g1x shl 8) or g2x
-
-            val g0y = packG(generators[0].gy[i])
-            val g1y = packG(generators[1].gy[i])
-            val g2y = packG(generators[2].gy[i])
-            val g3y = packG(generators[3].gy[i])
-            pixels[512 + i] = (g3y shl 24) or (g0y shl 16) or (g1y shl 8) or g2y
+            pixels[i] = packLattice(generators[0].p[i], generators[0].gx[i], generators[0].gy[i])
+            pixels[256 + i] = packLattice(generators[1].p[i], generators[1].gx[i], generators[1].gy[i])
+            pixels[512 + i] = packLattice(generators[2].p[i], generators[2].gx[i], generators[2].gy[i])
+            pixels[768 + i] = packLattice(generators[3].p[i], generators[3].gx[i], generators[3].gy[i])
         }
-        bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 3)
+        bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 4)
         node.gpuLatticeBitmap = bitmap
+        // TEMPORARY parity debug (remove after turbulence diagnosis).
+        if (android.util.Log.isLoggable("GpuParity", android.util.Log.DEBUG)) {
+            android.util.Log.d(
+                "GpuParity",
+                "lattice seed=${node.sourceElement.seed} px0=${pixels[0].toUInt().toString(16)} " +
+                    "px1=${pixels[1].toUInt().toString(16)} px256=${pixels[256].toUInt().toString(16)}",
+            )
+        }
         return bitmap
+    }
+
+    private fun packLattice(p: Int, gx: Double, gy: Double): Int {
+        return -0x1000000 or ((p and 0xFF) shl 16) or (packG(gx) shl 8) or packG(gy)
     }
 
     private fun packG(g: Double): Int = ((g + 1.0) * 127.5 + 0.5).toInt().coerceIn(0, 255)
@@ -872,356 +909,5 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             FeCompositeOperator.xor -> BlendMode.XOR
             FeCompositeOperator.arithmetic -> null
         }
-
-        private const val LIGHTING_SHADER = """
-            uniform shader uInput;
-            uniform float uSurfaceScale;
-            uniform float uConstant;
-            uniform float uExponent;
-            uniform float3 uLightColor;
-            uniform int uIsSpecular;
-            uniform int uLightType;
-            uniform float3 uLightPosDir;
-            uniform float3 uPointsAt;
-            uniform float2 uSpotParams;
-
-            uniform float2 uUserLeftTop;
-            uniform float2 uInvCanvasScale;
-            uniform float2 uOffset;
-            uniform float4 uPrimitiveRegion;
-
-            float3 getNormal(float2 fragCoord) {
-                float h0 = uInput.eval(fragCoord + float2(-1.0, -1.0)).a;
-                float h1 = uInput.eval(fragCoord + float2(0.0, -1.0)).a;
-                float h2 = uInput.eval(fragCoord + float2(1.0, -1.0)).a;
-                float h3 = uInput.eval(fragCoord + float2(-1.0, 0.0)).a;
-                float h5 = uInput.eval(fragCoord + float2(1.0, 0.0)).a;
-                float h6 = uInput.eval(fragCoord + float2(-1.0, 1.0)).a;
-                float h7 = uInput.eval(fragCoord + float2(0.0, 1.0)).a;
-                float h8 = uInput.eval(fragCoord + float2(1.0, 1.0)).a;
-                
-                float dx = (h2 + 2.0*h5 + h8) - (h0 + 2.0*h3 + h6);
-                float dy = (h6 + 2.0*h7 + h8) - (h0 + 2.0*h1 + h2);
-                
-                // SVG spec kernel: Nx = -surfaceScale * dx / 4.0. 
-                // Since samples are separated by 2 pixels, Nx is the slope per pixel.
-                // We multiply by uInvCanvasScale to get user-space slopes.
-                float Nx = -dx * 0.25 * uSurfaceScale * uInvCanvasScale.x;
-                float Ny = -dy * 0.25 * uSurfaceScale * uInvCanvasScale.y;
-                
-                float3 n = float3(Nx, Ny, 1.0);
-                return normalize(n);
-            }
-
-            half4 main(float2 fragCoord) {
-                if (fragCoord.x < uPrimitiveRegion.x - 0.5 || fragCoord.x > uPrimitiveRegion.z + 0.5 ||
-                    fragCoord.y < uPrimitiveRegion.y - 0.5 || fragCoord.y > uPrimitiveRegion.w + 0.5) {
-                    return half4(0.0);
-                }
-
-                float3 n = getNormal(fragCoord);
-                float3 l;
-                if (uLightType == 0) {
-                    l = normalize(uLightPosDir);
-                } else {
-                    float2 local = fragCoord - uOffset;
-                    float2 user = uUserLeftTop + local * uInvCanvasScale;
-
-                    float3 p = float3(user, uInput.eval(fragCoord).a * uSurfaceScale);
-                    l = normalize(uLightPosDir - p);
-                }
-                
-                float dotNL = max(dot(n, l), 0.0);
-                float3 color;
-                float a = 1.0;
-                if (uIsSpecular == 0) {
-                    color = uLightColor * uConstant * dotNL;
-                } else {
-                    float3 v = float3(0.0, 0.0, 1.0);
-                    float3 h = normalize(l + v);
-                    color = uLightColor * uConstant * pow(max(dot(n, h), 0.0), uExponent);
-                    a = max(max(color.r, color.g), color.b);
-                }
-                
-                return half4(color, a);
-            }
-        """
-
-        private const val COLOR_MATRIX_SHADER = """
-            uniform shader uInput;
-            uniform float uMatrix[20];
-            half4 main(float2 fragCoord) {
-                float4 c = uInput.eval(fragCoord);
-                float alpha = c.a;
-                if (alpha > 0.0) c.rgb /= alpha;
-                float4 res;
-                res.r = uMatrix[0]*c.r + uMatrix[1]*c.g + uMatrix[2]*c.b + uMatrix[3]*c.a + uMatrix[4]/255.0;
-                res.g = uMatrix[5]*c.r + uMatrix[6]*c.g + uMatrix[7]*c.b + uMatrix[8]*c.a + uMatrix[9]/255.0;
-                res.b = uMatrix[10]*c.r + uMatrix[11]*c.g + uMatrix[12]*c.b + uMatrix[13]*c.a + uMatrix[14]/255.0;
-                res.a = uMatrix[15]*c.r + uMatrix[16]*c.g + uMatrix[17]*c.b + uMatrix[18]*c.a + uMatrix[19]/255.0;
-                res = clamp(res, 0.0, 1.0);
-                return half4(res.r * res.a, res.g * res.a, res.b * res.a, res.a);
-            }
-        """
-
-        private const val COMPOSITE_SHADER = """
-            uniform shader uInput;
-            uniform shader uIn2;
-            uniform int uOperator;
-            uniform float4 uK;
-            half4 main(float2 fragCoord) {
-                float4 src = uInput.eval(fragCoord);
-                float4 dst = uIn2.eval(fragCoord);
-                if (uOperator == 0) return half4(src + dst * (1.0 - src.a));
-                if (uOperator == 1) return half4(src * dst.a);
-                if (uOperator == 2) return half4(src * (1.0 - dst.a));
-                if (uOperator == 3) return half4(src * dst.a + dst * (1.0 - src.a));
-                if (uOperator == 4) return half4(src * (1.0 - dst.a) + dst * (1.0 - src.a));
-                if (uOperator == 5) {
-                    float4 res = uK.x * dst * src + uK.y * src + uK.z * dst + uK.w;
-                    return half4(clamp(res, 0.0, 1.0));
-                }
-                return half4(dst);
-            }
-        """
-
-        private const val FLOOD_SHADER = """
-            uniform shader uInput;
-            layout(color) uniform half4 uColor;
-            uniform float4 uPrimitiveRegion;
-            half4 main(float2 fragCoord) {
-                if (fragCoord.x < uPrimitiveRegion.x - 0.5 || fragCoord.x > uPrimitiveRegion.z + 0.5 ||
-                    fragCoord.y < uPrimitiveRegion.y - 0.5 || fragCoord.y > uPrimitiveRegion.w + 0.5) {
-                    return half4(0.0);
-                }
-                return uColor;
-            }
-        """
-
-        private const val TILE_SHADER = """
-            uniform shader uInput;
-            uniform float4 uRect;
-            half4 main(float2 fragCoord) {
-                // feTile only paints inside its own subregion (uRect); outside it is transparent.
-                if (fragCoord.x < uRect.x || fragCoord.x > uRect.z ||
-                    fragCoord.y < uRect.y || fragCoord.y > uRect.w) {
-                    return half4(0.0);
-                }
-                float w = uRect.z - uRect.x;
-                float h = uRect.w - uRect.y;
-                float2 coord = float2(
-                    mod(fragCoord.x - uRect.x, w),
-                    mod(fragCoord.y - uRect.y, h)
-                ) + uRect.xy;
-                return uInput.eval(coord);
-            }
-        """
-
-        private const val COMPONENT_TRANSFER_SHADER = """
-            uniform shader uInput;
-            uniform shader uLut;
-            half4 main(float2 fragCoord) {
-                float4 color = uInput.eval(fragCoord);
-                float alpha = color.a;
-                if (alpha > 0.0) color.rgb /= alpha;
-                float r = uLut.eval(float2(color.r * 255.0 + 0.5, 0.5)).r;
-                float g = uLut.eval(float2(color.g * 255.0 + 0.5, 0.5)).g;
-                float b = uLut.eval(float2(color.b * 255.0 + 0.5, 0.5)).b;
-                float a = uLut.eval(float2(color.a * 255.0 + 0.5, 0.5)).a;
-                return half4(r * a, g * a, b * a, a);
-            }
-        """
-
-        private const val CONVOLVE_MATRIX_SHADER = """
-            uniform shader uInput;
-            uniform float uKernel[25];
-            uniform int uOrderX;
-            uniform int uOrderY;
-            uniform int uTargetX;
-            uniform int uTargetY;
-            uniform float uDivisor;
-            uniform float uBias;
-            uniform int uPreserveAlpha;
-            half4 main(float2 fragCoord) {
-                float4 sum = float4(0.0);
-                int kx = 0;
-                int ky = 0;
-                for (int i = 0; i < 25; ++i) {
-                    if (i >= uOrderX * uOrderY) break;
-                    float2 offset = float2(float(kx - uTargetX), float(ky - uTargetY));
-                    sum += uInput.eval(fragCoord + offset) * uKernel[i];
-                    kx++;
-                    if (kx >= uOrderX) {
-                        kx = 0;
-                        ky++;
-                    }
-                }
-                float4 res = sum / uDivisor + uBias;
-                if (uPreserveAlpha != 0) res.a = uInput.eval(fragCoord).a;
-                return half4(res);
-            }
-        """
-
-        private const val MORPHOLOGY_SHADER = """
-            uniform shader uInput;
-            uniform float2 uRadius;
-            uniform int uErode;
-            half4 main(float2 fragCoord) {
-                float2 r = abs(uRadius);
-                int steps = int(max(r.x, r.y));
-                float2 dir = sign(uRadius);
-                float4 res = uInput.eval(fragCoord);
-                for (int i = 1; i <= 20; ++i) {
-                    if (i > steps) break;
-                    res = (uErode != 0) 
-                        ? min(res, min(uInput.eval(fragCoord + float(i) * dir), uInput.eval(fragCoord - float(i) * dir)))
-                        : max(res, max(uInput.eval(fragCoord + float(i) * dir), uInput.eval(fragCoord - float(i) * dir)));
-                }
-                return half4(res);
-            }
-        """
-
-        private const val DISPLACEMENT_MAP_SHADER = """
-            uniform shader uInput;
-            uniform shader uMap;
-            uniform float2 uScale;
-            uniform int uXChannel;
-            uniform int uYChannel;
-            float getChannel(float4 color, int selector) {
-                if (selector == 0) return color.r;
-                if (selector == 1) return color.g;
-                if (selector == 2) return color.b;
-                return color.a;
-            }
-            half4 main(float2 fragCoord) {
-                float4 mapColor = uMap.eval(fragCoord);
-                float dx = (getChannel(mapColor, uXChannel) - 0.5) * uScale.x;
-                float dy = (getChannel(mapColor, uYChannel) - 0.5) * uScale.y;
-                return uInput.eval(fragCoord + float2(dx, dy));
-            }
-        """
-
-        private const val TURBULENCE_SHADER = """
-            uniform shader uLattice;
-            uniform shader in_source;
-            uniform float2 uBaseFrequency;
-            uniform int uNumOctaves;
-            uniform int uIsFractal;
-            uniform float2 uTilePeriod;
-            uniform float2 uOrigin;
-            uniform float2 uPrimitiveUnitSize;
-            uniform float2 uUserLeftTop;
-            uniform float2 uInvCanvasScale;
-            uniform float2 uOffset;
-            uniform float4 uPrimitiveRegion;
-
-            int customMod(int x, int y) {
-                return x - y * int(floor(float(x) / float(y)));
-            }
-
-            float4 getLattice(int x, int row) {
-                return uLattice.eval(float2(float(x) + 0.5, float(row) + 0.5));
-            }
-
-            float4 sCurve(float4 t) {
-                return t * t * (3.0 - 2.0 * t);
-            }
-
-            float4 noise2(float2 p, float2 period) {
-                float2 pf = floor(p);
-                float2 r0 = p - pf;
-                float2 r1 = r0 - 1.0;
-                int2 b0 = int2(pf);
-
-                if (period.x > 0.0) {
-                    b0.x = customMod(b0.x, int(period.x));
-                } else {
-                    b0.x = customMod(b0.x, 256);
-                }
-
-                int bx1;
-                if (period.x > 0.0) {
-                    bx1 = customMod(b0.x + 1, int(period.x));
-                } else {
-                    bx1 = customMod(b0.x + 1, 256);
-                }
-
-                if (period.y > 0.0) {
-                    b0.y = customMod(b0.y, int(period.y));
-                } else {
-                    b0.y = customMod(b0.y, 256);
-                }
-
-                int by1;
-                if (period.y > 0.0) {
-                    by1 = customMod(b0.y + 1, int(period.y));
-                } else {
-                    by1 = customMod(b0.y + 1, 256);
-                }
-
-                float4 i = getLattice(b0.x, 0) * 255.0;
-                float4 j = getLattice(bx1, 0) * 255.0;
-
-                float4 val00 = i + float4(b0.y) + 0.5;
-                float4 val10 = j + float4(b0.y) + 0.5;
-                float4 val01 = i + float4(by1) + 0.5;
-                float4 val11 = j + float4(by1) + 0.5;
-
-                int4 idx00 = int4(val00 - 256.0 * floor(val00 / 256.0));
-                int4 idx10 = int4(val10 - 256.0 * floor(val10 / 256.0));
-                int4 idx01 = int4(val01 - 256.0 * floor(val01 / 256.0));
-                int4 idx11 = int4(val11 - 256.0 * floor(val11 / 256.0));
-
-                float4 b00 = float4(getLattice(idx00.r, 0).r, getLattice(idx00.g, 0).g, getLattice(idx00.b, 0).b, getLattice(idx00.a, 0).a) * 255.0;
-                float4 b10 = float4(getLattice(idx10.r, 0).r, getLattice(idx10.g, 0).g, getLattice(idx10.b, 0).b, getLattice(idx10.a, 0).a) * 255.0;
-                float4 b01 = float4(getLattice(idx01.r, 0).r, getLattice(idx01.g, 0).g, getLattice(idx01.b, 0).b, getLattice(idx01.a, 0).a) * 255.0;
-                float4 b11 = float4(getLattice(idx11.r, 0).r, getLattice(idx11.g, 0).g, getLattice(idx11.b, 0).b, getLattice(idx11.a, 0).a) * 255.0;
-
-                float4 sx = sCurve(float4(r0.x));
-                float4 sy = sCurve(float4(r0.y));
-
-                float4 q00x = float4(getLattice(int(b00.r+0.5), 1).r, getLattice(int(b00.g+0.5), 1).g, getLattice(int(b00.b+0.5), 1).b, getLattice(int(b00.a+0.5), 1).a) * 2.0 - 1.0;
-                float4 q00y = float4(getLattice(int(b00.r+0.5), 2).r, getLattice(int(b00.g+0.5), 2).g, getLattice(int(b00.b+0.5), 2).b, getLattice(int(b00.a+0.5), 2).a) * 2.0 - 1.0;
-                float4 q10x = float4(getLattice(int(b10.r+0.5), 1).r, getLattice(int(b10.g+0.5), 1).g, getLattice(int(b10.b+0.5), 1).b, getLattice(int(b10.a+0.5), 1).a) * 2.0 - 1.0;
-                float4 q10y = float4(getLattice(int(b10.r+0.5), 2).r, getLattice(int(b10.g+0.5), 2).g, getLattice(int(b10.b+0.5), 2).b, getLattice(int(b10.a+0.5), 2).a) * 2.0 - 1.0;
-                float4 q01x = float4(getLattice(int(b01.r+0.5), 1).r, getLattice(int(b01.g+0.5), 1).g, getLattice(int(b01.b+0.5), 1).b, getLattice(int(b01.a+0.5), 1).a) * 2.0 - 1.0;
-                float4 q01y = float4(getLattice(int(b01.r+0.5), 2).r, getLattice(int(b01.g+0.5), 2).g, getLattice(int(b01.b+0.5), 2).b, getLattice(int(b01.a+0.5), 2).a) * 2.0 - 1.0;
-                float4 q11x = float4(getLattice(int(b11.r+0.5), 1).r, getLattice(int(b11.g+0.5), 1).g, getLattice(int(b11.b+0.5), 1).b, getLattice(int(b11.a+0.5), 1).a) * 2.0 - 1.0;
-                float4 q11y = float4(getLattice(int(b11.r+0.5), 2).r, getLattice(int(b11.g+0.5), 2).g, getLattice(int(b11.b+0.5), 2).b, getLattice(int(b11.a+0.5), 2).a) * 2.0 - 1.0;
-
-                float4 u = r0.x * q00x + r0.y * q00y;
-                float4 v = r1.x * q10x + r0.y * q10y;
-                float4 a = u + sx * (v - u);
-                float4 u2 = r0.x * q01x + r1.y * q01y;
-                float4 v2 = r1.x * q11x + r1.y * q11y;
-                float4 b = u2 + sx * (v2 - u2);
-                return a + sy * (b - a);
-            }
-
-            half4 main(float2 fragCoord) {
-                if (fragCoord.x < uPrimitiveRegion.x - 0.5 || fragCoord.x > uPrimitiveRegion.z + 0.5 ||
-                    fragCoord.y < uPrimitiveRegion.y - 0.5 || fragCoord.y > uPrimitiveRegion.w + 0.5) {
-                    return half4(0.0);
-                }
-
-                // fragCoord is in gpuNode-local buffer space; uOffset maps it back to
-                // device-pixel coordinates relative to the filter region top-left.
-                float2 local = fragCoord - uOffset;
-                float2 user = uUserLeftTop + local * uInvCanvasScale;
-                float2 p = ((user - uOrigin) / uPrimitiveUnitSize) * uBaseFrequency;
-                float4 sums = float4(0.0);
-                float ratio = 1.0;
-                float2 period = uTilePeriod;
-                for (int i = 0; i < 8; ++i) {
-                    if (i >= uNumOctaves) break;
-                    float4 n = noise2(p, period);
-                    if (uIsFractal != 0) sums += n / ratio; else sums += abs(n) / ratio;
-                    p *= 2.0; ratio *= 2.0; if (period.x > 0.0) period *= 2.0;
-                }
-                float4 finalVal = (uIsFractal != 0) ? (sums + 1.0) * 0.5 : sums;
-                finalVal = clamp(finalVal, 0.0, 1.0);
-                return half4(finalVal.r * finalVal.a, finalVal.g * finalVal.a, finalVal.b * finalVal.a, finalVal.a);
-            }
-        """
     }
 }
