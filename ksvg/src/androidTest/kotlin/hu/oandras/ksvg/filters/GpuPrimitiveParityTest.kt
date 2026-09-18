@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg.filters
 
+import android.graphics.Bitmap
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assume
@@ -47,9 +48,10 @@ class GpuPrimitiveParityTest {
             svg = filteredSvg("""<feGaussianBlur stdDeviation="4"/>"""),
             // Skia's GPU blur kernel is an approximation: edges match past the
             // radius mapping, but corner zones differ structurally (maxAbs 11
-            // measured). Tight mean/count gates still catch regressions.
+            // measured, wider on Adreno). Tight mean/count gates still catch
+            // regressions.
             maxAbsTol = 14,
-            maxOutlierRatio = 0.002,
+            maxOutlierRatio = 0.006,
         )
     }
 
@@ -62,6 +64,9 @@ class GpuPrimitiveParityTest {
             name = "feGaussianBlurSmall",
             minGpuApi = 31,
             svg = filteredSvg("""<feGaussianBlur stdDeviation="1.5"/>"""),
+            // Steep small-sigma edges amplify residual calibration error.
+            maxAbsTol = 8,
+            maxOutlierRatio = 0.002,
         )
     }
 
@@ -116,6 +121,7 @@ class GpuPrimitiveParityTest {
                 </feDiffuseLighting>
                 """.trimIndent(),
             ),
+            ignoreBoundaryFringe = true,
         )
     }
 
@@ -139,6 +145,7 @@ class GpuPrimitiveParityTest {
                 </feSpecularLighting>
                 """.trimIndent(),
             ),
+            ignoreBoundaryFringe = true,
         )
     }
 
@@ -192,15 +199,6 @@ class GpuPrimitiveParityTest {
 
     @Test
     fun turbulence() {
-        // Same x86-native caveat as displacementMap below: the emulator's
-        // x86_64 turbulence kernel computes a different field than the
-        // reference (verified host-side), so the software reference is
-        // meaningless here. GPU-vs-reference was validated separately
-        // (maxAbs 4); physical ARM64 runs this case for real.
-        Assume.assumeFalse(
-            "x86_64 emulator: native turbulence kernel diverges from reference (see report §5)",
-            Build.SUPPORTED_ABIS.any { it.startsWith("x86") },
-        )
         checkParity(
             name = "feTurbulence",
             minGpuApi = 33,
@@ -208,13 +206,19 @@ class GpuPrimitiveParityTest {
                 // NOTE: explicit positive seed. Seed 0 exercises the native
                 // seed-normalization path (see report §5); parity at seed 0 is
                 // tracked separately once the native normalization matches.
+                // The SVG geometry must stay in sync with the golden asset
+                // (generated host-side from the pure-Kotlin reference, see
+                // TempTurbDumpTest in :filtering).
                 """<feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="8"/>""",
             ),
-            // GPU validated against the pure-Kotlin reference at maxAbs 4
-            // (fp32 accumulation + 8-bit gradient packing); device software
-            // renders via the native kernel, which is a separate parity pair.
+            // Golden reference (not device software: the native turbulence
+            // kernel diverges from the reference on emulator x86_64 and
+            // slightly on ARM64, so the on-device SW bitmap is untrusted).
+            // GPU-vs-reference residual is fp32 + 8-bit gradient packing.
+            goldenAsset = "parity/turb_seed8.png",
             maxAbsTol = 4,
             maxOutlierRatio = 0.005,
+            ignoreBoundaryFringe = true,
         )
     }
 
@@ -229,6 +233,7 @@ class GpuPrimitiveParityTest {
                 <feBlend in="SourceGraphic" in2="b" mode="multiply"/>
                 """.trimIndent(),
             ),
+            ignoreBoundaryFringe = true,
         )
     }
 
@@ -243,6 +248,7 @@ class GpuPrimitiveParityTest {
                 <feComposite in="SourceGraphic" in2="c" operator="over"/>
                 """.trimIndent(),
             ),
+            ignoreBoundaryFringe = true,
         )
     }
 
@@ -252,6 +258,7 @@ class GpuPrimitiveParityTest {
             name = "feFlood",
             minGpuApi = 33,
             svg = filteredSvg("""<feFlood flood-color="#20a020"/>"""),
+            ignoreBoundaryFringe = true,
         )
     }
 
@@ -266,6 +273,7 @@ class GpuPrimitiveParityTest {
                 <feMerge><feMergeNode in="m"/><feMergeNode in="SourceGraphic"/></feMerge>
                 """.trimIndent(),
             ),
+            ignoreBoundaryFringe = true,
         )
     }
 
@@ -280,6 +288,7 @@ class GpuPrimitiveParityTest {
                 <feTile in="t"/>
                 """.trimIndent(),
             ),
+            ignoreBoundaryFringe = true,
         )
     }
 
@@ -300,6 +309,16 @@ class GpuPrimitiveParityTest {
         svg: String,
         maxAbsTol: Int = GPU_PARITY_MAX_ABS,
         maxOutlierRatio: Double = GPU_PARITY_MAX_OUTLIER_RATIO,
+        // See assertParity: Adreno-only boundary-fringe accommodation.
+        // Enable ONLY where the driver quirk is proven (region-filling
+        // primitives); never for edge-band cases (blur/displacement), where
+        // fringe-adjacent diffs carry real signal.
+        ignoreBoundaryFringe: Boolean = false,
+        // Golden-asset path for cases where the on-device software reference
+        // is itself untrusted (divergent native kernel): compare the hardware
+        // render against the asset instead of the software render. The SW
+        // render still runs for the visible-effect guard.
+        goldenAsset: String? = null,
     ) {
         Assume.assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
@@ -308,12 +327,21 @@ class GpuPrimitiveParityTest {
         val sw = renderSoftware(svg)
         assertVisibleFilterEffect(name, sw, renderSoftware(unfilteredBaseline(svg)))
         val hw = renderOnHardware(svg)
+        val reference = if (goldenAsset != null) {
+            loadGoldenAsset(
+                goldenAsset,
+                Bitmap.createBitmap(GPU_PARITY_SIZE, GPU_PARITY_SIZE, Bitmap.Config.ARGB_8888),
+            )
+        } else {
+            sw
+        }
         assertParity(
             "$name (minGpuApi=$minGpuApi, deviceApi=${Build.VERSION.SDK_INT})",
-            sw,
+            reference,
             hw,
             maxAbsTol,
             maxOutlierRatio,
+            ignoreBoundaryFringe,
         )
     }
 

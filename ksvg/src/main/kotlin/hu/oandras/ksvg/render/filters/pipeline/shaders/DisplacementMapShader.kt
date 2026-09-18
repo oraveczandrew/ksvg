@@ -31,9 +31,18 @@ internal const val DISPLACEMENT_MAP_SHADER: String = """
                 return color.a;
             }
             half4 main(float2 fragCoord) {
-                float4 mapColor = uMap.eval(fragCoord);
-                float dx = (getChannel(mapColor, uXChannel) - 0.5) * uScale.x;
-                float dy = (getChannel(mapColor, uYChannel) - 0.5) * uScale.y;
-                return uInput.eval(fragCoord + float2(dx, dy));
+                // Nearest-neighbor sampling throughout, matching the CPU
+                // kernel (integer-truncated shifts, texel-exact map reads):
+                // the CPU displaces by trunc(scale * (ch - 0.5)) pixels and
+                // samples both bitmaps at integer texels. (Browsers bilinearly
+                // interpolate here; migrating both paths is future work. The
+                // CPU clamps out-of-range reads to the bitmap edge while this
+                // shader relies on the input effect's edge behavior instead.)
+                float4 mapColor = uMap.eval(floor(fragCoord) + 0.5);
+                int2 d = int2(
+                    (getChannel(mapColor, uXChannel) - 0.5) * uScale.x,
+                    (getChannel(mapColor, uYChannel) - 0.5) * uScale.y
+                );
+                return uInput.eval(floor(fragCoord + float2(d)) + 0.5);
             }
         """

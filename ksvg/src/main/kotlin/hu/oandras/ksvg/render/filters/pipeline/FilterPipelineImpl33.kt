@@ -882,6 +882,8 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
         val lattice = obtainLatticeBitmap(node)
         shader.setInputShader("uLattice", BitmapShader(lattice, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
+        val latticeB = obtainLatticeBitmapB(node)
+        shader.setInputShader("uLatticeB", BitmapShader(latticeB, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
         return shader
     }
 
@@ -891,28 +893,52 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             return cached
         }
         val generators = node.generators
-        // 256x4 data texture: row k holds channel k's (permutation, gradientX,
-        // gradientY) in RGB with opaque alpha. Data bitmaps MUST stay opaque:
-        // the GPU backend uploads textures premultiplied, which corrupts any
-        // data byte packed into RGB wherever alpha < 255.
+        // 256x4 data texture: row k holds channel k's (permutation,
+        // gradientX-hi, gradientX-lo) in RGB with opaque alpha. Data bitmaps
+        // MUST stay opaque: the GPU backend uploads textures premultiplied,
+        // which corrupts any data byte packed into RGB wherever alpha < 255.
+        // Gradients are 16-bit (hi/lo bytes): 8-bit packing leaves ~1-2 LSB
+        // of Perlin noise error, amplified by the terminal EOTF.
         val bitmap = createBitmap(256, 4)
         val pixels = IntArray(256 * 4)
         for (i in 0 until 256) {
-            pixels[i] = packLattice(generators[0].p[i], generators[0].gx[i], generators[0].gy[i])
-            pixels[256 + i] = packLattice(generators[1].p[i], generators[1].gx[i], generators[1].gy[i])
-            pixels[512 + i] = packLattice(generators[2].p[i], generators[2].gx[i], generators[2].gy[i])
-            pixels[768 + i] = packLattice(generators[3].p[i], generators[3].gx[i], generators[3].gy[i])
+            pixels[i] = packLattice(generators[0].p[i], packGradient16(generators[0].gx[i]))
+            pixels[256 + i] = packLattice(generators[1].p[i], packGradient16(generators[1].gx[i]))
+            pixels[512 + i] = packLattice(generators[2].p[i], packGradient16(generators[2].gx[i]))
+            pixels[768 + i] = packLattice(generators[3].p[i], packGradient16(generators[3].gx[i]))
         }
         bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 4)
         node.gpuLatticeBitmap = bitmap
         return bitmap
     }
 
-    private fun packLattice(p: Int, gx: Double, gy: Double): Int {
-        return -0x1000000 or ((p and 0xFF) shl 16) or (packG(gx) shl 8) or packG(gy)
+    private fun obtainLatticeBitmapB(node: FeTurbulenceRenderNode): Bitmap {
+        val cached = node.gpuLatticeBitmapB
+        if (cached != null) {
+            return cached
+        }
+        val generators = node.generators
+        // Companion to [obtainLatticeBitmap]: row k holds channel k's
+        // (permutation, gradientY-hi, gradientY-lo), opaque.
+        val bitmap = createBitmap(256, 4)
+        val pixels = IntArray(256 * 4)
+        for (i in 0 until 256) {
+            pixels[i] = packLattice(generators[0].p[i], packGradient16(generators[0].gy[i]))
+            pixels[256 + i] = packLattice(generators[1].p[i], packGradient16(generators[1].gy[i]))
+            pixels[512 + i] = packLattice(generators[2].p[i], packGradient16(generators[2].gy[i]))
+            pixels[768 + i] = packLattice(generators[3].p[i], packGradient16(generators[3].gy[i]))
+        }
+        bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 4)
+        node.gpuLatticeBitmapB = bitmap
+        return bitmap
     }
 
-    private fun packG(g: Double): Int = ((g + 1.0) * 127.5 + 0.5).toInt().coerceIn(0, 255)
+    private fun packLattice(p: Int, g16: Int): Int {
+        return -0x1000000 or ((p and 0xFF) shl 16) or (((g16 shr 8) and 0xFF) shl 8) or (g16 and 0xFF)
+    }
+
+    private fun packGradient16(g: Double): Int =
+        (((g + 1.0) * 32767.5 + 0.5).toInt()).coerceIn(0, 65535)
 
     companion object {
         private fun FeBlendMode.toBlendMode(): BlendMode? = when (this) {

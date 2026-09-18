@@ -20,6 +20,10 @@ package hu.oandras.ksvg.render.filters.pipeline.shaders
 
 internal const val TURBULENCE_SHADER: String = """
             uniform shader uLattice;
+            // Companion lattice texture: row k holds channel k's
+            // (permutation, gradientY-hi, gradientY-lo); X gradients live in
+            // uLattice. Split for 16-bit gradient precision.
+            uniform shader uLatticeB;
             uniform shader in_source;
             uniform float2 uBaseFrequency;
             uniform int uNumOctaves;
@@ -41,6 +45,16 @@ internal const val TURBULENCE_SHADER: String = """
 
             float4 getLattice(int x, int row) {
                 return uLattice.eval(float2(float(x) + 0.5, float(row) + 0.5));
+            }
+
+            float4 getLatticeB(int x, int row) {
+                return uLatticeB.eval(float2(float(x) + 0.5, float(row) + 0.5));
+            }
+
+            // 16-bit gradient dequantization matching packGradient16:
+            // value = hi * 256 + lo maps [0, 65535] onto [-1, 1].
+            float grad16(float4 t) {
+                return (t.g * 255.0 * 256.0 + t.b * 255.0) / 32767.5 - 1.0;
             }
 
             float4 sCurve(float4 t) {
@@ -113,14 +127,14 @@ internal const val TURBULENCE_SHADER: String = """
                 float4 sx = sCurve(float4(r0.x));
                 float4 sy = sCurve(float4(r0.y));
 
-                float4 q00x = float4(getLattice(int(b00.r+0.5), 0).g, getLattice(int(b00.g+0.5), 1).g, getLattice(int(b00.b+0.5), 2).g, getLattice(int(b00.a+0.5), 3).g) * 2.0 - 1.0;
-                float4 q00y = float4(getLattice(int(b00.r+0.5), 0).b, getLattice(int(b00.g+0.5), 1).b, getLattice(int(b00.b+0.5), 2).b, getLattice(int(b00.a+0.5), 3).b) * 2.0 - 1.0;
-                float4 q10x = float4(getLattice(int(b10.r+0.5), 0).g, getLattice(int(b10.g+0.5), 1).g, getLattice(int(b10.b+0.5), 2).g, getLattice(int(b10.a+0.5), 3).g) * 2.0 - 1.0;
-                float4 q10y = float4(getLattice(int(b10.r+0.5), 0).b, getLattice(int(b10.g+0.5), 1).b, getLattice(int(b10.b+0.5), 2).b, getLattice(int(b10.a+0.5), 3).b) * 2.0 - 1.0;
-                float4 q01x = float4(getLattice(int(b01.r+0.5), 0).g, getLattice(int(b01.g+0.5), 1).g, getLattice(int(b01.b+0.5), 2).g, getLattice(int(b01.a+0.5), 3).g) * 2.0 - 1.0;
-                float4 q01y = float4(getLattice(int(b01.r+0.5), 0).b, getLattice(int(b01.g+0.5), 1).b, getLattice(int(b01.b+0.5), 2).b, getLattice(int(b01.a+0.5), 3).b) * 2.0 - 1.0;
-                float4 q11x = float4(getLattice(int(b11.r+0.5), 0).g, getLattice(int(b11.g+0.5), 1).g, getLattice(int(b11.b+0.5), 2).g, getLattice(int(b11.a+0.5), 3).g) * 2.0 - 1.0;
-                float4 q11y = float4(getLattice(int(b11.r+0.5), 0).b, getLattice(int(b11.g+0.5), 1).b, getLattice(int(b11.b+0.5), 2).b, getLattice(int(b11.a+0.5), 3).b) * 2.0 - 1.0;
+                float4 q00x = float4(grad16(getLattice(int(b00.r+0.5), 0)), grad16(getLattice(int(b00.g+0.5), 1)), grad16(getLattice(int(b00.b+0.5), 2)), grad16(getLattice(int(b00.a+0.5), 3)));
+                float4 q00y = float4(grad16(getLatticeB(int(b00.r+0.5), 0)), grad16(getLatticeB(int(b00.g+0.5), 1)), grad16(getLatticeB(int(b00.b+0.5), 2)), grad16(getLatticeB(int(b00.a+0.5), 3)));
+                float4 q10x = float4(grad16(getLattice(int(b10.r+0.5), 0)), grad16(getLattice(int(b10.g+0.5), 1)), grad16(getLattice(int(b10.b+0.5), 2)), grad16(getLattice(int(b10.a+0.5), 3)));
+                float4 q10y = float4(grad16(getLatticeB(int(b10.r+0.5), 0)), grad16(getLatticeB(int(b10.g+0.5), 1)), grad16(getLatticeB(int(b10.b+0.5), 2)), grad16(getLatticeB(int(b10.a+0.5), 3)));
+                float4 q01x = float4(grad16(getLattice(int(b01.r+0.5), 0)), grad16(getLattice(int(b01.g+0.5), 1)), grad16(getLattice(int(b01.b+0.5), 2)), grad16(getLattice(int(b01.a+0.5), 3)));
+                float4 q01y = float4(grad16(getLatticeB(int(b01.r+0.5), 0)), grad16(getLatticeB(int(b01.g+0.5), 1)), grad16(getLatticeB(int(b01.b+0.5), 2)), grad16(getLatticeB(int(b01.a+0.5), 3)));
+                float4 q11x = float4(grad16(getLattice(int(b11.r+0.5), 0)), grad16(getLattice(int(b11.g+0.5), 1)), grad16(getLattice(int(b11.b+0.5), 2)), grad16(getLattice(int(b11.a+0.5), 3)));
+                float4 q11y = float4(grad16(getLatticeB(int(b11.r+0.5), 0)), grad16(getLatticeB(int(b11.g+0.5), 1)), grad16(getLatticeB(int(b11.b+0.5), 2)), grad16(getLatticeB(int(b11.a+0.5), 3)));
 
                 float4 u = r0.x * q00x + r0.y * q00y;
                 float4 v = r1.x * q10x + r0.y * q10y;

@@ -29,15 +29,18 @@ import androidx.annotation.RequiresApi
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
+import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.test.decodePng
 import hu.oandras.ksvg.test.renderWithLibrary
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.red
-import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import java.io.File
+import kotlin.math.abs
 
 internal const val GPU_PARITY_SIZE = 256
 
@@ -111,7 +114,7 @@ private fun pollLatestImage(reader: ImageReader, width: Int, height: Int): andro
         if (SystemClock.uptimeMillis() >= deadline) {
             fail("GpuParityHarness: no frame arrived from HardwareRenderer within 2s (${width}x$height)")
         }
-        Thread.sleep(10)
+        Thread.sleep(10L)
     }
 }
 
@@ -121,7 +124,7 @@ private fun imageToBitmap(image: android.media.Image, width: Int, height: Int): 
     val buffer = plane.buffer
     val pixelStride = plane.pixelStride
     val rowStride = plane.rowStride
-    val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val out = createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val row = ByteArray(rowStride)
     val pixels = IntArray(width)
     for (y in 0 until height) {
@@ -149,9 +152,13 @@ internal data class ParityStats(
     @JvmField val meanAbs: Double,
     @JvmField val outlierCount: Int,
     @JvmField val total: Int,
+    @JvmField val worstX: Int = -1,
+    @JvmField val worstY: Int = -1,
+    @JvmField val worstA: Int = 0,
+    @JvmField val worstB: Int = 0,
 )
 
-internal fun parityStats(sw: Bitmap, hw: Bitmap): ParityStats {
+internal fun parityStats(sw: Bitmap, hw: Bitmap, ignoreBoundaryFringe: Boolean = false): ParityStats {
     assertEquals("Bitmap widths differ", sw.width, hw.width)
     assertEquals("Bitmap heights differ", sw.height, hw.height)
     val w = sw.width
@@ -160,29 +167,79 @@ internal fun parityStats(sw: Bitmap, hw: Bitmap): ParityStats {
     val hwPx = IntArray(w * h)
     sw.getPixels(swPx, 0, w, 0, 0, w, h)
     hw.getPixels(hwPx, 0, w, 0, 0, w, h)
+    // Pixels transparent in both images: the fringe rule excuses differing
+    // pixels 4-adjacent to any of these (accepted Adreno boundary variance).
+    val bothTransparent = if (ignoreBoundaryFringe) {
+        BooleanArray(w * h) { i -> (swPx[i] ushr 24) == 0 && (hwPx[i] ushr 24) == 0 }
+    } else {
+        null
+    }
+    fun isFringe(x: Int, y: Int): Boolean {
+        val transparent = bothTransparent ?: return false
+        if (x > 0 && transparent[y * w + x - 1]) return true
+        if (x < w - 1 && transparent[y * w + x + 1]) return true
+        if (y > 0 && transparent[(y - 1) * w + x]) return true
+        if (y < h - 1 && transparent[(y + 1) * w + x]) return true
+        return false
+    }
     var maxAbs = 0
     var sumAbs = 0L
     var outliers = 0
-    for (i in swPx.indices) {
-        val a = swPx[i]
-        val b = hwPx[i]
-        val d = maxOf(
-            abs(a.alpha - b.alpha),
-            abs(a.red - b.red),
-            abs(a.green - b.green),
-            abs(a.blue - b.blue),
-        )
-        if (d > maxAbs) maxAbs = d
-        sumAbs += d
-        if (d > GPU_PARITY_MAX_ABS) outliers++
+    var total = 0
+    var worstX = -1
+    var worstY = -1
+    var worstA = 0
+    var worstB = 0
+    for (y in 0 until h) {
+        for (x in 0 until w) {
+            val i = y * w + x
+            if (isFringe(x, y)) continue
+            total++
+            val a = swPx[i]
+            val b = hwPx[i]
+            val d = maxOf(
+                abs(a.alpha - b.alpha),
+                abs(a.red - b.red),
+                abs(a.green - b.green),
+                abs(a.blue - b.blue),
+            )
+            if (d > maxAbs) {
+                maxAbs = d
+                worstX = x
+                worstY = y
+                worstA = a
+                worstB = b
+            }
+            sumAbs += d
+            if (d > GPU_PARITY_MAX_ABS) outliers++
+        }
     }
-    return ParityStats(maxAbs, sumAbs.toDouble() / (w * h), outliers, w * h)
+    return ParityStats(
+        maxAbs,
+        if (total == 0) 0.0 else sumAbs.toDouble() / total,
+        outliers,
+        total,
+        worstX,
+        worstY,
+        worstA,
+        worstB,
+    )
 }
 
 /**
  * CPU↔GPU parity assert. NOT bit-exact by design (Skia blur, AGSL fp32,
  * premultiplied intermediates): per-channel `maxAbs <= maxAbsTol` plus a cap
  * on the outlier share.
+ *
+ * @param ignoreBoundaryFringe when true, differing pixels 4-adjacent to a
+ * pixel that is transparent in BOTH bitmaps are excluded from both gates.
+ * Adreno-only accommodation: its rasterizer resolves exact-equality region
+ * boundary pixels (guard/clip bounds landing exactly on pixel centers, i.e.,
+ * integral filter regions) as CUT where SwiftShader and the CPU keep them,
+ * plus dithering on the fractional top row (both verified deterministically
+ * on-device). Confined to single boundary-adjacent pixels; interior
+ * divergences (wrong kernels, shapes, colors) still fail. See
+ * `tmp/GPU_SCALAR_PARITY_REPORT.md` §8.
  */
 internal fun assertParity(
     name: String,
@@ -190,8 +247,9 @@ internal fun assertParity(
     hw: Bitmap,
     maxAbsTol: Int = GPU_PARITY_MAX_ABS,
     maxOutlierRatio: Double = GPU_PARITY_MAX_OUTLIER_RATIO,
+    ignoreBoundaryFringe: Boolean = false,
 ) {
-    val stats = parityStats(sw, hw)
+    val stats = parityStats(sw, hw, ignoreBoundaryFringe)
     val outlierRatio = stats.outlierCount.toDouble() / stats.total
     if (stats.maxAbs > maxAbsTol || outlierRatio > maxOutlierRatio) {
         dumpParityBitmaps(name, sw, hw, stats)
@@ -207,6 +265,28 @@ internal fun assertParity(
             "(maxAbs=${stats.maxAbs}, meanAbs=${"%.4f".format(stats.meanAbs)})",
         outlierRatio <= maxOutlierRatio,
     )
+}
+
+/**
+ * Loads a golden reference PNG from androidTest assets into [outBitmap].
+ * Used where the on-device software reference is itself untrusted (e.g. a
+ * divergent native kernel); the golden is generated host-side from the
+ * pure-Kotlin reference (see `tmp/GPU_SCALAR_PARITY_REPORT.md`).
+ */
+internal fun loadGoldenAsset(assetPath: String, outBitmap: Bitmap): Bitmap {
+    val assets = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().context.assets
+    return assets.open(assetPath).use {
+        // Straight (non-premultiplied), unscaled decode: the golden bytes must
+        // land in the bitmap untouched. The defaults (premultiplied + scaled)
+        // round/shift pixel values and silently corrupt byte-exact references.
+        val opts = android.graphics.BitmapFactory.Options().also { o ->
+            o.inBitmap = outBitmap
+            o.inPremultiplied = false
+            o.inScaled = false
+        }
+        hu.oandras.ksvg.test.decodePng(it, outBitmap, opts)
+            ?: throw AssertionError("GpuParityHarness: cannot decode golden $assetPath")
+    }
 }
 
 /**
@@ -241,12 +321,17 @@ internal fun dumpParityBitmaps(name: String, sw: Bitmap, hw: Bitmap, stats: Pari
             )
             diffPx[i] = if (d > GPU_PARITY_MAX_ABS) -0x10000 else b
         }
-        val diff = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val diff = createBitmap(w, h, Bitmap.Config.ARGB_8888)
         diff.setPixels(diffPx, 0, w, 0, 0, w, h)
-        sw.compress(Bitmap.CompressFormat.PNG, 100, java.io.File(dir, "$safe.sw.png").outputStream())
-        hw.compress(Bitmap.CompressFormat.PNG, 100, java.io.File(dir, "$safe.hw.png").outputStream())
-        diff.compress(Bitmap.CompressFormat.PNG, 100, java.io.File(dir, "$safe.diff.png").outputStream())
+        sw.compress(Bitmap.CompressFormat.PNG, 100, File(dir, "$safe.sw.png").outputStream())
+        hw.compress(Bitmap.CompressFormat.PNG, 100, File(dir, "$safe.hw.png").outputStream())
+        diff.compress(Bitmap.CompressFormat.PNG, 100, File(dir, "$safe.diff.png").outputStream())
         android.util.Log.w("GpuParity", "$name parity dump in ${dir.absolutePath} stats=$stats")
+        android.util.Log.w(
+            "GpuParity",
+            "$name worst non-fringe d=${stats.maxAbs} at (${stats.worstX},${stats.worstY}) " +
+                "ref=${stats.worstA.toUInt().toString(16)} hw=${stats.worstB.toUInt().toString(16)}",
+        )
     } catch (_: Exception) {
         // Diagnostics must never mask the real assertion.
     }

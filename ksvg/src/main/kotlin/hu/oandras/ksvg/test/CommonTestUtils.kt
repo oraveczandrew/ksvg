@@ -91,9 +91,14 @@ internal fun decodePng(file: File, inBitmap: Bitmap): Bitmap? {
 
 @VisibleForTesting
 internal fun decodePng(input: InputStream, inBitmap: Bitmap): Bitmap? {
-    return BitmapFactory.decodeStream(input, null, BitmapFactory.Options().also {
+    return decodePng(input, inBitmap, BitmapFactory.Options().also {
         it.inBitmap = inBitmap
     })
+}
+
+@VisibleForTesting
+internal fun decodePng(input: InputStream, inBitmap: Bitmap, opts: BitmapFactory.Options): Bitmap? {
+    return BitmapFactory.decodeStream(input, null, opts)
 }
 
 /**

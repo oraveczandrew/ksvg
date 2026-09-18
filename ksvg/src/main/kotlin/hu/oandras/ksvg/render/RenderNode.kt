@@ -779,6 +779,12 @@ internal class FeTurbulenceRenderNode(
 
     @JvmField var gpuLatticeBitmap: Bitmap? = null
     @JvmField var gpuLatticeVersion: Int = -1
+
+    // Second lattice texture (opaque): row k holds channel k's (permutation,
+    // gradientY-hi, gradientY-lo); X gradients live in [gpuLatticeBitmap].
+    // Split for 16-bit gradient precision (see packLattice): 8-bit packing
+    // leaves ~1-2 LSB of Perlin noise error, amplified by the terminal EOTF.
+    @JvmField var gpuLatticeBitmapB: Bitmap? = null
 }
 
 internal class FeDisplacementMapRenderNode(
