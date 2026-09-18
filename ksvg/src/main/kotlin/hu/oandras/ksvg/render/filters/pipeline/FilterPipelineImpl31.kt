@@ -281,7 +281,7 @@ internal open class FilterPipelineImpl31 internal constructor(
                         inputEffect
                     } else {
                         RenderEffect.createBlurEffect(
-                            sigmaX, sigmaY,
+                            skiaBlurRadiusForSigma(sigmaX), skiaBlurRadiusForSigma(sigmaY),
                             android.graphics.Shader.TileMode.CLAMP
                         ).chainWith(inputEffect)
                     }
@@ -480,6 +480,45 @@ internal open class FilterPipelineImpl31 internal constructor(
     }
 
     companion object {
+        /**
+         * `RenderEffect.createBlurEffect` interprets its radius as the 1/e
+         * falloff radius (kernel ~exp(-x²/r²)), i.e. an effective Gaussian
+         * sigma of r/√2 — not the SVG stdDeviation — and Skia's kernel is an
+         * approximation whose width scales slightly sub-linearly on top.
+         * Parity-measured (CPU-fit σ vs requested radius r):
+         * r=1.0 → 1.05, r=1.833 → 1.55, r=2.25 → 1.75, r=4.0 → 2.80,
+         * r=5.657 → 3.75, r=6.0 → 3.95 (Adreno + SwiftShader agree).
+         * [skiaBlurRadiusForSigma] inverts this table so the effective sigma
+         * matches the requested one; re-fit against [GpuPrimitiveParityTest]
+         * if the blur changes.
+         */
+        private val SKIA_BLUR_RESPONSE_SIGMA = floatArrayOf(1.05f, 1.55f, 1.75f, 2.80f, 3.75f, 3.95f)
+        private val SKIA_BLUR_RESPONSE_RADIUS = floatArrayOf(1.0f, 1.833f, 2.25f, 4.0f, 5.657f, 6.0f)
+
+        /**
+         * Skia blur radius whose effective sigma equals [sigma], by piecewise
+         * linear inversion of the measured response table (linear
+         * extrapolation past the ends). Pure arithmetic, no allocation.
+         */
+        internal fun skiaBlurRadiusForSigma(sigma: Float): Float {
+            val s = SKIA_BLUR_RESPONSE_SIGMA
+            val r = SKIA_BLUR_RESPONSE_RADIUS
+            if (sigma <= s[0]) {
+                val slope = (r[1] - r[0]) / (s[1] - s[0])
+                return (r[0] + (sigma - s[0]) * slope).coerceAtLeast(0.5f)
+            }
+            for (i in 0 until s.size - 1) {
+                if (sigma <= s[i + 1]) {
+                    val t = (sigma - s[i]) / (s[i + 1] - s[i])
+                    return r[i] + t * (r[i + 1] - r[i])
+                }
+            }
+            val n = s.size - 1
+            val slope = (r[n] - r[n - 1]) / (s[n] - s[n - 1])
+            return r[n] + (sigma - s[n]) * slope
+        }
+
+
         @JvmField
         internal val IDENTITY_EFFECT = RenderEffect.createOffsetEffect(0f, 0f)
 

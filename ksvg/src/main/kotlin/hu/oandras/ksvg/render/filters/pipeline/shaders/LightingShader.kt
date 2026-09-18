@@ -23,7 +23,18 @@ internal const val LIGHTING_SHADER: String = """
             uniform float uSurfaceScale;
             uniform float uConstant;
             uniform float uExponent;
+            // Linearized light color when uUseLinear != 0 (exact sRGB->linear
+            // table lookup on the Kotlin side), raw sRGB otherwise.
             uniform float3 uLightColor;
+            // Always the raw sRGB light color: terminal specular output carries
+            // the full-strength light color (no EOTF), matching the CPU kernel.
+            uniform float3 uLightColorRaw;
+            // Linear-RGB EOTF on the straight output (color-interpolation-
+            // filters: linearRGB, the default), matching the CPU kernel.
+            uniform int uUseLinear;
+            // Terminal feSpecularLighting emits premultiplied output
+            // (full light color + intensity alpha), matching the CPU kernel.
+            uniform int uTerminalPremult;
             uniform int uIsSpecular;
             uniform int uLightType;
             uniform float3 uLightPosDir;
@@ -58,6 +69,19 @@ internal const val LIGHTING_SHADER: String = """
                 return normalize(n);
             }
 
+            // Linear->sRGB EOTF matching the CPU linearToSrgb table
+            // (threshold branch identical; float rounding may differ by 1 LSB
+            // at table rounding boundaries).
+            float3 srgbEotf(float3 c) {
+                float3 lo = c * 12.92;
+                float3 hi = 1.055 * pow(c, float3(1.0 / 2.4)) - 0.055;
+                return float3(
+                    c.r <= 0.0031308 ? lo.r : hi.r,
+                    c.g <= 0.0031308 ? lo.g : hi.g,
+                    c.b <= 0.0031308 ? lo.b : hi.b
+                );
+            }
+
             half4 main(float2 fragCoord) {
                 // fragCoord samples pixel centers: keep exactly the pixels the CPU
                 // kernels keep (their clip rects truncate region bounds to ints).
@@ -78,18 +102,25 @@ internal const val LIGHTING_SHADER: String = """
                     l = normalize(uLightPosDir - p);
                 }
                 
-                float dotNL = max(dot(n, l), 0.0);
-                float3 color;
-                float a = 1.0;
-                if (uIsSpecular == 0) {
-                    color = uLightColor * uConstant * dotNL;
-                } else {
-                    float3 v = float3(0.0, 0.0, 1.0);
-                    float3 h = normalize(l + v);
-                    color = uLightColor * uConstant * pow(max(dot(n, h), 0.0), uExponent);
-                    a = max(max(color.r, color.g), color.b);
+            float dotNL = max(dot(n, l), 0.0);
+            float3 color;
+            float a = 1.0;
+            if (uIsSpecular == 0) {
+                float intensity = clamp(dotNL * uConstant, 0.0, 1.0);
+                float3 lin = uLightColor * intensity;
+                color = (uUseLinear != 0) ? srgbEotf(floor(lin * 255.0 + 0.5) / 255.0) : lin;
+            } else {
+                float3 v = float3(0.0, 0.0, 1.0);
+                float3 h = normalize(l + v);
+                float intensity = clamp(uConstant * pow(max(dot(n, h), 0.0), uExponent), 0.0, 1.0);
+                if (uTerminalPremult != 0) {
+                    return half4(uLightColorRaw, intensity);
                 }
-                
-                return half4(color, a);
+                float3 lin = uLightColor * intensity;
+                color = (uUseLinear != 0) ? srgbEotf(floor(lin * 255.0 + 0.5) / 255.0) : lin;
+                a = max(max(color.r, color.g), color.b);
             }
+
+            return half4(color, a);
+        }
         """

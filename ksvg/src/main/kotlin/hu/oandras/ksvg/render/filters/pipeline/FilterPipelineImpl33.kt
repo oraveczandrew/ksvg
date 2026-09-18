@@ -65,6 +65,7 @@ import hu.oandras.ksvg.render.calculatePrimitiveRegion
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.resolvePrimitiveInputRegion
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
+import hu.oandras.ksvg.filtering.ColorLuts
 import hu.oandras.ksvg.render.filters.buildColorMatrix
 import hu.oandras.ksvg.render.filters.buildTransferLutTables
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
@@ -201,8 +202,10 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             if (sigmaX <= 0f && sigmaY <= 0f) {
                                 inputEffect
                             } else {
-                                RenderEffect.createBlurEffect(sigmaX, sigmaY, Shader.TileMode.CLAMP)
-                                    .chainWith(inputEffect)
+                                RenderEffect.createBlurEffect(
+                                    skiaBlurRadiusForSigma(sigmaX), skiaBlurRadiusForSigma(sigmaY),
+                                    Shader.TileMode.CLAMP,
+                                ).chainWith(inputEffect)
                             }
                         }
 
@@ -234,7 +237,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                             )
 
-                            val shader = buildLightingShader(primitive, false) ?: return null
+                            val shader = buildLightingShader(
+                                primitive, false, terminalPremult = false,
+                            ) ?: return null
                             shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
                             shader.setFloatUniform("uInvCanvasScale", 1f / sx, 1f / sy)
                             shader.setFloatUniform("uOffset", totalPadX.toFloat(), totalPadY.toFloat())
@@ -252,7 +257,13 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                             )
 
-                            val shader = buildLightingShader(primitive, true) ?: return null
+                            // Terminal specular emits premultiplied output on the CPU
+                            // path (full light color + intensity alpha); mirror it.
+                            val terminalPremult =
+                                primitive === filterNode.primitives.lastOrNull()
+                            val shader = buildLightingShader(
+                                primitive, true, terminalPremult,
+                            ) ?: return null
                             shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
                             shader.setFloatUniform("uInvCanvasScale", 1f / sx, 1f / sy)
                             shader.setFloatUniform("uOffset", totalPadX.toFloat(), totalPadY.toFloat())
@@ -428,7 +439,10 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             val sigmaX = primitive.blurNode.stdDeviationX * scaleX
                             val sigmaY = primitive.blurNode.stdDeviationY * scaleY
                             val blurredEffect = if (sigmaX > 0f || sigmaY > 0f) {
-                                RenderEffect.createBlurEffect(sigmaX, sigmaY, alphaEffect, Shader.TileMode.CLAMP)
+                                RenderEffect.createBlurEffect(
+                                    skiaBlurRadiusForSigma(sigmaX), skiaBlurRadiusForSigma(sigmaY),
+                                    alphaEffect, Shader.TileMode.CLAMP,
+                                )
                             } else {
                                 alphaEffect
                             }
@@ -670,7 +684,8 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
     private fun buildLightingShader(
         node: FilterPrimitiveRenderNode<*>,
-        isSpecular: Boolean
+        isSpecular: Boolean,
+        terminalPremult: Boolean,
     ): RuntimeShader? {
         val shader = RuntimeShader(LIGHTING_SHADER)
         val light: Lighting?
@@ -707,7 +722,28 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         shader.setFloatUniform("uSurfaceScale", surfaceScale)
         shader.setFloatUniform("uConstant", constant)
         shader.setFloatUniform("uExponent", exponent)
-        shader.setFloatUniform("uLightColor", styleColor.red / 255f, styleColor.green / 255f, styleColor.blue / 255f)
+        // Exact sRGB->linear table lookup (same tables as the CPU kernel);
+        // the linearized color feeds the useLinear path, the raw color the
+        // terminal-specular premultiplied output (which skips the EOTF).
+        val useLinear = node.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+        val lut = ColorLuts.SRGB_TO_LINEAR
+        val linR = lut[styleColor.red].toFloat()
+        val linG = lut[styleColor.green].toFloat()
+        val linB = lut[styleColor.blue].toFloat()
+        if (useLinear) {
+            shader.setFloatUniform("uLightColor", linR / 255f, linG / 255f, linB / 255f)
+        } else {
+            shader.setFloatUniform(
+                "uLightColor",
+                styleColor.red / 255f, styleColor.green / 255f, styleColor.blue / 255f,
+            )
+        }
+        shader.setFloatUniform(
+            "uLightColorRaw",
+            styleColor.red / 255f, styleColor.green / 255f, styleColor.blue / 255f,
+        )
+        shader.setIntUniform("uUseLinear", if (useLinear) 1 else 0)
+        shader.setIntUniform("uTerminalPremult", if (terminalPremult) 1 else 0)
         shader.setIntUniform("uIsSpecular", if (isSpecular) 1 else 0)
 
         when (light) {
@@ -838,6 +874,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         shader.setFloatUniform("uPrimitiveUnitSize", unitSizeX, unitSizeY)
         // fragCoord is in gpuNode-local buffer space; the filter region top-left sits at (padX, padY).
         shader.setFloatUniform("uOffset", padX.toFloat(), padY.toFloat())
+        // Terminal turbulence under linearRGB gets the linear->sRGB transfer
+        // (CPU unLinearizeBitmap equivalent); anything else stays linear.
+        val unlinearize = node === filterNode.primitives.lastOrNull() &&
+            filterNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+        shader.setIntUniform("uUnlinearize", if (unlinearize) 1 else 0)
 
         val lattice = obtainLatticeBitmap(node)
         shader.setInputShader("uLattice", BitmapShader(lattice, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))

@@ -31,6 +31,9 @@ internal const val TURBULENCE_SHADER: String = """
             uniform float2 uInvCanvasScale;
             uniform float2 uOffset;
             uniform float4 uPrimitiveRegion;
+            // Terminal feTurbulence under linearRGB gets the linear->sRGB
+            // transfer on its straight RGB (CPU unLinearizeBitmap equivalent).
+            uniform int uUnlinearize;
 
             int customMod(int x, int y) {
                 return x - y * int(floor(float(x) / float(y)));
@@ -42,6 +45,19 @@ internal const val TURBULENCE_SHADER: String = """
 
             float4 sCurve(float4 t) {
                 return t * t * (3.0 - 2.0 * t);
+            }
+
+            // Linear->sRGB EOTF matching the CPU linearToSrgb table
+            // (threshold branch identical; float rounding may differ by 1 LSB
+            // at table rounding boundaries).
+            float3 srgbEotf(float3 c) {
+                float3 lo = c * 12.92;
+                float3 hi = 1.055 * pow(c, float3(1.0 / 2.4)) - 0.055;
+                return float3(
+                    c.r <= 0.0031308 ? lo.r : hi.r,
+                    c.g <= 0.0031308 ? lo.g : hi.g,
+                    c.b <= 0.0031308 ? lo.b : hi.b
+                );
             }
 
             float4 noise2(float2 p, float2 period) {
@@ -146,6 +162,10 @@ internal const val TURBULENCE_SHADER: String = """
                 // writes straight bytes into the result bitmap, and parity (plus
                 // the golden references pinning the CPU side) requires the same
                 // convention here.
-                return half4(finalVal.rgb, finalVal.a);
+                float3 outRgb = finalVal.rgb;
+                if (uUnlinearize != 0) {
+                    outRgb = srgbEotf(floor(outRgb * 255.0 + 0.5) / 255.0);
+                }
+                return half4(outRgb, finalVal.a);
             }
         """
