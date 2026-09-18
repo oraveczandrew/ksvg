@@ -191,8 +191,11 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyNative(
                             k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
 #elif defined(__x86_64__) || defined(_M_X64)
         if (useLinear == JNI_TRUE) {
-            applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
-                                  k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+            // Linear light runs on the hand-written SSSE3 kernel: the AVX2 kernel's
+            // 16-segment LUT spills its register file in linear mode and ends up
+            // no faster than SSSE3.
+            ksvgArithmeticApplySse(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                   k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
         } else if (detectSimdLevel() >= SIMD_AVX2) {
             ksvgArithmeticApplyAvx2(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                    k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
