@@ -88,18 +88,23 @@
  *   One Horner step: acc = f * acc + coeff, with the scalar coefficient
  *   broadcast to all lanes first.
  *
- *   WARNING: never fold the broadcast into the FMA memory operand
+ * WARNING: never fold the broadcast into the FMA memory operand
  *   (vfmadd213ps mem, %ymm, %ymm). VEX.256 FMA has no broadcast semantics
  *   (broadcast is EVEX-only); the mem operand is a full m256, so lanes 1-7
  *   would silently consume neighboring table words. Lane 0 would stay
  *   correct by accident, hiding the bug from narrow tests.
  *
+ *   The broadcast scratch is a parameter (\tmp) so callers whose %ymm9 is
+ *   live (point/spot kernels) can pass a dead register instead. \tmp must
+ *   be dead at every expansion site and distinct from \f, \acc and the
+ *   POW8_AVX2 fixed regs below (%ymm10-%ymm15).
+ *
  * Clobbers:
- *   %ymm9 (broadcast scratch), \acc
+ *   \tmp (broadcast scratch), \acc
  */
-.macro POW8_FMA_STEP coeff, f, acc
-    vbroadcastss \coeff, %ymm9
-    vfmadd213ps %ymm9, \f, \acc
+.macro POW8_FMA_STEP coeff, f, acc, tmp
+    vbroadcastss \coeff, \tmp
+    vfmadd213ps \tmp, \f, \acc
 .endm
 
 /*
@@ -215,18 +220,16 @@
  * Inputs:
  *   \x    = YMM register with base values (destroyed)
  *   \y    = YMM register with exponents (preserved)
+ *   \tmp  = YMM broadcast scratch (destroyed; must be dead at the call
+ *           site and distinct from \x, \y, %ymm10-%ymm15)
  *
  * Output:
  *   \x    = Result of pow(\x, \y)
  *
  * Clobbers:
- *   \x, %ymm9-%ymm15
- *
- *   %ymm9 is the Horner broadcast scratch: callers must have no live values
- *   in %ymm9 across the macro (the lighting row kernels keep pixels in
- *   %ymm0-%ymm8, so %ymm9 is free).
+ *   \x, \tmp, %ymm10-%ymm15
  */
-.macro POW8_AVX2 x, y
+.macro POW8_AVX2 x, y, tmp
     vmovaps   .Lbiased_127(%rip), %ymm15
     vmovaps   .Lmantissa_mask(%rip), %ymm14
     vmovaps   .Lfloat_1_bits(%rip), %ymm13
@@ -243,14 +246,14 @@
 
     # 2. Horner's method for P_log(f) ≈ log2(1+f)
     vbroadcastss .Lpoly_log2+0(%rip), %ymm10 # c8
-    POW8_FMA_STEP .Lpoly_log2+4(%rip), %ymm11, %ymm10 # c8*f + c7
-    POW8_FMA_STEP .Lpoly_log2+8(%rip), %ymm11, %ymm10 # .. + c6
-    POW8_FMA_STEP .Lpoly_log2+12(%rip), %ymm11, %ymm10
-    POW8_FMA_STEP .Lpoly_log2+16(%rip), %ymm11, %ymm10
-    POW8_FMA_STEP .Lpoly_log2+20(%rip), %ymm11, %ymm10
-    POW8_FMA_STEP .Lpoly_log2+24(%rip), %ymm11, %ymm10
-    POW8_FMA_STEP .Lpoly_log2+28(%rip), %ymm11, %ymm10
-    POW8_FMA_STEP .Lpoly_log2+32(%rip), %ymm11, %ymm10 # .. + c0
+    POW8_FMA_STEP .Lpoly_log2+4(%rip), %ymm11, %ymm10, \tmp # c8*f + c7
+    POW8_FMA_STEP .Lpoly_log2+8(%rip), %ymm11, %ymm10, \tmp # .. + c6
+    POW8_FMA_STEP .Lpoly_log2+12(%rip), %ymm11, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_log2+16(%rip), %ymm11, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_log2+20(%rip), %ymm11, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_log2+24(%rip), %ymm11, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_log2+28(%rip), %ymm11, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_log2+32(%rip), %ymm11, %ymm10, \tmp # .. + c0
 
     vaddps    %ymm10, %ymm12, %ymm12     # log2(x) = e + P_log(f)
 
@@ -264,14 +267,14 @@
 
     # 5. Horner's method for P_exp(t_f) ≈ 2^t_f
     vbroadcastss .Lpoly_exp2+0(%rip), %ymm10 # c8
-    POW8_FMA_STEP .Lpoly_exp2+4(%rip), %ymm12, %ymm10 # c8*t_f + c7
-    POW8_FMA_STEP .Lpoly_exp2+8(%rip), %ymm12, %ymm10
-    POW8_FMA_STEP .Lpoly_exp2+12(%rip), %ymm12, %ymm10
-    POW8_FMA_STEP .Lpoly_exp2+16(%rip), %ymm12, %ymm10
-    POW8_FMA_STEP .Lpoly_exp2+20(%rip), %ymm12, %ymm10
-    POW8_FMA_STEP .Lpoly_exp2+24(%rip), %ymm12, %ymm10
-    POW8_FMA_STEP .Lpoly_exp2+28(%rip), %ymm12, %ymm10
-    POW8_FMA_STEP .Lpoly_exp2+32(%rip), %ymm12, %ymm10 # .. + c0
+    POW8_FMA_STEP .Lpoly_exp2+4(%rip), %ymm12, %ymm10, \tmp # c8*t_f + c7
+    POW8_FMA_STEP .Lpoly_exp2+8(%rip), %ymm12, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_exp2+12(%rip), %ymm12, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_exp2+16(%rip), %ymm12, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_exp2+20(%rip), %ymm12, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_exp2+24(%rip), %ymm12, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_exp2+28(%rip), %ymm12, %ymm10, \tmp
+    POW8_FMA_STEP .Lpoly_exp2+32(%rip), %ymm12, %ymm10, \tmp # .. + c0
 
     # 6. Final scale by 2^t_i
     vcvtps2dq %ymm11, %ymm11              # t_i_int

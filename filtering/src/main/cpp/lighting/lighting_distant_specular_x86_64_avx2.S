@@ -212,7 +212,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
 
     // Full SIMD Specular Path (Fast Approximation)
     vbroadcastss 56(%rsp), %ymm1 # exponent
-    POW8_AVX2 %ymm0, %ymm1
+    POW8_AVX2 %ymm0, %ymm1, %ymm9
 
     // intensity = k * p clamped to [0, 1]
     vbroadcastss 8(%rbx), %ymm1 # k
@@ -404,7 +404,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 
     // Full SIMD Specular Path (Fast Approximation) - Linear
     vbroadcastss 56(%rsp), %ymm1 # exponent
-    POW8_AVX2 %ymm0, %ymm1
+    POW8_AVX2 %ymm0, %ymm1, %ymm9
 
     // intensity = k * p clamped to [0, 1]
     vbroadcastss 8(%rbx), %ymm1 # k

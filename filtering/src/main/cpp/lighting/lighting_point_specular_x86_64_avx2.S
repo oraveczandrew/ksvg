@@ -318,230 +318,20 @@ SYM(core8):
     vmulps       %ymm1, %ymm3, %ymm1
     vaddps       %ymm0, %ymm1, %ymm0
     vmaxps       %ymm2, %ymm0, %ymm0
-    vmovaps      %ymm0, 128(%rsp)  # 32-byte Spill
-    vxorps       %xmm1, %xmm1, %xmm1
-    vucomiss     %xmm1, %xmm10
-    vxorps       %xmm0, %xmm0, %xmm0
-    vmovaps      %ymm10, 160(%rsp)  # 32-byte Spill
-    jne          LBB1_1
-    jnp          LBB1_2
-LBB1_1:
-    vmovaps      128(%rsp), %ymm0  # 32-byte Reload
-    vmovss       16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vzeroupper
-    POW1_X64
-    vxorps       %xmm1, %xmm1, %xmm1
-    vmovaps      160(%rsp), %ymm10  # 32-byte Reload
-    vmulss       8(%r15), %xmm0, %xmm0
-LBB1_2:
-    vmovss       %xmm0, 80(%rsp)  # 4-byte Spill
-    vmovshdup    %xmm10, %xmm0  # xmm0 = xmm10[1,1,3,3]
-    vucomiss     %xmm1, %xmm0
-    vxorps       %xmm0, %xmm0, %xmm0
-    jne          LBB1_3
-    jnp          LBB1_4
-LBB1_3:
-    vmovshdup    128(%rsp), %xmm0  # 16-byte Folded Reload
-# xmm0 = mem[1,1,3,3]
-    vmovss       16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vzeroupper
-    POW1_X64
-    vmovaps      160(%rsp), %ymm10  # 32-byte Reload
-    vmulss       8(%r15), %xmm0, %xmm0
-LBB1_4:
-    vmovss       %xmm0, 64(%rsp)  # 4-byte Spill
-    vxorps       %xmm4, %xmm4, %xmm4
-    vshufpd      $1, %xmm10, %xmm10, %xmm0  # xmm0 = xmm10[1,0]
-    vucomiss     %xmm4, %xmm0
-    vxorps       %xmm5, %xmm5, %xmm5
-    jne          LBB1_5
-    jnp          LBB1_6
-LBB1_5:
-    vpermilpd    $1, 128(%rsp), %xmm0  # 16-byte Folded Reload
-# xmm0 = mem[1,0]
-    vmovss       16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vzeroupper
-    POW1_X64
-    vxorps       %xmm4, %xmm4, %xmm4
-    vmovaps      160(%rsp), %ymm10  # 32-byte Reload
-    vmulss       8(%r15), %xmm0, %xmm5
-LBB1_6:
-    vshufps      $255, %xmm10, %xmm10, %xmm0  # xmm0 = xmm10[3,3,3,3]
-    vucomiss     %xmm4, %xmm0
-    vxorps       %xmm6, %xmm6, %xmm6
-    jne          LBB1_7
-    jnp          LBB1_8
-LBB1_7:
-    vpermilps    $255, 128(%rsp), %xmm0  # 16-byte Folded Reload
-# xmm0 = mem[3,3,3,3]
-    vmovss       16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm5, 32(%rsp)  # 4-byte Spill
-    vzeroupper
-    POW1_X64
-    vmovss       32(%rsp), %xmm5  # 4-byte Reload
-# xmm5 = mem[0],zero,zero,zero
-    vxorps       %xmm4, %xmm4, %xmm4
-    vmovaps      160(%rsp), %ymm10  # 32-byte Reload
-    vmulss       8(%r15), %xmm0, %xmm6
-LBB1_8:
-    vmovss       LCPI1_0(%rip), %xmm2  # xmm2 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vxorps       %xmm7, %xmm7, %xmm7
-    vextractf128 $1, %ymm10, %xmm3
-    vucomiss     %xmm7, %xmm3
-    vxorps       %xmm0, %xmm0, %xmm0
-    vmovaps      %xmm3, 160(%rsp)  # 16-byte Spill
-    jne          LBB1_9
-    jnp          LBB1_10
-LBB1_9:
-    vmovaps      128(%rsp), %ymm0  # 32-byte Reload
-    vextractf128 $1, %ymm0, %xmm0
-    vmovss       16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vmovss       %xmm5, 32(%rsp)  # 4-byte Spill
-    vmovss       %xmm6, 48(%rsp)  # 4-byte Spill
-    vzeroupper
-    POW1_X64
-    vmovss       48(%rsp), %xmm6  # 4-byte Reload
-# xmm6 = mem[0],zero,zero,zero
-    vxorps       %xmm7, %xmm7, %xmm7
-    vmovss       32(%rsp), %xmm5  # 4-byte Reload
-# xmm5 = mem[0],zero,zero,zero
-    vxorps       %xmm4, %xmm4, %xmm4
-    vmovaps      160(%rsp), %xmm3  # 16-byte Reload
-    vmovss       LCPI1_0(%rip), %xmm2  # xmm2 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vmulss       8(%r15), %xmm0, %xmm0
-LBB1_10:
-    vmovss       80(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vminss       %xmm1, %xmm2, %xmm8
-    vcmpltss     LCPI1_5(%rip), %xmm1, %xmm9
-    vmovss       64(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vminss       %xmm1, %xmm2, %xmm10
-    vcmpltss     %xmm4, %xmm1, %xmm1
-    vminss       %xmm5, %xmm2, %xmm12
-    vcmpltss     %xmm4, %xmm5, %xmm4
-    vminss       %xmm6, %xmm2, %xmm5
-    vcmpltss     %xmm7, %xmm6, %xmm13
-    vminss       %xmm0, %xmm2, %xmm14
-    vcmpltss     %xmm7, %xmm0, %xmm15
-    vmovshdup    %xmm3, %xmm0  # xmm0 = xmm3[1,1,3,3]
-    vucomiss     %xmm7, %xmm0
-    jne          LBB1_11
-    jnp          LBB1_12
-LBB1_11:
-    vmovaps      128(%rsp), %ymm0  # 32-byte Reload
-    vextractf128 $1, %ymm0, %xmm0
-    vmovshdup    %xmm0, %xmm0  # xmm0 = xmm0[1,1,3,3]
-    vmovaps      %xmm1, 48(%rsp)  # 16-byte Spill
-    vmovss       16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vmovaps      %xmm8, 80(%rsp)  # 16-byte Spill
-    vmovaps      %xmm9, 64(%rsp)  # 16-byte Spill
-    vmovaps      %xmm10, 32(%rsp)  # 16-byte Spill
-    vmovaps      %xmm12, 112(%rsp)  # 16-byte Spill
-    vmovaps      %xmm4, 96(%rsp)  # 16-byte Spill
-    vmovaps      %xmm5, 256(%rsp)  # 16-byte Spill
-    vmovaps      %xmm13, 240(%rsp)  # 16-byte Spill
-    vmovaps      %xmm14, 224(%rsp)  # 16-byte Spill
-    vmovaps      %xmm15, 208(%rsp)  # 16-byte Spill
-    vzeroupper
-    POW1_X64
-    vmovaps      208(%rsp), %xmm15  # 16-byte Reload
-    vmovaps      224(%rsp), %xmm14  # 16-byte Reload
-    vmovaps      240(%rsp), %xmm13  # 16-byte Reload
-    vmovaps      256(%rsp), %xmm5  # 16-byte Reload
-    vmovaps      96(%rsp), %xmm4  # 16-byte Reload
-    vmovaps      112(%rsp), %xmm12  # 16-byte Reload
-    vmovaps      48(%rsp), %xmm1  # 16-byte Reload
-    vmovaps      32(%rsp), %xmm10  # 16-byte Reload
-    vmovaps      64(%rsp), %xmm9  # 16-byte Reload
-    vmovaps      80(%rsp), %xmm8  # 16-byte Reload
-    vmovaps      160(%rsp), %xmm3  # 16-byte Reload
-    vmovss       LCPI1_0(%rip), %xmm2  # xmm2 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vmulss       8(%r15), %xmm0, %xmm7
-LBB1_12:
-    vandnps      %xmm8, %xmm9, %xmm6
-    vandnps      %xmm10, %xmm1, %xmm11
-    vandnps      %xmm12, %xmm4, %xmm10
-    vandnps      %xmm5, %xmm13, %xmm9
-    vandnps      %xmm14, %xmm15, %xmm8
-    vminss       %xmm7, %xmm2, %xmm0
-    vxorps       %xmm4, %xmm4, %xmm4
-    vcmpltss     %xmm4, %xmm7, %xmm1
-    vandnps      %xmm0, %xmm1, %xmm7
-    vshufpd      $1, %xmm3, %xmm3, %xmm0  # xmm0 = xmm3[1,0]
-    vucomiss     %xmm4, %xmm0
-    vxorps       %xmm0, %xmm0, %xmm0
-    jne          LBB1_13
-    jnp          LBB1_14
-LBB1_13:
-    vmovapd      128(%rsp), %ymm0  # 32-byte Reload
-    vextractf128 $1, %ymm0, %xmm0
-    vshufpd      $1, %xmm0, %xmm0, %xmm0  # xmm0 = xmm0[1,0]
-    vmovss       16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vmovaps      %xmm7, 80(%rsp)  # 16-byte Spill
-    vmovaps      %xmm8, 64(%rsp)  # 16-byte Spill
-    vmovaps      %xmm9, 32(%rsp)  # 16-byte Spill
-    vmovaps      %xmm10, 48(%rsp)  # 16-byte Spill
-    vmovaps      %xmm11, 112(%rsp)  # 16-byte Spill
-    vmovaps      %xmm6, 96(%rsp)  # 16-byte Spill
-    vzeroupper
-    POW1_X64
-    vxorps       %xmm4, %xmm4, %xmm4
-    vmovaps      160(%rsp), %xmm3  # 16-byte Reload
-    vmovaps      96(%rsp), %xmm6  # 16-byte Reload
-    vmovss       LCPI1_0(%rip), %xmm2  # xmm2 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vmovaps      112(%rsp), %xmm11  # 16-byte Reload
-    vmovaps      48(%rsp), %xmm10  # 16-byte Reload
-    vmovaps      32(%rsp), %xmm9  # 16-byte Reload
-    vmovaps      64(%rsp), %xmm8  # 16-byte Reload
-    vmovaps      80(%rsp), %xmm7  # 16-byte Reload
-    vmulss       8(%r15), %xmm0, %xmm0
-LBB1_14:
-    vminss       %xmm0, %xmm2, %xmm1
-    vcmpltss     %xmm4, %xmm0, %xmm5
-    vshufps      $255, %xmm3, %xmm3, %xmm0  # xmm0 = xmm3[3,3,3,3]
-    vucomiss     %xmm4, %xmm0
-    jne          LBB1_15
-    jnp          LBB1_16
-LBB1_15:
-    vmovaps      128(%rsp), %ymm0  # 32-byte Reload
-    vextractf128 $1, %ymm0, %xmm0
-    vshufps      $255, %xmm0, %xmm0, %xmm0  # xmm0 = xmm0[3,3,3,3]
-    vmovaps      %xmm1, 128(%rsp)  # 16-byte Spill
-    vmovss       16(%rsp), %xmm1  # 4-byte Reload
-# xmm1 = mem[0],zero,zero,zero
-    vmovaps      %xmm7, 80(%rsp)  # 16-byte Spill
-    vmovaps      %xmm8, 64(%rsp)  # 16-byte Spill
-    vmovaps      %xmm9, 32(%rsp)  # 16-byte Spill
-    vmovaps      %xmm10, 48(%rsp)  # 16-byte Spill
-    vmovaps      %xmm11, 112(%rsp)  # 16-byte Spill
-    vmovaps      %xmm6, 96(%rsp)  # 16-byte Spill
-    vmovaps      %xmm5, 16(%rsp)  # 16-byte Spill
-    vzeroupper
-    POW1_X64
-    vmovaps      16(%rsp), %xmm5  # 16-byte Reload
-    vmovaps      128(%rsp), %xmm1  # 16-byte Reload
-    vmovaps      96(%rsp), %xmm6  # 16-byte Reload
-    vmovss       LCPI1_0(%rip), %xmm2  # xmm2 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vmovaps      112(%rsp), %xmm11  # 16-byte Reload
-    vmovaps      48(%rsp), %xmm10  # 16-byte Reload
-    vmovaps      32(%rsp), %xmm9  # 16-byte Reload
-    vmovaps      64(%rsp), %xmm8  # 16-byte Reload
-    vmovaps      80(%rsp), %xmm7  # 16-byte Reload
-    vmulss       8(%r15), %xmm0, %xmm4
-LBB1_16:
-    vandnps      %xmm1, %xmm5, %xmm5
-    vminss       %xmm4, %xmm2, %xmm0
-    vxorps       %xmm1, %xmm1, %xmm1
-    vcmpltss     %xmm1, %xmm4, %xmm1
-    vandnps      %xmm0, %xmm1, %xmm2
+    // Full-vector specular: POW8 over all 8 lanes (no per-lane calls).
+    // %ymm9 stays live (light dir); scratch is %ymm8 (dead: Sobel temp).
+    // %ymm10-%ymm15 dead (len spilled/unused); GPRs untouched. Intensity
+    // matches the old per-lane clamp01 bit-for-bit (min/max exact, NaN
+    // inputs impossible: zero-guarded normalize upstream, max-clamped base).
+    vbroadcastss 16(%rsp), %ymm1       # exponent
+    POW8_AVX2 %ymm0, %ymm1, %ymm8      # p vec = pow(ndoth, exp)
+    vbroadcastss 8(%r15), %ymm1        # k
+    vmulps       %ymm1, %ymm0, %ymm2   # k * p
+    vxorps       %ymm3, %ymm3, %ymm3
+    vmaxps       %ymm3, %ymm2, %ymm2   # max(0, .)
+    vbroadcastss LCPI1_0(%rip), %ymm3 # 1.0f
+    vminps       %ymm3, %ymm2, %ymm2   # intensity_vec = clamp01(k*p)
+    vmovaps      %ymm2, 128(%rsp)      # park for linear lane extracts
     vmovsd       24(%r15), %xmm3  # xmm3 = mem[0],zero
     vshufps      $225, %xmm3, %xmm3, %xmm0  # xmm0 = xmm3[1,0,2,3]
     vbroadcastsd %xmm0, %ymm1
@@ -550,6 +340,16 @@ LBB1_16:
     // vector-pack fast path (.LBB1_17).
   testq        %r14, %r14
   je           LBB1_17
+    // Linear path: extract lanes for the scalar packs (only lane 0 of
+    // each dest is read downstream: vmulss/vbroadcastss/vcvttss2si).
+    vmovss       128(%rsp), %xmm6      # lane0
+    vmovss       132(%rsp), %xmm11     # lane1
+    vmovss       136(%rsp), %xmm10     # lane2
+    vmovss       140(%rsp), %xmm9      # lane3
+    vmovss       144(%rsp), %xmm8      # lane4
+    vmovss       148(%rsp), %xmm7      # lane5
+    vmovss       152(%rsp), %xmm5      # lane6
+    vmovss       156(%rsp), %xmm2      # lane7
     vmulss       %xmm6, %xmm0, %xmm3
     vaddss       LCPI1_6(%rip), %xmm3, %xmm3  # +0.5 round-half-up
     vroundss     $11, %xmm3, %xmm3, %xmm3
@@ -692,16 +492,8 @@ LBB1_16:
     movl         %edx, 28(%rbx)
     jmp          LBB1_18
 LBB1_17:
-    // Vector path: shuffle scalar lanes into vectors, then vector
+    // Vector path: intensity_vec already in %ymm2 (see above); vector
     // scale/round/truncate/clamp (no LUT needed).
-    vinsertps    $16, %xmm2, %xmm5, %xmm2  # xmm2 = xmm5[0],xmm2[0],xmm5[2,3]
-    vinsertps    $16, %xmm7, %xmm8, %xmm4  # xmm4 = xmm8[0],xmm7[0],xmm8[2,3]
-    vinsertps    $16, %xmm11, %xmm6, %xmm5  # xmm5 = xmm6[0],xmm11[0],xmm6[2,3]
-    vinsertps    $32, %xmm10, %xmm5, %xmm5  # xmm5 = xmm5[0,1],xmm10[0],xmm5[3]
-    vinsertps    $48, %xmm9, %xmm5, %xmm5  # xmm5 = xmm5[0,1,2],xmm9[0]
-    vinsertf128  $1, %xmm4, %ymm5, %ymm4
-    vinsertf128  $1, %xmm2, %ymm5, %ymm2
-    vshufpd      $2, %ymm2, %ymm4, %ymm2  # ymm2 = ymm4[0],ymm2[1],ymm4[2],ymm2[2]
     vmulps       %ymm2, %ymm1, %ymm1
     vaddps       LCPI1_6(%rip), %ymm1, %ymm1  # +0.5 round-half-up
     vroundps     $11, %ymm1, %ymm1
