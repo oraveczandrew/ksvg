@@ -499,54 +499,54 @@ the unified 5×5 kernel; ArithmeticComposite uses 3 buffers (12 B/px).
 | Lighting (diffuse, spot, linear) | scalar | 2048x2048 | 1012.71 | 4.14 | 0.03 | 1.00x |  |  |
 | Lighting (diffuse, spot, linear) | ssse3 | 2048x2048 | 139.88 | 29.98 | 0.24 | 7.24x | 🟢 |  |
 | Lighting (diffuse, spot, linear) | avx2 | 2048x2048 | 138.14 | 30.36 | 0.24 | 7.33x | 🟢 |  |
-| Lighting (specular, distant) | kotlin | 512x512 | 29.27 | 8.96 | 0.07 | 2.13x | ⬆️ |  |
-| Lighting (specular, distant) | scalar | 512x512 | 62.43 | 4.20 | 0.03 | 1.00x |  |  |
-| Lighting (specular, distant) | ssse3 | 512x512 | 18.64 | 14.07 | 0.11 | 3.35x | 🟢 |  |
-| Lighting (specular, distant) | avx2 | 512x512 | 14.48 | 18.10 | 0.14 | 4.31x | 🟢 |  |
-| Lighting (specular, distant) | kotlin | 2048x2048 | 452.24 | 9.27 | 0.07 | 2.12x | ⬆️ |  |
-| Lighting (specular, distant) | scalar | 2048x2048 | 958.19 | 4.38 | 0.04 | 1.00x |  |  |
-| Lighting (specular, distant) | ssse3 | 2048x2048 | 286.52 | 14.64 | 0.12 | 3.34x | 🟢 |  |
-| Lighting (specular, distant) | avx2 | 2048x2048 | 213.93 | 19.61 | 0.16 | 4.48x | 🟢 |  |
-| Lighting (specular, distant, linear) | kotlin | 512x512 | 30.88 | 8.49 | 0.07 | 2.10x | ⬆️ | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, distant, linear) | scalar | 512x512 | 64.76 | 4.05 | 0.03 | 1.00x |  |  |
-| Lighting (specular, distant, linear) | ssse3 | 512x512 | 18.85 | 13.91 | 0.11 | 3.44x | 🟢 |  |
-| Lighting (specular, distant, linear) | avx2 | 512x512 | 16.03 | 16.35 | 0.13 | 4.04x | 🟢 |  |
-| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 459.29 | 9.13 | 0.07 | 2.14x | ⬆️ |  |
-| Lighting (specular, distant, linear) | scalar | 2048x2048 | 984.25 | 4.26 | 0.03 | 1.00x |  | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, distant, linear) | ssse3 | 2048x2048 | 287.94 | 14.57 | 0.12 | 3.42x | 🟢 |  |
-| Lighting (specular, distant, linear) | avx2 | 2048x2048 | 231.70 | 18.10 | 0.14 | 4.25x | 🟢 |  |
-| Lighting (specular, point) | kotlin | 512x512 | 33.06 | 7.93 | 0.06 | 2.07x | ⬆️ |  |
-| Lighting (specular, point) | scalar | 512x512 | 68.49 | 3.83 | 0.03 | 1.00x |  |  |
-| Lighting (specular, point) | ssse3 | 512x512 | 23.76 | 11.03 | 0.09 | 2.88x | 🟢 |  |
-| Lighting (specular, point) | avx2 | 512x512 | 22.25 | 11.78 | 0.09 | 3.08x | 🟢 |  |
-| Lighting (specular, point) | kotlin | 2048x2048 | 532.05 | 7.88 | 0.06 | 1.96x | ⬆️ |  |
-| Lighting (specular, point) | scalar | 2048x2048 | 1044.08 | 4.02 | 0.03 | 1.00x |  |  |
-| Lighting (specular, point) | ssse3 | 2048x2048 | 370.64 | 11.32 | 0.09 | 2.82x | 🟢 |  |
-| Lighting (specular, point) | avx2 | 2048x2048 | 349.88 | 11.99 | 0.10 | 2.98x | 🟢 |  |
-| Lighting (specular, point, linear) | kotlin | 512x512 | 34.49 | 7.60 | 0.06 | 2.08x | ⬆️ |  |
-| Lighting (specular, point, linear) | scalar | 512x512 | 71.62 | 3.66 | 0.03 | 1.00x |  |  |
-| Lighting (specular, point, linear) | ssse3 | 512x512 | 24.82 | 10.56 | 0.08 | 2.89x | 🟢 |  |
-| Lighting (specular, point, linear) | avx2 | 512x512 | 24.26 | 10.81 | 0.09 | 2.95x | 🟢 | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, point, linear) | kotlin | 2048x2048 | 526.20 | 7.97 | 0.06 | 2.10x | ⬆️ |  |
-| Lighting (specular, point, linear) | scalar | 2048x2048 | 1103.28 | 3.80 | 0.03 | 1.00x |  |  |
-| Lighting (specular, point, linear) | ssse3 | 2048x2048 | 376.81 | 11.13 | 0.09 | 2.93x | 🟢 |  |
-| Lighting (specular, point, linear) | avx2 | 2048x2048 | 362.32 | 11.58 | 0.09 | 3.05x | 🟢 |  |
-| Lighting (specular, spot) | kotlin | 512x512 | 35.60 | 7.36 | 0.06 | 2.23x | ⬆️ | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot) | scalar | 512x512 | 79.31 | 3.31 | 0.03 | 1.00x |  | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot) | ssse3 | 512x512 | 31.13 | 8.42 | 0.07 | 2.55x | 🟢 | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot) | avx2 | 512x512 | 38.03 | 6.89 | 0.06 | 2.09x | 🟢 | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot) | kotlin | 2048x2048 | 1022.26 | 4.10 | 0.03 | 1.35x | ⬆️ | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot) | scalar | 2048x2048 | 1379.26 | 3.04 | 0.02 | 1.00x |  | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot) | ssse3 | 2048x2048 | 438.91 | 9.56 | 0.08 | 3.14x | 🟢 | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot) | avx2 | 2048x2048 | 521.06 | 8.05 | 0.06 | 2.65x | 🟢 | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot, linear) | kotlin | 512x512 | 36.44 | 7.19 | 0.06 | 2.12x | ⬆️ |  |
-| Lighting (specular, spot, linear) | scalar | 512x512 | 77.44 | 3.39 | 0.03 | 1.00x |  |  |
-| Lighting (specular, spot, linear) | ssse3 | 512x512 | 25.14 | 10.43 | 0.08 | 3.08x | 🟢 |  |
-| Lighting (specular, spot, linear) | avx2 | 512x512 | 29.49 | 8.89 | 0.07 | 2.63x | 🟢 |  |
-| Lighting (specular, spot, linear) | kotlin | 2048x2048 | 561.58 | 7.47 | 0.06 | 2.36x | ⬆️ |  |
-| Lighting (specular, spot, linear) | scalar | 2048x2048 | 1324.68 | 3.17 | 0.03 | 1.00x |  | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot, linear) | ssse3 | 2048x2048 | 378.59 | 11.08 | 0.09 | 3.50x | 🟢 | ⚠️ UNSTABLE BENCH |
-| Lighting (specular, spot, linear) | avx2 | 2048x2048 | 436.48 | 9.61 | 0.08 | 3.03x | 🟢 | ⚠️ UNSTABLE BENCH |
+| Lighting (specular, distant) | kotlin | 512x512 | 28.65 | 9.15 | 0.07 | 2.14x | ⬆️ |  |
+| Lighting (specular, distant) | scalar | 512x512 | 61.20 | 4.28 | 0.03 | 1.00x |  |  |
+| Lighting (specular, distant) | ssse3 | 512x512 | 18.34 | 14.29 | 0.11 | 3.34x | 🟢 |  |
+| Lighting (specular, distant) | avx2 | 512x512 | 14.69 | 17.84 | 0.14 | 4.17x | 🟢 |  |
+| Lighting (specular, distant) | kotlin | 2048x2048 | 440.25 | 9.53 | 0.08 | 2.14x | ⬆️ |  |
+| Lighting (specular, distant) | scalar | 2048x2048 | 944.23 | 4.44 | 0.04 | 1.00x |  |  |
+| Lighting (specular, distant) | ssse3 | 2048x2048 | 284.43 | 14.75 | 0.12 | 3.32x | 🟢 |  |
+| Lighting (specular, distant) | avx2 | 2048x2048 | 204.07 | 20.55 | 0.16 | 4.63x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 512x512 | 28.00 | 9.36 | 0.07 | 2.21x | ⬆️ |  |
+| Lighting (specular, distant, linear) | scalar | 512x512 | 61.95 | 4.23 | 0.03 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | ssse3 | 512x512 | 18.24 | 14.37 | 0.11 | 3.40x | 🟢 |  |
+| Lighting (specular, distant, linear) | avx2 | 512x512 | 15.08 | 17.38 | 0.14 | 4.11x | 🟢 |  |
+| Lighting (specular, distant, linear) | kotlin | 2048x2048 | 450.87 | 9.30 | 0.07 | 2.18x | ⬆️ | ⚠️ UNSTABLE BENCH |
+| Lighting (specular, distant, linear) | scalar | 2048x2048 | 980.90 | 4.28 | 0.03 | 1.00x |  |  |
+| Lighting (specular, distant, linear) | ssse3 | 2048x2048 | 291.54 | 14.39 | 0.12 | 3.36x | 🟢 |  |
+| Lighting (specular, distant, linear) | avx2 | 2048x2048 | 230.06 | 18.23 | 0.15 | 4.26x | 🟢 |  |
+| Lighting (specular, point) | kotlin | 512x512 | 32.96 | 7.95 | 0.06 | 2.07x | ⬆️ |  |
+| Lighting (specular, point) | scalar | 512x512 | 68.35 | 3.84 | 0.03 | 1.00x |  |  |
+| Lighting (specular, point) | ssse3 | 512x512 | 23.91 | 10.96 | 0.09 | 2.86x | 🟢 |  |
+| Lighting (specular, point) | avx2 | 512x512 | 22.93 | 11.43 | 0.09 | 2.98x | 🟢 |  |
+| Lighting (specular, point) | kotlin | 2048x2048 | 520.02 | 8.07 | 0.06 | 1.97x | ⬆️ |  |
+| Lighting (specular, point) | scalar | 2048x2048 | 1025.56 | 4.09 | 0.03 | 1.00x |  |  |
+| Lighting (specular, point) | ssse3 | 2048x2048 | 360.84 | 11.62 | 0.09 | 2.84x | 🟢 |  |
+| Lighting (specular, point) | avx2 | 2048x2048 | 337.40 | 12.43 | 0.10 | 3.04x | 🟢 |  |
+| Lighting (specular, point, linear) | kotlin | 512x512 | 32.63 | 8.03 | 0.06 | 2.16x | ⬆️ |  |
+| Lighting (specular, point, linear) | scalar | 512x512 | 70.57 | 3.71 | 0.03 | 1.00x |  |  |
+| Lighting (specular, point, linear) | ssse3 | 512x512 | 23.78 | 11.02 | 0.09 | 2.97x | 🟢 |  |
+| Lighting (specular, point, linear) | avx2 | 512x512 | 23.57 | 11.12 | 0.09 | 2.99x | 🟢 |  |
+| Lighting (specular, point, linear) | kotlin | 2048x2048 | 509.10 | 8.24 | 0.07 | 2.06x | ⬆️ |  |
+| Lighting (specular, point, linear) | scalar | 2048x2048 | 1047.16 | 4.01 | 0.03 | 1.00x |  |  |
+| Lighting (specular, point, linear) | ssse3 | 2048x2048 | 373.68 | 11.22 | 0.09 | 2.80x | 🟢 |  |
+| Lighting (specular, point, linear) | avx2 | 2048x2048 | 356.15 | 11.78 | 0.09 | 2.94x | 🟢 |  |
+| Lighting (specular, spot) | kotlin | 512x512 | 32.86 | 7.98 | 0.06 | 2.12x | ⬆️ |  |
+| Lighting (specular, spot) | scalar | 512x512 | 69.82 | 3.75 | 0.03 | 1.00x |  |  |
+| Lighting (specular, spot) | ssse3 | 512x512 | 21.96 | 11.94 | 0.10 | 3.18x | 🟢 |  |
+| Lighting (specular, spot) | avx2 | 512x512 | 28.35 | 9.25 | 0.07 | 2.46x | 🟢 |  |
+| Lighting (specular, spot) | kotlin | 2048x2048 | 511.73 | 8.20 | 0.07 | 2.11x | ⬆️ |  |
+| Lighting (specular, spot) | scalar | 2048x2048 | 1080.33 | 3.88 | 0.03 | 1.00x |  |  |
+| Lighting (specular, spot) | ssse3 | 2048x2048 | 340.57 | 12.32 | 0.10 | 3.17x | 🟢 |  |
+| Lighting (specular, spot) | avx2 | 2048x2048 | 423.95 | 9.89 | 0.08 | 2.55x | 🟢 |  |
+| Lighting (specular, spot, linear) | kotlin | 512x512 | 33.15 | 7.91 | 0.06 | 2.16x | ⬆️ |  |
+| Lighting (specular, spot, linear) | scalar | 512x512 | 71.45 | 3.67 | 0.03 | 1.00x |  |  |
+| Lighting (specular, spot, linear) | ssse3 | 512x512 | 23.34 | 11.23 | 0.09 | 3.06x | 🟢 |  |
+| Lighting (specular, spot, linear) | avx2 | 512x512 | 29.11 | 9.01 | 0.07 | 2.45x | 🟢 |  |
+| Lighting (specular, spot, linear) | kotlin | 2048x2048 | 519.53 | 8.07 | 0.06 | 2.17x | ⬆️ |  |
+| Lighting (specular, spot, linear) | scalar | 2048x2048 | 1128.89 | 3.72 | 0.03 | 1.00x |  |  |
+| Lighting (specular, spot, linear) | ssse3 | 2048x2048 | 364.78 | 11.50 | 0.09 | 3.09x | 🟢 |  |
+| Lighting (specular, spot, linear) | avx2 | 2048x2048 | 430.57 | 9.74 | 0.08 | 2.62x | 🟢 |  |
 | Morphology (dilate, r=5) | kotlin | 512x512 | 104.95 | 2.50 | 0.02 | 1.25x | ⬆️ |  |
 | Morphology (dilate, r=5) | scalar | 512x512 | 131.34 | 2.00 | 0.02 | 1.00x |  |  |
 | Morphology (dilate, r=5) | sse2 | 512x512 | 5.43 | 48.32 | 0.39 | **24.21x** | 🚀 |  |
