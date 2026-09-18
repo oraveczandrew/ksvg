@@ -69,7 +69,7 @@
 .text
 
 RODATA16
-.p2align 4, 0x0  # -- Begin function ksvgLightingPointDiffuseRowAvx2
+.p2align 4, 0x0
 .LCPI0_0:
 .long	0x40000000  # float 2
 .long	0x40400000  # float 3
@@ -98,7 +98,6 @@ RODATA4
 .type SYM(ksvgLightingPointDiffuseRowAvx2), @function
 SYM(ksvgLightingPointDiffuseRowAvx2):
 CFI_START
-    # %bb.0:
     pushl        %ebp
     CFI_DEF_CFA_OFFSET(8)
     pushl        %ebx
@@ -121,7 +120,6 @@ CFI_START
     movl         624(%esp), %eax  # count
     testl        %eax, %eax
     jle          .LBB0_3
-    # %bb.1:
     movl         628(%esp), %ecx  # params
     movl         616(%esp), %edx  # srcB
     movl         612(%esp), %esi  # srcM
@@ -129,64 +127,64 @@ CFI_START
     vmovss       16(%ecx), %xmm0
     vbroadcastss 48(%ecx), %xmm4
     vpbroadcastd 36(%ecx), %ymm1
-    vmovdqu      %ymm1, 128(%esp)  # 32-byte Spill
+    vmovdqu      %ymm1, 128(%esp)
     vbroadcastss (%ecx), %ymm2
-    vmovups      %ymm2, 544(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 544(%esp)
     vbroadcastss 4(%ecx), %ymm2
-    vmovups      %ymm2, 512(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 512(%esp)
     vxorps       %xmm2, %xmm2, %xmm2
     vblendps     $2, %xmm4, %xmm2, %xmm2
     vmulps       .LCPI0_0@GOTOFF(%ebx), %xmm4, %xmm3
     vpermpd      $208, %ymm3, %ymm3
     vblendps     $3, %ymm2, %ymm3, %ymm2
-    vmovaps      %xmm4, 16(%esp)  # 16-byte Spill
+    vmovaps      %xmm4, 16(%esp)
     vmulps       .LCPI0_1@GOTOFF(%ebx), %xmm4, %xmm4
     vinsertf128  $1, %xmm4, %ymm3, %ymm3
     vshufpd      $2, %ymm3, %ymm2, %ymm2
-    vmovupd      %ymm2, 480(%esp)  # 32-byte Spill
+    vmovupd      %ymm2, 480(%esp)
     vbroadcastss 12(%ecx), %ymm2
-    vmovups      %ymm2, 448(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 448(%esp)
     vsubss       44(%ecx), %xmm0, %xmm0
     vbroadcastss %xmm0, %ymm2
-    vmovups      %ymm2, 416(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 416(%esp)
     vmulss       %xmm0, %xmm0, %xmm0
     vbroadcastss %xmm0, %ymm0
-    vmovups      %ymm0, 384(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 384(%esp)
     xorl         %ebp, %ebp  # loop counter
     vbroadcastss 20(%ecx), %ymm0
-    vmovups      %ymm0, 352(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 352(%esp)
     vbroadcastss 8(%ecx), %ymm0
-    vmovups      %ymm0, 320(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 320(%esp)
     vbroadcastss 24(%ecx), %ymm0
-    vmovups      %ymm0, 288(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 288(%esp)
     vbroadcastss 28(%ecx), %ymm0
-    vmovups      %ymm0, 256(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 256(%esp)
     vbroadcastss 32(%ecx), %ymm0
-    vmovups      %ymm0, 224(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 224(%esp)
     vbroadcastss .LCPI0_2@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 192(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 192(%esp)
     movss        40(%ecx), %xmm0
-    vmovss       %xmm0, 12(%esp)  # 4-byte Spill
+    vmovss       %xmm0, 12(%esp)
     movl         620(%esp), %ecx  # dst
     vbroadcastss .LCPI0_3@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 160(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 160(%esp)
     vbroadcastss .LCPI0_4@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 96(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 96(%esp)
     vbroadcastss .LCPI0_5@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 64(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 64(%esp)
 .p2align 4, 0x90
-.LBB0_2:  # =>This Inner Loop Header: Depth=1
-    // Main loop, 8 pixels per iteration: Sobel window, normalize, dot with
-    // the point-light direction, clamp, per-channel pack, store.
-    // Main loop, 8 pixels per iteration: Sobel window, normalize, dot with
-    // the point-light direction, clamp, per-channel pack, store.
+.LBB0_2:
+    # Main loop, 8 pixels per iteration: Sobel window, normalize, dot with
+    # the point-light direction, clamp, per-channel pack, store.
+    # Main loop, 8 pixels per iteration: Sobel window, normalize, dot with
+    # the point-light direction, clamp, per-channel pack, store.
     vxorps       %xmm7, %xmm7, %xmm7
     vcvtsi2ss    %ebp, %xmm7, %xmm0
-    vmovss       %xmm0, 32(%esp)  # 4-byte Spill
+    vmovss       %xmm0, 32(%esp)
     vmovdqu      (%edi,%ebp,4), %ymm3
     vpsrld       $24, %ymm3, %ymm3
     vcvtdq2ps    %ymm3, %ymm3
-    vmovups      128(%esp), %ymm1  # 32-byte Reload
+    vmovups      128(%esp), %ymm1
     vmulps       %ymm3, %ymm1, %ymm7
     vmovdqu      8(%edi,%ebp,4), %ymm3
     ALPHA_FSCALE_V %ymm3, %ymm3, %ymm1, %ymm5
@@ -216,23 +214,23 @@ CFI_START
     vaddps       %ymm4, %ymm6, %ymm4
     vaddps       %ymm4, %ymm5, %ymm4
     vsubps       %ymm4, %ymm3, %ymm3
-    vmovups      192(%esp), %ymm2  # 32-byte Reload
+    vmovups      192(%esp), %ymm2
     vxorps       %ymm2, %ymm0, %ymm0
     vdivps       544(%esp), %ymm0, %ymm4
     vxorps       %ymm2, %ymm3, %ymm0
     vdivps       512(%esp), %ymm0, %ymm5
-    vmovss       32(%esp), %xmm0  # 4-byte Reload
+    vmovss       32(%esp), %xmm0
     vmulss       16(%esp), %xmm0, %xmm0
     vmulps       %ymm5, %ymm5, %ymm3
     vmulps       %ymm4, %ymm4, %ymm7
     vaddps       %ymm3, %ymm7, %ymm3
-    vmovups      160(%esp), %ymm1  # 32-byte Reload
+    vmovups      160(%esp), %ymm1
     vaddps       %ymm1, %ymm3, %ymm3
     vsqrtps      %ymm3, %ymm3
     vaddss       12(%esp), %xmm0, %xmm7
     vdivps       %ymm3, %ymm1, %ymm0
     vmulps       %ymm0, %ymm4, %ymm2
-    vmovups      %ymm2, 32(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 32(%esp)
     vbroadcastss %xmm7, %ymm4
     vaddps       480(%esp), %ymm4, %ymm4
     vmovups      448(%esp), %ymm2
@@ -252,7 +250,7 @@ CFI_START
     vxorps       %xmm3, %xmm3, %xmm3
     vcmpneqps    %ymm3, %ymm2, %ymm2
     vandps       %ymm4, %ymm2, %ymm4
-    vmulps       32(%esp), %ymm4, %ymm3  # 32-byte Folded Reload
+    vmulps       32(%esp), %ymm4, %ymm3
     vmulps       %ymm0, %ymm5, %ymm4
     vmulps       %ymm7, %ymm6, %ymm5
     vmulps       416(%esp), %ymm7, %ymm6
@@ -272,7 +270,7 @@ CFI_START
     vaddps       %ymm5, %ymm2, %ymm2
     vcvttps2dq   %ymm2, %ymm2
     vpmaxsd      %ymm4, %ymm2, %ymm2
-    vmovdqu      96(%esp), %ymm1  # 32-byte Reload
+    vmovdqu      96(%esp), %ymm1
     vpminsd      %ymm1, %ymm2, %ymm2
     vmulps       256(%esp), %ymm0, %ymm3
     vaddps       %ymm5, %ymm3, %ymm3
@@ -306,7 +304,7 @@ SIZE(SYM(ksvgLightingPointDiffuseRowAvx2))
 CFI_END
 
 RODATA16
-.p2align 4, 0x0  # -- Begin function ksvgLightingPointDiffuseRowAvx2Linear
+.p2align 4, 0x0
 .LCPI1_0:
 .long	0x40000000  # float 2
 .long	0x40400000  # float 3
@@ -335,7 +333,6 @@ RODATA4
 .type SYM(ksvgLightingPointDiffuseRowAvx2Linear), @function
 SYM(ksvgLightingPointDiffuseRowAvx2Linear):
 CFI_START
-    # %bb.0:
     pushl        %ebp
     CFI_DEF_CFA_OFFSET(8)
     pushl        %ebx
@@ -357,59 +354,58 @@ CFI_START
     addl         $_GLOBAL_OFFSET_TABLE_+(.Ltmp1-.L1$pb), %ebx
     cmpl         $0, 592(%esp)  # count
     jle          .LBB1_6
-    # %bb.1:
     movl         596(%esp), %eax  # params
     movl         588(%esp), %esi  # dst
     vmovss       16(%eax), %xmm0
     vbroadcastss 48(%eax), %xmm4
     vpbroadcastd 36(%eax), %ymm1
-    vmovdqu      %ymm1, 96(%esp)  # 32-byte Spill
+    vmovdqu      %ymm1, 96(%esp)
     vbroadcastss (%eax), %ymm2
-    vmovups      %ymm2, 512(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 512(%esp)
     vbroadcastss 4(%eax), %ymm2
-    vmovups      %ymm2, 480(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 480(%esp)
     vxorps       %xmm2, %xmm2, %xmm2
     vblendps     $2, %xmm4, %xmm2, %xmm2
     vmulps       .LCPI1_0@GOTOFF(%ebx), %xmm4, %xmm3
     vpermpd      $208, %ymm3, %ymm3
     vblendps     $3, %ymm2, %ymm3, %ymm2
-    vmovaps      %xmm4, 16(%esp)  # 16-byte Spill
+    vmovaps      %xmm4, 16(%esp)
     vmulps       .LCPI1_1@GOTOFF(%ebx), %xmm4, %xmm4
     vinsertf128  $1, %xmm4, %ymm3, %ymm3
     vshufpd      $2, %ymm3, %ymm2, %ymm2
-    vmovupd      %ymm2, 448(%esp)  # 32-byte Spill
+    vmovupd      %ymm2, 448(%esp)
     vbroadcastss 12(%eax), %ymm2
-    vmovups      %ymm2, 416(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 416(%esp)
     vsubss       44(%eax), %xmm0, %xmm0
     vbroadcastss %xmm0, %ymm2
-    vmovups      %ymm2, 384(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 384(%esp)
     vmulss       %xmm0, %xmm0, %xmm0
     vbroadcastss %xmm0, %ymm0
-    vmovups      %ymm0, 352(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 352(%esp)
     xorl         %ecx, %ecx  # loop counter
     vbroadcastss 20(%eax), %ymm0
-    vmovups      %ymm0, 320(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 320(%esp)
     vbroadcastss 8(%eax), %ymm0
-    vmovups      %ymm0, 288(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 288(%esp)
     vbroadcastss 24(%eax), %ymm0
-    vmovups      %ymm0, 256(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 256(%esp)
     vbroadcastss 28(%eax), %ymm0
-    vmovups      %ymm0, 224(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 224(%esp)
     vbroadcastss 32(%eax), %ymm0
-    vmovups      %ymm0, 192(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 192(%esp)
     vbroadcastss .LCPI1_2@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 160(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 160(%esp)
     vbroadcastss .LCPI1_3@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 128(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 128(%esp)
     vmovss       40(%eax), %xmm0
-    vmovss       %xmm0, 12(%esp)  # 4-byte Spill
+    vmovss       %xmm0, 12(%esp)
     vbroadcastss .LCPI1_4@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 64(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 64(%esp)
     jmp          .LBB1_2
 .p2align 4, 0x90
-.LBB1_4:  #   in Loop: Header=BB1_2 Depth=1
-    // Vector-pack fast path (all channels already sRGB bytes, no LUT).
-    // Vector-pack fast path (all channels already sRGB bytes, no LUT).
+.LBB1_4:
+    # Vector-pack fast path (all channels already sRGB bytes, no LUT).
+    # Vector-pack fast path (all channels already sRGB bytes, no LUT).
     vpslld       $16, %xmm7, %xmm2
     vpslld       $8, %xmm5, %xmm5
     vpor         %xmm5, %xmm2, %xmm2
@@ -435,9 +431,9 @@ CFI_START
     vpextrd      $3, %xmm3, %ebp
     vpextrd      $3, %xmm0, %edx
     vpextrd      $3, %xmm6, %edi
-.LBB1_5:  #   in Loop: Header=BB1_2 Depth=1
-    // Shared scalar-pack tail (last pixel of the L2S path).
-    // Shared scalar-pack tail (last pixel of the L2S path).
+.LBB1_5:
+    # Shared scalar-pack tail (last pixel of the L2S path).
+    # Shared scalar-pack tail (last pixel of the L2S path).
     shll         $16, %ebp
     shll         $8, %edx
     addl         %ebp, %edx
@@ -447,18 +443,18 @@ CFI_START
     addl         $8, %ecx
     cmpl         592(%esp), %ecx
     jge          .LBB1_6
-.LBB1_2:  # =>This Inner Loop Header: Depth=1
-    // Linear-kernel main loop (window/normalize/dot as above); per-pixel
-    // L2S conversion below uses the global LUT (no l2s pointer arg on i386).
-    // Linear-kernel main loop (window/normalize/dot as above); per-pixel
-    // L2S conversion below uses the global LUT (no l2s pointer arg on i386).
+.LBB1_2:
+    # Linear-kernel main loop (window/normalize/dot as above); per-pixel
+    # L2S conversion below uses the global LUT (no l2s pointer arg on i386).
+    # Linear-kernel main loop (window/normalize/dot as above); per-pixel
+    # L2S conversion below uses the global LUT (no l2s pointer arg on i386).
     vxorps       %xmm7, %xmm7, %xmm7
     vcvtsi2ss    %ecx, %xmm7, %xmm0
     movl         576(%esp), %edi  # srcT
     vmovdqu      (%edi,%ecx,4), %ymm3
     vpsrld       $24, %ymm3, %ymm3
     vcvtdq2ps    %ymm3, %ymm3
-    vmovups      96(%esp), %ymm1  # 32-byte Reload
+    vmovups      96(%esp), %ymm1
     vmulps       %ymm3, %ymm1, %ymm3
     vmovdqu      8(%edi,%ecx,4), %ymm4
     ALPHA_FSCALE_V %ymm4, %ymm4, %ymm1, %ymm4
@@ -490,7 +486,7 @@ CFI_START
     vaddps       %ymm3, %ymm5, %ymm3
     vaddps       %ymm3, %ymm4, %ymm3
     vsubps       %ymm3, %ymm6, %ymm6
-    vmovups      160(%esp), %ymm4  # 32-byte Reload
+    vmovups      160(%esp), %ymm4
     vxorps       %ymm4, %ymm2, %ymm2
     vdivps       512(%esp), %ymm2, %ymm2
     vxorps       %ymm4, %ymm6, %ymm3
@@ -499,13 +495,13 @@ CFI_START
     vmulps       %ymm3, %ymm3, %ymm4
     vmulps       %ymm2, %ymm2, %ymm6
     vaddps       %ymm4, %ymm6, %ymm4
-    vmovups      128(%esp), %ymm1  # 32-byte Reload
+    vmovups      128(%esp), %ymm1
     vaddps       %ymm1, %ymm4, %ymm4
     vsqrtps      %ymm4, %ymm4
     vaddss       12(%esp), %xmm0, %xmm6
     vdivps       %ymm4, %ymm1, %ymm0
     vmulps       %ymm0, %ymm2, %ymm2
-    vmovups      %ymm2, 32(%esp)  # 32-byte Spill
+    vmovups      %ymm2, 32(%esp)
     vbroadcastss %xmm6, %ymm2
     vaddps       448(%esp), %ymm2, %ymm2
     vmovups      416(%esp), %ymm6
@@ -529,7 +525,7 @@ CFI_START
     vmulps       32(%esp), %ymm2, %ymm2
     vmulps       %ymm0, %ymm3, %ymm3
     vmulps       %ymm7, %ymm5, %ymm5
-    vmovups      %ymm5, 32(%esp)  # 32-byte Spill
+    vmovups      %ymm5, 32(%esp)
     vmulps       384(%esp), %ymm7, %ymm5
     vandps       %ymm5, %ymm6, %ymm5
     vmulps       %ymm3, %ymm5, %ymm3
@@ -546,7 +542,7 @@ CFI_START
     vaddps       %ymm3, %ymm2, %ymm2
     vcvttps2dq   %ymm2, %ymm2
     vpmaxsd      %ymm4, %ymm2, %ymm2
-    vmovdqu      64(%esp), %ymm1  # 32-byte Reload
+    vmovdqu      64(%esp), %ymm1
     vpminsd      %ymm1, %ymm2, %ymm7
     vmulps       224(%esp), %ymm0, %ymm2
     vaddps       %ymm3, %ymm2, %ymm2
@@ -566,7 +562,6 @@ CFI_START
     movl         ksvg_linear_to_srgb_lut@GOT(%ebx), %edx
     testl        %edx, %edx
     je           .LBB1_4
-    # %bb.3:
     vmovd        %xmm4, %eax
     vmovd        %xmm5, %edi
     vmovd        %xmm7, %ebp  # Register swap: ebp was used for temp. ebx is GOT.

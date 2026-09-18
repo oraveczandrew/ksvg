@@ -84,12 +84,12 @@ SYM(ksvgLightingPointSpecularRowSsse3):
     movq         %rsi, %r12
     movq         %rdi, %r13
     movl         %r8d, %eax
-    movq         %rax, -56(%rbp)  # 8-byte Spill
+    movq         %rax, -56(%rbp)
     xorl         %ebx, %ebx
-    vmovss       %xmm0, -44(%rbp)  # 4-byte Spill
-    movq         %r9, -64(%rbp)  # 8-byte Spill
+    vmovss       %xmm0, -44(%rbp)
+    movq         %r9, -64(%rbp)
 .p2align 4, 0x90
-LBB3_2:  # =>This Inner Loop Header: Depth=1
+LBB3_2:
     vmovups      (%r9), %ymm3
     vmovups      20(%r9), %ymm1
     vcvtsi2ss    %ebx, %xmm4, %xmm2
@@ -108,14 +108,14 @@ LBB3_2:  # =>This Inner Loop Header: Depth=1
     // Both wrappers share core4 below (non-linear and linear differ only in
     // the final L2S conversion inside core4's scalar packs).
     callq        SYM(core4)
-    movq         -64(%rbp), %r9  # 8-byte Reload
+    movq         -64(%rbp), %r9
     vmovss       -44(%rbp), %xmm0
     addq         $4, %rbx
     addq         $16, %r14
     addq         $16, %r15
     addq         $16, %r12
     addq         $16, %r13
-    cmpq         -56(%rbp), %rbx  # 8-byte Folded Reload
+    cmpq         -56(%rbp), %rbx
     jb           LBB3_2
     addq         $88, %rsp
     popq         %rbx
@@ -130,33 +130,33 @@ LBB3_4:
 POINT_LIT4
 .p2align 2, 0x0
 LCPI4_0:
-.long	0x80000000  # float -0
+.long	0x80000000  // float -0
 LCPI4_1:
-.long	0x3f800000  # float 1
+.long	0x3f800000  // float 1
 LCPI4_3:
-.long	255  # 0xff
+.long	255  // 0xff
 POINT_LIT16
 .p2align 4, 0x0
 LCPI4_2:
-.long	0x00000000  # float 0
-.long	0x3f800000  # float 1
-.long	0x40000000  # float 2
-.long	0x40400000  # float 3
+.long	0x00000000  // float 0
+.long	0x3f800000  // float 1
+.long	0x40000000  // float 2
+.long	0x40400000  // float 3
 LCPI4_4:
-.long	8  # 0x8
-.long	16  # 0x10
+.long	8  // 0x8
+.long	16  // 0x10
 .space	4
 .space	4
 LCPI4_5:
-.long	16  # 0x10
-.long	8  # 0x8
+.long	16  // 0x10
+.long	8  // 0x8
 .space	4
 .space	4
 LCPI4_6:
-.long	0x3f000000  # float 0.5
-.long	0x3f000000  # float 0.5
-.long	0x3f000000  # float 0.5
-.long	0x3f000000  # float 0.5
+.long	0x3f000000  // float 0.5
+.long	0x3f000000  // float 0.5
+.long	0x3f000000  // float 0.5
+.long	0x3f000000  // float 0.5
 EMIT_LOG2_POLY_8
 EMIT_EXP2_POLY_8
 EMIT_POW_COMMON_CONSTANTS
@@ -218,12 +218,12 @@ SYM(core4):
     vaddps       %xmm5, %xmm4, %xmm4
     vsubps       %xmm4, %xmm7, %xmm4
     vdivps       %xmm2, %xmm4, %xmm2
-    vbroadcastss LCPI4_0(%rip), %xmm4  # xmm4 = [-0.0E+0,-0.0E+0,-0.0E+0,-0.0E+0]
+    vbroadcastss LCPI4_0(%rip), %xmm4  // xmm4 = [-0.0E+0,-0.0E+0,-0.0E+0,-0.0E+0]
     vxorps       %xmm4, %xmm3, %xmm5
     vmulps       %xmm2, %xmm2, %xmm4
     vmulps       %xmm3, %xmm3, %xmm3
     vaddps       %xmm4, %xmm3, %xmm3
-    vbroadcastss LCPI4_1(%rip), %xmm4  # xmm4 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0]
+    vbroadcastss LCPI4_1(%rip), %xmm4  // xmm4 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0]
     vaddps       %xmm4, %xmm3, %xmm3
     vsqrtps      %xmm3, %xmm6
     vdivps       %xmm6, %xmm5, %xmm5
@@ -235,7 +235,7 @@ SYM(core4):
     vaddps       %xmm7, %xmm6, %xmm6
     vbroadcastss 12(%r8), %xmm7
     vsubps       %xmm6, %xmm7, %xmm6
-    vmovss       16(%r8), %xmm7  # xmm7 = mem[0],zero,zero,zero
+    vmovss       16(%r8), %xmm7  // xmm7 = mem[0],zero,zero,zero
     vsubss       44(%r8), %xmm7, %xmm7
     vbroadcastss %xmm7, %xmm8
     vbroadcastss 20(%r8), %xmm9
@@ -281,9 +281,9 @@ SYM(core4):
     vxorps       %xmm5, %xmm5, %xmm5
     vucomiss     %xmm5, %xmm10
     vxorps       %xmm0, %xmm0, %xmm0
-    vmovss       %xmm13, -48(%rbp)  # 4-byte Spill
-    vmovaps      %xmm10, -96(%rbp)  # 16-byte Spill
-    vmovaps      %xmm2, -80(%rbp)  # 16-byte Spill
+    vmovss       %xmm13, -48(%rbp)
+    vmovaps      %xmm10, -96(%rbp)
+    vmovaps      %xmm2, -80(%rbp)
     jne          LBB4_1
     jnp          LBB4_2
 LBB4_1:
@@ -291,27 +291,27 @@ LBB4_1:
     vmovaps      %xmm13, %xmm1
     POW1_X64
     vxorps       %xmm5, %xmm5, %xmm5
-    vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
-    vmovaps      -96(%rbp), %xmm10  # 16-byte Reload
+    vmovaps      -80(%rbp), %xmm2
+    vmovaps      -96(%rbp), %xmm10
     vmovss       -48(%rbp), %xmm13
     vmulss       8(%r15), %xmm0, %xmm0
 LBB4_2:
-    vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
+    vmovss       LCPI4_1(%rip), %xmm3  // xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vminss       %xmm0, %xmm3, %xmm1
     vcmpltss     %xmm5, %xmm0, %xmm0
     vandnps      %xmm1, %xmm0, %xmm0
-    vmovaps      %xmm0, -112(%rbp)  # 16-byte Spill
-    vmovshdup    %xmm10, %xmm0  # xmm0 = xmm10[1,1,3,3]
+    vmovaps      %xmm0, -112(%rbp)
+    vmovshdup    %xmm10, %xmm0  // xmm0 = xmm10[1,1,3,3]
     vucomiss     %xmm5, %xmm0
     jne          LBB4_3
     jnp          LBB4_4
 LBB4_3:
-    vmovshdup    %xmm2, %xmm0  # xmm0 = xmm2[1,1,3,3]
+    vmovshdup    %xmm2, %xmm0  // xmm0 = xmm2[1,1,3,3]
     vmovaps      %xmm13, %xmm1
     POW1_X64
-    vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
-    vmovaps      -96(%rbp), %xmm10  # 16-byte Reload
+    vmovss       LCPI4_1(%rip), %xmm3  // xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
+    vmovaps      -80(%rbp), %xmm2
+    vmovaps      -96(%rbp), %xmm10
     vmovss       -48(%rbp), %xmm13
     vmulss       8(%r15), %xmm0, %xmm5
 LBB4_4:
@@ -319,52 +319,52 @@ LBB4_4:
     vxorps       %xmm4, %xmm4, %xmm4
     vcmpltss     %xmm4, %xmm5, %xmm1
     vandnps      %xmm0, %xmm1, %xmm8
-    vshufpd      $1, %xmm10, %xmm10, %xmm0  # xmm0 = xmm10[1,0]
+    vshufpd      $1, %xmm10, %xmm10, %xmm0  // xmm0 = xmm10[1,0]
     vucomiss     %xmm4, %xmm0
     vxorps       %xmm0, %xmm0, %xmm0
     jne          LBB4_5
     jnp          LBB4_6
 LBB4_5:
-    vshufpd      $1, %xmm2, %xmm2, %xmm0  # xmm0 = xmm2[1,0]
+    vshufpd      $1, %xmm2, %xmm2, %xmm0  // xmm0 = xmm2[1,0]
     vmovaps      %xmm13, %xmm1
-    vmovaps      %xmm8, -64(%rbp)  # 16-byte Spill
+    vmovaps      %xmm8, -64(%rbp)
     POW1_X64
     vxorps       %xmm4, %xmm4, %xmm4
-    vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vmovaps      -80(%rbp), %xmm2  # 16-byte Reload
-    vmovaps      -96(%rbp), %xmm10  # 16-byte Reload
-    vmovaps      -64(%rbp), %xmm8  # 16-byte Reload
+    vmovss       LCPI4_1(%rip), %xmm3  // xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
+    vmovaps      -80(%rbp), %xmm2
+    vmovaps      -96(%rbp), %xmm10
+    vmovaps      -64(%rbp), %xmm8
     vmovss       -48(%rbp), %xmm13
     vmulss       8(%r15), %xmm0, %xmm0
 LBB4_6:
     vminss       %xmm0, %xmm3, %xmm1
     vcmpltss     %xmm4, %xmm0, %xmm0
     vandnps      %xmm1, %xmm0, %xmm7
-    vshufps      $255, %xmm10, %xmm10, %xmm0  # xmm0 = xmm10[3,3,3,3]
+    vshufps      $255, %xmm10, %xmm10, %xmm0  // xmm0 = xmm10[3,3,3,3]
     vucomiss     %xmm4, %xmm0
     jne          LBB4_7
     jnp          LBB4_8
 LBB4_7:
-    vshufps      $255, %xmm2, %xmm2, %xmm0  # xmm0 = xmm2[3,3,3,3]
+    vshufps      $255, %xmm2, %xmm2, %xmm0  // xmm0 = xmm2[3,3,3,3]
     vmovaps      %xmm13, %xmm1
-    vmovaps      %xmm7, -48(%rbp)  # 16-byte Spill
-    vmovaps      %xmm8, -64(%rbp)  # 16-byte Spill
+    vmovaps      %xmm7, -48(%rbp)
+    vmovaps      %xmm8, -64(%rbp)
     POW1_X64
-    vmovss       LCPI4_1(%rip), %xmm3  # xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
-    vmovaps      -64(%rbp), %xmm8  # 16-byte Reload
-    vmovaps      -48(%rbp), %xmm7  # 16-byte Reload
+    vmovss       LCPI4_1(%rip), %xmm3  // xmm3 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
+    vmovaps      -64(%rbp), %xmm8
+    vmovaps      -48(%rbp), %xmm7
     vmulss       8(%r15), %xmm0, %xmm4
 LBB4_8:
     vminss       %xmm4, %xmm3, %xmm0
     vxorps       %xmm1, %xmm1, %xmm1
     vcmpltss     %xmm1, %xmm4, %xmm1
     vandnps      %xmm0, %xmm1, %xmm0
-    vmovsd       24(%r15), %xmm5  # xmm5 = mem[0],zero
-    vshufps      $225, %xmm5, %xmm5, %xmm4  # xmm4 = xmm5[1,0,2,3]
-    vmovss       32(%r15), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    vmovaps      -112(%rbp), %xmm3  # 16-byte Reload
+    vmovsd       24(%r15), %xmm5  // xmm5 = mem[0],zero
+    vshufps      $225, %xmm5, %xmm5, %xmm4  // xmm4 = xmm5[1,0,2,3]
+    vmovss       32(%r15), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    vmovaps      -112(%rbp), %xmm3
     vmulss       %xmm3, %xmm1, %xmm2
-    vaddss       LCPI4_6(%rip), %xmm2, %xmm2  # round-half-up R
+    vaddss       LCPI4_6(%rip), %xmm2, %xmm2  // round-half-up R
     vroundss     $11, %xmm2, %xmm2, %xmm2
     vcvttss2si   %xmm2, %edx
     cmpl         $255, %edx
@@ -375,10 +375,10 @@ LBB4_8:
     cmovlel      %ecx, %edx
     vbroadcastss %xmm3, %xmm2
     vmulps       %xmm2, %xmm4, %xmm2
-    vaddps       LCPI4_6(%rip), %xmm2, %xmm2  # round-half-up G/B
+    vaddps       LCPI4_6(%rip), %xmm2, %xmm2  // round-half-up G/B
     vroundps     $11, %xmm2, %xmm2
     vcvttps2dq   %xmm2, %xmm3
-    vpbroadcastd LCPI4_3(%rip), %xmm2  # xmm2 = [255,255,255,255]
+    vpbroadcastd LCPI4_3(%rip), %xmm2  // xmm2 = [255,255,255,255]
     vpminsd      %xmm2, %xmm3, %xmm6
     vpxor        %xmm3, %xmm3, %xmm3
     vpmaxsd      %xmm3, %xmm6, %xmm6
@@ -404,7 +404,7 @@ LBB4_8:
     orl          %r8d, %edi
     orl          %edx, %edi
     vmulss       %xmm5, %xmm8, %xmm6
-    vaddss       LCPI4_6(%rip), %xmm6, %xmm6  # round-half-up
+    vaddss       LCPI4_6(%rip), %xmm6, %xmm6  // round-half-up
     vroundss     $11, %xmm6, %xmm6, %xmm6
     vcvttss2si   %xmm6, %edx
     movl         %edi, (%rbx)
@@ -415,11 +415,11 @@ LBB4_8:
     movzbl       (%r14,%rcx), %eax
     movl         %eax, %ecx
     shll         $16, %ecx
-    vshufps      $69, %xmm5, %xmm5, %xmm5  # xmm5 = xmm5[1,1,0,1]
-    vinsertps    $16, %xmm1, %xmm5, %xmm5  # xmm5 = xmm5[0],xmm1[0],xmm5[2,3]
-    vshufps      $0, %xmm7, %xmm8, %xmm6  # xmm6 = xmm8[0,0],xmm7[0,0]
+    vshufps      $69, %xmm5, %xmm5, %xmm5  // xmm5 = xmm5[1,1,0,1]
+    vinsertps    $16, %xmm1, %xmm5, %xmm5  // xmm5 = xmm5[0],xmm1[0],xmm5[2,3]
+    vshufps      $0, %xmm7, %xmm8, %xmm6  // xmm6 = xmm8[0,0],xmm7[0,0]
     vmulps       %xmm6, %xmm5, %xmm5
-    vaddps       LCPI4_6(%rip), %xmm5, %xmm5  # round-half-up
+    vaddps       LCPI4_6(%rip), %xmm5, %xmm5  // round-half-up
     vroundps     $11, %xmm5, %xmm5
     vcvttps2dq   %xmm5, %xmm5
     vpminsd      %xmm2, %xmm5, %xmm5
@@ -448,13 +448,13 @@ LBB4_8:
     shll         $16, %edx
     shll         $8, %ecx
     orl          %edx, %ecx
-    vmovddup     %xmm4, %xmm4  # xmm4 = xmm4[0,0]
-    vblendps     $1, %xmm1, %xmm4, %xmm1  # xmm1 = xmm1[0],xmm4[1,2,3]
-    vshufps      $36, %xmm1, %xmm1, %xmm1  # xmm1 = xmm1[0,1,2,0]
-    vinsertps    $16, %xmm0, %xmm7, %xmm0  # xmm0 = xmm7[0],xmm0[0],xmm7[2,3]
-    vshufps      $84, %xmm0, %xmm0, %xmm0  # xmm0 = xmm0[0,1,1,1]
+    vmovddup     %xmm4, %xmm4  // xmm4 = xmm4[0,0]
+    vblendps     $1, %xmm1, %xmm4, %xmm1  // xmm1 = xmm1[0],xmm4[1,2,3]
+    vshufps      $36, %xmm1, %xmm1, %xmm1  // xmm1 = xmm1[0,1,2,0]
+    vinsertps    $16, %xmm0, %xmm7, %xmm0  // xmm0 = xmm7[0],xmm0[0],xmm7[2,3]
+    vshufps      $84, %xmm0, %xmm0, %xmm0  // xmm0 = xmm0[0,1,1,1]
     vmulps       %xmm0, %xmm1, %xmm0
-    vaddps       LCPI4_6(%rip), %xmm0, %xmm0  # round-half-up
+    vaddps       LCPI4_6(%rip), %xmm0, %xmm0  // round-half-up
     vroundps     $11, %xmm0, %xmm0
     vcvttps2dq   %xmm0, %xmm0
     vpminsd      %xmm2, %xmm0, %xmm0
@@ -491,14 +491,14 @@ LBB4_9:
     orl          %edx, %esi
     orl          %r8d, %esi
     movl         %esi, (%rbx)
-    vinsertps    $16, %xmm7, %xmm8, %xmm6  # xmm6 = xmm8[0],xmm7[0],xmm8[2,3]
+    vinsertps    $16, %xmm7, %xmm8, %xmm6  // xmm6 = xmm8[0],xmm7[0],xmm8[2,3]
     vmulps       %xmm6, %xmm5, %xmm7
-    vaddps       LCPI4_6(%rip), %xmm7, %xmm7  # +0.5 round-half-up
+    vaddps       LCPI4_6(%rip), %xmm7, %xmm7  // +0.5 round-half-up
     vmulps       %xmm6, %xmm4, %xmm4
-    vaddps       LCPI4_6(%rip), %xmm4, %xmm4  # +0.5 round-half-up
+    vaddps       LCPI4_6(%rip), %xmm4, %xmm4  // +0.5 round-half-up
     vbroadcastss %xmm1, %xmm8
     vmulps       %xmm6, %xmm8, %xmm6
-    vaddps       LCPI4_6(%rip), %xmm6, %xmm6  # +0.5 round-half-up
+    vaddps       LCPI4_6(%rip), %xmm6, %xmm6  // +0.5 round-half-up
     vroundps     $11, %xmm4, %xmm4
     vcvttps2dq   %xmm4, %xmm4
     vpminsd      %xmm2, %xmm4, %xmm4
@@ -511,15 +511,15 @@ LBB4_9:
     vcvttps2dq   %xmm6, %xmm6
     vpminsd      %xmm2, %xmm6, %xmm2
     vpmaxsd      %xmm3, %xmm2, %xmm2
-    vpblendd     $2, %xmm4, %xmm7, %xmm3  # xmm3 = xmm7[0],xmm4[1],xmm7[2,3]
-    vpblendd     $2, %xmm7, %xmm4, %xmm6  # xmm6 = xmm4[0],xmm7[1],xmm4[2,3]
+    vpblendd     $2, %xmm4, %xmm7, %xmm3  // xmm3 = xmm7[0],xmm4[1],xmm7[2,3]
+    vpblendd     $2, %xmm7, %xmm4, %xmm6  // xmm6 = xmm4[0],xmm7[1],xmm4[2,3]
     vpmaxud      %xmm6, %xmm3, %xmm3
     vpmaxud      %xmm2, %xmm3, %xmm3
     vpslld       $24, %xmm3, %xmm3
     vpsllvd      LCPI4_4(%rip), %xmm4, %xmm4
     vpsllvd      LCPI4_5(%rip), %xmm7, %xmm6
     vmulss       %xmm0, %xmm5, %xmm7
-    vaddss       LCPI4_6(%rip), %xmm7, %xmm7  # +0.5 round-half-up
+    vaddss       LCPI4_6(%rip), %xmm7, %xmm7  // +0.5 round-half-up
     vroundss     $11, %xmm7, %xmm7, %xmm7
     vcvttss2si   %xmm7, %edx
     vpor         %xmm6, %xmm4, %xmm4
@@ -527,9 +527,9 @@ LBB4_9:
     cmovgel      %eax, %edx
     testl        %edx, %edx
     cmovlel      %ecx, %edx
-    vmovshdup    %xmm5, %xmm5  # xmm5 = xmm5[1,1,3,3]
+    vmovshdup    %xmm5, %xmm5  // xmm5 = xmm5[1,1,3,3]
     vmulss       %xmm0, %xmm5, %xmm5
-    vaddss       LCPI4_6(%rip), %xmm5, %xmm5  # +0.5 round-half-up
+    vaddss       LCPI4_6(%rip), %xmm5, %xmm5  // +0.5 round-half-up
     vroundss     $11, %xmm5, %xmm5, %xmm5
     vcvttss2si   %xmm5, %esi
     vpor         %xmm2, %xmm3, %xmm2
@@ -539,7 +539,7 @@ LBB4_9:
     testl        %esi, %esi
     cmovlel      %ecx, %esi
     vmulss       %xmm0, %xmm1, %xmm0
-    vaddss       LCPI4_6(%rip), %xmm0, %xmm0  # +0.5 round-half-up
+    vaddss       LCPI4_6(%rip), %xmm0, %xmm0  // +0.5 round-half-up
     vroundss     $11, %xmm0, %xmm0, %xmm0
     vcvttss2si   %xmm0, %edi
     vmovq        %xmm2, 4(%rbx)
@@ -595,12 +595,12 @@ SYM(ksvgLightingPointSpecularRowSsse3Linear):
     movq         %rsi, %r12
     movq         %rdi, %r13
     movl         %r8d, %eax
-    movq         %rax, -56(%rbp)  # 8-byte Spill
+    movq         %rax, -56(%rbp)
     xorl         %ebx, %ebx
-    vmovss       %xmm0, -44(%rbp)  # 4-byte Spill
-    movq         %r9, -64(%rbp)  # 8-byte Spill
+    vmovss       %xmm0, -44(%rbp)
+    movq         %r9, -64(%rbp)
 .p2align 4, 0x90
-LBB5_2:  # =>This Inner Loop Header: Depth=1
+LBB5_2:
     vmovups      (%r9), %ymm3
     vmovups      20(%r9), %ymm1
     vcvtsi2ss    %ebx, %xmm4, %xmm2
@@ -617,14 +617,14 @@ LBB5_2:  # =>This Inner Loop Header: Depth=1
     movq         16(%rbp), %r9
     vzeroupper
     callq        SYM(core4)
-    movq         -64(%rbp), %r9  # 8-byte Reload
+    movq         -64(%rbp), %r9
     vmovss       -44(%rbp), %xmm0
     addq         $4, %rbx
     addq         $16, %r14
     addq         $16, %r15
     addq         $16, %r12
     addq         $16, %r13
-    cmpq         -56(%rbp), %rbx  # 8-byte Folded Reload
+    cmpq         -56(%rbp), %rbx
     jb           LBB5_2
     addq         $88, %rsp
     popq         %rbx

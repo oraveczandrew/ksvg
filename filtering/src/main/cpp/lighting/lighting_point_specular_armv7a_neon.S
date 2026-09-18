@@ -510,7 +510,7 @@ ksvgLightingPointSpecularRowNeon32:
     // q2 = ndoth vector.
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
-    vst1.32 {q2}, [sp]           // stash ndoth at [sp,#0..#15]
+    vst1.32 {q2}, [sp]           // stash ndoth at [sp, #0..#15]
     // ---- 4-lane scalar VFP pow (no bl, invariants survive) ----
     vldr    d1, [sp, #16]        // double exponent
     vcvt.f32.f64 s1, d1          // s1 = exponent float
@@ -1078,7 +1078,7 @@ ksvgLightingPointSpecularRowNeon32Linear:
     // q2 = ndoth vector.
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
-    vst1.32 {q2}, [sp]           // stash ndoth at [sp,#0..#15]
+    vst1.32 {q2}, [sp]           // stash ndoth at [sp, #0..#15]
     // ---- 4-lane scalar VFP pow (no bl, invariants survive) ----
     vldr    d1, [sp, #16]        // double exponent
     vcvt.f32.f64 s1, d1          // s1 = exponent float

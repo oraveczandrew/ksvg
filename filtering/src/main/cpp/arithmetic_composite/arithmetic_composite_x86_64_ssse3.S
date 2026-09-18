@@ -239,6 +239,20 @@
 
 .text
 .p2align 5
+
+/*
+ * void ksvgArithmeticApplySse(
+ *     const jint* src1, const jint* src2, jint* dst,
+ *     jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+ *     jfloat k1, jfloat k2, jfloat k3, jfloat k4,
+ *     jboolean useLinear,
+ *     const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+ *
+ * x86-64 System V ABI:
+ *   rdi = src1, rsi = src2, rdx = dst, ecx = width, r8d = clipLeft, r9d = clipTop
+ *   xmm0 = k1, xmm1 = k2, xmm2 = k3, xmm3 = k4
+ *   stack: clipRight, clipBottom, useLinear, srgbToLinear, linearToSrgb
+ */
 .globl SYM(ksvgArithmeticApplySse)
 TYPE(SYM(ksvgArithmeticApplySse), @function)
 SYM(ksvgArithmeticApplySse):
@@ -457,7 +471,7 @@ SYM(ksvgArithmeticApplySse):
     andl $3, %eax                  /* remainder blocks */
     movl %eax, 28(%rsp)
 
-    .p2align 4
+.p2align 4
 .Llinear_quad:
     testl %r9d, %r9d
     jz .Llinear_remainder
@@ -689,7 +703,7 @@ SYM(ksvgArithmeticApplySse):
     .byte 2,6,10,14,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80
 .LshuffleA:
     .byte 3,7,11,15,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80
- .Ls2lExpand4Even:
+.Ls2lExpand4Even:
     .byte 0,0x80,1,0x80,2,0x80,3,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80
 .LdwordExpand4Even:
     .byte 0,0x80,4,0x80,8,0x80,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80

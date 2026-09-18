@@ -149,13 +149,7 @@ CFI_DEF_CFA_OFFSET(192)
     incl    %edx
     cmpl    %edx, %eax
     jge     .LBB0_27
-.LBB0_3:  # =>This Loop Header: Depth=1
-    # Child Loop BB0_4 Depth 2
-    # Child Loop BB0_9 Depth 3
-    # Child Loop BB0_10 Depth 4
-    # Child Loop BB0_12 Depth 4
-    # Child Loop BB0_18 Depth 3
-    # Child Loop BB0_19 Depth 4
+.LBB0_3:
     movl    %edi, 92(%esp)
     movl    %eax, 116(%esp)
     # Source row = src + (y - targetY) * width * 4.
@@ -248,13 +242,7 @@ CFI_DEF_CFA_OFFSET(192)
     addl    $16, 88(%esp)
     cmpl    %ebp, %eax
     jg      .LBB0_26
-.LBB0_4:  # Parent Loop BB0_3 Depth=1
-    # =>  This Loop Header: Depth=2
-    # Child Loop BB0_9 Depth 3
-    # Child Loop BB0_10 Depth 4
-    # Child Loop BB0_12 Depth 4
-    # Child Loop BB0_18 Depth 3
-    # Child Loop BB0_19 Depth 4
+.LBB0_4:
     movl    %eax, 124(%esp)
     cmpl    $0, 216(%esp)
     jle     .LBB0_5
@@ -278,21 +266,14 @@ CFI_DEF_CFA_OFFSET(192)
     addl    %ebx, %eax
     cmpl    216(%esp), %ebp
     je      .LBB0_16
-.LBB0_9:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # =>    This Loop Header: Depth=3
-    # Child Loop BB0_10 Depth 4
-    # Child Loop BB0_12 Depth 4
+.LBB0_9:
     xorl    %edi, %edi
     cmpl    224(%esp), %ebp
     jne     .LBB0_10
     movaps  %xmm1, %xmm0
     jmp     .LBB0_12
 .p2align 4, 0x90
-.LBB0_10:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # Parent Loop BB0_9 Depth=3
-    # =>      This Inner Loop Header: Depth=4
+.LBB0_10:
     movups  (%eax, %edi, 4), %xmm5
     movss   (%edx, %edi, 4), %xmm0
     shufps  $0, %xmm0, %xmm0
@@ -340,10 +321,7 @@ CFI_DEF_CFA_OFFSET(192)
     movaps  %xmm1, %xmm0
     cmpl    %edi, %esi
     je      .LBB0_15
-.LBB0_12:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # Parent Loop BB0_9 Depth=3
-    # =>      This Inner Loop Header: Depth=4
+.LBB0_12:
     movups  (%eax, %edi, 4), %xmm4
     movaps  %xmm4, %xmm1
     cmpl    %edi, %ecx
@@ -374,16 +352,10 @@ CFI_DEF_CFA_OFFSET(192)
     xorps   %xmm7, %xmm7
     xorps   %xmm6, %xmm6
 .p2align 4, 0x90
-.LBB0_18:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # =>    This Loop Header: Depth=3
-    # Child Loop BB0_19 Depth 4
+.LBB0_18:
     xorl    %edi, %edi
 .p2align 4, 0x90
-.LBB0_19:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # Parent Loop BB0_18 Depth=3
-    # =>      This Inner Loop Header: Depth=4
+.LBB0_19:
     movups  (%edx, %edi, 4), %xmm0
     movss   (%ebp, %edi, 4), %xmm4
     shufps  $0, %xmm4, %xmm4

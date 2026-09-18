@@ -65,8 +65,8 @@ SYM(ksvgLightingSpotSpecularRowSsse3Linear):
     movl          %eax, -24(%ebp)
 
 .Lsps_loop_Ssse3:
-    // Per-pixel loop (Sobel window, normalize, half-vector dot, powf,
-    // intensity, pack, store).
+    # Per-pixel loop (Sobel window, normalize, half-vector dot, powf,
+    # intensity, pack, store).
     cmpl          $0, -12(%ebp)
     jle           .Lsps_done_Ssse3
 

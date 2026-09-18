@@ -23,7 +23,7 @@ EMIT_POW1_I386_TABLES
 .text
 
 RODATA4
-.p2align 2, 0x0  # -- Begin function ksvgLightingDistantSpecularRowAvx2
+.p2align 2, 0x0
 .LCPI0_0:
 .long	0x3f800000  # float 1
 .LCPI0_1:
@@ -48,7 +48,6 @@ RODATA16
 .type SYM(ksvgLightingDistantSpecularRowAvx2), @function
 SYM(ksvgLightingDistantSpecularRowAvx2):
 .cfi_startproc
-    # %bb.0:
     pushl        %ebp
 .cfi_def_cfa_offset 8
 .cfi_offset %ebp, -8
@@ -69,47 +68,45 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     addl         $_GLOBAL_OFFSET_TABLE_+(.Ltmp0-.L0$pb), %ebx
     cmpl         $0, 24(%ebp)
     jle          .LBB0_8
-    # %bb.1:
     vmovss       32(%ebp), %xmm0  # xmm0 = mem[0],zero,zero,zero
     movl         28(%ebp), %edi
     movl         20(%ebp), %eax
-    movl         %eax, 20(%esp)  # 4-byte Spill
+    movl         %eax, 20(%esp)
     vmovss       36(%edi), %xmm1  # xmm1 = mem[0],zero,zero,zero
     vdivss       4(%edi), %xmm1, %xmm2
     vdivss       (%edi), %xmm1, %xmm1
     vbroadcastss %xmm1, %ymm1
-    vmovaps      %ymm1, 160(%esp)  # 32-byte Spill
+    vmovaps      %ymm1, 160(%esp)
     vbroadcastss %xmm2, %ymm1
-    vmovaps      %ymm1, 128(%esp)  # 32-byte Spill
+    vmovaps      %ymm1, 128(%esp)
     vcvtss2sd    %xmm0, %xmm0, %xmm0
-    vmovsd       %xmm0, 40(%esp)  # 8-byte Spill
+    vmovsd       %xmm0, 40(%esp)
     vbroadcastss .LCPI0_0@GOTOFF(%ebx), %ymm0  # ymm0 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0]
-    vmovaps      %ymm0, 96(%esp)  # 32-byte Spill
+    vmovaps      %ymm0, 96(%esp)
     vmovss       .LCPI0_0@GOTOFF(%ebx), %xmm7  # xmm7 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovss       .LCPI0_1@GOTOFF(%ebx), %xmm0  # xmm0 = [5.0E-1,0.0E+0,0.0E+0,0.0E+0]
-    vmovss       %xmm0, 28(%esp)  # 4-byte Spill
+    vmovss       %xmm0, 28(%esp)
     vbroadcastss .LCPI0_1@GOTOFF(%ebx), %xmm0  # xmm0 = [5.0E-1,5.0E-1,5.0E-1,5.0E-1]
-    vmovaps      %xmm0, 80(%esp)  # 16-byte Spill
+    vmovaps      %xmm0, 80(%esp)
     xorl         %ecx, %ecx
     vbroadcastss .LCPI0_2@GOTOFF(%ebx), %xmm0  # xmm0 = [255,255,255,255]
-    vmovaps      %xmm0, 64(%esp)  # 16-byte Spill
+    vmovaps      %xmm0, 64(%esp)
     vpmovsxbd    .LCPI0_4@GOTOFF(%ebx), %xmm0  # xmm0 = [16,8,0,0]
-    vmovdqa      %xmm0, 48(%esp)  # 16-byte Spill
-    vmovss       %xmm7, 32(%esp)  # 4-byte Spill
+    vmovdqa      %xmm0, 48(%esp)
+    vmovss       %xmm7, 32(%esp)
     jmp          .LBB0_2
 .p2align 4, 0x90
-.LBB0_7:  #   in Loop: Header=BB0_2 Depth=1
-    movl         24(%esp), %ecx  # 4-byte Reload
+.LBB0_7:
+    movl         24(%esp), %ecx
     addl         $8, %ecx
-    addl         $32, 20(%esp)  # 4-byte Folded Spill
+    addl         $32, 20(%esp)
     cmpl         24(%ebp), %ecx
     jge          .LBB0_8
-.LBB0_2:  # =>This Loop Header: Depth=1
-    // Main loop, 8 pixels per iteration: Sobel window, normalize, per-pixel
-    // specular tails below (pow + intensity + RGB + pack).
-    #     Child Loop BB0_3 Depth 2
-    // Main loop, 8 pixels per iteration: Sobel window, normalize, per-pixel
-    // specular tails below (pow + intensity + RGB + pack).
+.LBB0_2:
+    # Main loop, 8 pixels per iteration: Sobel window, normalize, per-pixel
+    # specular tails below (pow + intensity + RGB + pack).
+    # Main loop, 8 pixels per iteration: Sobel window, normalize, per-pixel
+    # specular tails below (pow + intensity + RGB + pack).
     movl         8(%ebp), %eax
     vmovdqu      (%eax,%ecx,4), %ymm0
     vmovdqu      4(%eax,%ecx,4), %ymm2
@@ -129,7 +126,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vpsrld       $24, %ymm4, %ymm4
     vpsrld       $24, %ymm5, %ymm5
     vpsubd       %ymm2, %ymm5, %ymm2
-    movl         %ecx, 24(%esp)  # 4-byte Spill
+    movl         %ecx, 24(%esp)
     vmovdqu      8(%eax,%ecx,4), %ymm5
     vpsrld       $24, %ymm5, %ymm5
     vpsubd       %ymm1, %ymm0, %ymm6
@@ -145,18 +142,18 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vcvtdq2ps    %ymm2, %ymm2
     vaddps       %ymm2, %ymm2, %ymm2
     vaddps       %ymm1, %ymm2, %ymm1
-    vmulps       160(%esp), %ymm3, %ymm2  # 32-byte Folded Reload
+    vmulps       160(%esp), %ymm3, %ymm2
     vpsubd       %ymm0, %ymm5, %ymm0
     vcvtdq2ps    %ymm0, %ymm0
     vaddps       %ymm0, %ymm1, %ymm0
-    vmulps       128(%esp), %ymm0, %ymm0  # 32-byte Folded Reload
+    vmulps       128(%esp), %ymm0, %ymm0
     vxorps       %xmm3, %xmm3, %xmm3
     vsubps       %ymm2, %ymm3, %ymm1
     vsubps       %ymm0, %ymm3, %ymm0
     vmulps       %ymm1, %ymm1, %ymm2
     vmulps       %ymm0, %ymm0, %ymm3
     vaddps       %ymm3, %ymm2, %ymm2
-    vmovaps      96(%esp), %ymm3  # 32-byte Reload
+    vmovaps      96(%esp), %ymm3
     vaddps       %ymm3, %ymm2, %ymm2
     vsqrtps      %ymm2, %ymm2
     vdivps       %ymm2, %ymm1, %ymm1
@@ -168,9 +165,9 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     xorl         %esi, %esi
     jmp          .LBB0_3
 .p2align 4, 0x90
-.LBB0_6:  #   in Loop: Header=BB0_3 Depth=2
+.LBB0_6:
     vmulss       32(%edi), %xmm1, %xmm0
-    vaddss       28(%esp), %xmm0, %xmm0  # 4-byte Folded Reload
+    vaddss       28(%esp), %xmm0, %xmm0
     vcvttss2si   %xmm0, %eax
     cmpl         $255, %eax
     movl         $255, %ecx
@@ -181,9 +178,9 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vmovsd       24(%edi), %xmm0  # xmm0 = mem[0],zero
     vbroadcastss %xmm1, %xmm1
     vmulps       %xmm0, %xmm1, %xmm0
-    vaddps       80(%esp), %xmm0, %xmm0  # 16-byte Folded Reload
+    vaddps       80(%esp), %xmm0, %xmm0
     vcvttps2dq   %xmm0, %xmm0
-    vpminsd      64(%esp), %xmm0, %xmm0  # 16-byte Folded Reload
+    vpminsd      64(%esp), %xmm0, %xmm0
     vxorps       %xmm1, %xmm1, %xmm1
     vpmaxsd      %xmm1, %xmm0, %xmm0
     vmovd        %xmm0, %edx
@@ -192,20 +189,19 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     cmoval       %edx, %ecx
     cmpl         %eax, %ecx
     cmovbel      %eax, %ecx
-    vpsllvd      48(%esp), %xmm0, %xmm0  # 16-byte Folded Reload
+    vpsllvd      48(%esp), %xmm0, %xmm0
     vpshufd      $85, %xmm0, %xmm1  # xmm1 = xmm0[1,1,1,1]
     vpor         %xmm0, %xmm1, %xmm0
     vmovd        %xmm0, %edx
     orl          %eax, %edx
     shll         $24, %ecx
     orl          %ecx, %edx
-    movl         20(%esp), %eax  # 4-byte Reload
+    movl         20(%esp), %eax
     movl         %edx, (%eax,%esi,4)
     incl         %esi
     cmpl         $8, %esi
     je           .LBB0_7
-.LBB0_3:  #   Parent Loop BB0_2 Depth=1
-    # =>  This Inner Loop Header: Depth=2
+.LBB0_3:
     vaddss       20(%edi), %xmm7, %xmm0
     vmovss       12(%edi), %xmm1  # xmm1 = mem[0],zero,zero,zero
     vmovss       16(%edi), %xmm2  # xmm2 = mem[0],zero,zero,zero
@@ -232,18 +228,16 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vzeroupper
     POW1_SSE
     vxorps       %xmm1, %xmm1, %xmm1
-    vmovss       32(%esp), %xmm7  # 4-byte Reload
+    vmovss       32(%esp), %xmm7
     # xmm7 = mem[0],zero,zero,zero
     movss        %xmm0, 36(%esp)
     vmovss       8(%edi), %xmm0  # xmm0 = mem[0],zero,zero,zero
     vmulss       36(%esp), %xmm0, %xmm0
     vucomiss     %xmm0, %xmm1
     ja           .LBB0_6
-    # %bb.4:                                #   in Loop: Header=BB0_3 Depth=2
     vucomiss     %xmm7, %xmm0
     vmovaps      %xmm0, %xmm1
     jbe          .LBB0_6
-    # %bb.5:                                #   in Loop: Header=BB0_3 Depth=2
     vmovaps      %xmm7, %xmm1
     jmp          .LBB0_6
 .LBB0_8:
@@ -258,9 +252,8 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
 .Lfunc_end0:
 .size SYM(ksvgLightingDistantSpecularRowAvx2), .Lfunc_end0-ksvgLightingDistantSpecularRowAvx2
 .cfi_endproc
-    # -- End function
 RODATA4
-.p2align 2, 0x0  # -- Begin function ksvgLightingDistantSpecularRowAvx2Linear
+.p2align 2, 0x0
 .LCPI1_0:
 .long	0x3f800000  # float 1
 .LCPI1_1:
@@ -271,7 +264,6 @@ RODATA4
 .type SYM(ksvgLightingDistantSpecularRowAvx2Linear), @function
 SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 .cfi_startproc
-    # %bb.0:
     pushl        %ebp
 .cfi_def_cfa_offset 8
 .cfi_offset %ebp, -8
@@ -290,47 +282,45 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     popl         %eax
 .Ltmp1:
     addl         $_GLOBAL_OFFSET_TABLE_+(.Ltmp1-.L1$pb), %eax
-    movl         %eax, 28(%esp)  # 4-byte Spill
+    movl         %eax, 28(%esp)
     cmpl         $0, 24(%ebp)
     jle          .LBB1_8
-    # %bb.1:
     vmovss       32(%ebp), %xmm0  # xmm0 = mem[0],zero,zero,zero
     movl         28(%ebp), %edi
     movl         20(%ebp), %eax
-    movl         %eax, 32(%esp)  # 4-byte Spill
+    movl         %eax, 32(%esp)
     vmovss       36(%edi), %xmm1  # xmm1 = mem[0],zero,zero,zero
     vdivss       4(%edi), %xmm1, %xmm2
     vdivss       (%edi), %xmm1, %xmm1
     vbroadcastss %xmm1, %ymm1
-    vmovaps      %ymm1, 128(%esp)  # 32-byte Spill
+    vmovaps      %ymm1, 128(%esp)
     vbroadcastss %xmm2, %ymm1
-    vmovaps      %ymm1, 96(%esp)  # 32-byte Spill
+    vmovaps      %ymm1, 96(%esp)
     vcvtss2sd    %xmm0, %xmm0, %xmm0
-    vmovsd       %xmm0, 56(%esp)  # 8-byte Spill
-    movl         28(%esp), %eax  # 4-byte Reload
+    vmovsd       %xmm0, 56(%esp)
+    movl         28(%esp), %eax
     vbroadcastss .LCPI1_0@GOTOFF(%eax), %ymm0  # ymm0 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0]
-    vmovaps      %ymm0, 64(%esp)  # 32-byte Spill
+    vmovaps      %ymm0, 64(%esp)
     vmovss       .LCPI1_0@GOTOFF(%eax), %xmm7  # xmm7 = [1.0E+0,0.0E+0,0.0E+0,0.0E+0]
     vmovss       .LCPI1_1@GOTOFF(%eax), %xmm0  # xmm0 = [5.0E-1,0.0E+0,0.0E+0,0.0E+0]
-    vmovss       %xmm0, 44(%esp)  # 4-byte Spill
+    vmovss       %xmm0, 44(%esp)
     movl         ksvg_linear_to_srgb_lut@GOT(%eax), %eax
-    movl         %eax, 40(%esp)  # 4-byte Spill
+    movl         %eax, 40(%esp)
     xorl         %ecx, %ecx
-    vmovss       %xmm7, 48(%esp)  # 4-byte Spill
+    vmovss       %xmm7, 48(%esp)
     jmp          .LBB1_2
 .p2align 4, 0x90
-.LBB1_7:  #   in Loop: Header=BB1_2 Depth=1
-    movl         36(%esp), %ecx  # 4-byte Reload
+.LBB1_7:
+    movl         36(%esp), %ecx
     addl         $8, %ecx
-    addl         $32, 32(%esp)  # 4-byte Folded Spill
+    addl         $32, 32(%esp)
     cmpl         24(%ebp), %ecx
     jge          .LBB1_8
-.LBB1_2:  # =>This Loop Header: Depth=1
-    // Linear-kernel main loop (window/normalize/dot as above); per-pixel
-    // finishes below, with scalar L2S conversion on the linear path.
-    #     Child Loop BB1_3 Depth 2
-    // Linear-kernel main loop (window/normalize/dot as above); per-pixel
-    // finishes below, with scalar L2S conversion on the linear path.
+.LBB1_2:
+    # Linear-kernel main loop (window/normalize/dot as above); per-pixel
+    # finishes below, with scalar L2S conversion on the linear path.
+    # Linear-kernel main loop (window/normalize/dot as above); per-pixel
+    # finishes below, with scalar L2S conversion on the linear path.
     movl         8(%ebp), %eax
     vmovdqu      (%eax,%ecx,4), %ymm0
     vmovdqu      4(%eax,%ecx,4), %ymm2
@@ -350,7 +340,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vpsrld       $24, %ymm4, %ymm4
     vpsrld       $24, %ymm5, %ymm5
     vpsubd       %ymm2, %ymm5, %ymm2
-    movl         %ecx, 36(%esp)  # 4-byte Spill
+    movl         %ecx, 36(%esp)
     vmovdqu      8(%eax,%ecx,4), %ymm5
     vpsrld       $24, %ymm5, %ymm5
     vpsubd       %ymm1, %ymm0, %ymm6
@@ -366,18 +356,18 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vcvtdq2ps    %ymm2, %ymm2
     vaddps       %ymm2, %ymm2, %ymm2
     vaddps       %ymm1, %ymm2, %ymm1
-    vmulps       128(%esp), %ymm3, %ymm2  # 32-byte Folded Reload
+    vmulps       128(%esp), %ymm3, %ymm2
     vpsubd       %ymm0, %ymm5, %ymm0
     vcvtdq2ps    %ymm0, %ymm0
     vaddps       %ymm0, %ymm1, %ymm0
-    vmulps       96(%esp), %ymm0, %ymm0  # 32-byte Folded Reload
+    vmulps       96(%esp), %ymm0, %ymm0
     vxorps       %xmm3, %xmm3, %xmm3
     vsubps       %ymm2, %ymm3, %ymm1
     vsubps       %ymm0, %ymm3, %ymm0
     vmulps       %ymm1, %ymm1, %ymm2
     vmulps       %ymm0, %ymm0, %ymm3
     vaddps       %ymm3, %ymm2, %ymm2
-    vmovaps      64(%esp), %ymm3  # 32-byte Reload
+    vmovaps      64(%esp), %ymm3
     vaddps       %ymm3, %ymm2, %ymm2
     vsqrtps      %ymm2, %ymm2
     vdivps       %ymm2, %ymm1, %ymm1
@@ -389,9 +379,9 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     xorl         %esi, %esi
     jmp          .LBB1_3
 .p2align 4, 0x90
-.LBB1_6:  #   in Loop: Header=BB1_3 Depth=2
+.LBB1_6:
     vmulss       24(%edi), %xmm2, %xmm0
-    vmovss       44(%esp), %xmm1  # 4-byte Reload
+    vmovss       44(%esp), %xmm1
     # xmm1 = mem[0],zero,zero,zero
     vaddss       %xmm1, %xmm0, %xmm0
     vcvttss2si   %xmm0, %eax
@@ -415,7 +405,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     cmovgel      %ebx, %edi
     testl        %edi, %edi
     cmovlel      %edx, %edi
-    movl         40(%esp), %ebx  # 4-byte Reload
+    movl         40(%esp), %ebx
     movzbl       (%ebx,%eax), %edx
     movzbl       (%ebx,%ecx), %eax
     movzbl       (%ebx,%edi), %ecx
@@ -431,13 +421,12 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     orl          %edi, %eax
     movl         28(%ebp), %edi
     orl          %ecx, %eax
-    movl         32(%esp), %ecx  # 4-byte Reload
+    movl         32(%esp), %ecx
     movl         %eax, (%ecx,%esi,4)
     incl         %esi
     cmpl         $8, %esi
     je           .LBB1_7
-.LBB1_3:  #   Parent Loop BB1_2 Depth=1
-    # =>  This Inner Loop Header: Depth=2
+.LBB1_3:
     vaddss       20(%edi), %xmm7, %xmm0
     vmovss       12(%edi), %xmm1  # xmm1 = mem[0],zero,zero,zero
     vmovss       16(%edi), %xmm2  # xmm2 = mem[0],zero,zero,zero
@@ -461,22 +450,20 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     # p = pow(ndoth, exponent): inline scalar minimax, no PLT call.
     vmovaps      %xmm0, %xmm1  # pow base
     vmovss       32(%ebp), %xmm2  # exponent
-    movl         28(%esp), %ebx  # 4-byte Reload (GOT base for GOTOFF)
+    movl         28(%esp), %ebx
     vzeroupper
     POW1_SSE
     vxorps       %xmm2, %xmm2, %xmm2
-    vmovss       48(%esp), %xmm7  # 4-byte Reload
+    vmovss       48(%esp), %xmm7
     # xmm7 = mem[0],zero,zero,zero
     movss        %xmm0, 52(%esp)
     vmovss       8(%edi), %xmm0  # xmm0 = mem[0],zero,zero,zero
     vmulss       52(%esp), %xmm0, %xmm0
     vucomiss     %xmm0, %xmm2
     ja           .LBB1_6
-    # %bb.4:                                #   in Loop: Header=BB1_3 Depth=2
     vucomiss     %xmm7, %xmm0
     vmovaps      %xmm0, %xmm2
     jbe          .LBB1_6
-    # %bb.5:                                #   in Loop: Header=BB1_3 Depth=2
     vmovaps      %xmm7, %xmm2
     jmp          .LBB1_6
 .LBB1_8:
@@ -491,6 +478,5 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 .Lfunc_end1:
 .size SYM(ksvgLightingDistantSpecularRowAvx2Linear), .Lfunc_end1-ksvgLightingDistantSpecularRowAvx2Linear
 .cfi_endproc
-    # -- End function
 
 ADDRSIG

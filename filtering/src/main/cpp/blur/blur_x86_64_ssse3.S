@@ -24,11 +24,18 @@
 .Lpack_mask:
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 
+/*
+ * void rsdIntrinsicBlurVFU4_K_x86_64_ssse3(
+ *     void* dst, const void* pin, int stride, const void* gptr, int rct, int x1, int x2);
+ *
+ * SysV x86-64 ABI:
+ *   rdi = dst, rsi = pin, rdx = stride, rcx = gptr, r8d = rct, r9d = x1
+ *   [rsp+16] = x2 (after push %r12)
+ */
 .globl SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3)
 TYPE(SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3), @function)
 SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3):
     push %r12
-    // rdi=dst rsi=pin edx=stride rcx=gptr r8d=rct r9d=x1; after push, x2 is at [rsp+16]
     mov 16(%rsp), %r10d
     movslq %edx, %rdx
     movdqa .Lcvte_mask(%rip), %xmm7
@@ -71,11 +78,17 @@ SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3):
     ret
 // SIZE(SYM(rsdIntrinsicBlurVFU4_K_x86_64_ssse3))
 
+/*
+ * void rsdIntrinsicBlurHFU4_K_x86_64_ssse3(
+ *     void* dst, const void* pin, const void* gptr, int rct, int x1, int x2);
+ *
+ * SysV x86-64 ABI:
+ *   rdi = dst, rsi = pin, rdx = gptr, ecx = rct, r8d = x1, r9d = x2
+ */
 .globl SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3)
 TYPE(SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3), @function)
 SYM(rsdIntrinsicBlurHFU4_K_x86_64_ssse3):
     push %r12
-    // rdi=dst rsi=pin rdx=gptr ecx=rct r8d=x1 r9d=x2
     cmp %r9d, %r8d
     jge .LH_done
     movdqa .Lpack_mask(%rip), %xmm7

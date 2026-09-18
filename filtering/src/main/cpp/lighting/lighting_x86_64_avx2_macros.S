@@ -148,8 +148,8 @@
     andl    $0x007fffff, %eax
     orl     $0x3f800000, %eax
     movd    %eax, %xmm2
-    subss   .Lfloat_1_bits(%rip), %xmm2  # f = m - 1
-    movss   .Lpoly_log2(%rip), %xmm0     # c8
+    subss   .Lfloat_1_bits(%rip), %xmm2  // f = m - 1
+    movss   .Lpoly_log2(%rip), %xmm0  // c8
     mulss   %xmm2, %xmm0
     addss   .Lpoly_log2+4(%rip), %xmm0
     mulss   %xmm2, %xmm0
@@ -166,18 +166,18 @@
     addss   .Lpoly_log2+28(%rip), %xmm0
     mulss   %xmm2, %xmm0
     addss   .Lpoly_log2+32(%rip), %xmm0
-    cvtsi2ss %ecx, %xmm2                 # e
-    addss   %xmm2, %xmm0                 # log2x = e + P(f)
-    mulss   %xmm1, %xmm0                 # t = y * log2x
-    cvttss2si %xmm0, %ecx                # trunc
+    cvtsi2ss %ecx, %xmm2  // e
+    addss   %xmm2, %xmm0  // log2x = e + P(f)
+    mulss   %xmm1, %xmm0  // t = y * log2x
+    cvttss2si %xmm0, %ecx  // trunc
     cvtsi2ss %ecx, %xmm2
     ucomiss %xmm0, %xmm2
     jbe     78f
     subl    $1, %ecx
     cvtsi2ss %ecx, %xmm2
 78:
-    subss   %xmm2, %xmm0                 # tf = t - ti
-    movss   .Lpoly_exp2(%rip), %xmm2     # c8
+    subss   %xmm2, %xmm0  // tf = t - ti
+    movss   .Lpoly_exp2(%rip), %xmm2  // c8
     mulss   %xmm0, %xmm2
     addss   .Lpoly_exp2+4(%rip), %xmm2
     mulss   %xmm0, %xmm2
@@ -234,54 +234,54 @@
     vmovaps   .Lmantissa_mask(%rip), %ymm14
     vmovaps   .Lfloat_1_bits(%rip), %ymm13
 
-    # 1. log2(x) range reduction
-    # e = (bits >> 23) - 127; m = (bits & mask) | 1.0f
-    vpsrad    $23, \x, %ymm12            # Get biased exponent
-    vpsubd    %ymm15, %ymm12, %ymm12     # e = biased - 127
-    vcvtdq2ps %ymm12, %ymm12             # e_float
+// 1. log2(x) range reduction
+// e = (bits >> 23) - 127; m = (bits & mask) | 1.0f
+    vpsrad    $23, \x, %ymm12  // Get biased exponent
+    vpsubd    %ymm15, %ymm12, %ymm12  // e = biased - 127
+    vcvtdq2ps %ymm12, %ymm12  // e_float
 
-    vpand     %ymm14, \x, %ymm11         # Get mantissa bits
-    vpor      %ymm13, %ymm11, %ymm11      # m in [1, 2)
-    vsubps    %ymm13, %ymm11, %ymm11      # f = m - 1.0 (in [0, 1))
+    vpand     %ymm14, \x, %ymm11  // Get mantissa bits
+    vpor      %ymm13, %ymm11, %ymm11  // m in [1, 2)
+    vsubps    %ymm13, %ymm11, %ymm11  // f = m - 1.0 (in [0, 1))
 
-    # 2. Horner's method for P_log(f) ≈ log2(1+f)
-    vbroadcastss .Lpoly_log2+0(%rip), %ymm10 # c8
-    POW8_FMA_STEP .Lpoly_log2+4(%rip), %ymm11, %ymm10, \tmp # c8*f + c7
-    POW8_FMA_STEP .Lpoly_log2+8(%rip), %ymm11, %ymm10, \tmp # .. + c6
+// 2. Horner's method for P_log(f) ≈ log2(1+f)
+    vbroadcastss .Lpoly_log2+0(%rip), %ymm10  // c8
+    POW8_FMA_STEP .Lpoly_log2+4(%rip), %ymm11, %ymm10, \tmp  // c8*f + c7
+    POW8_FMA_STEP .Lpoly_log2+8(%rip), %ymm11, %ymm10, \tmp  // .. + c6
     POW8_FMA_STEP .Lpoly_log2+12(%rip), %ymm11, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_log2+16(%rip), %ymm11, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_log2+20(%rip), %ymm11, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_log2+24(%rip), %ymm11, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_log2+28(%rip), %ymm11, %ymm10, \tmp
-    POW8_FMA_STEP .Lpoly_log2+32(%rip), %ymm11, %ymm10, \tmp # .. + c0
+    POW8_FMA_STEP .Lpoly_log2+32(%rip), %ymm11, %ymm10, \tmp  // .. + c0
 
-    vaddps    %ymm10, %ymm12, %ymm12     # log2(x) = e + P_log(f)
+    vaddps    %ymm10, %ymm12, %ymm12  // log2(x) = e + P_log(f)
 
-    # 3. t = y * log2(x)
-    vmulps    \y, %ymm12, %ymm12          # t = y * log2(x)
+// 3. t = y * log2(x)
+    vmulps    \y, %ymm12, %ymm12  // t = y * log2(x)
 
-    # 4. exp2(t) range reduction
-    # t = t_i + t_f; t_i = floor(t); t_f = t - t_i
-    vroundps  $1, %ymm12, %ymm11         # t_i = floor(t)
-    vsubps    %ymm11, %ymm12, %ymm12      # t_f = t - t_i (in [0, 1))
+// 4. exp2(t) range reduction
+// t = t_i + t_f; t_i = floor(t); t_f = t - t_i
+    vroundps  $1, %ymm12, %ymm11  // t_i = floor(t)
+    vsubps    %ymm11, %ymm12, %ymm12  // t_f = t - t_i (in [0, 1))
 
-    # 5. Horner's method for P_exp(t_f) ≈ 2^t_f
-    vbroadcastss .Lpoly_exp2+0(%rip), %ymm10 # c8
-    POW8_FMA_STEP .Lpoly_exp2+4(%rip), %ymm12, %ymm10, \tmp # c8*t_f + c7
+// 5. Horner's method for P_exp(t_f) ≈ 2^t_f
+    vbroadcastss .Lpoly_exp2+0(%rip), %ymm10  // c8
+    POW8_FMA_STEP .Lpoly_exp2+4(%rip), %ymm12, %ymm10, \tmp  // c8*t_f + c7
     POW8_FMA_STEP .Lpoly_exp2+8(%rip), %ymm12, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_exp2+12(%rip), %ymm12, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_exp2+16(%rip), %ymm12, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_exp2+20(%rip), %ymm12, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_exp2+24(%rip), %ymm12, %ymm10, \tmp
     POW8_FMA_STEP .Lpoly_exp2+28(%rip), %ymm12, %ymm10, \tmp
-    POW8_FMA_STEP .Lpoly_exp2+32(%rip), %ymm12, %ymm10, \tmp # .. + c0
+    POW8_FMA_STEP .Lpoly_exp2+32(%rip), %ymm12, %ymm10, \tmp  // .. + c0
 
-    # 6. Final scale by 2^t_i
-    vcvtps2dq %ymm11, %ymm11              # t_i_int
-    vpaddd    %ymm15, %ymm11, %ymm11      # biased_t_i = t_i + 127
-    vpmaxsd   .Lmin_exp_biased(%rip), %ymm11, %ymm11 # clamp to 0 (handle underflow)
-    vpslld    $23, %ymm11, %ymm11         # shift to exponent field
-    vmulps    %ymm10, %ymm11, \x          # Result = 2^t_f * 2^t_i
+// 6. Final scale by 2^t_i
+    vcvtps2dq %ymm11, %ymm11  // t_i_int
+    vpaddd    %ymm15, %ymm11, %ymm11  // biased_t_i = t_i + 127
+    vpmaxsd   .Lmin_exp_biased(%rip), %ymm11, %ymm11  // clamp to 0 (handle underflow)
+    vpslld    $23, %ymm11, %ymm11  // shift to exponent field
+    vmulps    %ymm10, %ymm11, \x  // Result = 2^t_f * 2^t_i
 .endm
 
 RODATA

@@ -19,6 +19,28 @@
 
 .text
 .p2align 4
+
+/*
+ * void ksvgTurbulenceApplyAvx2_x86_64(
+ *     jint* pixels, jint width, jint height,
+ *     jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+ *     jdouble baseFrequencyX, jdouble baseFrequencyY,
+ *     jint periodX, jint periodY, jint octaves, jboolean fractalNoise,
+ *     jdouble invCanvasScaleX, jdouble invCanvasScaleY,
+ *     jdouble userLeft, jdouble userTop,
+ *     jdouble originX, jdouble originY,
+ *     jdouble unitSizeX, jdouble unitSizeY,
+ *     jint seed);
+ *
+ * x86-64 System V ABI:
+ *   rdi = pixels, rsi = width, rdx = height, rcx = clipLeft, r8d = clipTop, r9d = clipRight
+ *   xmm0 = baseFrequencyX, xmm1 = baseFrequencyY
+ *   xmm2 = invCanvasScaleX, xmm3 = invCanvasScaleY
+ *   xmm4 = userLeft, xmm5 = userTop
+ *   xmm6 = originX, xmm7 = originY
+ *   stack: clipBottom (16(%rbp)), periodX (24(%rbp)), periodY (32(%rbp)), octaves (40(%rbp))
+ *   stack: fractalNoise (48(%rbp)), unitSizeX (56(%rbp)), unitSizeY (64(%rbp)), seed (72(%rbp))
+ */
 .globl SYM(ksvgTurbulenceApplyAvx2_x86_64)
 TYPE(ksvgTurbulenceApplyAvx2_x86_64, @function)
     SYM(ksvgTurbulenceApplyAvx2_x86_64):

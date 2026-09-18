@@ -168,13 +168,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorSsse3I386), @function)
     addl    %ebx, %edi
     cmpl    32(%esp), %eax
     jge     .LBB0_23
-.LBB0_3:  # =>This Loop Header: Depth=1
-    # Child Loop BB0_4 Depth 2
-    # Child Loop BB0_9 Depth 3
-    # Child Loop BB0_11 Depth 4
-    # Child Loop BB0_14 Depth 4
-    # Child Loop BB0_25 Depth 3
-    # Child Loop BB0_26 Depth 4
+.LBB0_3:
     movl    %edi, 12(%esp)
     movl    %eax, 36(%esp)
     imull   136(%esp), %eax
@@ -259,13 +253,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorSsse3I386), @function)
     movl    %edi, 20(%esp)
     cmpl    %ebp, %eax
     jg      .LBB0_22
-.LBB0_4:  # Parent Loop BB0_3 Depth=1
-    # =>  This Loop Header: Depth=2
-    # Child Loop BB0_9 Depth 3
-    # Child Loop BB0_11 Depth 4
-    # Child Loop BB0_14 Depth 4
-    # Child Loop BB0_25 Depth 3
-    # Child Loop BB0_26 Depth 4
+.LBB0_4:
     movl    %eax, 44(%esp)
     cmpl    $0, 152(%esp)
     jle     .LBB0_5
@@ -288,11 +276,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorSsse3I386), @function)
     addl    %ebx, %eax
     cmpl    152(%esp), %ebp
     je      .LBB0_18
-.LBB0_9:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # =>    This Loop Header: Depth=3
-    # Child Loop BB0_11 Depth 4
-    # Child Loop BB0_14 Depth 4
+.LBB0_9:
     cmpl    160(%esp), %ebp
     jne     .LBB0_10
     xorl    %edi, %edi
@@ -321,10 +305,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorSsse3I386), @function)
     movaps  %xmm0, %xmm3
     cmpl    %edi, %esi
     je      .LBB0_17
-.LBB0_14:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # Parent Loop BB0_9 Depth=3
-    # =>      This Inner Loop Header: Depth=4
+.LBB0_14:
     movups  (%eax, %edi, 4), %xmm1
     movaps  %xmm1, %xmm0
     cmpl    %edi, %ecx
@@ -338,10 +319,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorSsse3I386), @function)
     movaps  .LCPI0_1, %xmm2
     movdqa  .LCPI0_2, %xmm0
 .p2align 4, 0x90
-.LBB0_11:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # Parent Loop BB0_9 Depth=3
-    # =>      This Inner Loop Header: Depth=4
+.LBB0_11:
     movups  (%eax, %edi, 4), %xmm4
     movss   (%edx, %edi, 4), %xmm1
     shufps  $0, %xmm1, %xmm1
@@ -393,17 +371,11 @@ TYPE(SYM(ksvgConvolveApplyInteriorSsse3I386), @function)
     xorps   %xmm6, %xmm6
     xorps   %xmm5, %xmm5
 .p2align 4, 0x90
-.LBB0_25:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # =>    This Loop Header: Depth=3
-    # Child Loop BB0_26 Depth 4
+.LBB0_25:
     xorl    %edi, %edi
     movaps  .LCPI0_1, %xmm0
 .p2align 4, 0x90
-.LBB0_26:  # Parent Loop BB0_3 Depth=1
-    # Parent Loop BB0_4 Depth=2
-    # Parent Loop BB0_25 Depth=3
-    # =>      This Inner Loop Header: Depth=4
+.LBB0_26:
     movups  (%edx, %edi, 4), %xmm3
     movss   (%ebp, %edi, 4), %xmm2
     shufps  $0, %xmm2, %xmm2

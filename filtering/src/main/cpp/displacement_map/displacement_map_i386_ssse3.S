@@ -97,9 +97,9 @@ TYPE(SYM(ksvgDisplacementMapApplySsse3_i386), @function)
 .set DM_MASK_A_OFF, .Ldm_mask_a - .Ldm_const
 
 .macro KERNEL LABEL, XMASK, YMASK, XSHIFT, YSHIFT
-    .p2align 4
+.p2align 4
     TYPE(SYM(\LABEL), @function)
-    SYM(\LABEL):
+SYM(\LABEL):
     push    ebp
     push    ebx
     push    esi
@@ -314,7 +314,7 @@ TYPE(SYM(ksvgDisplacementMapApplySsse3_i386), @function)
     pop     ebx
     pop     ebp
     ret
-    //      SIZE(SYM(\LABEL))
+    #      SIZE(SYM(\LABEL))
 .endm
 
         /* xChannel/yChannel use the public R=0, G=1, B=2, A=3 order. */

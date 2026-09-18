@@ -16,6 +16,12 @@
 
 .text
 .align 2
+/*
+ * void turbulence64Asm(const Turbulence64AsmArgs* args);
+ *
+ * AArch64 ABI:
+ *   x0 = args
+ */
 .global turbulence64Asm
 .type turbulence64Asm, %function
 

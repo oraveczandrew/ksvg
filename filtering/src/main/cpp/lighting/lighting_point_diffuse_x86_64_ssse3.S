@@ -49,106 +49,103 @@
 .endm
 
 .text
-.file "pd_ss.c"
 LIT16
-.p2align 4, 0x0  # -- Begin function ksvgLightingPointDiffuseRowSsse3
+.p2align 4, 0x0
 .LCPI0_0:
-.long	0x40000000  # float 2
-.long	0x40400000  # float 3
+.long	0x40000000  // float 2
+.long	0x40400000  // float 3
 .zero	4
 .zero	4
 .LCPI0_1:
-.long	0x80000000  # float -0
-.long	0x80000000  # float -0
-.long	0x80000000  # float -0
-.long	0x80000000  # float -0
+.long	0x80000000  // float -0
+.long	0x80000000  // float -0
+.long	0x80000000  // float -0
+.long	0x80000000  // float -0
 .LCPI0_2:
-.long	0x3f800000  # float 1
-.long	0x3f800000  # float 1
-.long	0x3f800000  # float 1
-.long	0x3f800000  # float 1
+.long	0x3f800000  // float 1
+.long	0x3f800000  // float 1
+.long	0x3f800000  // float 1
+.long	0x3f800000  // float 1
 .LCPI0_3:
-.long	255  # 0xff
-.long	255  # 0xff
-.long	255  # 0xff
-.long	255  # 0xff
+.long	255  // 0xff
+.long	255  // 0xff
+.long	255  // 0xff
+.long	255  // 0xff
 .LCPI0_4:
-.long	4278190080  # 0xff000000
-.long	4278190080  # 0xff000000
-.long	4278190080  # 0xff000000
-.long	4278190080  # 0xff000000
+.long	4278190080  // 0xff000000
+.long	4278190080  // 0xff000000
+.long	4278190080  // 0xff000000
+.long	4278190080  // 0xff000000
 .LCPI0_5:
 .zero	16,255
 .Lpoint_half:
-.long	0x3f000000  # float 0.5
-.long	0x3f000000  # float 0.5
-.long	0x3f000000  # float 0.5
-.long	0x3f000000  # float 0.5
+.long	0x3f000000  // float 0.5
+.long	0x3f000000  // float 0.5
+.long	0x3f000000  // float 0.5
+.long	0x3f000000  // float 0.5
 .text
 .globl SYM(ksvgLightingPointDiffuseRowSsse3)
 .p2align 4, 0x90
 TYPE(SYM(ksvgLightingPointDiffuseRowSsse3), @function)
 SYM(ksvgLightingPointDiffuseRowSsse3):
 CFI_START
-# %bb.0:
     testl          %r8d, %r8d
     jle            .LBB0_4
-# %bb.1:
     subq           $40, %rsp
     CFI_DEF_CFA_OFFSET(48)
-    movss          16(%r9), %xmm0  # xmm0 = mem[0],zero,zero,zero
-    movss          40(%r9), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    movss          %xmm1, -116(%rsp)  # 4-byte Spill
-    movd           48(%r9), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    movss          36(%r9), %xmm3  # xmm3 = mem[0],zero,zero,zero
-    shufps         $0, %xmm3, %xmm3  # xmm3 = xmm3[0,0,0,0]
-    movss          (%r9), %xmm2  # xmm2 = mem[0],zero,zero,zero
-    movss          4(%r9), %xmm4  # xmm4 = mem[0],zero,zero,zero
-    movss          8(%r9), %xmm5  # xmm5 = mem[0],zero,zero,zero
-    movss          12(%r9), %xmm6  # xmm6 = mem[0],zero,zero,zero
-    shufps         $0, %xmm2, %xmm2  # xmm2 = xmm2[0,0,0,0]
-    movaps         %xmm2, (%rsp)  # 16-byte Spill
-    shufps         $0, %xmm4, %xmm4  # xmm4 = xmm4[0,0,0,0]
-    movaps         %xmm4, -16(%rsp)  # 16-byte Spill
-    movq           %xmm1, %xmm2  # xmm2 = xmm1[0],zero
-    movdqa         %xmm1, 16(%rsp)  # 16-byte Spill
-    movsldup       %xmm1, %xmm1  # xmm1 = xmm1[0,0,2,2]
+    movss          16(%r9), %xmm0  // xmm0 = mem[0],zero,zero,zero
+    movss          40(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    movss          %xmm1, -116(%rsp)
+    movd           48(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    movss          36(%r9), %xmm3  // xmm3 = mem[0],zero,zero,zero
+    shufps         $0, %xmm3, %xmm3  // xmm3 = xmm3[0,0,0,0]
+    movss          (%r9), %xmm2  // xmm2 = mem[0],zero,zero,zero
+    movss          4(%r9), %xmm4  // xmm4 = mem[0],zero,zero,zero
+    movss          8(%r9), %xmm5  // xmm5 = mem[0],zero,zero,zero
+    movss          12(%r9), %xmm6  // xmm6 = mem[0],zero,zero,zero
+    shufps         $0, %xmm2, %xmm2  // xmm2 = xmm2[0,0,0,0]
+    movaps         %xmm2, (%rsp)
+    shufps         $0, %xmm4, %xmm4  // xmm4 = xmm4[0,0,0,0]
+    movaps         %xmm4, -16(%rsp)
+    movq           %xmm1, %xmm2  // xmm2 = xmm1[0],zero
+    movdqa         %xmm1, 16(%rsp)
+    movsldup       %xmm1, %xmm1  // xmm1 = xmm1[0,0,2,2]
     mulps          .LCPI0_0(%rip), %xmm1
-    shufps         $66, %xmm1, %xmm2  # xmm2 = xmm2[2,0],xmm1[0,1]
-    movaps         %xmm2, -64(%rsp)  # 16-byte Spill
-    shufps         $0, %xmm6, %xmm6  # xmm6 = xmm6[0,0,0,0]
-    movaps         %xmm6, -48(%rsp)  # 16-byte Spill
+    shufps         $66, %xmm1, %xmm2  // xmm2 = xmm2[2,0],xmm1[0,1]
+    movaps         %xmm2, -64(%rsp)
+    shufps         $0, %xmm6, %xmm6  // xmm6 = xmm6[0,0,0,0]
+    movaps         %xmm6, -48(%rsp)
     subss          44(%r9), %xmm0
     movaps         %xmm0, %xmm1
-    shufps         $0, %xmm0, %xmm1  # xmm1 = xmm1[0,0],xmm0[0,0]
-    movaps         %xmm1, -80(%rsp)  # 16-byte Spill
-    movss          20(%r9), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    shufps         $0, %xmm1, %xmm1  # xmm1 = xmm1[0,0,0,0]
-    movaps         %xmm1, -96(%rsp)  # 16-byte Spill
+    shufps         $0, %xmm0, %xmm1  // xmm1 = xmm1[0,0],xmm0[0,0]
+    movaps         %xmm1, -80(%rsp)
+    movss          20(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    shufps         $0, %xmm1, %xmm1  // xmm1 = xmm1[0,0,0,0]
+    movaps         %xmm1, -96(%rsp)
     mulss          %xmm0, %xmm0
-    shufps         $0, %xmm0, %xmm0  # xmm0 = xmm0[0,0,0,0]
-    shufps         $0, %xmm5, %xmm5  # xmm5 = xmm5[0,0,0,0]
-    movaps         %xmm5, -32(%rsp)  # 16-byte Spill
-    movss          24(%r9), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    shufps         $0, %xmm1, %xmm1  # xmm1 = xmm1[0,0,0,0]
-    movaps         %xmm1, -112(%rsp)  # 16-byte Spill
-    movss          28(%r9), %xmm12  # xmm12 = mem[0],zero,zero,zero
-    shufps         $0, %xmm12, %xmm12  # xmm12 = xmm12[0,0,0,0]
-    movss          32(%r9), %xmm13  # xmm13 = mem[0],zero,zero,zero
-    shufps         $0, %xmm13, %xmm13  # xmm13 = xmm13[0,0,0,0]
+    shufps         $0, %xmm0, %xmm0  // xmm0 = xmm0[0,0,0,0]
+    shufps         $0, %xmm5, %xmm5  // xmm5 = xmm5[0,0,0,0]
+    movaps         %xmm5, -32(%rsp)
+    movss          24(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    shufps         $0, %xmm1, %xmm1  // xmm1 = xmm1[0,0,0,0]
+    movaps         %xmm1, -112(%rsp)
+    movss          28(%r9), %xmm12  // xmm12 = mem[0],zero,zero,zero
+    shufps         $0, %xmm12, %xmm12  // xmm12 = xmm12[0,0,0,0]
+    movss          32(%r9), %xmm13  // xmm13 = mem[0],zero,zero,zero
+    shufps         $0, %xmm13, %xmm13  // xmm13 = xmm13[0,0,0,0]
     movl           %r8d, %eax
     xorl           %r8d, %r8d
-    movaps         .LCPI0_2(%rip), %xmm15  # xmm15 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0]
+    movaps         .LCPI0_2(%rip), %xmm15  // xmm15 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0]
     xorps          %xmm1, %xmm1
-    movdqa         .LCPI0_3(%rip), %xmm2  # xmm2 = [255,255,255,255]
+    movdqa         .LCPI0_3(%rip), %xmm2  // xmm2 = [255,255,255,255]
 .p2align 4, 0x90
-.LBB0_2:  # =>This Inner Loop Header: Depth=1
+.LBB0_2:
     // Main loop, 4 pixels per iteration: Sobel window, normalize, dot with
     // the point-light direction, clamp, per-channel pack, store.
     xorps          %xmm4, %xmm4
     cvtsi2ss       %r8d, %xmm4
-    mulss          16(%rsp), %xmm4  # 16-byte Folded Reload
-    addss          -116(%rsp), %xmm4  # 4-byte Folded Reload
+    mulss          16(%rsp), %xmm4
+    addss          -116(%rsp), %xmm4
     movdqu         (%rdi,%r8,4), %xmm5
     movdqu         4(%rdi,%r8,4), %xmm6
     movdqu         8(%rdi,%r8,4), %xmm7
@@ -182,11 +179,11 @@ CFI_START
     addps          %xmm9, %xmm8
     addps          %xmm11, %xmm8
     subps          %xmm10, %xmm8
-    movaps         .LCPI0_1(%rip), %xmm6  # xmm6 = [-0.0E+0,-0.0E+0,-0.0E+0,-0.0E+0]
+    movaps         .LCPI0_1(%rip), %xmm6  // xmm6 = [-0.0E+0,-0.0E+0,-0.0E+0,-0.0E+0]
     xorps          %xmm6, %xmm7
-    divps          (%rsp), %xmm7  # 16-byte Folded Reload
+    divps          (%rsp), %xmm7
     xorps          %xmm6, %xmm8
-    divps          -16(%rsp), %xmm8  # 16-byte Folded Reload
+    divps          -16(%rsp), %xmm8
     movaps         %xmm8, %xmm6
     mulps          %xmm8, %xmm6
     movaps         %xmm7, %xmm9
@@ -196,11 +193,11 @@ CFI_START
     sqrtps         %xmm9, %xmm9
     movaps         %xmm15, %xmm6
     divps          %xmm9, %xmm6
-    shufps         $0, %xmm4, %xmm4  # xmm4 = xmm4[0,0,0,0]
-    addps          -64(%rsp), %xmm4  # 16-byte Folded Reload
-    movaps         -48(%rsp), %xmm9  # 16-byte Reload
+    shufps         $0, %xmm4, %xmm4  // xmm4 = xmm4[0,0,0,0]
+    addps          -64(%rsp), %xmm4
+    movaps         -48(%rsp), %xmm9
     subps          %xmm4, %xmm9
-    movaps         -96(%rsp), %xmm10  # 16-byte Reload
+    movaps         -96(%rsp), %xmm10
     subps          %xmm5, %xmm10
     movaps         %xmm9, %xmm5
     mulps          %xmm9, %xmm5
@@ -212,7 +209,7 @@ CFI_START
     movaps         %xmm15, %xmm11
     divps          %xmm5, %xmm11
     mulps          %xmm11, %xmm9
-    movaps         -80(%rsp), %xmm5  # 16-byte Reload
+    movaps         -80(%rsp), %xmm5
     mulps          %xmm11, %xmm5
     mulps          %xmm10, %xmm11
     mulps          %xmm6, %xmm7
@@ -227,12 +224,12 @@ CFI_START
     mulps          %xmm6, %xmm4
     addps          %xmm5, %xmm4
     maxps          %xmm1, %xmm4
-    mulps          -32(%rsp), %xmm4  # 16-byte Folded Reload
+    mulps          -32(%rsp), %xmm4
     maxps          %xmm1, %xmm4
     minps          %xmm15, %xmm4
-    movaps         -112(%rsp), %xmm5  # 16-byte Reload
+    movaps         -112(%rsp), %xmm5
     mulps          %xmm4, %xmm5
-    addps          .Lpoint_half(%rip), %xmm5  # round-half-up R
+    addps          .Lpoint_half(%rip), %xmm5  // round-half-up R
     cvttps2dq      %xmm5, %xmm5
     movdqa         %xmm5, %xmm6
     pcmpgtd        %xmm1, %xmm6
@@ -244,7 +241,7 @@ CFI_START
     por            %xmm6, %xmm5
     movaps         %xmm12, %xmm6
     mulps          %xmm4, %xmm6
-    addps          .Lpoint_half(%rip), %xmm6  # round-half-up G
+    addps          .Lpoint_half(%rip), %xmm6  // round-half-up G
     cvttps2dq      %xmm6, %xmm6
     movdqa         %xmm6, %xmm7
     pcmpgtd        %xmm1, %xmm7
@@ -255,7 +252,7 @@ CFI_START
     pandn          %xmm2, %xmm6
     por            %xmm7, %xmm6
     mulps          %xmm13, %xmm4
-    addps          .Lpoint_half(%rip), %xmm4  # round-half-up B
+    addps          .Lpoint_half(%rip), %xmm4  // round-half-up B
     cvttps2dq      %xmm4, %xmm4
     movdqa         %xmm4, %xmm7
     pcmpgtd        %xmm1, %xmm7
@@ -274,39 +271,37 @@ CFI_START
     addq           $4, %r8
     cmpq           %rax, %r8
     jb             .LBB0_2
-# %bb.3:
     addq           $40, %rsp
     CFI_DEF_CFA_OFFSET(8)
 .LBB0_4:
     retq
 .Lfunc_end0:
 CFI_END
-# -- End function
 LIT16
-.p2align 4, 0x0  # -- Begin function ksvgLightingPointDiffuseRowSsse3Linear
+.p2align 4, 0x0
 .LCPI1_0:
-.long	0x40000000  # float 2
-.long	0x40400000  # float 3
+.long	0x40000000  // float 2
+.long	0x40400000  // float 3
 .zero	4
 .zero	4
 .LCPI1_1:
-.long	0x80000000  # float -0
-.long	0x80000000  # float -0
-.long	0x80000000  # float -0
-.long	0x80000000  # float -0
+.long	0x80000000  // float -0
+.long	0x80000000  // float -0
+.long	0x80000000  // float -0
+.long	0x80000000  // float -0
 .LCPI1_2:
-.long	0x3f800000  # float 1
-.long	0x3f800000  # float 1
-.long	0x3f800000  # float 1
-.long	0x3f800000  # float 1
+.long	0x3f800000  // float 1
+.long	0x3f800000  // float 1
+.long	0x3f800000  // float 1
+.long	0x3f800000  // float 1
 .LCPI1_3:
-.long	255  # 0xff
-.long	255  # 0xff
-.long	255  # 0xff
-.long	255  # 0xff
+.long	255  // 0xff
+.long	255  // 0xff
+.long	255  // 0xff
+.long	255  // 0xff
 .LCPI1_4:
-.long	4278190080  # 0xff000000
-.long	4278190080  # 0xff000000
+.long	4278190080  // 0xff000000
+.long	4278190080  // 0xff000000
 .zero	4
 .zero	4
 .text
@@ -315,10 +310,8 @@ LIT16
 TYPE(SYM(ksvgLightingPointDiffuseRowSsse3Linear), @function)
 SYM(ksvgLightingPointDiffuseRowSsse3Linear):
 CFI_START
-# %bb.0:
     testl          %r8d, %r8d
     jle            .LBB1_7
-# %bb.1:
     pushq          %r14
     CFI_DEF_CFA_OFFSET(16)
     pushq          %rbx
@@ -328,54 +321,54 @@ CFI_START
     CFI_OFFSET(%rbx, -24)
     CFI_OFFSET(%r14, -16)
     movq           64(%rsp), %rax
-    movss          16(%r9), %xmm0  # xmm0 = mem[0],zero,zero,zero
-    movss          40(%r9), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    movss          %xmm1, -116(%rsp)  # 4-byte Spill
-    movd           48(%r9), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    movss          36(%r9), %xmm3  # xmm3 = mem[0],zero,zero,zero
-    shufps         $0, %xmm3, %xmm3  # xmm3 = xmm3[0,0,0,0]
-    movss          (%r9), %xmm2  # xmm2 = mem[0],zero,zero,zero
-    movss          4(%r9), %xmm4  # xmm4 = mem[0],zero,zero,zero
-    movss          8(%r9), %xmm5  # xmm5 = mem[0],zero,zero,zero
-    movss          12(%r9), %xmm6  # xmm6 = mem[0],zero,zero,zero
-    shufps         $0, %xmm2, %xmm2  # xmm2 = xmm2[0,0,0,0]
-    movaps         %xmm2, (%rsp)  # 16-byte Spill
-    shufps         $0, %xmm4, %xmm4  # xmm4 = xmm4[0,0,0,0]
-    movaps         %xmm4, -16(%rsp)  # 16-byte Spill
-    movq           %xmm1, %xmm2  # xmm2 = xmm1[0],zero
-    movdqa         %xmm1, 16(%rsp)  # 16-byte Spill
-    movsldup       %xmm1, %xmm1  # xmm1 = xmm1[0,0,2,2]
+    movss          16(%r9), %xmm0  // xmm0 = mem[0],zero,zero,zero
+    movss          40(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    movss          %xmm1, -116(%rsp)
+    movd           48(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    movss          36(%r9), %xmm3  // xmm3 = mem[0],zero,zero,zero
+    shufps         $0, %xmm3, %xmm3  // xmm3 = xmm3[0,0,0,0]
+    movss          (%r9), %xmm2  // xmm2 = mem[0],zero,zero,zero
+    movss          4(%r9), %xmm4  // xmm4 = mem[0],zero,zero,zero
+    movss          8(%r9), %xmm5  // xmm5 = mem[0],zero,zero,zero
+    movss          12(%r9), %xmm6  // xmm6 = mem[0],zero,zero,zero
+    shufps         $0, %xmm2, %xmm2  // xmm2 = xmm2[0,0,0,0]
+    movaps         %xmm2, (%rsp)
+    shufps         $0, %xmm4, %xmm4  // xmm4 = xmm4[0,0,0,0]
+    movaps         %xmm4, -16(%rsp)
+    movq           %xmm1, %xmm2  // xmm2 = xmm1[0],zero
+    movdqa         %xmm1, 16(%rsp)
+    movsldup       %xmm1, %xmm1  // xmm1 = xmm1[0,0,2,2]
     mulps          .LCPI1_0(%rip), %xmm1
-    shufps         $66, %xmm1, %xmm2  # xmm2 = xmm2[2,0],xmm1[0,1]
-    movaps         %xmm2, -64(%rsp)  # 16-byte Spill
-    shufps         $0, %xmm6, %xmm6  # xmm6 = xmm6[0,0,0,0]
-    movaps         %xmm6, -48(%rsp)  # 16-byte Spill
+    shufps         $66, %xmm1, %xmm2  // xmm2 = xmm2[2,0],xmm1[0,1]
+    movaps         %xmm2, -64(%rsp)
+    shufps         $0, %xmm6, %xmm6  // xmm6 = xmm6[0,0,0,0]
+    movaps         %xmm6, -48(%rsp)
     subss          44(%r9), %xmm0
     movaps         %xmm0, %xmm1
-    shufps         $0, %xmm0, %xmm1  # xmm1 = xmm1[0,0],xmm0[0,0]
-    movaps         %xmm1, -80(%rsp)  # 16-byte Spill
-    movss          20(%r9), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    shufps         $0, %xmm1, %xmm1  # xmm1 = xmm1[0,0,0,0]
-    movaps         %xmm1, -96(%rsp)  # 16-byte Spill
+    shufps         $0, %xmm0, %xmm1  // xmm1 = xmm1[0,0],xmm0[0,0]
+    movaps         %xmm1, -80(%rsp)
+    movss          20(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    shufps         $0, %xmm1, %xmm1  // xmm1 = xmm1[0,0,0,0]
+    movaps         %xmm1, -96(%rsp)
     mulss          %xmm0, %xmm0
-    shufps         $0, %xmm0, %xmm0  # xmm0 = xmm0[0,0,0,0]
-    shufps         $0, %xmm5, %xmm5  # xmm5 = xmm5[0,0,0,0]
-    movaps         %xmm5, -32(%rsp)  # 16-byte Spill
-    movss          24(%r9), %xmm1  # xmm1 = mem[0],zero,zero,zero
-    shufps         $0, %xmm1, %xmm1  # xmm1 = xmm1[0,0,0,0]
-    movaps         %xmm1, -112(%rsp)  # 16-byte Spill
-    movss          28(%r9), %xmm12  # xmm12 = mem[0],zero,zero,zero
-    shufps         $0, %xmm12, %xmm12  # xmm12 = xmm12[0,0,0,0]
-    movss          32(%r9), %xmm13  # xmm13 = mem[0],zero,zero,zero
-    shufps         $0, %xmm13, %xmm13  # xmm13 = xmm13[0,0,0,0]
+    shufps         $0, %xmm0, %xmm0  // xmm0 = xmm0[0,0,0,0]
+    shufps         $0, %xmm5, %xmm5  // xmm5 = xmm5[0,0,0,0]
+    movaps         %xmm5, -32(%rsp)
+    movss          24(%r9), %xmm1  // xmm1 = mem[0],zero,zero,zero
+    shufps         $0, %xmm1, %xmm1  // xmm1 = xmm1[0,0,0,0]
+    movaps         %xmm1, -112(%rsp)
+    movss          28(%r9), %xmm12  // xmm12 = mem[0],zero,zero,zero
+    shufps         $0, %xmm12, %xmm12  // xmm12 = xmm12[0,0,0,0]
+    movss          32(%r9), %xmm13  // xmm13 = mem[0],zero,zero,zero
+    shufps         $0, %xmm13, %xmm13  // xmm13 = xmm13[0,0,0,0]
     movl           %r8d, %r8d
     xorl           %r9d, %r9d
-    movaps         .LCPI1_2(%rip), %xmm15  # xmm15 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0]
+    movaps         .LCPI1_2(%rip), %xmm15  // xmm15 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0]
     xorps          %xmm1, %xmm1
-    movdqa         .LCPI1_3(%rip), %xmm11  # xmm11 = [255,255,255,255]
+    movdqa         .LCPI1_3(%rip), %xmm11  // xmm11 = [255,255,255,255]
     jmp            .LBB1_2
 .p2align 4, 0x90
-.LBB1_4:  #   in Loop: Header=BB1_2 Depth=1
+.LBB1_4:
     // Vector-pack fast path (all channels already sRGB bytes, no LUT).
     pslld          $16, %xmm7
     pslld          $8, %xmm14
@@ -390,29 +383,29 @@ CFI_START
     shll           $8, %r11d
     orl            %r10d, %r11d
     leal           (%rbx,%r11), %r10d
-    addl           $-16777216, %r10d  # imm = 0xFF000000
+    addl           $-16777216, %r10d  // imm = 0xFF000000
     movl           %r10d, 8(%rcx,%r9,4)
     movd           %xmm6, %r11d
     movd           %xmm5, %r10d
     movd           %xmm4, %ebx
-.LBB1_5:  #   in Loop: Header=BB1_2 Depth=1
+.LBB1_5:
     // Shared scalar-pack tail (last pixel of the L2S path).
     shll           $16, %r11d
     shll           $8, %r10d
     addl           %r11d, %r10d
     addl           %ebx, %r10d
-    addl           $-16777216, %r10d  # imm = 0xFF000000
+    addl           $-16777216, %r10d  // imm = 0xFF000000
     movl           %r10d, 12(%rcx,%r9,4)
     addq           $4, %r9
     cmpq           %r8, %r9
     jae            .LBB1_6
-.LBB1_2:  # =>This Inner Loop Header: Depth=1
+.LBB1_2:
     // Linear-kernel main loop (window/normalize/dot as in the plain kernel,
     // then per-pixel L2S conversion below).
     xorps          %xmm4, %xmm4
     cvtsi2ss       %r9d, %xmm4
-    mulss          16(%rsp), %xmm4  # 16-byte Folded Reload
-    addss          -116(%rsp), %xmm4  # 4-byte Folded Reload
+    mulss          16(%rsp), %xmm4
+    addss          -116(%rsp), %xmm4
     movdqu         (%rdi,%r9,4), %xmm2
     movdqu         4(%rdi,%r9,4), %xmm5
     movdqu         8(%rdi,%r9,4), %xmm7
@@ -449,11 +442,11 @@ CFI_START
     addps          %xmm9, %xmm8
     addps          %xmm2, %xmm8
     subps          %xmm6, %xmm8
-    movaps         .LCPI1_1(%rip), %xmm2  # xmm2 = [-0.0E+0,-0.0E+0,-0.0E+0,-0.0E+0]
+    movaps         .LCPI1_1(%rip), %xmm2  // xmm2 = [-0.0E+0,-0.0E+0,-0.0E+0,-0.0E+0]
     xorps          %xmm2, %xmm7
-    divps          (%rsp), %xmm7  # 16-byte Folded Reload
+    divps          (%rsp), %xmm7
     xorps          %xmm2, %xmm8
-    divps          -16(%rsp), %xmm8  # 16-byte Folded Reload
+    divps          -16(%rsp), %xmm8
     movaps         %xmm8, %xmm2
     mulps          %xmm8, %xmm2
     movaps         %xmm7, %xmm6
@@ -465,11 +458,11 @@ CFI_START
     divps          %xmm6, %xmm2
     mulps          %xmm2, %xmm7
     mulps          %xmm2, %xmm8
-    shufps         $0, %xmm4, %xmm4  # xmm4 = xmm4[0,0,0,0]
-    addps          -64(%rsp), %xmm4  # 16-byte Folded Reload
-    movaps         -48(%rsp), %xmm6  # 16-byte Reload
+    shufps         $0, %xmm4, %xmm4  // xmm4 = xmm4[0,0,0,0]
+    addps          -64(%rsp), %xmm4
+    movaps         -48(%rsp), %xmm6
     subps          %xmm4, %xmm6
-    movaps         -96(%rsp), %xmm9  # 16-byte Reload
+    movaps         -96(%rsp), %xmm9
     subps          %xmm5, %xmm9
     movaps         %xmm6, %xmm5
     mulps          %xmm6, %xmm5
@@ -481,7 +474,7 @@ CFI_START
     movaps         %xmm15, %xmm10
     divps          %xmm5, %xmm10
     mulps          %xmm10, %xmm6
-    movaps         -80(%rsp), %xmm5  # 16-byte Reload
+    movaps         -80(%rsp), %xmm5
     mulps          %xmm10, %xmm5
     mulps          %xmm9, %xmm10
     cmpneqps       %xmm1, %xmm4
@@ -494,12 +487,12 @@ CFI_START
     mulps          %xmm2, %xmm4
     addps          %xmm5, %xmm4
     maxps          %xmm1, %xmm4
-    mulps          -32(%rsp), %xmm4  # 16-byte Folded Reload
+    mulps          -32(%rsp), %xmm4
     maxps          %xmm1, %xmm4
     minps          %xmm15, %xmm4
-    movaps         -112(%rsp), %xmm2  # 16-byte Reload
+    movaps         -112(%rsp), %xmm2
     mulps          %xmm4, %xmm2
-    addps          .Lpoint_half(%rip), %xmm2  # round-half-up R
+    addps          .Lpoint_half(%rip), %xmm2  // round-half-up R
     cvttps2dq      %xmm2, %xmm2
     movdqa         %xmm2, %xmm5
     pcmpgtd        %xmm1, %xmm5
@@ -511,7 +504,7 @@ CFI_START
     por            %xmm5, %xmm7
     movaps         %xmm12, %xmm2
     mulps          %xmm4, %xmm2
-    addps          .Lpoint_half(%rip), %xmm2  # round-half-up G
+    addps          .Lpoint_half(%rip), %xmm2  // round-half-up G
     cvttps2dq      %xmm2, %xmm2
     movdqa         %xmm2, %xmm5
     pcmpgtd        %xmm1, %xmm5
@@ -522,7 +515,7 @@ CFI_START
     pandn          %xmm11, %xmm14
     por            %xmm5, %xmm14
     mulps          %xmm13, %xmm4
-    addps          .Lpoint_half(%rip), %xmm4  # round-half-up B
+    addps          .Lpoint_half(%rip), %xmm4  // round-half-up B
     cvttps2dq      %xmm4, %xmm2
     movdqa         %xmm2, %xmm4
     pcmpgtd        %xmm1, %xmm4
@@ -532,27 +525,26 @@ CFI_START
     pand           %xmm2, %xmm4
     pandn          %xmm11, %xmm2
     por            %xmm4, %xmm2
-    pshufd         $238, %xmm7, %xmm10  # xmm10 = xmm7[2,3,2,3]
-    pshufd         $238, %xmm14, %xmm9  # xmm9 = xmm14[2,3,2,3]
-    pshufd         $238, %xmm2, %xmm8  # xmm8 = xmm2[2,3,2,3]
-    pshufd         $255, %xmm7, %xmm6  # xmm6 = xmm7[3,3,3,3]
-    pshufd         $255, %xmm14, %xmm5  # xmm5 = xmm14[3,3,3,3]
-    pshufd         $255, %xmm2, %xmm4  # xmm4 = xmm2[3,3,3,3]
+    pshufd         $238, %xmm7, %xmm10  // xmm10 = xmm7[2,3,2,3]
+    pshufd         $238, %xmm14, %xmm9  // xmm9 = xmm14[2,3,2,3]
+    pshufd         $238, %xmm2, %xmm8  // xmm8 = xmm2[2,3,2,3]
+    pshufd         $255, %xmm7, %xmm6  // xmm6 = xmm7[3,3,3,3]
+    pshufd         $255, %xmm14, %xmm5  // xmm5 = xmm14[3,3,3,3]
+    pshufd         $255, %xmm2, %xmm4  // xmm4 = xmm2[3,3,3,3]
     testq          %rax, %rax
     // With an L2S table, convert channels through it (scalar path below);
     // otherwise take the vector-pack fast path (.LBB1_4).
     je             .LBB1_4
-# %bb.3:                                #   in Loop: Header=BB1_2 Depth=1
     movd           %xmm2, %r10d
     movd           %xmm14, %r11d
     movd           %xmm7, %ebx
     L2S_GATHER_PACK %rax, %rbx, %ebx, %r11, %r11d, %r10, %r10d
     movl           %r11d, (%rcx,%r9,4)
-    pshufd         $85, %xmm7, %xmm7  # xmm7 = xmm7[1,1,1,1]
+    pshufd         $85, %xmm7, %xmm7  // xmm7 = xmm7[1,1,1,1]
     movd           %xmm7, %r10d
-    pshufd         $85, %xmm14, %xmm7  # xmm7 = xmm14[1,1,1,1]
+    pshufd         $85, %xmm14, %xmm7  // xmm7 = xmm14[1,1,1,1]
     movd           %xmm7, %r11d
-    pshufd         $85, %xmm2, %xmm2  # xmm2 = xmm2[1,1,1,1]
+    pshufd         $85, %xmm2, %xmm2  // xmm2 = xmm2[1,1,1,1]
     movd           %xmm2, %ebx
     L2S_GATHER_PACK %rax, %r10, %r10d, %r11, %r11d, %rbx, %ebx
     movl           %r11d, 4(%rcx,%r9,4)
@@ -581,4 +573,3 @@ CFI_START
     retq
 .Lfunc_end1:
 CFI_END
-# -- End function

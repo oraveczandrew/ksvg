@@ -17,49 +17,35 @@
 .text
 .align 2
 
+/*
+ * int ksvgConvolveGenericNeonAsm(
+ *     const NeonConvolveParams* params, int* dst, const int* src);
+ *
+ * AArch64 ABI:
+ *   x0 = params, x1 = dst, x2 = src
+ *
+ * NeonConvolveParams byte layout (hard contract, keep in sync):
+ *   +0  width      (jint)
+ *   +4  height     (jint)
+ *   +8  kernel     (const float*, orderY * orderX)
+ *   +16 orderX     (jint)
+ *   +20 orderY     (jint)
+ *   +24 targetX    (jint)
+ *   +28 targetY    (jint)
+ *   +32 divisor    (float)
+ *   +36 bias       (float)
+ *   +40 preserve   (jboolean; 0 = convolve alpha, nonzero = preserve alpha)
+ *
+ * Processes the interior rectangle:
+ *   x in [targetX, width  - orderX  + targetX)
+ *   y in [targetY, height - orderY  + targetY)
+ *   four output pixels at a time.
+ *
+ * Returns:
+ *   w0 = first x NOT processed on an interior row.
+ */
 .global ksvgConvolveGenericNeonAsm
 .type ksvgConvolveGenericNeonAsm, %function
-
-    // Generic AArch64 NEON feConvolveMatrix interior kernel.
-    //
-    // ABI (all integer/pointer args passed in the first three argument registers,
-    // no stack reads):
-    // x0 = const Convolve::NeonConvolveParams* (see convolve.h)
-    // x1 = jint*                        dst
-    // x2 = const jint*                  src
-    //
-    // NeonConvolveParams byte layout (hard contract, keep in sync):
-    // +0  width      (jint)
-    // +4  height     (jint)
-    // +8  kernel     (const float*, orderY * orderX)
-    // +16 orderX     (jint)
-    // +20 orderY     (jint)
-    // +24 targetX    (jint)
-    // +28 targetY    (jint)
-    // +32 divisor    (float)
-    // +36 bias       (float)
-    // +40 preserve   (jboolean; 0 = convolve alpha, nonzero = preserve alpha)
-    //
-    // Processes the interior rectangle:
-    // x in [targetX, width  - orderX  + targetX)
-    // y in [targetY, height - orderY  + targetY)
-    // four output pixels at a time, immediately to the right of / below the
-    // caller's edge handling. The kernel dimensions and anchor are fully
-    // runtime-variable; only the interior-validity guarantee is required.
-    //
-    // Alpha handling is selected at runtime from the preserve flag: nonzero
-    // preserves alpha from the source pixel, zero convolves the alpha channel
-    // with the same normalize/round/clamp path as R/G/B. The alpha
-    // accumulator (v18) is always maintained so both modes share one loop.
-    //
-    // The routine never writes the 0..3 leftover interior pixels at the end of a
-    // row.
-    //
-    // Returns:
-    // w0 = first x NOT processed on an interior row (a constant, identical for
-    // every interior row). The caller scalar-fills [w0, interiorXHi) for
-    // all interior rows.
-
 ksvgConvolveGenericNeonAsm:
     // Save all callee-saved GPRs we use (x19..x30 = 12 regs => 96 bytes, keeps
     // the 16-byte stack alignment required by AAPCS64).

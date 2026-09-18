@@ -14,28 +14,21 @@
  * limitations under the License.
  */
 
-/*
-* AArch64 / AdvSIMD implementation of the interior morphology kernels.
-*
-* Row:
-*   x0 = src
-*   x1 = dst
-*   w2 = width
-*   w3 = radiusX
-*   w4 = radiusY
-*   w5 = erode (0 = dilate, non-zero = erode)
-*   w6 = y
-*   w7 = xStart
-*   [sp] = xEnd
-*   [sp+8] = scratch
-*/
-
 .text
 .align 2
 
-/* -------------------------------------------------------------------------
-* Row kernel: ksvgMorphologyApplyRowNeon64
-* ------------------------------------------------------------------------- */
+/*
+ * Row kernel: ksvgMorphologyApplyRowNeon64
+ *
+ * void ksvgMorphologyApplyRowNeon64(
+ *     const jint* src, jint* dst, jint width, jint radiusX, jint radiusY,
+ *     jboolean erode, jint y, jint xStart, jint xEnd, jint* scratch);
+ *
+ * AArch64 ABI:
+ *   x0 = src, x1 = dst, w2 = width, w3 = radiusX, w4 = radiusY
+ *   w5 = erode, w6 = y, w7 = xStart
+ *   stack: xEnd ([sp, #48]), scratch ([sp, #56])
+ */
 .global ksvgMorphologyApplyRowNeon64
 .type ksvgMorphologyApplyRowNeon64, %function
 

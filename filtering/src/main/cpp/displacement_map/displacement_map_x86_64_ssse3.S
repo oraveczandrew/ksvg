@@ -19,6 +19,16 @@
 .text
 .intel_syntax noprefix
 
+/*
+ * void ksvgDisplacementMapApplySsse3(
+ *     const jint* src, const jint* map, jint* dst, jint width, jint height,
+ *     jfloat scale, jint xChannel, jint yChannel);
+ *
+ * x86-64 System V ABI:
+ *   rdi = src, rsi = map, rdx = dst, ecx = width, r8d = height
+ *   xmm0 = scale, r9d = xChannel
+ *   stack: yChannel ([rsp+8] at entry)
+ */
 .globl SYM(ksvgDisplacementMapApplySsse3)
 TYPE(SYM(ksvgDisplacementMapApplySsse3), @function)
 SYM(ksvgDisplacementMapApplySsse3):
@@ -282,4 +292,3 @@ SYM(ksvgDisplacementMapApplySsse3):
 .float 255.0
 .Ldm_halfs:
 .float 0.5
-

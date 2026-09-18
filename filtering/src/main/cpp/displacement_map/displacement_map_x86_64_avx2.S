@@ -19,6 +19,16 @@
 .text
 .intel_syntax noprefix
 
+/*
+ * void ksvgDisplacementMapApplyAvx2(
+ *     const jint* src, const jint* map, jint* dst, jint width, jint height,
+ *     jfloat scale, jint xChannel, jint yChannel);
+ *
+ * x86-64 System V ABI:
+ *   rdi = src, rsi = map, rdx = dst, ecx = width, r8d = height
+ *   xmm0 = scale, r9d = xChannel
+ *   stack: yChannel ([rsp+8] at entry)
+ */
 .globl SYM(ksvgDisplacementMapApplyAvx2)
 TYPE(SYM(ksvgDisplacementMapApplyAvx2), @function)
 SYM(ksvgDisplacementMapApplyAvx2):

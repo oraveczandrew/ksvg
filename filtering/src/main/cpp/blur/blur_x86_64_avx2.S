@@ -38,6 +38,14 @@
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 
+/*
+ * void ksvgBlurVerticalAvx2_x86_64(
+ *     void* dst, const void* pin, int stride, const void* gptr, int rct, int x1, int x2);
+ *
+ * SysV x86-64 ABI:
+ *   rdi = dst, rsi = pin, rdx = stride, rcx = gptr, r8d = rct, r9d = x1
+ *   [rsp+16] = x2 (after push %r12)
+ */
 .globl SYM(ksvgBlurVerticalAvx2_x86_64)
 TYPE(SYM(ksvgBlurVerticalAvx2_x86_64), @function)
 SYM(ksvgBlurVerticalAvx2_x86_64):
@@ -118,6 +126,13 @@ SYM(ksvgBlurVerticalAvx2_x86_64):
     ret
 // SIZE(SYM(ksvgBlurVerticalAvx2_x86_64))
 
+/*
+ * void ksvgBlurHorizontalAvx2_x86_64(
+ *     void* dst, const void* pin, const void* gptr, int rct, int x1, int x2);
+ *
+ * SysV x86-64 ABI:
+ *   rdi = dst, rsi = pin, rdx = gptr, ecx = rct, r8d = x1, r9d = x2
+ */
 .globl SYM(ksvgBlurHorizontalAvx2_x86_64)
 TYPE(SYM(ksvgBlurHorizontalAvx2_x86_64), @function)
 SYM(ksvgBlurHorizontalAvx2_x86_64):

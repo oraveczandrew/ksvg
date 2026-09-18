@@ -354,6 +354,15 @@
 
 .text
 .p2align 5
+
+/*
+ * void ksvgLightingDistantDiffuseRowAvx2(
+ *     const jint* srcT, const jint* srcM, const jint* srcB,
+ *     jint* dst, jint count, const LightingParams* params);
+ *
+ * x86-64 System V ABI:
+ *   rdi = srcT, rsi = srcM, rdx = srcB, rcx = dst, r8d = count, r9 = params
+ */
 .globl SYM(ksvgLightingDistantDiffuseRowAvx2)
 TYPE(SYM(ksvgLightingDistantDiffuseRowAvx2), @function)
 SYM(ksvgLightingDistantDiffuseRowAvx2):
@@ -402,6 +411,17 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
 SIZE(SYM(ksvgLightingDistantDiffuseRowAvx2))
 
 .p2align 5
+
+/*
+ * void ksvgLightingDistantDiffuseRowAvx2Linear(
+ *     const jint* srcT, const jint* srcM, const jint* srcB,
+ *     jint* dst, jint count, const LightingParams* params,
+ *     const uint8_t* linearToSrgb);
+ *
+ * x86-64 System V ABI:
+ *   rdi = srcT, rsi = srcM, rdx = srcB, rcx = dst, r8d = count, r9 = params
+ *   stack: linearToSrgb ([rsp+8] at entry)
+ */
 .globl SYM(ksvgLightingDistantDiffuseRowAvx2Linear)
 TYPE(SYM(ksvgLightingDistantDiffuseRowAvx2Linear), @function)
 SYM(ksvgLightingDistantDiffuseRowAvx2Linear):

@@ -16,6 +16,15 @@
 
 .text
 .align 2
+
+/*
+ * void ksvgLightingDistantDiffuseRowNeon64(
+ *     const jint* srcT, const jint* srcM, const jint* srcB,
+ *     jint* dst, jint count, const LightingParams* params);
+ *
+ * AArch64 ABI:
+ *   x0 = srcT, x1 = srcM, x2 = srcB, x3 = dst, w4 = count, x5 = params
+ */
 .global ksvgLightingDistantDiffuseRowNeon64
 .type ksvgLightingDistantDiffuseRowNeon64, %function
 
@@ -420,6 +429,17 @@ ksvgLightingDistantDiffuseRowNeon64:
 
 .text
 .align 2
+
+/*
+ * void ksvgLightingDistantDiffuseRowNeon64Linear(
+ *     const jint* srcT, const jint* srcM, const jint* srcB,
+ *     jint* dst, jint count, const LightingParams* params,
+ *     const uint8_t* linearToSrgb);
+ *
+ * AArch64 ABI:
+ *   x0 = srcT, x1 = srcM, x2 = srcB, x3 = dst, w4 = count, x5 = params
+ *   x6 = linearToSrgb
+ */
 .global ksvgLightingDistantDiffuseRowNeon64Linear
 .type ksvgLightingDistantDiffuseRowNeon64Linear, %function
 

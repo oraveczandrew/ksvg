@@ -19,7 +19,7 @@
 .text
 
     RODATA4
-.p2align 2, 0x0  # -- Begin function ksvgLightingDistantDiffuseRowAvx2
+.p2align 2, 0x0
 .LCPI0_0:
 .long	0x3f800000  # float 1
 .LCPI0_1:
@@ -34,7 +34,6 @@
 .type SYM(ksvgLightingDistantDiffuseRowAvx2), @function
 SYM(ksvgLightingDistantDiffuseRowAvx2):
     CFI_START
-# %bb.0:
     pushl        %ebp
     CFI_DEF_CFA_OFFSET(8)
     pushl        %ebx
@@ -57,7 +56,6 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     movl         432(%esp), %eax  # count
     testl        %eax, %eax
     jle          .LBB0_3
-# %bb.1:
     movl         436(%esp), %ebp  # params
     movl         424(%esp), %edx  # srcB
     movl         420(%esp), %esi  # srcM
@@ -66,36 +64,36 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vdivss       4(%ebp), %xmm0, %xmm1
     vdivss       (%ebp), %xmm0, %xmm0
     vbroadcastss %xmm0, %ymm0
-    vmovups      %ymm0, 352(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 352(%esp)
     vbroadcastss %xmm1, %ymm0
-    vmovups      %ymm0, 320(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 320(%esp)
     vbroadcastss 12(%ebp), %ymm0
-    vmovups      %ymm0, 288(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 288(%esp)
     vbroadcastss 16(%ebp), %ymm0
-    vmovups      %ymm0, 256(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 256(%esp)
     vbroadcastss 20(%ebp), %ymm0
-    vmovups      %ymm0, 224(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 224(%esp)
     vbroadcastss 8(%ebp), %ymm0
-    vmovups      %ymm0, 192(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 192(%esp)
     vbroadcastss 24(%ebp), %ymm0
-    vmovups      %ymm0, 160(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 160(%esp)
     vbroadcastss 28(%ebp), %ymm0
-    vmovups      %ymm0, 128(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 128(%esp)
     vbroadcastss 32(%ebp), %ymm0
-    vmovups      %ymm0, 96(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 96(%esp)
     xorl         %ebp, %ebp  # loop counter
     movl         428(%esp), %ecx  # dst
     vbroadcastss .LCPI0_0@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 64(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 64(%esp)
     vbroadcastss .LCPI0_1@GOTOFF(%ebx), %ymm0
-    vmovups      %ymm0, 32(%esp)  # 32-byte Spill
+    vmovups      %ymm0, 32(%esp)
     vpbroadcastd .LCPI0_2@GOTOFF(%ebx), %ymm4
     vpbroadcastd .LCPI0_3@GOTOFF(%ebx), %ymm0
-    vmovdqu      %ymm0, (%esp)  # 32-byte Spill
+    vmovdqu      %ymm0, (%esp)
 .p2align 4, 0x90
-.LBB0_2:  # =>This Inner Loop Header: Depth=1
-    // Main loop, 8 pixels per iteration: Sobel window, normalize, dot with
-    // the distant-light direction, clamp, per-channel pack, store.
+.LBB0_2:
+    # Main loop, 8 pixels per iteration: Sobel window, normalize, dot with
+    # the distant-light direction, clamp, per-channel pack, store.
     vmovdqu      (%edi,%ebp,4), %ymm6
     vmovdqu      4(%edi,%ebp,4), %ymm0
     vpsrld       $24, %ymm6, %ymm7
@@ -133,8 +131,8 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vaddps       %ymm2, %ymm0, %ymm0
     vmulps       320(%esp), %ymm0, %ymm0
     vpxor        %xmm5, %xmm5, %xmm5
-    // Surface normal n = (-dx, -dy, 1) / |..|, dotted with the light
-    // direction and clamped: intensity = min(k * max(dot, 0), 1).
+    # Surface normal n = (-dx, -dy, 1) / |..|, dotted with the light
+    # direction and clamped: intensity = min(k * max(dot, 0), 1).
     vsubps       %ymm1, %ymm5, %ymm1
     vsubps       %ymm0, %ymm5, %ymm0
     vmulps       %ymm1, %ymm1, %ymm2
@@ -192,7 +190,7 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     CFI_END
 
     RODATA4
-.p2align 2, 0x0  # -- Begin function ksvgLightingDistantDiffuseRowAvx2Linear
+.p2align 2, 0x0
 .LCPI1_0:
 .long	0x3f800000  # float 1
 .LCPI1_1:
@@ -203,7 +201,6 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
 .type SYM(ksvgLightingDistantDiffuseRowAvx2Linear), @function
 SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     CFI_START
-# %bb.0:
     pushl        %ebp
     CFI_DEF_CFA_OFFSET(8)
     CFI_OFFSET(%ebp, -8)
@@ -224,21 +221,20 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     addl         $_GLOBAL_OFFSET_TABLE_+(.Ltmp1-.L1$pb), %ebx
     cmpl         $0, 24(%ebp)  # count
     jle          .LBB1_17
-# %bb.1:
     movl         28(%ebp), %esi  # params
     vmovss       36(%esi), %xmm0
     vdivss       4(%esi), %xmm0, %xmm1
     vdivss       (%esi), %xmm0, %xmm0
     vbroadcastss %xmm0, %ymm0
-    vmovaps      %ymm0, 256(%esp)  # 32-byte Spill
+    vmovaps      %ymm0, 256(%esp)
     vbroadcastss %xmm1, %ymm0
-    vmovaps      %ymm0, 224(%esp)  # 32-byte Spill
+    vmovaps      %ymm0, 224(%esp)
     vmovss       8(%esi), %xmm0
-    vmovss       %xmm0, 28(%esp)  # 4-byte Spill
+    vmovss       %xmm0, 28(%esp)
     vmovss       12(%esi), %xmm0
-    vmovss       %xmm0, 24(%esp)  # 4-byte Spill
+    vmovss       %xmm0, 24(%esp)
     vmovss       16(%esi), %xmm0
-    vmovss       %xmm0, 20(%esp)  # 4-byte Spill
+    vmovss       %xmm0, 20(%esp)
     vmovss       20(%esi), %xmm5
     vmovss       24(%esi), %xmm6
     vmovss       28(%esi), %xmm7
@@ -246,67 +242,67 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     vmovss       32(%esi), %xmm0
     xorl         %esi, %esi  # loop counter
     vbroadcastss .LCPI1_0@GOTOFF(%ebx), %ymm1
-    vmovaps      %ymm1, 192(%esp)  # 32-byte Spill
+    vmovaps      %ymm1, 192(%esp)
     vmovss       .LCPI1_0@GOTOFF(%ebx), %xmm1
     vmovss       .LCPI1_1@GOTOFF(%ebx), %xmm2
     jmp          .LBB1_2
 .p2align 4, 0x90
-.LBB1_16:  #   in Loop: Header=BB1_2 Depth=1
+.LBB1_16:
     addl         $8, %esi
     cmpl         24(%ebp), %esi
     jge          .LBB1_17
-.LBB1_2:  # =>This Loop Header: Depth=1
-    // Linear-kernel main loop (window/normalize/dot as above); the 8-pixel
-    // child loop below finishes each pixel via scalar L2S conversion.
+.LBB1_2:
+    # Linear-kernel main loop (window/normalize/dot as above); the 8-pixel
+    # child loop below finishes each pixel via scalar L2S conversion.
     movl         8(%ebp), %edx  # srcT
     vmovdqu      (%edx,%esi,4), %ymm3
     vmovdqu      4(%edx,%esi,4), %ymm4
     vpsrld       $24, %ymm3, %ymm3
-    vmovdqa      %ymm3, 32(%esp)  # 32-byte Spill
+    vmovdqa      %ymm3, 32(%esp)
     vpsrld       $24, %ymm4, %ymm3
-    vmovdqa      %ymm3, 160(%esp)  # 32-byte Spill
+    vmovdqa      %ymm3, 160(%esp)
     vmovdqu      8(%edx,%esi,4), %ymm3
     vpsrld       $24, %ymm3, %ymm3
-    vmovdqa      %ymm3, 64(%esp)  # 32-byte Spill
+    vmovdqa      %ymm3, 64(%esp)
     movl         12(%ebp), %edx  # srcM
     vmovdqu      (%edx,%esi,4), %ymm3
     vmovdqu      8(%edx,%esi,4), %ymm4
     vpsrld       $24, %ymm3, %ymm3
-    vmovdqa      %ymm3, 128(%esp)  # 32-byte Spill
+    vmovdqa      %ymm3, 128(%esp)
     vpsrld       $24, %ymm4, %ymm3
     vpsubd       128(%esp), %ymm3, %ymm3
-    vmovdqa      %ymm3, 96(%esp)  # 32-byte Spill
+    vmovdqa      %ymm3, 96(%esp)
     movl         16(%ebp), %edx  # srcB
     vmovdqu      (%edx,%esi,4), %ymm3
     vmovups      4(%edx,%esi,4), %ymm4
-    vmovaps      %ymm4, 128(%esp)  # 32-byte Spill
+    vmovaps      %ymm4, 128(%esp)
     vpsrld       $24, %ymm3, %ymm4
-    vmovdqa      128(%esp), %ymm3  # 32-byte Reload
+    vmovdqa      128(%esp), %ymm3
     vpsrld       $24, %ymm3, %ymm3
     vpsubd       160(%esp), %ymm3, %ymm3
-    vmovdqa      %ymm3, 320(%esp)  # 32-byte Spill
+    vmovdqa      %ymm3, 320(%esp)
     vmovdqu      8(%edx,%esi,4), %ymm3
     vpsrld       $24, %ymm3, %ymm3
-    vmovdqa      %ymm3, 160(%esp)  # 32-byte Spill
-    vmovdqa      64(%esp), %ymm3  # 32-byte Reload
+    vmovdqa      %ymm3, 160(%esp)
+    vmovdqa      64(%esp), %ymm3
     vpsubd       32(%esp), %ymm3, %ymm3  # srcT index 0,2
     vcvtdq2ps    %ymm3, %ymm3
-    vmovaps      %ymm3, 288(%esp)  # 32-byte Spill
+    vmovaps      %ymm3, 288(%esp)
     vcvtdq2ps    96(%esp), %ymm3
     vaddps       %ymm3, %ymm3, %ymm3
     vaddps       288(%esp), %ymm3, %ymm3
-    vmovaps      %ymm3, 96(%esp)  # 32-byte Spill
+    vmovaps      %ymm3, 96(%esp)
     vmovdqa      160(%esp), %ymm3
     vpsubd       %ymm4, %ymm3, %ymm3
     vcvtdq2ps    %ymm3, %ymm3
     vaddps       96(%esp), %ymm3, %ymm3
-    vmovaps      %ymm3, 96(%esp)  # 32-byte Spill
+    vmovaps      %ymm3, 96(%esp)
     vpsubd       32(%esp), %ymm4, %ymm3
     vcvtdq2ps    %ymm3, %ymm4
     vcvtdq2ps    320(%esp), %ymm3
     vaddps       %ymm3, %ymm3, %ymm3
     vaddps       %ymm4, %ymm3, %ymm3
-    vmovaps      %ymm3, 32(%esp)  # 32-byte Spill
+    vmovaps      %ymm3, 32(%esp)
     vmovaps      96(%esp), %ymm3
     vmulps       256(%esp), %ymm3, %ymm4
     vmovdqa      160(%esp), %ymm3
@@ -314,12 +310,12 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     vcvtdq2ps    %ymm3, %ymm3
     vaddps       32(%esp), %ymm3, %ymm3
     vmulps       224(%esp), %ymm3, %ymm3
-    vmovaps      %ymm3, 32(%esp)  # 32-byte Spill
+    vmovaps      %ymm3, 32(%esp)
     vxorps       %xmm3, %xmm3, %xmm3
     vsubps       %ymm4, %ymm3, %ymm4
-    vmovaps      %ymm4, 64(%esp)  # 32-byte Spill
+    vmovaps      %ymm4, 64(%esp)
     vsubps       32(%esp), %ymm3, %ymm3
-    vmovaps      %ymm3, 32(%esp)  # 32-byte Spill
+    vmovaps      %ymm3, 32(%esp)
     vmulps       %ymm4, %ymm4, %ymm4
     vmovaps      32(%esp), %ymm3
     vmulps       %ymm3, %ymm3, %ymm3
@@ -328,10 +324,10 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     vsqrtps      %ymm3, %ymm3
     vmovaps      64(%esp), %ymm4
     vdivps       %ymm3, %ymm4, %ymm4
-    vmovaps      %ymm4, 64(%esp)  # 32-byte Spill
+    vmovaps      %ymm4, 64(%esp)
     vmovaps      32(%esp), %ymm4
     vdivps       %ymm3, %ymm4, %ymm4
-    vmovaps      %ymm4, 32(%esp)  # 32-byte Spill
+    vmovaps      %ymm4, 32(%esp)
     vmovaps      192(%esp), %ymm4
     vdivps       %ymm3, %ymm4, %ymm3
     vmovaps      64(%esp), %ymm4
@@ -340,9 +336,9 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     vmovaps      %ymm4, 384(%esp)
     vmovaps      %ymm3, 352(%esp)
     xorl         %edi, %edi  # child loop counter
-.LBB1_3:  #   Parent Loop BB1_2 Depth=1
-    // Per-pixel finish: dot, clamp, R/G/B scale + round + truncate with
-    // branch clamps, scalar L2S gathers, force-alpha pack, store.
+.LBB1_3:
+    # Per-pixel finish: dot, clamp, R/G/B scale + round + truncate with
+    # branch clamps, scalar L2S gathers, force-alpha pack, store.
     vmovss       24(%esp), %xmm3
     vmulss       416(%esp,%edi,4), %xmm3, %xmm3
     vmovss       20(%esp), %xmm4

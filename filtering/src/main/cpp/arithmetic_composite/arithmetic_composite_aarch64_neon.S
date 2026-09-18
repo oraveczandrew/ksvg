@@ -90,6 +90,20 @@
 
 .text
 .p2align 5
+/*
+ * void applyArithmeticNeon(
+ *     const jint* src1, const jint* src2, jint* dst,
+ *     jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+ *     jfloat k1, jfloat k2, jfloat k3, jfloat k4,
+ *     jboolean useLinear,
+ *     const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+ *
+ * AArch64 ABI:
+ *   x0 = src1, x1 = src2, x2 = dst
+ *   w3 = width, w4 = clipLeft, w5 = clipTop, w6 = clipRight, w7 = clipBottom
+ *   s0 = k1, s1 = k2, s2 = k3, s3 = k4
+ *   stack: useLinear (w15), srgbToLinear (x0), linearToSrgb (x1)
+ */
 .globl SYM(applyArithmeticNeon)
 TYPE(SYM(applyArithmeticNeon), @function)
 SYM(applyArithmeticNeon):

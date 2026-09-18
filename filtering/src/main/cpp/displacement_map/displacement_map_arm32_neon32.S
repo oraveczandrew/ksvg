@@ -88,52 +88,52 @@ TYPE(SYM(ksvgDisplacementMapApplyNeon32), %function)
     \label:
     push    {r4-r11, lr}
 
-    mov     r4, r0 @ src
-    mov     r5, r1 @ map row pointer
-    mov     r6, r2 @ dst row pointer
-    mov     r7, r3 @ width
-    ldr     r8, [sp, #36] @ height
-    sub     r9, r7, #1 @ width - 1
-    sub     r10, r8, #1 @ height - 1
-    mov     r11, #0 @ y
+    mov     r4, r0 // src
+    mov     r5, r1 // map row pointer
+    mov     r6, r2 // dst row pointer
+    mov     r7, r3 // width
+    ldr     r8, [sp, #36] // height
+    sub     r9, r7, #1 // width - 1
+    sub     r10, r8, #1 // height - 1
+    mov     r11, #0 // y
 
     cmp     r7, #0
     beq     .L_done_\label
     cmp     r8, #0
     beq     .L_done_\label
 
-    vdup.32 q7, r9 @ width - 1
-    vdup.32 q8, r10 @ height - 1
-    vmov.i32 q9, #0 @ zero
-    vmov.i32 q10, #255 @ byte mask / 255 source
+    vdup.32 q7, r9 // width - 1
+    vdup.32 q8, r10 // height - 1
+    vmov.i32 q9, #0 // zero
+    vmov.i32 q10, #255 // byte mask / 255 source
 
-    vldr    s22, [sp, #40] @ scale
-    vdup.32 q11, d11[0] @ scale = s22 (=d11[0]); NOT d22[0] (s44, uninit)
-    vmov.f32 q12, #0.5 @ half
+    vldr    s22, [sp, #40] // scale
+    vdup.32 q11, d11[0] // scale = s22 (=d11[0]); NOT d22[0] (s44, uninit)
+    vmov.f32 q12, #0.5 // half
 
-    @       255.0f for the true per-lane divide below. s26 = d13[0] is only safe
-    @       because the row's y-broadcast lives in q13, NOT q6 (= d12/d13): a
-    @       vdup.32 q6, r11 would have clobbered s26 with raw y bits every row,
-    @       yielding byte/0.0f -> +Inf -> saturating INT_MAX indices.
+    //       255.0f for the true per-lane divide below. s26 = d13[0] is only safe
+    //       because the row's y-broadcast lives in q13, NOT q6 (= d12/d13): a
+    //       vdup.32 q6, r11 would have clobbered s26 with raw y bits every row,
+    //       yielding byte/0.0f -> +Inf -> saturating INT_MAX indices.
     vldr    s26, .L_float255_\label
 
     adr     r0, .L_inc_\label
-    vld1.32 {d28-d29}, [r0] @ q14 = 0, 1, 2, 3
+    vld1.32 {d28-d29}, [r0] // q14 = 0, 1, 2, 3
 
-    mov     r12, #0 @ x
+    mov     r12, #0 // x
 
 .L_row_\label:
     cmp     r11, r8
     bge     .L_done_\label
 
-    vdup.32 q13, r11 @ y, y, y, y (q13: do NOT use q6, it aliases the s26 divisor)
+    vdup.32 q13, r11 // y, y, y, y (q13: do NOT use q6, it aliases the s26 divisor)
     mov     r12, #0
 
 .L_vec_\label:
     cmp     r12, r7
     bge     .L_tail_\label
 
-    vld1.32 {d0-d1}, [r5]! @ 4 map pixels
+    vld1.32 {d0-d1}, [r5]! // 4 map pixels
 
     .if \xshift == 0
     vmov    q1, q0
@@ -175,7 +175,7 @@ TYPE(SYM(ksvgDisplacementMapApplyNeon32), %function)
     vcvt.s32.f32 q2, q2
 
     vdup.32 q5, r12
-    vadd.i32 q5, q5, q14 @ x..x+3
+    vadd.i32 q5, q5, q14 // x..x+3
 
     vadd.i32 q3, q5, q1
     vmax.s32 q3, q3, q9
@@ -185,30 +185,30 @@ TYPE(SYM(ksvgDisplacementMapApplyNeon32), %function)
     vmax.s32 q4, q4, q9
     vmin.s32 q4, q4, q8
 
-    @       lane 0
-    vmov    r0, s12 @ sx0
-    vmov    r1, s16 @ sy0
+    //       lane 0
+    vmov    r0, s12 // sx0
+    vmov    r1, s16 // sy0
     mla     r2, r1, r7, r0
     ldr     r3, [r4, r2, lsl #2]
     str     r3, [r6, #0]
 
-    @       lane 1
-    vmov    r0, s13 @ sx1
-    vmov    r1, s17 @ sy1
+    //       lane 1
+    vmov    r0, s13 // sx1
+    vmov    r1, s17 // sy1
     mla     r2, r1, r7, r0
     ldr     r3, [r4, r2, lsl #2]
     str     r3, [r6, #4]
 
-    @       lane 2
-    vmov    r0, s14 @ sx2
-    vmov    r1, s18 @ sy2
+    //       lane 2
+    vmov    r0, s14 // sx2
+    vmov    r1, s18 // sy2
     mla     r2, r1, r7, r0
     ldr     r3, [r4, r2, lsl #2]
     str     r3, [r6, #8]
 
-    @       lane 3
-    vmov    r0, s15 @ sx3
-    vmov    r1, s19 @ sy3
+    //       lane 3
+    vmov    r0, s15 // sx3
+    vmov    r1, s19 // sy3
     mla     r2, r1, r7, r0
     ldr     r3, [r4, r2, lsl #2]
     str     r3, [r6, #12]
@@ -275,7 +275,7 @@ TYPE(SYM(ksvgDisplacementMapApplyNeon32), %function)
 .L_done_\label:
     pop     {r4-r11, pc}
 
-    .align 2
+.align 2
 .L_inc_\label:
     .word 0, 1, 2, 3
 .L_float255_\label:

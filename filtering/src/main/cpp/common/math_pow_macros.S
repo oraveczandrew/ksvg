@@ -37,15 +37,15 @@
 POINT_CONST
 .p2align 5
 .Lpoly_log2:
-    .long 0xbc14e99e # c8
-    .long 0x3d517250 # c7
-    .long 0xbe0b306b # c6
-    .long 0x3e762e19 # c5
-    .long 0xbeb16ed0 # c4
-    .long 0x3ef4f943 # c3
-    .long 0xbf389c1f # c2
-    .long 0x3fb8a9fd # c1
-    .long 0x3335bce7 # c0
+    .long 0xbc14e99e  // c8
+    .long 0x3d517250  // c7
+    .long 0xbe0b306b  // c6
+    .long 0x3e762e19  // c5
+    .long 0xbeb16ed0  // c4
+    .long 0x3ef4f943  // c3
+    .long 0xbf389c1f  // c2
+    .long 0x3fb8a9fd  // c1
+    .long 0x3335bce7  // c0
 .endm
 
 /*
@@ -57,15 +57,15 @@ POINT_CONST
 POINT_CONST
 .p2align 5
 .Lpoly_exp2:
-    .long 0x35fbc4c2 # c8
-    .long 0x376d5f0a # c7
-    .long 0x3922b9a8 # c6
-    .long 0x3aaeacc9 # c5
-    .long 0x3c1d965e # c4
-    .long 0x3d63583b # c3
-    .long 0x3e75fdf0 # c2
-    .long 0x3f317218 # c1
-    .long 0x3f800000 # c0
+    .long 0x35fbc4c2  // c8
+    .long 0x376d5f0a  // c7
+    .long 0x3922b9a8  // c6
+    .long 0x3aaeacc9  // c5
+    .long 0x3c1d965e  // c4
+    .long 0x3d63583b  // c3
+    .long 0x3e75fdf0  // c2
+    .long 0x3f317218  // c1
+    .long 0x3f800000  // c0
 .endm
 
 /*

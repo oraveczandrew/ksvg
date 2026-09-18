@@ -24,6 +24,14 @@
 .Lpack_mask:
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 
+/*
+ * void rsdIntrinsicBlurVFU4_K_i386_ssse3(
+ *     void* dst, const void* pin, int stride, const void* gptr, int rct, int x1, int x2);
+ *
+ * i386 cdecl ABI (stack parameters):
+ *   esp+28 = dst, esp+32 = pin, esp+36 = stride, esp+40 = gptr, esp+44 = rct, esp+48 = x1, esp+52 = x2
+ *   (offsets relative to esp after prologue pushes and allocations)
+ */
 .globl SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3)
 TYPE(SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3), @function)
 SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3):
@@ -32,7 +40,6 @@ SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3):
     pushl %esi
     pushl %edi
     subl $8, %esp
-    # after prologue: 28=dst 32=pin 36=stride 40=gptr 44=rct 48=x1 52=x2
     movl 28(%esp), %edi                 # dst
     movl 32(%esp), %esi                 # pin
     movl 36(%esp), %edx                 # stride
@@ -95,8 +102,15 @@ SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3):
     popl %ebx
     popl %ebp
     ret
-// SIZE(SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3))
+# SIZE(SYM(rsdIntrinsicBlurVFU4_K_i386_ssse3))
 
+/*
+ * void rsdIntrinsicBlurHFU4_K_i386_ssse3(
+ *     void* dst, const void* pin, const void* gptr, int rct, int x1, int x2);
+ *
+ * i386 cdecl ABI (stack parameters):
+ *   esp+20 = dst, esp+24 = pin, esp+28 = gptr, esp+32 = rct, esp+36 = x1, esp+40 = x2
+ */
 .globl SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3)
 TYPE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3), @function)
 SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3):
@@ -104,7 +118,6 @@ SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3):
     pushl %ebx
     pushl %esi
     pushl %edi
-    # after prologue: 20=dst 24=pin 28=gptr 32=rct 36=x1 40=x2
     movl 20(%esp), %edi                 # dst
     movl 24(%esp), %esi                 # current input column
     movl 28(%esp), %edx                 # gptr base / current weight ptr
@@ -163,4 +176,4 @@ SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3):
     popl %ebx
     popl %ebp
     ret
-// SIZE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3))
+# SIZE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3))

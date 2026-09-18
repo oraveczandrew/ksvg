@@ -29,6 +29,20 @@
 
 .text
 .p2align 5
+
+/*
+ * void ksvgArithmeticApplyAvx2(
+ *     const jint* src1, const jint* src2, jint* dst,
+ *     jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+ *     jfloat k1, jfloat k2, jfloat k3, jfloat k4,
+ *     jboolean useLinear,
+ *     const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+ *
+ * x86-64 System V ABI:
+ *   rdi = src1, rsi = src2, rdx = dst, ecx = width, r8d = clipLeft, r9d = clipTop
+ *   xmm0 = k1, xmm1 = k2, xmm2 = k3, xmm3 = k4
+ *   stack: clipRight, clipBottom, useLinear, srgbToLinear, linearToSrgb
+ */
 .globl SYM(ksvgArithmeticApplyAvx2)
 TYPE(SYM(ksvgArithmeticApplyAvx2), @function)
 SYM(ksvgArithmeticApplyAvx2):

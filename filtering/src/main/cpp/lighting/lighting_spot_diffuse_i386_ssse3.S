@@ -62,8 +62,8 @@ SYM(ksvgLightingSpotDiffuseRowSsse3Linear):
     movl          %eax, -24(%ebp)
 
 .Lspd_loop_Ssse3:
-    // Per-pixel loop (Sobel window, normalize, spot-cone factor with cutoff,
-    // intensity, pack, store).
+    # Per-pixel loop (Sobel window, normalize, spot-cone factor with cutoff,
+    # intensity, pack, store).
     cmpl          $0, -12(%ebp)
     jle           .Lspd_done_Ssse3
 

@@ -15,13 +15,14 @@
  */
 
 /*
+ */
+
+#include "asm_macros.S"
+
+.text
+.p2align 5
+/*
  * x86-64 AVX2 implementation of UnLinearize.
- *
- * void ksvgUnlinearizeApplyAvx2(
- *     jint* src, jint* dst, jint width, jint height, const jbyte* table);
- *
- * SysV x86-64 ABI:
- *   rdi = src, rsi = dst, edx = width, ecx = height, r8 = 256-byte LUT
  *
  * Processes 8 ARGB8888 pixels (32 bytes) per iteration.
  *
@@ -32,12 +33,13 @@
  * map over trying to keep all 16 rows live.
  *
  * Alpha is restored unchanged after the RGB lookup.
+ *
+ * void ksvgUnlinearizeApplyAvx2(
+ *     const jint* src, jint* dst, jint width, jint height, const jbyte* table);
+ *
+ * x86-64 System V ABI:
+ *   rdi = src, rsi = dst, edx = width, ecx = height, r8 = table
  */
-
-#include "asm_macros.S"
-
-.text
-.p2align 5
 .globl SYM(ksvgUnlinearizeApplyAvx2)
 TYPE(SYM(ksvgUnlinearizeApplyAvx2), @function)
 SYM(ksvgUnlinearizeApplyAvx2):

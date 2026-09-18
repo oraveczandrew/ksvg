@@ -107,8 +107,8 @@ SYM(ksvgLightingPointSpecularRowSsse3Linear):
     movl          %eax, -24(%ebp)  # lut pointer
 
 .Lp_loop_Ssse3:
-    // Per-pixel loop (Sobel window, normalize, half-vector dot, powf,
-    // intensity, pack, store; advances ux0 by dux).
+    # Per-pixel loop (Sobel window, normalize, half-vector dot, powf,
+    # intensity, pack, store; advances ux0 by dux).
     cmpl          $0, -12(%ebp)
     jle           .Lp_done_Ssse3
 

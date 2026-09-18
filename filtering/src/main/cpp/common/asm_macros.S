@@ -118,12 +118,10 @@
 #ifdef __APPLE__
 #define GNU_STACK
 #define ADDRSIG
-#define IDENT(x)
 #define HIDE_SYM(x)
 #else
 #define GNU_STACK .section .note.GNU-stack,"",@progbits
 #define ADDRSIG .addrsig
-#define IDENT(x) .ident x
 #define HIDE_SYM(x) .hidden SYM(x)
 #endif
 

@@ -227,10 +227,10 @@ POINT_LIT4
 EMIT_LOG2_POLY_8
 EMIT_EXP2_POLY_8
 EMIT_POW_COMMON_CONSTANTS
-# 8x255 int vector for vpminsd (must live in POINT_CONST, never in a
-# mergeable literal section: ld64 coalesces duplicate 4-byte literals,
-# which silently shortens multi-word tables - observed as
-# [255,0,0,0,255,255,255,255]).
+// 8x255 int vector for vpminsd (must live in POINT_CONST, never in a
+// mergeable literal section: ld64 coalesces duplicate 4-byte literals,
+// which silently shortens multi-word tables - observed as
+// [255,0,0,0,255,255,255,255]).
 .p2align 5
 .Lspot_255x8: .long 255,255,255,255,255,255,255,255
 
@@ -438,23 +438,23 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     // matches the old per-lane clamp01 bit-for-bit (min/max exact, NaN
     // inputs impossible: guarded normalize, max-clamped base/spot).
     vmovd        %r13d, %xmm1
-    vbroadcastss %xmm1, %ymm1          # exponent vec
-    POW8_AVX2 %ymm11, %ymm1, %ymm8     # p vec = pow(ndoth, exp)
-    vbroadcastss 8(%rbp), %ymm1        # k
-    vmulps       %ymm1, %ymm11, %ymm0  # k * p
-    vmulps       %ymm6, %ymm0, %ymm0   # k * p * cutoff (ymm6 = spot, live)
+    vbroadcastss %xmm1, %ymm1  // exponent vec
+    POW8_AVX2 %ymm11, %ymm1, %ymm8  // p vec = pow(ndoth, exp)
+    vbroadcastss 8(%rbp), %ymm1  // k
+    vmulps       %ymm1, %ymm11, %ymm0  // k * p
+    vmulps       %ymm6, %ymm0, %ymm0  // k * p * cutoff (ymm6 = spot, live)
     vxorps       %ymm1, %ymm1, %ymm1
-    vmaxps       %ymm1, %ymm0, %ymm0   # max(0, .)
-    vbroadcastss .Lspot_one(%rip), %ymm1  # 1.0f
-    vminps       %ymm1, %ymm0, %ymm0   # intensity_vec = clamp01
-    # R/G/B = intensity * lr/lg/lb
-    vbroadcastss 24(%rbp), %ymm1  # lr
+    vmaxps       %ymm1, %ymm0, %ymm0  // max(0, .)
+    vbroadcastss .Lspot_one(%rip), %ymm1  // 1.0f
+    vminps       %ymm1, %ymm0, %ymm0  // intensity_vec = clamp01
+// R/G/B = intensity * lr/lg/lb
+    vbroadcastss 24(%rbp), %ymm1  // lr
     vmulps       %ymm0, %ymm1, %ymm1
-    vbroadcastss 28(%rbp), %ymm2  # lg
+    vbroadcastss 28(%rbp), %ymm2  // lg
     vmulps       %ymm0, %ymm2, %ymm2
-    vbroadcastss 32(%rbp), %ymm3  # lb
+    vbroadcastss 32(%rbp), %ymm3  // lb
     vmulps       %ymm0, %ymm3, %ymm3
-    # Round-half-up and clamp to [0, 255]
+// Round-half-up and clamp to [0, 255]
     vbroadcastss .Lspot_half(%rip), %ymm4
     vaddps       %ymm4, %ymm1, %ymm1
     vaddps       %ymm4, %ymm2, %ymm2
@@ -466,16 +466,16 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     vpmaxsd      %ymm4, %ymm1, %ymm1
     vpmaxsd      %ymm4, %ymm2, %ymm2
     vpmaxsd      %ymm4, %ymm3, %ymm3
-    # NOTE: vmovdqu, not vmovdqa: .Lspot_255x8 sits in __literal4 whose
-    # section base is only 16-aligned, so a 32-byte aligned load faults.
+// NOTE: vmovdqu, not vmovdqa: .Lspot_255x8 sits in __literal4 whose
+// section base is only 16-aligned, so a 32-byte aligned load faults.
     vmovdqu      .Lspot_255x8(%rip), %ymm4
     vpminsd      %ymm4, %ymm1, %ymm1
     vpminsd      %ymm4, %ymm2, %ymm2
     vpminsd      %ymm4, %ymm3, %ymm3
-    # Alpha = max(R, G, B)
+// Alpha = max(R, G, B)
     vpmaxsd      %ymm1, %ymm2, %ymm4
     vpmaxsd      %ymm4, %ymm3, %ymm4
-    # Pack: (A << 24) | (R << 16) | (G << 8) | B
+// Pack: (A << 24) | (R << 16) | (G << 8) | B
     vpslld       $24, %ymm4, %ymm4
     vpslld       $16, %ymm1, %ymm1
     vpslld       $8, %ymm2, %ymm2

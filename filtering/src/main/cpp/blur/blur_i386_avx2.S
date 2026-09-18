@@ -38,6 +38,14 @@
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 .byte 0,4,8,12, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80, 0x80,0x80,0x80,0x80
 
+/*
+ * void ksvgBlurVerticalAvx2_i386(
+ *     void* dst, const void* pin, int stride, const void* gptr, int rct, int x1, int x2);
+ *
+ * i386 cdecl ABI (stack parameters):
+ *   esp+156 = dst, esp+160 = pin, esp+164 = stride, esp+168 = gptr, esp+172 = rct, esp+176 = x1, esp+180 = x2
+ *   (offsets relative to esp after prologue pushes and allocations)
+ */
 .globl SYM(ksvgBlurVerticalAvx2_i386)
 TYPE(SYM(ksvgBlurVerticalAvx2_i386), @function)
 SYM(ksvgBlurVerticalAvx2_i386):
@@ -47,7 +55,6 @@ SYM(ksvgBlurVerticalAvx2_i386):
     pushl %edi
     # locals: 0..31 A mask, 32..63 R, 64..95 G, 96..127 B, 128=x2, 132=row0 source
     subl $136, %esp
-    # 156=dst 160=pin 164=stride 168=gptr 172=rct 176=x1 180=x2
     movl 156(%esp), %edi
     movl 160(%esp), %esi
     movl 164(%esp), %edx
@@ -148,8 +155,15 @@ SYM(ksvgBlurVerticalAvx2_i386):
     popl %ebx
     popl %ebp
     ret
-// SIZE(SYM(ksvgBlurVerticalAvx2_i386))
+# SIZE(SYM(ksvgBlurVerticalAvx2_i386))
 
+/*
+ * void ksvgBlurHorizontalAvx2_i386(
+ *     void* dst, const void* pin, const void* gptr, int rct, int x1, int x2);
+ *
+ * i386 cdecl ABI (stack parameters):
+ *   esp+24 = dst, esp+28 = pin, esp+32 = gptr, esp+36 = rct, esp+40 = x1, esp+44 = x2
+ */
 .globl SYM(ksvgBlurHorizontalAvx2_i386)
 TYPE(SYM(ksvgBlurHorizontalAvx2_i386), @function)
 SYM(ksvgBlurHorizontalAvx2_i386):
@@ -158,7 +172,6 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     pushl %esi
     pushl %edi
     subl $4, %esp
-    # 24=dst 28=pin 32=gptr 36=rct 40=x1 44=x2
     movl 24(%esp), %edi
     movl 28(%esp), %esi
     movl 32(%esp), %edx
@@ -250,4 +263,4 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     popl %ebx
     popl %ebp
     ret
-// SIZE(SYM(ksvgBlurHorizontalAvx2_i386))
+# SIZE(SYM(ksvgBlurHorizontalAvx2_i386))

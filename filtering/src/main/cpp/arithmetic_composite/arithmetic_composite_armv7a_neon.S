@@ -128,6 +128,21 @@
 
 .text
 .p2align 5
+
+/*
+ * void applyArithmeticNeon(
+ *     const jint* src1, const jint* src2, jint* dst,
+ *     jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+ *     jfloat k1, jfloat k2, jfloat k3, jfloat k4,
+ *     jboolean useLinear,
+ *     const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+ *
+ * ARMv7a ABI:
+ *   r0 = src1, r1 = src2, r2 = dst, r3 = width
+ *   stack: clipLeft, clipTop, clipRight, clipBottom
+ *   stack: k1, k2, k3, k4
+ *   stack: useLinear, srgbToLinear, linearToSrgb
+ */
 .globl SYM(applyArithmeticNeon)
 TYPE(SYM(applyArithmeticNeon), %function)
 SYM(applyArithmeticNeon):
@@ -241,7 +256,7 @@ SYM(applyArithmeticNeon):
     vmov    d22, d3
     vmov    d23, d7
 
-    @ Scan S2L LUT for 6 channels. Accumulators d16-d21.
+    // Scan S2L LUT for 6 channels. Accumulators d16-d21.
     vmov.i8 q8, #0
     vmov.i8 q9, #0
     vmov.i8 q10, #0
@@ -304,7 +319,7 @@ SYM(applyArithmeticNeon):
     FORMULA8 d18, d21, d18
     FORMULA8 d22, d23, d19
 
-    @ Scan L2S LUT for 3 results. Accumulators d24-d26.
+    // Scan L2S LUT for 3 results. Accumulators d24-d26.
     vmov.i8 q12, #0
     vmov.i8 d26, #0
     mov     r3, r1

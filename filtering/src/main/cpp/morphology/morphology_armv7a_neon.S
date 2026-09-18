@@ -20,57 +20,54 @@
 .fpu neon
 .align 2
 
-/* ---------------------------------------------------------------------
-* Row kernel: ksvgMorphologyApplyRowNeon32
-*
-* ABI:
-*   r0 = src
-*   r1 = dst
-*   r2 = width
-*   r3 = radiusX
-*   [sp, #0]  = radiusY
-*   [sp, #4]  = erode
-*   [sp, #8]  = y
-*   [sp, #12] = xStart
-*   [sp, #16] = xEnd
-*   [sp, #20] = scratch
-*/
+/*
+ * Row kernel: ksvgMorphologyApplyRowNeon32
+ *
+ * void ksvgMorphologyApplyRowNeon32(
+ *     const jint* src, jint* dst, jint width, jint radiusX, jint radiusY,
+ *     jboolean erode, jint y, jint xStart, jint xEnd, jint* scratch);
+ *
+ * ARMv7a ABI:
+ *   r0 = src, r1 = dst, r2 = width, r3 = radiusX
+ *   stack: radiusY ([sp, #36]), erode ([sp, #40]), y ([sp, #44])
+ *   stack: xStart ([sp, #48]), xEnd ([sp, #52]), scratch ([sp, #56])
+ */
 .global ksvgMorphologyApplyRowNeon32
 .type ksvgMorphologyApplyRowNeon32, %function
 
 ksvgMorphologyApplyRowNeon32:
     push    {r4-r11, lr}
-    @       sp+36: radiusY, sp+40: erode, sp+44: y, sp+48: xStart, sp+52: xEnd, sp+56: scratch
+    //       sp+36: radiusY, sp+40: erode, sp+44: y, sp+48: xStart, sp+52: xEnd, sp+56: scratch
 
-    @       Constant geometry
-    ldr     r4, [sp, #36]               @ r4 = radiusY
+    //       Constant geometry
+    ldr     r4, [sp, #36] // r4 = radiusY
     add     r4, r4, r4
-    add     r4, r4, #1                  @ r4 = rowCount (STABLE)
+    add     r4, r4, #1 // r4 = rowCount (STABLE)
 
-    ldr     r5, [sp, #44]               @ r5 = y
-    ldr     r6, [sp, #48]               @ r6 = xStart (STABLE)
-    sub     r7, r6, r3                  @ r7 = colLo
+    ldr     r5, [sp, #44] // r5 = y
+    ldr     r6, [sp, #48] // r6 = xStart (STABLE)
+    sub     r7, r6, r3 // r7 = colLo
 
-    mov     r8, r2, lsl #2              @ r8 = row stride (STABLE)
+    mov     r8, r2, lsl #2 // r8 = row stride (STABLE)
 
-    lsr     r9, r4, #1                  @ r9 = radiusY (temp)
-    sub     r9, r5, r9                  @ r9 = top
+    lsr     r9, r4, #1 // r9 = radiusY (temp)
+    sub     r9, r5, r9 // r9 = top
     mul     r10, r9, r2
     add     r10, r10, r7
-    add     r10, r0, r10, lsl #2        @ r10 = src start base (STABLE)
+    add     r10, r0, r10, lsl #2 // r10 = src start base (STABLE)
 
     mul     r11, r5, r2
-    add     r11, r1, r11, lsl #2        @ r11 = dst row base (STABLE)
+    add     r11, r1, r11, lsl #2 // r11 = dst row base (STABLE)
 
-    ldr     r5, [sp, #52]               @ r5 = xEnd
-    add     r5, r5, r3                  @ r5 = colHi
-    sub     r5, r5, r7                  @ r5 = colCount
+    ldr     r5, [sp, #52] // r5 = xEnd
+    add     r5, r5, r3 // r5 = colHi
+    sub     r5, r5, r7 // r5 = colCount
 
-    lsr     r9, r5, #2                  @ r9 = fullGroups
-    and     r7, r5, #3                  @ r7 = tailCols
+    lsr     r9, r5, #2 // r9 = fullGroups
+    and     r7, r5, #3 // r7 = tailCols
 
-    @       Check erode
-    ldr     r12, [sp, #40]              @ erode
+    //       Check erode
+    ldr     r12, [sp, #40] // erode
     tst     r12, #255
     bne     .L_row_erode
 
@@ -78,8 +75,8 @@ ksvgMorphologyApplyRowNeon32:
 * Dilation (Row).
 * --------------------------------------------------------------------- */
 .L_row_dv:
-    ldr     r0, [sp, #56]               @ r0 = scratch cursor
-    mov     r1, r10                     @ r1 = moving src base
+    ldr     r0, [sp, #56] // r0 = scratch cursor
+    mov     r1, r10 // r1 = moving src base
 
     cmp     r9, #0
     beq     .L_row_dv_tail
@@ -87,8 +84,8 @@ ksvgMorphologyApplyRowNeon32:
 .L_row_dv_group_loop:
     vmov.i8 q0, #0
     vmov.i8 q1, #0
-    mov     r5, r1                      @ r5 = group row cursor
-    lsr     r2, r4, #1                  @ r2 = row pairs
+    mov     r5, r1 // r5 = group row cursor
+    lsr     r2, r4, #1 // r2 = row pairs
     cmp     r2, #0
     beq     .L_row_dv_group_rows_single
 .L_row_dv_group_rows_pairs:
@@ -130,18 +127,18 @@ ksvgMorphologyApplyRowNeon32:
     bne     .L_row_dv_tail_col
 
 .L_row_dh:
-    ldr     r0, [sp, #56]               @ scratch base
-    mov     r1, r6                      @ current x
-    add     r12, r11, r1, lsl #2        @ dst cursor
-    ldr     r10, [sp, #52]              @ xEnd
+    ldr     r0, [sp, #56] // scratch base
+    mov     r1, r6 // current x
+    add     r12, r11, r1, lsl #2 // dst cursor
+    ldr     r10, [sp, #52] // xEnd
 
 .L_row_dh_loop:
-    sub     r7, r1, r6                  @ rel index
-    add     r7, r0, r7, lsl #2          @ window base in scratch
+    sub     r7, r1, r6 // rel index
+    add     r7, r0, r7, lsl #2 // window base in scratch
 
     add     r2, r3, r3
-    add     r2, r2, #1                  @ L
-    lsr     r8, r2, #2                  @ vecCount
+    add     r2, r2, #1 // L
+    lsr     r8, r2, #2 // vecCount
 
     vmov.i8 q0, #0
     vmov.i8 q1, #0

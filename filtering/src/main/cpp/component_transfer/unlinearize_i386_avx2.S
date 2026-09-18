@@ -22,6 +22,14 @@
 
 .text
 .p2align 5
+
+/*
+ * void ksvgUnlinearizeApplyAvx2ApproxV26(
+ *     const jint* src, jint* dst, jint width, jint height, const jbyte* table);
+ *
+ * i386 ABI:
+ *   stack: src, dst, width, height, table
+ */
 .globl SYM(ksvgUnlinearizeApplyAvx2ApproxV26)
 TYPE(SYM(ksvgUnlinearizeApplyAvx2ApproxV26), @function)
 SYM(ksvgUnlinearizeApplyAvx2ApproxV26):

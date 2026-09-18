@@ -85,7 +85,7 @@ TYPE(SYM(ksvgDisplacementMapApplyAvx2_i386), @function)
     cmp     eax, 15
     je      SYM(ksvgDisplacementMapApplyAvx2_i386_k15)
     ret
-    //      SIZE(SYM(ksvgDisplacementMapApplyAvx2_i386))
+    #      SIZE(SYM(ksvgDisplacementMapApplyAvx2_i386))
 
 .set DM_MASK_OFF, .Ldm_mask_ff - .Ldm_const
 .set DM_HALF_OFF, .Ldm_half - .Ldm_const
@@ -95,11 +95,11 @@ TYPE(SYM(ksvgDisplacementMapApplyAvx2_i386), @function)
 .set DM_HALFF_OFF, .Ldm_half_f - .Ldm_const
 
 .macro KERNEL LABEL, SHIFTX, SHIFTY
-    .p2align 5
-    .globl SYM(\LABEL)
+.p2align 5
+.globl SYM(\LABEL)
     TYPE(SYM(\LABEL), @function)
     HIDE_SYM(\LABEL)
-    SYM(\LABEL):
+SYM(\LABEL):
     push    ebp
     push    ebx
     push    esi
@@ -317,7 +317,7 @@ TYPE(SYM(ksvgDisplacementMapApplyAvx2_i386), @function)
     pop     ebx
     pop     ebp
     ret
-    //      SIZE(SYM(\LABEL))
+    #      SIZE(SYM(\LABEL))
 .endm
 
     KERNEL ksvgDisplacementMapApplyAvx2_i386_k00, 16, 16

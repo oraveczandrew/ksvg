@@ -153,21 +153,21 @@
     movdqa   .Lbiased_127(%rip), %xmm15
     movdqa   .Lmantissa_mask(%rip), %xmm13
     movss    .Lfloat_1_bits(%rip), %xmm14
-    shufps   $0, %xmm14, %xmm14      # 1.0
+    shufps   $0, %xmm14, %xmm14  // 1.0
 
-    # 1. log2(x) range reduction: e = (bits >> 23) - 127; f = m - 1.0
+// 1. log2(x) range reduction: e = (bits >> 23) - 127; f = m - 1.0
     movdqa   \x, %xmm12
     psrad    $23, %xmm12
     psubd    %xmm15, %xmm12
-    cvtdq2ps %xmm12, %xmm12          # e_float
+    cvtdq2ps %xmm12, %xmm12  // e_float
     movdqa   \x, %xmm11
     pand     %xmm13, %xmm11
-    por      %xmm14, %xmm11          # m in [1, 2)
-    subps    %xmm14, %xmm11          # f in [0, 1)
+    por      %xmm14, %xmm11  // m in [1, 2)
+    subps    %xmm14, %xmm11  // f in [0, 1)
 
-    # 2. Horner for P_log(f)
+// 2. Horner for P_log(f)
     movss    .Lpoly_log2+0(%rip), %xmm10
-    shufps   $0, %xmm10, %xmm10      # c8
+    shufps   $0, %xmm10, %xmm10  // c8
     POW4_STEP .Lpoly_log2+4(%rip), %xmm11, %xmm10
     POW4_STEP .Lpoly_log2+8(%rip), %xmm11, %xmm10
     POW4_STEP .Lpoly_log2+12(%rip), %xmm11, %xmm10
@@ -176,24 +176,24 @@
     POW4_STEP .Lpoly_log2+24(%rip), %xmm11, %xmm10
     POW4_STEP .Lpoly_log2+28(%rip), %xmm11, %xmm10
     POW4_STEP .Lpoly_log2+32(%rip), %xmm11, %xmm10
-    addps    %xmm10, %xmm12          # log2(x)
+    addps    %xmm10, %xmm12  // log2(x)
 
-    # 3. t = y * log2(x)
+// 3. t = y * log2(x)
     mulps    \y, %xmm12
 
-    # 4. t_i = floor(t) (emulated), t_f = t - t_i
+// 4. t_i = floor(t) (emulated), t_f = t - t_i
     movaps   %xmm12, %xmm11
     cvttps2dq %xmm11, %xmm11
-    cvtdq2ps %xmm11, %xmm11          # trunc(t)
+    cvtdq2ps %xmm11, %xmm11  // trunc(t)
     movaps   %xmm12, %xmm13
-    cmpltps  %xmm11, %xmm13          # t < trunc
-    andps    %xmm14, %xmm13          # 1.0 where t non-integral negative
-    subps    %xmm13, %xmm11          # t_i
-    subps    %xmm11, %xmm12          # t_f in [0, 1)
+    cmpltps  %xmm11, %xmm13  // t < trunc
+    andps    %xmm14, %xmm13  // 1.0 where t non-integral negative
+    subps    %xmm13, %xmm11  // t_i
+    subps    %xmm11, %xmm12  // t_f in [0, 1)
 
-    # 5. Horner for P_exp(t_f)
+// 5. Horner for P_exp(t_f)
     movss    .Lpoly_exp2+0(%rip), %xmm10
-    shufps   $0, %xmm10, %xmm10      # c8
+    shufps   $0, %xmm10, %xmm10  // c8
     POW4_STEP .Lpoly_exp2+4(%rip), %xmm12, %xmm10
     POW4_STEP .Lpoly_exp2+8(%rip), %xmm12, %xmm10
     POW4_STEP .Lpoly_exp2+12(%rip), %xmm12, %xmm10
@@ -203,12 +203,12 @@
     POW4_STEP .Lpoly_exp2+28(%rip), %xmm12, %xmm10
     POW4_STEP .Lpoly_exp2+32(%rip), %xmm12, %xmm10
 
-    # 6. Scale by 2^t_i
-    cvtps2dq %xmm11, %xmm11          # t_i_int (exact: integral float)
-    paddd    %xmm15, %xmm11          # biased exponent
+// 6. Scale by 2^t_i
+    cvtps2dq %xmm11, %xmm11  // t_i_int (exact: integral float)
+    paddd    %xmm15, %xmm11  // biased exponent
     pxor     %xmm13, %xmm13
-    pcmpgtd  %xmm11, %xmm13          # 0 > biased (underflow lanes)
-    pandn    %xmm11, %xmm13          # max(biased, 0)
+    pcmpgtd  %xmm11, %xmm13  // 0 > biased (underflow lanes)
+    pandn    %xmm11, %xmm13  // max(biased, 0)
     movdqa   %xmm13, %xmm11
     pslld    $23, %xmm11
     mulps    %xmm10, %xmm11
@@ -255,8 +255,8 @@
     andl    $0x007fffff, %eax
     orl     $0x3f800000, %eax
     movd    %eax, %xmm2
-    subss   .Lfloat_1_bits(%rip), %xmm2  # f = m - 1
-    movss   .Lpoly_log2(%rip), %xmm0     # c8
+    subss   .Lfloat_1_bits(%rip), %xmm2  // f = m - 1
+    movss   .Lpoly_log2(%rip), %xmm0  // c8
     mulss   %xmm2, %xmm0
     addss   .Lpoly_log2+4(%rip), %xmm0
     mulss   %xmm2, %xmm0
@@ -273,18 +273,18 @@
     addss   .Lpoly_log2+28(%rip), %xmm0
     mulss   %xmm2, %xmm0
     addss   .Lpoly_log2+32(%rip), %xmm0
-    cvtsi2ss %ecx, %xmm2                 # e
-    addss   %xmm2, %xmm0                 # log2x = e + P(f)
-    mulss   %xmm1, %xmm0                 # t = y * log2x
-    cvttss2si %xmm0, %ecx                # trunc
+    cvtsi2ss %ecx, %xmm2  // e
+    addss   %xmm2, %xmm0  // log2x = e + P(f)
+    mulss   %xmm1, %xmm0  // t = y * log2x
+    cvttss2si %xmm0, %ecx  // trunc
     cvtsi2ss %ecx, %xmm2
     ucomiss %xmm0, %xmm2
     jbe     78f
     subl    $1, %ecx
     cvtsi2ss %ecx, %xmm2
 78:
-    subss   %xmm2, %xmm0                 # tf = t - ti
-    movss   .Lpoly_exp2(%rip), %xmm2     # c8
+    subss   %xmm2, %xmm0  // tf = t - ti
+    movss   .Lpoly_exp2(%rip), %xmm2  // c8
     mulss   %xmm0, %xmm2
     addss   .Lpoly_exp2+4(%rip), %xmm2
     mulss   %xmm0, %xmm2

@@ -14,14 +14,21 @@
  * limitations under the License.
  */
 
-/* i386 SSSE3 sRGB unlinearize.
- * Exact 8-bit result using 16-segment integer approximation + correction.
- * V31: PIC/no-text-rel local constants, fused base term; fixed tail table argument offset.
- */
 #include "asm_macros.S"
 
 .text
 .p2align 5
+/*
+ * i386 SSSE3 sRGB unlinearize.
+ * Exact 8-bit result using 16-segment integer approximation + correction.
+ * V31: PIC/no-text-rel local constants, fused base term; fixed tail table argument offset.
+ *
+ * void ksvgUnlinearizeApplySsse3ApproxV31(
+ *     const jint* src, jint* dst, jint width, jint height, const jbyte* table);
+ *
+ * i386 ABI:
+ *   stack: src, dst, width, height, table
+ */
 .globl SYM(ksvgUnlinearizeApplySsse3ApproxV31)
 TYPE(SYM(ksvgUnlinearizeApplySsse3ApproxV31), @function)
 SYM(ksvgUnlinearizeApplySsse3ApproxV31):

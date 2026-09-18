@@ -64,6 +64,12 @@
 .fpu neon
 .text
 .align 2
+/*
+ * void turbulence32Asm(const Turbulence32AsmArgs* args);
+ *
+ * ARMv7a ABI:
+ *   r0 = args
+ */
 .global turbulence32Asm
 .type turbulence32Asm, %function
 

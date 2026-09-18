@@ -304,7 +304,7 @@ ksvgLightingDistantSpecularRowNeon32:
     vmax.f32 q2, q2, q15         // ndoth (clamped, non-negative)
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
-    vst1.32 {q2}, [sp]           // stash ndoth at [sp,#0..#15]
+    vst1.32 {q2}, [sp]           // stash ndoth at [sp, #0..#15]
     // ---- 4-lane scalar VFP pow (no bl, invariants survive) ----
     vldr    d1, [sp, #16]        // double exponent
     vcvt.f32.f64 s1, d1          // s1 = exponent float
@@ -323,7 +323,6 @@ ksvgLightingDistantSpecularRowNeon32:
     vldr    s0, [sp, #12]
     POW1_VFP
     vstr    s0, [sp, #12]
-
 
     // ---- intensity = clamp01(k * p) ----
     vld1.32 {q2}, [sp]           // q2 = p (in-place pow results)
@@ -678,7 +677,6 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vldr    s0, [sp, #12]
     POW1_VFP
     vstr    s0, [sp, #12]
-
 
     // ---- intensity = clamp01(k * p) ----
     vld1.32 {q2}, [sp]

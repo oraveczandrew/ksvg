@@ -142,8 +142,8 @@ SYM(ksvgLightingPointSpecularRowAvx2Linear):
     movl       %eax, -24(%ebp)
 
 .Lpsa_loop_Avx2:
-    // Per-pixel loop (window, normalize, half-vector dot, powf, intensity,
-    // pack, store; advances ux0 by dux).
+    # Per-pixel loop (window, normalize, half-vector dot, powf, intensity,
+    # pack, store; advances ux0 by dux).
     cmpl       $0, -12(%ebp)
     jle        .Lpsa_done_Avx2
 
@@ -298,13 +298,13 @@ SYM(ksvgLightingPointSpecularRowAvx2Linear):
 
     cmpl       $0, -4(%ebp)  # useLinear
     je         .Lpsa_out
-    // Linear path: exact L2S bytes via the global LUT.
+    # Linear path: exact L2S bytes via the global LUT.
     movl       -24(%ebp), %esi  # lut
     movzbl     (%esi,%eax), %eax
     movzbl     (%esi,%ecx), %ecx
     movzbl     (%esi,%edx), %edx
 .Lpsa_out:
-    // Max-channel pack + store (alpha = max(R, G, B)).
+    # Max-channel pack + store (alpha = max(R, G, B)).
     shll       $16, %eax
     shll       $8, %ecx
     orl        %ecx, %eax

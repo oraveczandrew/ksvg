@@ -20,7 +20,7 @@
 .text
     TEXT_SECTION
     CONST4_SECTION
-.p2align 2, 0x0  # # -- Begin function applyAvx2
+.p2align 2, 0x0
 LCPI0_0: .long 0xfffffe00
 LCPI0_1: .long 0xffffff00
 LCPI0_18: .long 255
@@ -60,22 +60,22 @@ LCPI0_11: TURB_DBL_4096
 LCPI0_12: TURB_DBL_NEG_1
 LCPI0_13: TURB_DBL_3
 LCPI0_15:
-.long 4294967295  # # double NaN
+.long 4294967295  # double NaN
 .long 2147483647
 LCPI0_19:
-.long 0  # # double 255
+.long 0  # double 255
 .long 1081073664
 LCPI0_20:
-.long 0  # # double 0.5
+.long 0  # double 0.5
 .long 1071644672
 LCPI0_23:
-.long 0  # # double 1
+.long 0  # double 1
 .long 1072693248
 LCPI0_24:
-.long 0  # # double 127.5
+.long 0  # double 127.5
 .long 1080025088
 LCPI0_27:
-.long 0  # # double 0.00390625
+.long 0  # double 0.00390625
 .long 1064304640
     TEXT_SECTION
 .globl SYM(ksvgTurbulenceApplyAvx2_i386)
@@ -85,9 +85,8 @@ LCPI0_27:
 
 TYPE(ksvgTurbulenceApplyAvx2_i386, @function)
 .p2align 4, 0x90
-    SYM(ksvgTurbulenceApplyAvx2_i386):  # # @applyAvx2
+    SYM(ksvgTurbulenceApplyAvx2_i386):
 .cfi_startproc
-# # %bb.0:
     pushl   %ebp
 .cfi_def_cfa_offset 8
 .cfi_offset %ebp, -8
@@ -97,7 +96,7 @@ TYPE(ksvgTurbulenceApplyAvx2_i386, @function)
     pushl   %edi
     pushl   %esi
     andl    $-32, %esp
-    subl    $69664, %esp  # # imm = 0x10FE0
+    subl    $69664, %esp  # imm = 0x10FE0
 .cfi_offset %esi, -20
 .cfi_offset %edi, -16
 .cfi_offset %ebx, -12
@@ -129,38 +128,37 @@ TYPE(ksvgTurbulenceApplyAvx2_i386, @function)
     movl    $0, -69488(%ebp)
     movl    $0, -69484(%ebp)
     movl    $0, -69480(%ebp)
-    movl    $1072693248, -69476(%ebp)  # # [0.0, 1.0]
-    movl    $524304, -69504(%ebp)  # # [16, 8, 0, 0] as dwords
+    movl    $1072693248, -69476(%ebp)  # [0.0, 1.0]
+    movl    $524304, -69504(%ebp)  # [16, 8, 0, 0] as dwords
     movl    132(%ebp), %eax
     testl   %eax, %eax
     jg      LBB0_2
-# # %bb.1:
     leal    2147483646(%eax), %ecx
     leal    2147483645(%eax), %edx
-    cmpl    $2147483646, %edx  # # imm = 0x7FFFFFFE
+    cmpl    $2147483646, %edx  # imm = 0x7FFFFFFE
     cmovbl  %eax, %ecx
     movl    $1, %eax
     subl    %ecx, %eax
 LBB0_2:
-    cmpl    $2147483646, %eax  # # imm = 0x7FFFFFFE
-    movl    $2147483646, %ecx  # # imm = 0x7FFFFFFE
+    cmpl    $2147483646, %eax  # imm = 0x7FFFFFFE
+    movl    $2147483646, %ecx  # imm = 0x7FFFFFFE
     cmovbl  %eax, %ecx
     pushl   %edx
     calll   .Lksvg_pcrel_get_pc_edx
 1:
     leal    (LCPI0_0-1b)(%edx), %edx
-    vpbroadcastd (%edx), %xmm0  # # xmm0 = [4294966784,4294966784,4294966784,4294966784]
+    vpbroadcastd (%edx), %xmm0  # xmm0 = [4294966784,4294966784,4294966784,4294966784]
     popl    %edx
     xorl    %edi, %edi
-    movl    $-2092037281, %ebx  # # imm = 0x834E0B5F
+    movl    $-2092037281, %ebx  # imm = 0x834E0B5F
     pushl   %edx
     calll   .Lksvg_pcrel_get_pc_edx
 1:
     leal    (LCPI0_1-1b)(%edx), %edx
-    vpbroadcastd (%edx), %xmm1  # # xmm1 = [4294967040,4294967040,4294967040,4294967040]
+    vpbroadcastd (%edx), %xmm1  # xmm1 = [4294967040,4294967040,4294967040,4294967040]
     popl    %edx
-    vmovddup -69432(%ebp), %xmm2  # # xmm2 = [3.90625E-3,3.90625E-3]
-                                        # # xmm2 = mem[0,0]
+    vmovddup -69432(%ebp), %xmm2  # xmm2 = [3.90625E-3,3.90625E-3]
+                                        # xmm2 = mem[0,0]
     vxorpd  %xmm3, %xmm3, %xmm3
     vpcmpeqd %xmm4, %xmm4, %xmm4
 .p2align 4, 0x90
@@ -172,10 +170,10 @@ LBB0_3:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %esi
@@ -187,11 +185,11 @@ LBB0_3:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     movl    %esi, %ecx
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %ecx
@@ -210,21 +208,20 @@ LBB0_3:
     vtestpd %xmm4, %xmm6
     jb      LBB0_3
     vmulsd  %xmm5, %xmm5, %xmm6
-    vmovsd  %xmm6, 64(%esp)  # # 8-byte Spill
-    vshufpd $1, %xmm5, %xmm5, %xmm7  # # xmm7 = xmm5[1,0]
+    vmovsd  %xmm6, 64(%esp)
+    vshufpd $1, %xmm5, %xmm5, %xmm7  # xmm7 = xmm5[1,0]
     vmulsd  %xmm7, %xmm7, %xmm6
-    vaddsd  64(%esp), %xmm6, %xmm6  # # 8-byte Folded Reload
+    vaddsd  64(%esp), %xmm6, %xmm6
     vsqrtsd %xmm6, %xmm6, %xmm6
     vdivsd  %xmm6, %xmm7, %xmm7
     vmovsd  %xmm7, 3788(%esp, %edi, 8)
     vdivsd  %xmm6, %xmm5, %xmm5
     vmovsd  %xmm5, 7900(%esp, %edi, 8)
     incl    %edi
-    cmpl    $256, %edi  # # imm = 0x100
+    cmpl    $256, %edi  # imm = 0x100
     jne     LBB0_3
-# # %bb.5:
     xorl    %edi, %edi
-    movl    $-2092037281, %ebx  # # imm = 0x834E0B5F
+    movl    $-2092037281, %ebx  # imm = 0x834E0B5F
     vxorpd  %xmm3, %xmm3, %xmm3
     vpcmpeqd %xmm4, %xmm4, %xmm4
 .p2align 4, 0x90
@@ -236,10 +233,10 @@ LBB0_6:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %esi
@@ -251,11 +248,11 @@ LBB0_6:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     movl    %esi, %ecx
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %ecx
@@ -274,21 +271,20 @@ LBB0_6:
     vtestpd %xmm4, %xmm6
     jb      LBB0_6
     vmulsd  %xmm5, %xmm5, %xmm6
-    vmovsd  %xmm6, 64(%esp)  # # 8-byte Spill
-    vshufpd $1, %xmm5, %xmm5, %xmm7  # # xmm7 = xmm5[1,0]
+    vmovsd  %xmm6, 64(%esp)
+    vshufpd $1, %xmm5, %xmm5, %xmm7  # xmm7 = xmm5[1,0]
     vmulsd  %xmm7, %xmm7, %xmm6
-    vaddsd  64(%esp), %xmm6, %xmm6  # # 8-byte Folded Reload
+    vaddsd  64(%esp), %xmm6, %xmm6
     vsqrtsd %xmm6, %xmm6, %xmm6
     vdivsd  %xmm6, %xmm7, %xmm7
     vmovsd  %xmm7, 12012(%esp, %edi, 8)
     vdivsd  %xmm6, %xmm5, %xmm5
     vmovsd  %xmm5, 16124(%esp, %edi, 8)
     incl    %edi
-    cmpl    $256, %edi  # # imm = 0x100
+    cmpl    $256, %edi  # imm = 0x100
     jne     LBB0_6
-# # %bb.8:
     xorl    %edi, %edi
-    movl    $-2092037281, %ebx  # # imm = 0x834E0B5F
+    movl    $-2092037281, %ebx  # imm = 0x834E0B5F
     vxorpd  %xmm3, %xmm3, %xmm3
     vpcmpeqd %xmm4, %xmm4, %xmm4
 .p2align 4, 0x90
@@ -300,10 +296,10 @@ LBB0_9:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %esi
@@ -315,11 +311,11 @@ LBB0_9:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     movl    %esi, %ecx
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %ecx
@@ -338,21 +334,20 @@ LBB0_9:
     vtestpd %xmm4, %xmm6
     jb      LBB0_9
     vmulsd  %xmm5, %xmm5, %xmm6
-    vmovsd  %xmm6, 64(%esp)  # # 8-byte Spill
-    vshufpd $1, %xmm5, %xmm5, %xmm7  # # xmm7 = xmm5[1,0]
+    vmovsd  %xmm6, 64(%esp)
+    vshufpd $1, %xmm5, %xmm5, %xmm7  # xmm7 = xmm5[1,0]
     vmulsd  %xmm7, %xmm7, %xmm6
-    vaddsd  64(%esp), %xmm6, %xmm6  # # 8-byte Folded Reload
+    vaddsd  64(%esp), %xmm6, %xmm6
     vsqrtsd %xmm6, %xmm6, %xmm6
     vdivsd  %xmm6, %xmm7, %xmm7
     vmovsd  %xmm7, 20236(%esp, %edi, 8)
     vdivsd  %xmm6, %xmm5, %xmm5
     vmovsd  %xmm5, 24348(%esp, %edi, 8)
     incl    %edi
-    cmpl    $256, %edi  # # imm = 0x100
+    cmpl    $256, %edi  # imm = 0x100
     jne     LBB0_9
-# # %bb.11:
     xorl    %edi, %edi
-    movl    $-2092037281, %ebx  # # imm = 0x834E0B5F
+    movl    $-2092037281, %ebx  # imm = 0x834E0B5F
     vxorpd  %xmm3, %xmm3, %xmm3
     vpcmpeqd %xmm4, %xmm4, %xmm4
 .p2align 4, 0x90
@@ -364,10 +359,10 @@ LBB0_12:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %esi
@@ -379,11 +374,11 @@ LBB0_12:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     movl    %esi, %ecx
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %ecx
@@ -402,19 +397,18 @@ LBB0_12:
     vtestpd %xmm4, %xmm6
     jb      LBB0_12
     vmulsd  %xmm5, %xmm5, %xmm6
-    vmovsd  %xmm6, 64(%esp)  # # 8-byte Spill
-    vshufpd $1, %xmm5, %xmm5, %xmm7  # # xmm7 = xmm5[1,0]
+    vmovsd  %xmm6, 64(%esp)
+    vshufpd $1, %xmm5, %xmm5, %xmm7  # xmm7 = xmm5[1,0]
     vmulsd  %xmm7, %xmm7, %xmm6
-    vaddsd  64(%esp), %xmm6, %xmm6  # # 8-byte Folded Reload
+    vaddsd  64(%esp), %xmm6, %xmm6
     vsqrtsd %xmm6, %xmm6, %xmm6
     vdivsd  %xmm6, %xmm7, %xmm7
     vmovsd  %xmm7, 28460(%esp, %edi, 8)
     vdivsd  %xmm6, %xmm5, %xmm5
     vmovsd  %xmm5, 32572(%esp, %edi, 8)
     incl    %edi
-    cmpl    $256, %edi  # # imm = 0x100
+    cmpl    $256, %edi  # imm = 0x100
     jne     LBB0_12
-# # %bb.LBB0_14:
     pushl   %edx
     calll   .Lksvg_pcrel_get_pc_edx
 1:
@@ -438,8 +432,8 @@ LBB0_12:
     vmovapd (LCPI0_3+224-1b)(%edx), %ymm0
     vmovupd %ymm0, 1444(%esp)
     popl    %edx
-    movl    $256, %esi  # # imm = 0x100
-    movl    $-2092037281, %ebx  # # imm = 0x834E0B5F
+    movl    $256, %esi  # imm = 0x100
+    movl    $-2092037281, %ebx  # imm = 0x834E0B5F
 .p2align 4, 0x90
 LBB0_15:
     movl    %ecx, %eax
@@ -449,10 +443,10 @@ LBB0_15:
     shrl    $31, %eax
     sarl    $16, %edx
     addl    %eax, %edx
-    imull   $127773, %edx, %eax  # # imm = 0x1F31D
+    imull   $127773, %edx, %eax  # imm = 0x1F31D
     subl    %eax, %ecx
-    imull   $16807, %ecx, %eax  # # imm = 0x41A7
-    imull   $-2836, %edx, %ecx  # # imm = 0xF4EC
+    imull   $16807, %ecx, %eax  # imm = 0x41A7
+    imull   $-2836, %edx, %ecx  # imm = 0xF4EC
     leal    (%ecx, %eax), %edx
     testl   %edx, %edx
     leal    2147483647(%ecx, %eax), %ecx
@@ -470,41 +464,40 @@ LBB0_15:
     decl    %esi
     cmpl    $1, %esi
     ja      LBB0_15
-# # %bb.16:
     xorl    %eax, %eax
-    movl    $15033, %ecx  # # imm = 0x3AB9
+    movl    $15033, %ecx  # imm = 0x3AB9
 .p2align 4, 0x90
 LBB0_17:
     movzbl  1216(%esp, %eax), %edx
     movb    %dl, 1472(%esp, %eax)
     movl    %edx, 1732(%esp, %eax, 4)
     movl    %edx, 2756(%esp, %eax, 4)
-    vmovsd  3788(%esp, %eax, 8), %xmm0  # # xmm0 = mem[0],zero
-    vmovsd  7900(%esp, %eax, 8), %xmm1  # # xmm1 = mem[0],zero
+    vmovsd  3788(%esp, %eax, 8), %xmm0  # xmm0 = mem[0],zero
+    vmovsd  7900(%esp, %eax, 8), %xmm1  # xmm1 = mem[0],zero
     vmovsd  %xmm0, 5836(%esp, %eax, 8)
     vmovsd  %xmm1, 9948(%esp, %eax, 8)
     vmovsd  %xmm0, -23448(%esp, %ecx, 4)
     vmovsd  %xmm1, -7000(%esp, %ecx, 4)
     vmovsd  %xmm0, -15256(%esp, %ecx, 4)
     vmovsd  %xmm1, 1192(%esp, %ecx, 4)
-    vmovsd  12012(%esp, %eax, 8), %xmm0  # # xmm0 = mem[0],zero
-    vmovsd  16124(%esp, %eax, 8), %xmm1  # # xmm1 = mem[0],zero
+    vmovsd  12012(%esp, %eax, 8), %xmm0  # xmm0 = mem[0],zero
+    vmovsd  16124(%esp, %eax, 8), %xmm1  # xmm1 = mem[0],zero
     vmovsd  %xmm0, 14060(%esp, %eax, 8)
     vmovsd  %xmm1, 18172(%esp, %eax, 8)
     vmovsd  %xmm0, -23440(%esp, %ecx, 4)
     vmovsd  %xmm1, -6992(%esp, %ecx, 4)
     vmovsd  %xmm0, -15248(%esp, %ecx, 4)
     vmovsd  %xmm1, 1200(%esp, %ecx, 4)
-    vmovsd  20236(%esp, %eax, 8), %xmm0  # # xmm0 = mem[0],zero
-    vmovsd  24348(%esp, %eax, 8), %xmm1  # # xmm1 = mem[0],zero
+    vmovsd  20236(%esp, %eax, 8), %xmm0  # xmm0 = mem[0],zero
+    vmovsd  24348(%esp, %eax, 8), %xmm1  # xmm1 = mem[0],zero
     vmovsd  %xmm0, 22284(%esp, %eax, 8)
     vmovsd  %xmm1, 26396(%esp, %eax, 8)
     vmovsd  %xmm0, -23432(%esp, %ecx, 4)
     vmovsd  %xmm1, -6984(%esp, %ecx, 4)
     vmovsd  %xmm0, -15240(%esp, %ecx, 4)
     vmovsd  %xmm1, 1208(%esp, %ecx, 4)
-    vmovsd  28460(%esp, %eax, 8), %xmm0  # # xmm0 = mem[0],zero
-    vmovq   32572(%esp, %eax, 8), %xmm1  # # xmm1 = mem[0],zero
+    vmovsd  28460(%esp, %eax, 8), %xmm0  # xmm0 = mem[0],zero
+    vmovq   32572(%esp, %eax, 8), %xmm1  # xmm1 = mem[0],zero
     vmovsd  %xmm0, 30508(%esp, %eax, 8)
     vmovq   %xmm1, 34620(%esp, %eax, 8)
     vmovsd  %xmm0, -23424(%esp, %ecx, 4)
@@ -513,9 +506,8 @@ LBB0_17:
     vmovq   %xmm1, 1216(%esp, %ecx, 4)
     incl    %eax
     addl    $8, %ecx
-    cmpl    $258, %eax  # # imm = 0x102
+    cmpl    $258, %eax  # imm = 0x102
     jne     LBB0_17
-# # %bb.18:
     movl    16(%ebp), %eax
     imull   12(%ebp), %eax
     shll    $2, %eax
@@ -534,42 +526,38 @@ LBB0_17:
     cmpl    $32, %ecx
     movl    $32, %esi
     cmovll  %ecx, %esi
-    movl    %esi, 28(%esp)  # # 4-byte Spill
+    movl    %esi, 28(%esp)
     movl    24(%ebp), %ecx
     cmpl    32(%ebp), %ecx
     jge     LBB0_30
-# # %bb.19:
     orb     %al, %ah
-    movb    %ah, 23(%esp)  # # 1-byte Spill
+    movb    %ah, 23(%esp)
     movzbl  %ah, %eax
-    movl    %eax, 56(%esp)  # # 4-byte Spill
+    movl    %eax, 56(%esp)
     leal    4096(%edx), %eax
-    movl    %eax, 60(%esp)  # # 4-byte Spill
+    movl    %eax, 60(%esp)
     xorl    %esi, %esi
     movl    24(%ebp), %eax
-    movl    %eax, 24(%esp)  # # 4-byte Spill
+    movl    %eax, 24(%esp)
     jmp     LBB0_20
 .p2align 4, 0x90
 LBB0_29:
-    movl    24(%esp), %eax  # # 4-byte Reload
+    movl    24(%esp), %eax
     incl    %eax
-    movl    %eax, 24(%esp)  # # 4-byte Spill
+    movl    %eax, 24(%esp)
     cmpl    32(%ebp), %eax
     je      LBB0_30
-LBB0_20:  # # =>This Loop Header: Depth=1
-                                        # #     Child Loop BB0_22 Depth 2
-                                        # #     Child Loop BB0_27 Depth 2
-                                        # #       Child Loop BB0_32 Depth 3
+LBB0_20:
     cmpl    $0, 60(%ebp)
     jle     LBB0_25
-    movl    24(%esp), %ecx  # # 4-byte Reload
+    movl    24(%esp), %ecx
     movl    %ecx, %eax
     subl    24(%ebp), %eax
     vxorps  %xmm6, %xmm6, %xmm6
     vcvtsi2sd %eax, %xmm6, %xmm0
     vxorps  %xmm6, %xmm6, %xmm6
     vcvtsi2sd %ecx, %xmm6, %xmm3
-    vmovsd  44(%ebp), %xmm1  # # xmm1 = mem[0],zero
+    vmovsd  44(%ebp), %xmm1  # xmm1 = mem[0],zero
     vmulsd  %xmm1, %xmm0, %xmm4
     vmulsd  76(%ebp), %xmm3, %xmm0
     vaddsd  92(%ebp), %xmm0, %xmm0
@@ -580,12 +568,12 @@ LBB0_20:  # # =>This Loop Header: Depth=1
     # the per-row struct build corrupt the ratio/pack inputs. [336,1360)
     # is free (byte tables there are dead during pixels).
     leal    336(%esp), %eax
-    movl    28(%esp), %ebx  # # 4-byte Reload
+    movl    28(%esp), %ebx
     movl    56(%ebp), %edi
     jmp     LBB0_22
 .p2align 4, 0x90
 LBB0_24:
-    movl    64(%esp), %ebx  # # 4-byte Reload
+    movl    64(%esp), %ebx
     movzbl  %dl, %edx
     movl    %edx, (%eax)
     movzbl  %cl, %ecx
@@ -596,40 +584,39 @@ LBB0_24:
     vmovsd  %xmm3, 16(%eax)
     vmulsd  %xmm0, %xmm0, %xmm3
     vaddsd  %xmm0, %xmm0, %xmm0
-    vmovsd  -69392(%ebp), %xmm1  # # xmm1 = [3.0E+0,0.0E+0]
+    vmovsd  -69392(%ebp), %xmm1  # xmm1 = [3.0E+0,0.0E+0]
     vsubsd  %xmm0, %xmm1, %xmm0
     vmulsd  %xmm0, %xmm3, %xmm0
     vmovsd  %xmm0, 24(%eax)
-    movl    56(%esp), %ecx  # # 4-byte Reload
-                                        # # kill: def $cl killed $cl killed $ecx
+    movl    56(%esp), %ecx
     shll    %cl, %edi
     vaddsd  %xmm5, %xmm5, %xmm5
     vaddsd  %xmm4, %xmm4, %xmm4
     addl    $32, %eax
     decl    %ebx
     je      LBB0_25
-LBB0_22:  # #   Parent Loop BB0_20 Depth=1
-    movl    %ebx, 64(%esp)  # # 4-byte Spill
+LBB0_22:
+    movl    %ebx, 64(%esp)
     vaddsd  -69376(%ebp), %xmm5, %xmm6
     vroundsd $9, %xmm6, %xmm6, %xmm7
     vcvttsd2si %xmm7, %edx
     leal    1(%edx), %ecx
     testl   %edi, %edi
     setg    %bl
-    andb    23(%esp), %bl  # # 1-byte Folded Reload
+    andb    23(%esp), %bl
     cmpb    $1, %bl
     jne     LBB0_24
     vroundsd $9, %xmm4, %xmm4, %xmm0
     vcvttsd2si %xmm0, %ebx
     leal    (%edi, %ebx), %esi
-    addl    $4096, %esi  # # imm = 0x1000
-    movl    %esi, 40(%esp)  # # 4-byte Spill
+    addl    $4096, %esi  # imm = 0x1000
+    movl    %esi, 40(%esp)
     cmpl    %edx, %esi
     movl    %edi, %esi
     movl    $0, %ebx
     cmovgl  %ebx, %esi
     subl    %esi, %edx
-    cmpl    40(%esp), %ecx  # # 4-byte Folded Reload
+    cmpl    40(%esp), %ecx
     movl    %edi, %esi
     cmovll  %ebx, %esi
     subl    %esi, %ecx
@@ -641,36 +628,36 @@ LBB0_25:
     cmpl    28(%ebp), %eax
     movl    52(%ebp), %ebx
     jge     LBB0_29
-    movl    24(%esp), %eax  # # 4-byte Reload
+    movl    24(%esp), %eax
     imull   12(%ebp), %eax
     movl    8(%ebp), %ecx
     leal    (%ecx, %eax, 4), %eax
-    movl    %eax, 52(%esp)  # # 4-byte Spill
+    movl    %eax, 52(%esp)
     movl    20(%ebp), %edi
     jmp     LBB0_27
 .p2align 4, 0x90
 LBB0_39:
     # Fractal R/G: broadcast single-double constants (packed mem loads would
     # also pick up neighboring constants for the second lane).
-    vmovddup -69440(%ebp), %xmm1  # # [+1.0,+1.0] fractal offset (xmm1 dead)
+    vmovddup -69440(%ebp), %xmm1  # [+1.0,+1.0] fractal offset (xmm1 dead)
     vaddpd  %xmm1, %xmm2, %xmm0
-    vmovddup -69472(%ebp), %xmm1  # # [127.5,127.5] fractal scale
+    vmovddup -69472(%ebp), %xmm1  # [127.5,127.5] fractal scale
     vmulpd  %xmm1, %xmm0, %xmm0
-    vmovddup -69456(%ebp), %xmm1  # # [+0.5,+0.5] rounding offset
+    vmovddup -69456(%ebp), %xmm1  # [+0.5,+0.5] rounding offset
     vaddpd  %xmm1, %xmm0, %xmm0
     vroundpd $9, %xmm0, %xmm0
     vcvttpd2dq %xmm0, %xmm0
     vextractf128 $1, %ymm2, %xmm1
-    vmovsd  -69416(%ebp), %xmm3  # # xmm3 = [1.0E+0,0.0E+0]
+    vmovsd  -69416(%ebp), %xmm3  # xmm3 = [1.0E+0,0.0E+0]
     vaddsd  %xmm3, %xmm1, %xmm2
-    vmovsd  -69424(%ebp), %xmm4  # # xmm4 = [1.275E+2,0.0E+0]
+    vmovsd  -69424(%ebp), %xmm4  # xmm4 = [1.275E+2,0.0E+0]
     vmulsd  %xmm4, %xmm2, %xmm2
-    vmovsd  -69408(%ebp), %xmm6  # # xmm6 = [5.0E-1,0.0E+0]
+    vmovsd  -69408(%ebp), %xmm6  # xmm6 = [5.0E-1,0.0E+0]
     vaddsd  %xmm6, %xmm2, %xmm2
     vroundsd $9, %xmm2, %xmm2, %xmm2
     vcvttsd2si %xmm2, %ecx
     vpcmpeqd %xmm7, %xmm7, %xmm7
-    vpsrld  $24, %xmm7, %xmm7  # # xmm7 = [255,255,255,255]
+    vpsrld  $24, %xmm7, %xmm7  # xmm7 = [255,255,255,255]
     cmpl    $255, %ecx
     movl    $255, %edx
     cmovgel %edx, %ecx
@@ -679,21 +666,21 @@ LBB0_39:
     cmovlel %esi, %ecx
     vpxor   %xmm5, %xmm5, %xmm5
     vpmaxsd %xmm5, %xmm0, %xmm5
-    vshufpd $1, %xmm1, %xmm1, %xmm0  # # xmm0 = xmm1[1,0]
+    vshufpd $1, %xmm1, %xmm1, %xmm0  # xmm0 = xmm1[1,0]
     vaddsd  %xmm3, %xmm0, %xmm0
     vmovapd %xmm6, %xmm2
     vmulsd  %xmm4, %xmm0, %xmm0
 LBB0_40:
-    movl    32(%esp), %edi  # # 4-byte Reload
+    movl    32(%esp), %edi
     # Pack shifts [16,8,0,0] via LCPI0_25 (PC-relative): the old frame slot
     # `vmovd -69504(%ebp)` reads a clobbered slot (channel structs overlap
     # the Hot frame constants) and only sets lane0 (dropping G's <<8).
-    pushl   %edx  # # save 255 (live as cmov source below)
+    pushl   %edx  # save 255 (live as cmov source below)
     calll   .Lksvg_pcrel_get_pc_edx
-    22:
+22:
     leal    (LCPI0_25-22b)(%edx), %edx
-    vmovdqu (%edx), %xmm1  # # [16,8,0,0] shift counts
-    popl    %edx  # # restore 255
+    vmovdqu (%edx), %xmm1  # [16,8,0,0] shift counts
+    popl    %edx  # restore 255
     vpsllvd %xmm1, %xmm5, %xmm1
     vaddsd  %xmm2, %xmm0, %xmm0
     vroundsd $9, %xmm0, %xmm0, %xmm0
@@ -708,16 +695,14 @@ LBB0_40:
     orl     %ecx, %edx
     shll    $24, %eax
     orl     %eax, %edx
-    movl    52(%esp), %eax  # # 4-byte Reload
+    movl    52(%esp), %eax
     movl    %edx, (%eax, %edi, 4)
     incl    %edi
     cmpl    28(%ebp), %edi
     je      LBB0_29
-LBB0_27:  # #   Parent Loop BB0_20 Depth=1
-                                        # # =>  This Loop Header: Depth=2
-                                        # #       Child Loop BB0_32 Depth 3
+LBB0_27:
     cmpl    $0, 60(%ebp)
-    movl    %edi, 32(%esp)  # # 4-byte Spill
+    movl    %edi, 32(%esp)
     jle     LBB0_28
     movl    %edi, %eax
     subl    20(%ebp), %eax
@@ -728,24 +713,24 @@ LBB0_27:  # #   Parent Loop BB0_20 Depth=1
     vmulsd  68(%ebp), %xmm3, %xmm3
     vaddsd  84(%ebp), %xmm3, %xmm3
     vdivsd  116(%ebp), %xmm3, %xmm3
-    vmovsd  36(%ebp), %xmm1  # # xmm1 = mem[0],zero
+    vmovsd  36(%ebp), %xmm1  # xmm1 = mem[0],zero
     vmulsd  %xmm1, %xmm3, %xmm3
     vmulsd  %xmm1, %xmm0, %xmm0
-    vblendpd $2, -69488(%ebp), %xmm0, %xmm4  # # xmm4 = xmm0[0],mem[1]
+    vblendpd $2, -69488(%ebp), %xmm0, %xmm4  # xmm4 = xmm0[0],mem[1]
     vxorpd  %xmm2, %xmm2, %xmm2
     # (struct base relocated 192->336; see note at the row-setup leal above.)
     leal    336(%esp), %ecx
-    movl    28(%esp), %eax  # # 4-byte Reload
+    movl    28(%esp), %eax
     jmp     LBB0_32
 .p2align 4, 0x90
 LBB0_36:
     xorl    %esi, %esi
-    vmovapd 64(%esp), %ymm2  # # 32-byte Reload
-    vmovsd  40(%esp), %xmm3  # # 8-byte Reload
-                                        # # xmm3 = mem[0],zero
-    vmovapd 160(%esp), %ymm4  # # 32-byte Reload
-    movl    36(%esp), %eax  # # 4-byte Reload
-    vpermpd $85, %ymm4, %ymm1  # # ymm1 = ymm4[1,1,1,1]
+    vmovapd 64(%esp), %ymm2
+    vmovsd  40(%esp), %xmm3
+                                        # xmm3 = mem[0],zero
+    vmovapd 160(%esp), %ymm4
+    movl    36(%esp), %eax
+    vpermpd $85, %ymm4, %ymm1  # ymm1 = ymm4[1,1,1,1]
     vdivpd  %ymm1, %ymm0, %ymm0
     vaddpd  %ymm0, %ymm2, %ymm2
     vaddsd  %xmm3, %xmm3, %xmm3
@@ -754,10 +739,9 @@ LBB0_36:
     decl    %eax
     movl    52(%ebp), %ebx
     je      LBB0_37
-LBB0_32:  # #   Parent Loop BB0_20 Depth=1
-                                        # #     Parent Loop BB0_27 Depth=2
-    movl    %eax, 36(%esp)  # # 4-byte Spill
-    vmovsd  %xmm3, 40(%esp)  # # 8-byte Spill
+LBB0_32:
+    movl    %eax, 36(%esp)
+    vmovsd  %xmm3, 40(%esp)
     vaddsd  -69376(%ebp), %xmm3, %xmm0
     vroundsd $9, %xmm0, %xmm0, %xmm3
     vcvttsd2si %xmm3, %edx
@@ -767,12 +751,12 @@ LBB0_32:  # #   Parent Loop BB0_20 Depth=1
     vaddsd  -69384(%ebp), %xmm7, %xmm0
     vmovsd  %xmm0, 120(%esp)
     testl   %ebx, %ebx
-    vmovapd %ymm2, 64(%esp)  # # 32-byte Spill
-    vmovapd %ymm4, 160(%esp)  # # 32-byte Spill
+    vmovapd %ymm2, 64(%esp)
+    vmovapd %ymm4, 160(%esp)
     jle     LBB0_34
     vroundsd $9, %xmm4, %xmm4, %xmm0
     vcvttsd2si %xmm0, %esi
-    addl    60(%esp), %esi  # # 4-byte Folded Reload
+    addl    60(%esp), %esi
     cmpl    %edx, %esi
     movl    %ebx, %edi
     movl    $0, %ebx
@@ -800,11 +784,11 @@ LBB0_34:
     vmovups %xmm0, 128(%esp)
     vmulsd  %xmm7, %xmm7, %xmm0
     vaddsd  %xmm7, %xmm7, %xmm3
-    vmovsd  -69392(%ebp), %xmm1  # # xmm1 = [3.0E+0,0.0E+0]
+    vmovsd  -69392(%ebp), %xmm1  # xmm1 = [3.0E+0,0.0E+0]
     vsubsd  %xmm3, %xmm1, %xmm3
     vmulsd  %xmm3, %xmm0, %xmm0
     vmovsd  %xmm0, 144(%esp)
-    vmovsd  24(%ecx), %xmm0  # # xmm0 = mem[0],zero
+    vmovsd  24(%ecx), %xmm0  # xmm0 = mem[0],zero
     vmovsd  %xmm0, 152(%esp)
     vbroadcastsd 112(%esp), %ymm0
     vbroadcastsd 128(%esp), %ymm1
@@ -818,7 +802,7 @@ LBB0_34:
     vmulpd  16448(%ebx, %edx), %ymm1, %ymm1
     movzbl  1732(%esp, %eax, 4), %eax
     shll    $5, %eax
-    vmovddup 16(%ecx), %xmm5  # # xmm5 = mem[0,0]
+    vmovddup 16(%ecx), %xmm5  # xmm5 = mem[0,0]
     vbroadcastsd %xmm5, %ymm5
     vmulpd  (%ebx, %eax), %ymm0, %ymm0
     vmulpd  16448(%ebx, %eax), %ymm5, %ymm6
@@ -868,9 +852,9 @@ LBB0_37:
     vpxor   %xmm5, %xmm5, %xmm5
     vpmaxsd %xmm5, %xmm0, %xmm5
     vextractf128 $1, %ymm2, %xmm0
-    vmovsd  -69400(%ebp), %xmm3  # # xmm3 = [2.55E+2,0.0E+0]
+    vmovsd  -69400(%ebp), %xmm3  # xmm3 = [2.55E+2,0.0E+0]
     vmulsd  %xmm3, %xmm0, %xmm1
-    vmovsd  -69408(%ebp), %xmm2  # # xmm2 = [5.0E-1,0.0E+0]
+    vmovsd  -69408(%ebp), %xmm2  # xmm2 = [5.0E-1,0.0E+0]
     vaddsd  %xmm2, %xmm1, %xmm1
     vroundsd $9, %xmm1, %xmm1, %xmm1
     vcvttsd2si %xmm1, %ecx
@@ -879,7 +863,7 @@ LBB0_37:
     cmovgel %edx, %ecx
     testl   %ecx, %ecx
     cmovlel %esi, %ecx
-    vshufpd $1, %xmm0, %xmm0, %xmm0  # # xmm0 = xmm0[1,0]
+    vshufpd $1, %xmm0, %xmm0, %xmm0  # xmm0 = xmm0[1,0]
     vmulsd  %xmm3, %xmm0, %xmm0
     jmp     LBB0_40
 LBB0_30:
@@ -891,5 +875,4 @@ LBB0_30:
     vzeroupper
     retl
 .cfi_endproc
-                                        # # -- End function
-    ////    SIZE(SYM(ksvgTurbulenceApplyAvx2_i386))
+    #    SIZE(SYM(ksvgTurbulenceApplyAvx2_i386))

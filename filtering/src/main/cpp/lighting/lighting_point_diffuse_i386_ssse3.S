@@ -66,8 +66,8 @@ SYM(ksvgLightingPointDiffuseRowSsse3Linear):
     movl          %eax, -24(%ebp)
 
 .Lpd_loop_Ssse3:
-    // Per-pixel loop (Sobel window, normalize, point-light direction, dot,
-    // clamp, pack, store; advances ux0 by dux).
+    # Per-pixel loop (Sobel window, normalize, point-light direction, dot,
+    # clamp, pack, store; advances ux0 by dux).
     cmpl          $0, -12(%ebp)
     jle           .Lpd_done_Ssse3
 

@@ -62,7 +62,7 @@ SYM(ksvgLightingDistantDiffuseRowSsse3Linear):
     movl          %eax, -24(%ebp)
 
 .Ldd_loop_Ssse3:
-    // Per-pixel loop (Sobel window, normalize, dot, clamp, pack, store).
+    # Per-pixel loop (Sobel window, normalize, dot, clamp, pack, store).
     cmpl          $0, -12(%ebp)
     jle           .Ldd_done_Ssse3
 

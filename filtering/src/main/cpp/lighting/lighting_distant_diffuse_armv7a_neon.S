@@ -19,6 +19,16 @@
 .fpu neon
 .text
 .align 2
+
+/*
+ * void ksvgLightingDistantDiffuseRowNeon32(
+ *     const jint* srcT, const jint* srcM, const jint* srcB,
+ *     jint* dst, jint count, const LightingParams* params);
+ *
+ * ARMv7a ABI:
+ *   r0 = srcT, r1 = srcM, r2 = srcB, r3 = dst
+ *   stack: count, params
+ */
 .global ksvgLightingDistantDiffuseRowNeon32
 .type ksvgLightingDistantDiffuseRowNeon32, %function
 
@@ -312,6 +322,16 @@ ksvgLightingDistantDiffuseRowNeon32:
     str     r9, [r3], #4
 .endm
 
+/*
+ * void ksvgLightingDistantDiffuseRowNeon32Linear(
+ *     const jint* srcT, const jint* srcM, const jint* srcB,
+ *     jint* dst, jint count, const LightingParams* params,
+ *     const uint8_t* linearToSrgb);
+ *
+ * ARMv7a ABI:
+ *   r0 = srcT, r1 = srcM, r2 = srcB, r3 = dst
+ *   stack: count, params, linearToSrgb
+ */
 .global ksvgLightingDistantDiffuseRowNeon32Linear
 .type ksvgLightingDistantDiffuseRowNeon32Linear, %function
 

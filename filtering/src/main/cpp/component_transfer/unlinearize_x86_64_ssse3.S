@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include "asm_macros.S"
+
+.text
+.p2align 5
 /*
  * x86-64 SSSE3 linear -> sRGB (u8), exact corrected integer approximation.
  *
@@ -26,13 +30,11 @@
  *   - Uses all 16 XMM registers to hold constants (xmm9-xmm15) and state.
  *
  * void ksvgUnlinearizeApplySsse3(
- *     jint* src, jint* dst, jint width, jint height, const jbyte* table);
+ *     const jint* src, jint* dst, jint width, jint height, const jbyte* table);
+ *
+ * x86-64 System V ABI:
+ *   rdi = src, rsi = dst, edx = width, ecx = height, r8 = table
  */
-
-#include "asm_macros.S"
-
-.text
-.p2align 5
 .globl SYM(ksvgUnlinearizeApplySsse3)
 TYPE(SYM(ksvgUnlinearizeApplySsse3), @function)
 SYM(ksvgUnlinearizeApplySsse3):

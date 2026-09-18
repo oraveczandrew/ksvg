@@ -87,7 +87,6 @@
 .globl SYM(ksvgLightingDistantSpecularRowAvx2)
 TYPE(SYM(ksvgLightingDistantSpecularRowAvx2), @function)
 SYM(ksvgLightingDistantSpecularRowAvx2):
-# %bb.0:
     pushq        %rbp
     movq         %rsp, %rbp
     pushq        %r15
@@ -96,24 +95,22 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     pushq        %r12
     pushq        %rbx
     andq         $-64, %rsp
-    subq         $320, %rsp  # imm = 0x140
-# kill: def $r8d killed $r8d def $r8
-    movq         %rdx, 48(%rsp)  # 8-byte Spill
-    movq         %rsi, 40(%rsp)  # 8-byte Spill
-    movq         %rdi, 32(%rsp)  # 8-byte Spill
+    subq         $320, %rsp  // imm = 0x140
+    movq         %rdx, 48(%rsp)
+    movq         %rsi, 40(%rsp)
+    movq         %rdi, 32(%rsp)
     testl        %r8d, %r8d
     jle          .LBB1_20
-# %bb.1:
     // Normalize the distant light direction once: l = (lx, ly, lz + 1) / |..|
     // (specular half-vector base; the +1 folds in the (0, 0, 1) view term).
     movq         %r9, %rbx
     movq         %rcx, %r15
     movq         %r8, %rax
     vbroadcastss (%r9), %ymm1
-    vmovaps      %ymm1, 224(%rsp)  # 32-byte Spill
+    vmovaps      %ymm1, 224(%rsp)
     vbroadcastss 12(%r9), %ymm1
     vbroadcastss 16(%r9), %ymm2
-    vmovss       20(%r9), %xmm3  # xmm3 = mem[0],zero,zero,zero
+    vmovss       20(%r9), %xmm3  // xmm3 = mem[0],zero,zero,zero
     vaddss       .LCPI1_0(%rip), %xmm3, %xmm3
     vmulss       %xmm2, %xmm2, %xmm4
     vmulss       %xmm1, %xmm1, %xmm5
@@ -123,45 +120,44 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vbroadcastss %xmm4, %ymm4
     vsqrtps      %ymm4, %ymm4
     vdivps       %ymm4, %ymm1, %ymm1
-    vmovaps      %ymm1, 192(%rsp)  # 32-byte Spill
+    vmovaps      %ymm1, 192(%rsp)
     vdivps       %ymm4, %ymm2, %ymm1
-    vmovaps      %ymm1, 160(%rsp)  # 32-byte Spill
+    vmovaps      %ymm1, 160(%rsp)
     vbroadcastss %xmm3, %ymm1
     vdivps       %ymm4, %ymm1, %ymm1
-    vmovaps      %ymm1, 128(%rsp)  # 32-byte Spill
+    vmovaps      %ymm1, 128(%rsp)
     vbroadcastss 4(%r9), %ymm1
-    vmovaps      %ymm1, 96(%rsp)  # 32-byte Spill
-    vextractps     $0, %xmm0, 56(%rsp)  # 4-byte Spill
+    vmovaps      %ymm1, 96(%rsp)
+    vextractps     $0, %xmm0, 56(%rsp)
     decl         %eax
     shrl         $3, %eax
     incl         %eax
-    movq         %rax, 24(%rsp)  # 8-byte Spill
+    movq         %rax, 24(%rsp)
     xorl         %r13d, %r13d
     xorl         %r12d, %r12d
     jmp          .LBB1_2
-.LBB1_19:  #   in Loop: Header=BB1_2 Depth=1
+.LBB1_19:
     addq         $8, %r13
     incq         %r12
     addq         $32, %r15
-    cmpq         24(%rsp), %r12  # 8-byte Folded Reload
+    cmpq         24(%rsp), %r12
     je           .LBB1_20
-.LBB1_2:  # =>This Loop Header: Depth=1
-#     Child Loop BB1_3 Depth 2
+.LBB1_2:
     // Sobel window: load row alphas, scale to heights (h = (alpha >> 24) * ss).
     vbroadcastss 36(%rbx), %ymm0
-    movq         32(%rsp), %rax  # 8-byte Reload
+    movq         32(%rsp), %rax
     vmovdqu      (%rax,%r13,4), %ymm1
     vmovdqu      4(%rax,%r13,4), %ymm2
     vmovdqu      8(%rax,%r13,4), %ymm3
     ALPHA_FSCALE %ymm1, %ymm1, %ymm0, %ymm1
     ALPHA_FSCALE %ymm2, %ymm2, %ymm0, %ymm2
     ALPHA_FSCALE %ymm3, %ymm3, %ymm0, %ymm3
-    movq         40(%rsp), %rax  # 8-byte Reload
+    movq         40(%rsp), %rax
     vmovdqu      (%rax,%r13,4), %ymm4
     vmovdqu      8(%rax,%r13,4), %ymm5
     ALPHA_FSCALE %ymm4, %ymm4, %ymm0, %ymm4
     ALPHA_FSCALE %ymm5, %ymm5, %ymm0, %ymm5
-    movq         48(%rsp), %rax  # 8-byte Reload
+    movq         48(%rsp), %rax
     vmovdqu      (%rax,%r13,4), %ymm6
     vmovdqu      4(%rax,%r13,4), %ymm7
     vmovdqu      8(%rax,%r13,4), %ymm8
@@ -179,7 +175,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vaddps       %ymm1, %ymm4, %ymm4
     vaddps       %ymm6, %ymm4, %ymm4
     vsubps       %ymm4, %ymm5, %ymm4
-    vdivps       224(%rsp), %ymm4, %ymm4  # 32-byte Folded Reload
+    vdivps       224(%rsp), %ymm4, %ymm4
     vmulps       %ymm7, %ymm0, %ymm0
     vaddps       %ymm0, %ymm0, %ymm0
     vaddps       %ymm6, %ymm0, %ymm0
@@ -188,7 +184,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vaddps       %ymm1, %ymm2, %ymm1
     vaddps       %ymm3, %ymm1, %ymm1
     vsubps       %ymm1, %ymm0, %ymm0
-    vdivps       96(%rsp), %ymm0, %ymm0  # 32-byte Folded Reload
+    vdivps       96(%rsp), %ymm0, %ymm0
     // Surface normal n = (-dx, -dy, 1) / |..|, dotted with the scaled light
     // dirs and clamped: dot = max(0, n.l).
     vxorps       %xmm5, %xmm5, %xmm5
@@ -197,37 +193,37 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     vmulps       %ymm0, %ymm0, %ymm2
     vmulps       %ymm1, %ymm1, %ymm3
     vaddps       %ymm2, %ymm3, %ymm2
-    vbroadcastss .LCPI1_0(%rip), %ymm3  # ymm3 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0]
+    vbroadcastss .LCPI1_0(%rip), %ymm3  // ymm3 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0]
     vaddps       %ymm3, %ymm2, %ymm2
     vsqrtps      %ymm2, %ymm2
     vdivps       %ymm2, %ymm1, %ymm1
     vdivps       %ymm2, %ymm0, %ymm0
-    vmulps       192(%rsp), %ymm1, %ymm1  # 32-byte Folded Reload
-    vmulps       160(%rsp), %ymm0, %ymm0  # 32-byte Folded Reload
+    vmulps       192(%rsp), %ymm1, %ymm1
+    vmulps       160(%rsp), %ymm0, %ymm0
     vaddps       %ymm0, %ymm1, %ymm0
     vdivps       %ymm2, %ymm3, %ymm1
-    vmulps       128(%rsp), %ymm1, %ymm1  # 32-byte Folded Reload
+    vmulps       128(%rsp), %ymm1, %ymm1
     vaddps       %ymm0, %ymm1, %ymm0
     vmaxps       %ymm5, %ymm0, %ymm0
 
     // Full SIMD Specular Path (Fast Approximation)
-    vbroadcastss 56(%rsp), %ymm1 # exponent
+    vbroadcastss 56(%rsp), %ymm1  // exponent
     POW8_AVX2 %ymm0, %ymm1, %ymm9
 
     // intensity = k * p clamped to [0, 1]
-    vbroadcastss 8(%rbx), %ymm1 # k
+    vbroadcastss 8(%rbx), %ymm1  // k
     vmulps    %ymm1, %ymm0, %ymm0
     vxorps    %ymm1, %ymm1, %ymm1
     vmaxps    %ymm1, %ymm0, %ymm0
-    vbroadcastss .LCPI1_0(%rip), %ymm1 # 1.0f
+    vbroadcastss .LCPI1_0(%rip), %ymm1  // 1.0f
     vminps    %ymm1, %ymm0, %ymm0
 
     // R/G/B = intensity * lr/lg/lb
-    vbroadcastss 24(%rbx), %ymm1 # lr
+    vbroadcastss 24(%rbx), %ymm1  // lr
     vmulps    %ymm0, %ymm1, %ymm1
-    vbroadcastss 28(%rbx), %ymm2 # lg
+    vbroadcastss 28(%rbx), %ymm2  // lg
     vmulps    %ymm0, %ymm2, %ymm2
-    vbroadcastss 32(%rbx), %ymm3 # lb
+    vbroadcastss 32(%rbx), %ymm3  // lb
     vmulps    %ymm0, %ymm3, %ymm3
 
     // Round-half-up and clamp to [0, 255]
@@ -273,14 +269,12 @@ SYM(ksvgLightingDistantSpecularRowAvx2):
     popq         %rbp
     retq
 .Lfunc_end1:
-# -- End function
 
 .text
 .p2align 4
 .globl SYM(ksvgLightingDistantSpecularRowAvx2Linear)
 TYPE(SYM(ksvgLightingDistantSpecularRowAvx2Linear), @function)
 SYM(ksvgLightingDistantSpecularRowAvx2Linear):
-# %bb.0:
     pushq        %rbp
     movq         %rsp, %rbp
     pushq        %r15
@@ -289,24 +283,22 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     pushq        %r12
     pushq        %rbx
     andq         $-64, %rsp
-    subq         $320, %rsp  # imm = 0x140
-# kill: def $r8d killed $r8d def $r8
-    movq         %rdx, 48(%rsp)  # 8-byte Spill
-    movq         %rsi, 40(%rsp)  # 8-byte Spill
-    movq         %rdi, 32(%rsp)  # 8-byte Spill
+    subq         $320, %rsp  // imm = 0x140
+    movq         %rdx, 48(%rsp)
+    movq         %rsi, 40(%rsp)
+    movq         %rdi, 32(%rsp)
     testl        %r8d, %r8d
     jle          .LBS1_20
-# %bb.1:
     // Normalize the distant light direction once: l = (lx, ly, lz + 1) / |..|
     // (specular half-vector base; the +1 folds in the (0, 0, 1) view term).
     movq         %r9, %rbx
     movq         %rcx, %r15
     movq         %r8, %rax
     vbroadcastss (%r9), %ymm1
-    vmovaps      %ymm1, 224(%rsp)  # 32-byte Spill
+    vmovaps      %ymm1, 224(%rsp)
     vbroadcastss 12(%r9), %ymm1
     vbroadcastss 16(%r9), %ymm2
-    vmovss       20(%r9), %xmm3  # xmm3 = mem[0],zero,zero,zero
+    vmovss       20(%r9), %xmm3  // xmm3 = mem[0],zero,zero,zero
     vaddss       .LCPI1_0(%rip), %xmm3, %xmm3
     vmulss       %xmm2, %xmm2, %xmm4
     vmulss       %xmm1, %xmm1, %xmm5
@@ -316,44 +308,43 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vbroadcastss %xmm4, %ymm4
     vsqrtps      %ymm4, %ymm4
     vdivps       %ymm4, %ymm1, %ymm1
-    vmovaps      %ymm1, 192(%rsp)  # 32-byte Spill
+    vmovaps      %ymm1, 192(%rsp)
     vdivps       %ymm4, %ymm2, %ymm1
-    vmovaps      %ymm1, 160(%rsp)  # 32-byte Spill
+    vmovaps      %ymm1, 160(%rsp)
     vbroadcastss %xmm3, %ymm1
     vdivps       %ymm4, %ymm1, %ymm1
-    vmovaps      %ymm1, 128(%rsp)  # 32-byte Spill
+    vmovaps      %ymm1, 128(%rsp)
     vbroadcastss 4(%r9), %ymm1
-    vmovaps      %ymm1, 96(%rsp)  # 32-byte Spill
-    vextractps     $0, %xmm0, 56(%rsp)  # 4-byte Spill
+    vmovaps      %ymm1, 96(%rsp)
+    vextractps     $0, %xmm0, 56(%rsp)
     decl         %eax
     shrl         $3, %eax
     incl         %eax
-    movq         %rax, 24(%rsp)  # 8-byte Spill
+    movq         %rax, 24(%rsp)
     xorl         %r13d, %r13d
     xorl         %r12d, %r12d
     jmp          .LBS1_2
-.LBS1_19:  #   in Loop: Header=BB1_2 Depth=1
+.LBS1_19:
     addq         $8, %r13
     incq         %r12
     addq         $32, %r15
-    cmpq         24(%rsp), %r12  # 8-byte Folded Reload
+    cmpq         24(%rsp), %r12
     je           .LBS1_20
-.LBS1_2:  # =>This Loop Header: Depth=1
-#     Child Loop BB1_3 Depth 2
+.LBS1_2:
     vbroadcastss 36(%rbx), %ymm0
-    movq         32(%rsp), %rax  # 8-byte Reload
+    movq         32(%rsp), %rax
     vmovdqu      (%rax,%r13,4), %ymm1
     vmovdqu      4(%rax,%r13,4), %ymm2
     vmovdqu      8(%rax,%r13,4), %ymm3
     ALPHA_FSCALE %ymm1, %ymm1, %ymm0, %ymm1
     ALPHA_FSCALE %ymm2, %ymm2, %ymm0, %ymm2
     ALPHA_FSCALE %ymm3, %ymm3, %ymm0, %ymm3
-    movq         40(%rsp), %rax  # 8-byte Reload
+    movq         40(%rsp), %rax
     vmovdqu      (%rax,%r13,4), %ymm4
     vmovdqu      8(%rax,%r13,4), %ymm5
     ALPHA_FSCALE %ymm4, %ymm4, %ymm0, %ymm4
     ALPHA_FSCALE %ymm5, %ymm5, %ymm0, %ymm5
-    movq         48(%rsp), %rax  # 8-byte Reload
+    movq         48(%rsp), %rax
     vmovdqu      (%rax,%r13,4), %ymm6
     vmovdqu      4(%rax,%r13,4), %ymm7
     vmovdqu      8(%rax,%r13,4), %ymm8
@@ -371,7 +362,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vaddps       %ymm1, %ymm4, %ymm4
     vaddps       %ymm6, %ymm4, %ymm4
     vsubps       %ymm4, %ymm5, %ymm4
-    vdivps       224(%rsp), %ymm4, %ymm4  # 32-byte Folded Reload
+    vdivps       224(%rsp), %ymm4, %ymm4
     vmulps       %ymm7, %ymm0, %ymm0
     vaddps       %ymm0, %ymm0, %ymm0
     vaddps       %ymm6, %ymm0, %ymm0
@@ -380,7 +371,7 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vaddps       %ymm1, %ymm2, %ymm1
     vaddps       %ymm3, %ymm1, %ymm1
     vsubps       %ymm1, %ymm0, %ymm0
-    vdivps       96(%rsp), %ymm0, %ymm0  # 32-byte Folded Reload
+    vdivps       96(%rsp), %ymm0, %ymm0
     // Surface normal n = (-dx, -dy, 1) / |..|, dotted with the scaled light
     // dirs and clamped: dot = max(0, n.l).
     vxorps       %xmm5, %xmm5, %xmm5
@@ -389,37 +380,37 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     vmulps       %ymm0, %ymm0, %ymm2
     vmulps       %ymm1, %ymm1, %ymm3
     vaddps       %ymm2, %ymm3, %ymm2
-    vbroadcastss .LCPI1_0(%rip), %ymm3  # ymm3 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0]
+    vbroadcastss .LCPI1_0(%rip), %ymm3  // ymm3 = [1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0,1.0E+0]
     vaddps       %ymm3, %ymm2, %ymm2
     vsqrtps      %ymm2, %ymm2
     vdivps       %ymm2, %ymm1, %ymm1
     vdivps       %ymm2, %ymm0, %ymm0
-    vmulps       192(%rsp), %ymm1, %ymm1  # 32-byte Folded Reload
-    vmulps       160(%rsp), %ymm0, %ymm0  # 32-byte Folded Reload
+    vmulps       192(%rsp), %ymm1, %ymm1
+    vmulps       160(%rsp), %ymm0, %ymm0
     vaddps       %ymm0, %ymm1, %ymm0
     vdivps       %ymm2, %ymm3, %ymm1
-    vmulps       128(%rsp), %ymm1, %ymm1  # 32-byte Folded Reload
+    vmulps       128(%rsp), %ymm1, %ymm1
     vaddps       %ymm0, %ymm1, %ymm0
     vmaxps       %ymm5, %ymm0, %ymm0
 
     // Full SIMD Specular Path (Fast Approximation) - Linear
-    vbroadcastss 56(%rsp), %ymm1 # exponent
+    vbroadcastss 56(%rsp), %ymm1  // exponent
     POW8_AVX2 %ymm0, %ymm1, %ymm9
 
     // intensity = k * p clamped to [0, 1]
-    vbroadcastss 8(%rbx), %ymm1 # k
+    vbroadcastss 8(%rbx), %ymm1  // k
     vmulps    %ymm1, %ymm0, %ymm0
     vxorps    %ymm1, %ymm1, %ymm1
     vmaxps    %ymm1, %ymm0, %ymm0
-    vbroadcastss .LCPI1_0(%rip), %ymm1 # 1.0f
+    vbroadcastss .LCPI1_0(%rip), %ymm1  // 1.0f
     vminps    %ymm1, %ymm0, %ymm0
 
     // R/G/B = intensity * lr/lg/lb (Linear Light)
-    vbroadcastss 24(%rbx), %ymm1 # lr
+    vbroadcastss 24(%rbx), %ymm1  // lr
     vmulps    %ymm0, %ymm1, %ymm1
-    vbroadcastss 28(%rbx), %ymm2 # lg
+    vbroadcastss 28(%rbx), %ymm2  // lg
     vmulps    %ymm0, %ymm2, %ymm2
-    vbroadcastss 32(%rbx), %ymm3 # lb
+    vbroadcastss 32(%rbx), %ymm3  // lb
     vmulps    %ymm0, %ymm3, %ymm3
 
     // Round-half-up and clamp to [0, 255]
@@ -459,12 +450,12 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
     // then max-channel pack (alpha = max(R,G,B)) + 32-byte store.
     vmovdqu      256(%rsp), %ymm0
     vextracti128 $1, %ymm0, %xmm1
-    vmovdqa      %xmm1, 304(%rsp)  # park lane1 input
+    vmovdqa      %xmm1, 304(%rsp)  // park lane1 input
     call         l2s_vec4_avx2
-    vmovdqa      %xmm1, 288(%rsp)  # park lane0 result
-    vmovdqa      304(%rsp), %xmm0  # lane1 input
+    vmovdqa      %xmm1, 288(%rsp)  // park lane0 result
+    vmovdqa      304(%rsp), %xmm0  // lane1 input
     call         l2s_vec4_avx2
-    vmovdqa      288(%rsp), %xmm0  # lane0 result
+    vmovdqa      288(%rsp), %xmm0  // lane0 result
     vinserti128  $1, %xmm1, %ymm0, %ymm0
     vmovdqu      %ymm0, (%r15)
     jmp          .LBS1_19
@@ -613,7 +604,7 @@ l2s_vec4_avx2:
 RODATA
 .p2align 5
 .Lhalf:
-.long 0x3f000000  # 0.5f round-half-up bias (matches scalar floor(v+0.5f))
+.long 0x3f000000  // 0.5f round-half-up bias (matches scalar floor(v+0.5f))
 
 EMIT_LOG2_POLY_8
 EMIT_EXP2_POLY_8
@@ -621,4 +612,4 @@ EMIT_POW_COMMON_CONSTANTS
 .p2align 4
 .LCPI1_0:
 .long	0x3f800000
-.p2align 4  # float 1
+.p2align 4  // float 1
