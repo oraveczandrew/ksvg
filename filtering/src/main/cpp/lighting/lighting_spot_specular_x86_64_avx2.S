@@ -224,6 +224,8 @@ POINT_LIT4
 .Lspot_one: .long 0x3f800000
 .Lspot_255: .long 0x437f0000
 .Lspot_half: .long 0x3f000000
+.p2align 5
+.Lspot_255x8: .long 255,255,255,255,255,255,255,255
 EMIT_LOG2_POLY_8
 EMIT_EXP2_POLY_8
 EMIT_POW_COMMON_CONSTANTS
@@ -426,19 +428,55 @@ SYM(ksvgLightingSpotSpecularRowAvx2):
     vaddps       %ymm0, %ymm11, %ymm11
     vxorps       %ymm0, %ymm0, %ymm0
     vmaxps       %ymm0, %ymm11, %ymm11
-    vmovups      %ymm11, 0(%rsp)
-    vmovups      %ymm6, 32(%rsp)
-    leaq         .Lspot_l2s_data(%rip), %r15
-    vzeroupper
-    // Per-pixel specular blocks below (powf + intensity + RGB + pack).
-    SPOT_SPEC_PIXEL 0, 32, 0, %r14, %rbp, %r13d, 0
-    SPOT_SPEC_PIXEL 4, 36, 4, %r14, %rbp, %r13d, 0
-    SPOT_SPEC_PIXEL 8, 40, 8, %r14, %rbp, %r13d, 0
-    SPOT_SPEC_PIXEL 12, 44, 12, %r14, %rbp, %r13d, 0
-    SPOT_SPEC_PIXEL 16, 48, 16, %r14, %rbp, %r13d, 0
-    SPOT_SPEC_PIXEL 20, 52, 20, %r14, %rbp, %r13d, 0
-    SPOT_SPEC_PIXEL 24, 56, 24, %r14, %rbp, %r13d, 0
-    SPOT_SPEC_PIXEL 28, 60, 28, %r14, %rbp, %r13d, 0
+    // Full-vector specular: POW8 over all 8 lanes (no per-lane calls).
+    // %ymm9 stays live (light dir); scratch is %ymm8 (dead: Sobel temp).
+    // %ymm10-%ymm15 dead (len spilled/unused); GPRs untouched. Intensity
+    // matches the old per-lane clamp01 bit-for-bit (min/max exact, NaN
+    // inputs impossible: guarded normalize, max-clamped base/spot).
+    vmovd        %r13d, %xmm1
+    vbroadcastss %xmm1, %ymm1          # exponent vec
+    POW8_AVX2 %ymm11, %ymm1, %ymm8     # p vec = pow(ndoth, exp)
+    vbroadcastss 8(%rbp), %ymm1        # k
+    vmulps       %ymm1, %ymm11, %ymm0  # k * p
+    vmulps       %ymm6, %ymm0, %ymm0   # k * p * cutoff (ymm6 = spot, live)
+    vxorps       %ymm1, %ymm1, %ymm1
+    vmaxps       %ymm1, %ymm0, %ymm0   # max(0, .)
+    vbroadcastss .Lspot_one(%rip), %ymm1  # 1.0f
+    vminps       %ymm1, %ymm0, %ymm0   # intensity_vec = clamp01
+    # R/G/B = intensity * lr/lg/lb
+    vbroadcastss 24(%rbp), %ymm1  # lr
+    vmulps       %ymm0, %ymm1, %ymm1
+    vbroadcastss 28(%rbp), %ymm2  # lg
+    vmulps       %ymm0, %ymm2, %ymm2
+    vbroadcastss 32(%rbp), %ymm3  # lb
+    vmulps       %ymm0, %ymm3, %ymm3
+    # Round-half-up and clamp to [0, 255]
+    vbroadcastss .Lspot_half(%rip), %ymm4
+    vaddps       %ymm4, %ymm1, %ymm1
+    vaddps       %ymm4, %ymm2, %ymm2
+    vaddps       %ymm4, %ymm3, %ymm3
+    vcvttps2dq   %ymm1, %ymm1
+    vcvttps2dq   %ymm2, %ymm2
+    vcvttps2dq   %ymm3, %ymm3
+    vpxor        %xmm4, %xmm4, %xmm4
+    vpmaxsd      %ymm4, %ymm1, %ymm1
+    vpmaxsd      %ymm4, %ymm2, %ymm2
+    vpmaxsd      %ymm4, %ymm3, %ymm3
+    vmovdqa      .Lspot_255x8(%rip), %ymm4
+    vpminsd      %ymm4, %ymm1, %ymm1
+    vpminsd      %ymm4, %ymm2, %ymm2
+    vpminsd      %ymm4, %ymm3, %ymm3
+    # Alpha = max(R, G, B)
+    vpmaxsd      %ymm1, %ymm2, %ymm4
+    vpmaxsd      %ymm4, %ymm3, %ymm4
+    # Pack: (A << 24) | (R << 16) | (G << 8) | B
+    vpslld       $24, %ymm4, %ymm4
+    vpslld       $16, %ymm1, %ymm1
+    vpslld       $8, %ymm2, %ymm2
+    vpor         %ymm4, %ymm1, %ymm1
+    vpor         %ymm2, %ymm3, %ymm2
+    vpor         %ymm1, %ymm2, %ymm1
+    vmovdqu      %ymm1, (%r14)
     vmovd        %r13d, %xmm0
     addq         $80, %rsp
     popq         %r15
