@@ -236,17 +236,24 @@
  *   %rax, %rcx, %xmm0, %xmm2
  *   %xmm1 preserved. Callee-saved GPRs untouched.
  */
-.macro POW1_X64
+// NOTE: the dummy parameter exists so Apple-LLVM treats $N immediates
+// below as literals. In a parameter-less macro body LLVM substitutes
+// bare $N (N followed by a non-digit, e.g. $1, $23, $255, $0xff) with
+// the Nth macro argument (empty here), silently producing a memory
+// operand - or EVEX-encoded garbage -> SIGILL. Named-parameter macros
+// (like POW8_AVX2/POW4_SSSE3) are immune. Same reason: no $0x hex,
+// no bare $N below without this guard.
+.macro POW1_X64 dummy
     xorps   %xmm2, %xmm2
     ucomiss %xmm2, %xmm0
     jbe     77f
     movd    %xmm0, %eax
     movl    %eax, %ecx
     shrl    $23, %ecx
-    andl    $255, %ecx  # NOT $0xff: Apple LLVM eats $0 in param-less macros
+    andl    $0xff, %ecx
     subl    $127, %ecx
-    andl    $8388607, %eax  # = 0x007fffff (see above)
-    orl     $1065353216, %eax  # = 0x3f800000 (see above)
+    andl    $0x007fffff, %eax
+    orl     $0x3f800000, %eax
     movd    %eax, %xmm2
     subss   .Lfloat_1_bits(%rip), %xmm2  # f = m - 1
     movss   .Lpoly_log2(%rip), %xmm0     # c8
@@ -273,8 +280,8 @@
     cvtsi2ss %ecx, %xmm2
     ucomiss %xmm0, %xmm2
     jbe     78f
-    decl    %ecx  # NOT subl $1: Apple LLVM substitutes bare $N inside
-    cvtsi2ss %ecx, %xmm2  # parameter-less macros (see macrotest); decl is exact
+    subl    $1, %ecx
+    cvtsi2ss %ecx, %xmm2
 78:
     subss   %xmm2, %xmm0                 # tf = t - ti
     movss   .Lpoly_exp2(%rip), %xmm2     # c8
@@ -304,7 +311,7 @@
     mulss   %xmm2, %xmm0
     jmp     80f
 79:
-    movl    $2139095039, %ecx  # = 0x7f7fffff FLT_MAX (see above)
+    movl    $0x7f7fffff, %ecx
     movd    %ecx, %xmm0
     jmp     80f
 77:

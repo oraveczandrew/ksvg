@@ -16,6 +16,16 @@
 
 /*
  * Shared SIMD math macros for fast transcendental approximations.
+ *
+ * SECTION CONTRACT: the EMIT_* macros below switch to POINT_CONST
+ * (__TEXT,__const / .rodata — a regular, NON-mergeable section) before
+ * emitting. Never emit RIP+offset-indexed tables into a mergeable literal
+ * section (Apple __literal4/__literal16, ELF .rodata.cst*): the linker
+ * coalesces duplicate literals there, so table entries past a merged
+ * duplicate silently resolve to a *different* literal (observed: exp-c0
+ * reading .Lbiased_127's 127 on macOS, passing on ELF). Callers must
+ * TEXT_SECTION/POINT_TEXT/SPOT_TEXT after the EMIT block (all current
+ * callers do).
  */
 
 /*
@@ -24,6 +34,7 @@
  *   Precision: ~1.365 ULP (float32).
  */
 .macro EMIT_LOG2_POLY_8
+POINT_CONST
 .p2align 5
 .Lpoly_log2:
     .long 0xbc14e99e # c8
@@ -43,6 +54,7 @@
  *   Precision: ~1.378 ULP (float32).
  */
 .macro EMIT_EXP2_POLY_8
+POINT_CONST
 .p2align 5
 .Lpoly_exp2:
     .long 0x35fbc4c2 # c8
@@ -61,6 +73,7 @@
  *   Common constants for SIMD range reduction (IEEE-754 bit manipulation).
  */
 .macro EMIT_POW_COMMON_CONSTANTS
+POINT_CONST
 .p2align 5
 .Lbiased_127:    .long 127,127,127,127,127,127,127,127
 .Lmantissa_mask: .long 0x007fffff,0x007fffff,0x007fffff,0x007fffff,0x007fffff,0x007fffff,0x007fffff,0x007fffff
