@@ -147,6 +147,32 @@ private fun imageToBitmap(image: android.media.Image, width: Int, height: Int): 
     return out
 }
 
+/**
+ * Exact integer-math straight -> premultiplied conversion
+ * (`(c * a + 127) / 255`), mirroring the platform store path.
+ */
+internal fun premultipliedCopy(src: Bitmap): Bitmap {
+    val w = src.width
+    val h = src.height
+    val px = IntArray(w * h)
+    src.getPixels(px, 0, w, 0, 0, w, h)
+    for (i in px.indices) {
+        val p = px[i]
+        val a = p.alpha
+        if (a == 0) {
+            px[i] = 0
+        } else if (a < 255) {
+            px[i] = (a shl 24) or
+                (((p.red * a + 127) / 255) shl 16) or
+                (((p.green * a + 127) / 255) shl 8) or
+                ((p.blue * a + 127) / 255)
+        }
+    }
+    val out = createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    out.setPixels(px, 0, w, 0, 0, w, h)
+    return out
+}
+
 internal data class ParityStats(
     @JvmField val maxAbs: Int,
     @JvmField val meanAbs: Double,
@@ -240,6 +266,15 @@ internal fun parityStats(sw: Bitmap, hw: Bitmap, ignoreBoundaryFringe: Boolean =
  * on-device). Confined to single boundary-adjacent pixels; interior
  * divergences (wrong kernels, shapes, colors) still fail. See
  * `tmp/GPU_SCALAR_PARITY_REPORT.md` §8.
+ * @param premultiplyReference when true, the reference (software) bitmap is
+ * converted to premultiplied form before comparison. The software backend
+ * emits straight pixels (`getPixels` contract) while the hardware
+ * `RenderEffect` chain emits premultiplied pixels; both composite
+ * identically, but raw bytes differ wherever alpha is neither 0 nor 255.
+ * Needed for corpus inputs with translucent pixels (round-A cases are
+ * opaque, hence unaffected). Multiplication attenuates conversion noise
+ * (unlike unpremultiplying the hardware side, which amplifies it at
+ * small alpha).
  */
 internal fun assertParity(
     name: String,
@@ -248,11 +283,13 @@ internal fun assertParity(
     maxAbsTol: Int = GPU_PARITY_MAX_ABS,
     maxOutlierRatio: Double = GPU_PARITY_MAX_OUTLIER_RATIO,
     ignoreBoundaryFringe: Boolean = false,
+    premultiplyReference: Boolean = false,
 ) {
-    val stats = parityStats(sw, hw, ignoreBoundaryFringe)
+    val reference = if (premultiplyReference) premultipliedCopy(sw) else sw
+    val stats = parityStats(reference, hw, ignoreBoundaryFringe)
     val outlierRatio = stats.outlierCount.toDouble() / stats.total
     if (stats.maxAbs > maxAbsTol || outlierRatio > maxOutlierRatio) {
-        dumpParityBitmaps(name, sw, hw, stats)
+        dumpParityBitmaps(name, reference, hw, stats)
     }
     assertTrue(
         "$name: maxAbsDiff=${stats.maxAbs} exceeds $maxAbsTol " +

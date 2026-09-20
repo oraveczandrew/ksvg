@@ -106,6 +106,12 @@ class GpuPrimitiveParityTest {
             name = "feMorphology",
             minGpuApi = 33,
             svg = filteredSvg("""<feMorphology operator="erode" radius="3"/>"""),
+            // Adreno exact-boundary pixels on the erode interior edge
+            // (device col 205 = clip arithmetic landing on integers): the
+            // shader samples out-of-bounds there (undefined values) where
+            // the CPU clamps/keeps transparent. Same driver-boundary class
+            // as the §8 fringe cases (4-px period, deterministic).
+            ignoreBoundaryFringe = true,
         )
     }
 

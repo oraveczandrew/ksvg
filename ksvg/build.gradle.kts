@@ -141,6 +141,9 @@ dependencies.apply {
     testImplementation("org.robolectric:robolectric:4.16.1")
 
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    // Round-B corpus parity runners reuse the :filtering validation corpora
+    // and the pure-Kotlin parity SVG builders (tmp/GPU_PARITY_PLAN_B.md §3).
+    androidTestImplementation(testFixtures(project(":filtering")))
 }
 
 // PUBLISHING
