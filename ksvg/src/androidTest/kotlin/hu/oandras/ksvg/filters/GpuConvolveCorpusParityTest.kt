@@ -77,6 +77,11 @@ class GpuConvolveCorpusParityTest(
                 hw,
                 maxAbsTol = 0,
                 maxOutlierRatio = 0.0,
+                // Readback symmetry (see arithmetic runner): the HW readback
+                // double-converts while a raw SW read converts once; without
+                // this the assert would measure the readback on translucent
+                // pixels instead of the fallback. No-op at alpha 255.
+                premultiplyReference = true,
             )
         }
     }
