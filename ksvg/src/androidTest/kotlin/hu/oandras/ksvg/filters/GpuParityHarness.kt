@@ -339,7 +339,13 @@ internal fun parityStats(
  * Adreno readback + software Bitmap round-trips with zero excess on the
  * bisection configs). The bound stays tight (== maxAbsTol) at alpha 255 and
  * still catches real kernel errors, which shift all alphas. Opt-in; 0 keeps
- * the legacy flat gates for every other runner.
+ * the legacy flat gates for every other runner. Bound-exceeding pixels are
+ * counted as outliers, so [maxOutlierRatio] budgets them: pass a tight
+ * ratio (turbulence: default 0.001, measured 0) where any excess is a bug,
+ * a calibrated per-case ratio where the primitive amplifies quantization
+ * into selection flips (displacement: trunc(scale*(ch-0.5)) flips the
+ * sampled texel wherever the map sits within ±1 LSB of an integer
+ * boundary, at a rate growing with |scale|).
  */
 internal fun assertParity(
     name: String,
@@ -356,8 +362,15 @@ internal fun assertParity(
     val stats = parityStats(reference, hw, ignoreBoundaryFringe, ignoreTransparent, translucentQuantK)
     val outlierRatio = stats.outlierCount.toDouble() / stats.total
     // With the alpha-scaled bound active, the raw maxAbs is dominated by
-    // unrepresentable low-alpha levels; gate on bound excess instead.
-    val maxFailed = if (translucentQuantK > 0) stats.boundExceeded > 0 else stats.maxAbs > maxAbsTol
+    // unrepresentable low-alpha levels; the bound-exceeding pixels are the
+    // outliers, budgeted by maxOutlierRatio (when active, outlierCount ==
+    // boundExceeded by construction, so the second assert below is the
+    // effective gate and this one just mirrors it for message clarity).
+    val maxFailed = if (translucentQuantK > 0) {
+        outlierRatio > maxOutlierRatio
+    } else {
+        stats.maxAbs > maxAbsTol
+    }
     if (maxFailed || outlierRatio > maxOutlierRatio) {
         dumpParityBitmaps(name, reference, hw, stats)
     }
