@@ -30,6 +30,7 @@ import androidx.annotation.RequiresApi
 import androidx.collection.ArrayMap
 import hu.oandras.ksvg.dom.COLOR_WHITE
 import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.dom.filter.FeBlendMode
 import hu.oandras.ksvg.dom.filter.FeCompositeOperator
 import hu.oandras.ksvg.dom.filter.FeDistantLight
@@ -318,7 +319,14 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         }
 
                         is FeConvolveMatrixRenderNode -> {
-                            val shader = buildConvolveMatrixShader(primitive) ?: return null
+                            val shader = buildConvolveMatrixShader(
+                                primitive,
+                                filterRegion,
+                                sx,
+                                sy,
+                                totalPadX,
+                                totalPadY,
+                            ) ?: return null
                             resultShaders[resultName ?: ""] = shader
                             RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                         }
@@ -842,10 +850,23 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         return shader
     }
 
-    private fun buildConvolveMatrixShader(node: FeConvolveMatrixRenderNode): RuntimeShader? {
+    private fun buildConvolveMatrixShader(
+        node: FeConvolveMatrixRenderNode,
+        filterRegion: RectF,
+        sx: Float,
+        sy: Float,
+        padX: Int,
+        padY: Int,
+    ): RuntimeShader? {
         val size = node.orderX * node.orderY
         val kernel = node.kernel ?: FloatArray(size)
         if (size > 25 || kernel.size > 25) return null
+        // The AGSL sampling below clamps out-of-bounds taps (Skia child
+        // clamping), which is only correct for edgeMode=duplicate. wrap/none
+        // would silently compute the wrong edges on the GPU, so decline the
+        // chain and let the software backend handle them (round-B fallback
+        // coverage in GpuConvolveCorpusParityTest).
+        if (node.edgeMode != ConvolveMatrixEdgeMode.duplicate) return null
         val shader = RuntimeShader(CONVOLVE_MATRIX_SHADER)
         val paddedKernel = FloatArray(25)
         kernel.copyInto(paddedKernel)
@@ -857,6 +878,17 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         shader.setFloatUniform("uDivisor", node.divisor)
         shader.setFloatUniform("uBias", node.bias)
         shader.setIntUniform("uPreserveAlpha", if (node.preserveAlpha) 1 else 0)
+        // Input extent for tap clamping (mirrors the CPU bitmap bounds).
+        // Inset by half a texel: clamped taps must land on texel CENTERS
+        // (integer-corner clamping would bilinearly blend two edge texels
+        // where the CPU samples the single clamped index exactly).
+        shader.setFloatUniform(
+            "uBounds",
+            padX + 0.5f,
+            padY + 0.5f,
+            padX + filterRegion.width() * sx - 0.5f,
+            padY + filterRegion.height() * sy - 0.5f,
+        )
         return shader
     }
 

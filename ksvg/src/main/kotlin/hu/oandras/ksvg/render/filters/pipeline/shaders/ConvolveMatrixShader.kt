@@ -18,6 +18,14 @@
 
 package hu.oandras.ksvg.render.filters.pipeline.shaders
 
+/**
+ * Single-pass convolution over straight taps with premultiplied output.
+ * Out-of-bounds taps clamp to [uBounds] (the input extent in `fragCoord`
+ * space), mirroring the CPU `duplicate` path (`sampleCoordinate` clamp).
+ * Skia child sampling outside the input is NOT reliably clamped (Adreno
+ * reads undefined values there), so the clamp is explicit. wrap/none edge
+ * modes are declined host-side (software fallback) instead.
+ */
 internal const val CONVOLVE_MATRIX_SHADER: String = """
             uniform shader uInput;
             uniform float uKernel[25];
@@ -28,6 +36,7 @@ internal const val CONVOLVE_MATRIX_SHADER: String = """
             uniform float uDivisor;
             uniform float uBias;
             uniform int uPreserveAlpha;
+            uniform float4 uBounds;
             half4 main(float2 fragCoord) {
                 float4 sum = float4(0.0);
                 int kx = 0;
@@ -35,7 +44,7 @@ internal const val CONVOLVE_MATRIX_SHADER: String = """
                 for (int i = 0; i < 25; ++i) {
                     if (i >= uOrderX * uOrderY) break;
                     float2 offset = float2(float(kx - uTargetX), float(ky - uTargetY));
-                    sum += uInput.eval(fragCoord + offset) * uKernel[i];
+                    sum += uInput.eval(clamp(fragCoord + offset, uBounds.xy, uBounds.zw)) * uKernel[i];
                     kx++;
                     if (kx >= uOrderX) {
                         kx = 0;
