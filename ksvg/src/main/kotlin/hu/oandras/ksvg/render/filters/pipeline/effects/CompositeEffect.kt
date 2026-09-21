@@ -5,7 +5,7 @@
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *        https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,13 @@
 
 @file:Suppress("SpellCheckingInspection") // AGSL builtins
 
-package hu.oandras.ksvg.render.filters.pipeline.shaders
+package hu.oandras.ksvg.render.filters.pipeline.effects
+
+import android.graphics.RectF
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
+import android.os.Build
+import androidx.annotation.RequiresApi
 
 /**
  * Porter-Duff-style compositing plus `arithmetic` (`uOperator == 5`).
@@ -24,7 +30,7 @@ package hu.oandras.ksvg.render.filters.pipeline.shaders
  * (transparent outside — mirrors the CPU kernel, which writes the clip
  * only). Other operators are unaffected by the region uniform.
  */
-internal const val COMPOSITE_SHADER: String = """
+private const val COMPOSITE_SHADER: String = """
             uniform shader uInput;
             uniform shader uIn2;
             uniform int uOperator;
@@ -55,3 +61,42 @@ internal const val COMPOSITE_SHADER: String = """
                 return half4(dst);
             }
         """
+
+/**
+ * Builds the arithmetic-composite step of an Impl33 chain: the configured
+ * [RuntimeShader] (kept by the caller for downstream `resultShaders`
+ * lookups) plus the [RenderEffect] wrapping it under [inputUniformName].
+ *
+ * Only the `arithmetic` operator needs a shader (the rest lower to blend
+ * modes, and linear-light arithmetic declines the chain host-side). The
+ * caller chains the effect onto the primitive input and registers the
+ * shader. The second operand comes from a previously registered chain
+ * shader (flood, ...), resolved by the caller via `in2`.
+ *
+ * @param k1 k2 k3 k4 the arithmetic coefficients
+ * @param primitiveRegion the primitive subregion in buffer space (already
+ * remapped from user space by the caller); the CPU kernel writes the clip
+ * only
+ * @param in2Shader the already-configured chain shader feeding `uIn2`
+ * @param inputUniformName the shader-input uniform name (`uInput`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createArithmeticCompositeShaderEffect(
+    k1: Float,
+    k2: Float,
+    k3: Float,
+    k4: Float,
+    primitiveRegion: RectF,
+    in2Shader: RuntimeShader,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect> {
+    val shader = RuntimeShader(COMPOSITE_SHADER)
+    shader.setInputShader("uIn2", in2Shader)
+    shader.setIntUniform("uOperator", 5)
+    shader.setFloatUniform("uK", k1, k2, k3, k4)
+    shader.setFloatUniform(
+        "uPrimitiveRegion",
+        primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom,
+    )
+    return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
+}

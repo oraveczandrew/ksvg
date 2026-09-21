@@ -5,7 +5,7 @@
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *        https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,15 @@
 
 @file:Suppress("SpellCheckingInspection") // AGSL builtins
 
-package hu.oandras.ksvg.render.filters.pipeline.shaders
+package hu.oandras.ksvg.render.filters.pipeline.effects
 
-internal const val DISPLACEMENT_MAP_SHADER: String = """
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
+import android.os.Build
+import androidx.annotation.RequiresApi
+import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
+
+private const val DISPLACEMENT_MAP_SHADER: String = """
             uniform shader uInput;
             uniform shader uMap;
             uniform float2 uScale;
@@ -46,3 +52,34 @@ internal const val DISPLACEMENT_MAP_SHADER: String = """
                 return uInput.eval(floor(fragCoord + float2(d)) + 0.5);
             }
         """
+
+/**
+ * Builds the displacement-map step of an Impl33 chain: the configured
+ * [RuntimeShader] (kept by the caller for downstream `resultShaders`
+ * lookups) plus the [RenderEffect] wrapping it under [inputUniformName].
+ *
+ * The caller chains the effect onto the primitive input and registers the
+ * shader. The displacement field comes from a previously registered chain
+ * shader (turbulence, flood, ...), resolved by the caller via `in2`.
+ *
+ * @param node the displacement render node (scale + channel selectors)
+ * @param scaleX scaleY the primitive scale in bitmap pixels per user unit
+ * @param mapShader the already-configured chain shader feeding `uMap`
+ * @param inputUniformName the shader-input uniform name (`uInput`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createDisplacementMapShaderEffect(
+    node: FeDisplacementMapRenderNode,
+    scaleX: Float,
+    scaleY: Float,
+    mapShader: RuntimeShader,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect> {
+    val element = node.sourceElement
+    val shader = RuntimeShader(DISPLACEMENT_MAP_SHADER)
+    shader.setFloatUniform("uScale", element.scale * scaleX, element.scale * scaleY)
+    shader.setIntUniform("uXChannel", element.xChannelSelector.ordinal)
+    shader.setIntUniform("uYChannel", element.yChannelSelector.ordinal)
+    shader.setInputShader("uMap", mapShader)
+    return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
+}

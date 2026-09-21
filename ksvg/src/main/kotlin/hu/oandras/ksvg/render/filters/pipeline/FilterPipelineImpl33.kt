@@ -16,8 +16,6 @@
 
 package hu.oandras.ksvg.render.filters.pipeline
 
-import android.graphics.Bitmap
-import android.graphics.BitmapShader
 import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.PorterDuffColorFilter
@@ -28,19 +26,11 @@ import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.collection.ArrayMap
-import hu.oandras.ksvg.dom.COLOR_WHITE
 import hu.oandras.ksvg.dom.core.Box
-import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.dom.filter.FeBlendMode
 import hu.oandras.ksvg.dom.filter.FeCompositeOperator
-import hu.oandras.ksvg.dom.filter.FeDistantLight
-import hu.oandras.ksvg.dom.filter.FePointLight
-import hu.oandras.ksvg.dom.filter.FeSpotLight
 import hu.oandras.ksvg.dom.filter.FeStitchTiles
-import hu.oandras.ksvg.dom.filter.FeTurbulenceType
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
-import hu.oandras.ksvg.dom.filter.Lighting
-import hu.oandras.ksvg.dom.style.ColorValue
 import hu.oandras.ksvg.render.ALPHA_MATRIX_COLOR_FILTER
 import hu.oandras.ksvg.render.FeBlendRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
@@ -58,42 +48,33 @@ import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.FeSpecularLightingRenderNode
 import hu.oandras.ksvg.render.FeTileRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
-import hu.oandras.ksvg.render.FilterPrimitiveRenderNode
 import hu.oandras.ksvg.render.FilterRenderNode
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.calculatePrimitiveRegion
-import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.resolvePrimitiveInputRegion
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
-import hu.oandras.ksvg.filtering.ColorLuts
 import hu.oandras.ksvg.render.filters.buildColorMatrix
-import hu.oandras.ksvg.render.filters.buildTransferLutTables
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
-import hu.oandras.ksvg.render.filters.pipeline.shaders.COLOR_MATRIX_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.COMPONENT_TRANSFER_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.COMPOSITE_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.CONVOLVE_MATRIX_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.DISPLACEMENT_MAP_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.FLOOD_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.LIGHTING_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.TILE_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.TURBULENCE_SHADER
-import hu.oandras.ksvg.render.filters.pipeline.shaders.createMorphologyDilateShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.shaders.createMorphologyErodeShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createArithmeticCompositeShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createColorMatrixShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createComponentTransferShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveMatrixShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createDiffuseLightingShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createDisplacementMapShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createFloodShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyDilateShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyErodeShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createSpecularLightingShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createTileShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createTurbulenceShaderEffect
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withSave
-import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
-import hu.oandras.ksvg.utils.green
-import hu.oandras.ksvg.utils.red
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * AGSL (RuntimeShader) GPU backend (API 33+, hardware canvas only).
@@ -260,10 +241,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         is FeColorMatrixRenderNode -> {
                             val colorMatrix = primitive.sourceElement
                             val matrix = buildColorMatrix(colorMatrix.type, colorMatrix.values)
-                            val shader = RuntimeShader(COLOR_MATRIX_SHADER)
-                            shader.setFloatUniform("uMatrix", matrix.array)
+                            val (shader, colorMatrixEffect) = createColorMatrixShaderEffect(matrix.array, "uInput")
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                            colorMatrixEffect.chainWith(inputEffect)
                         }
 
                         is FeDiffuseLightingRenderNode -> {
@@ -274,17 +254,12 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                             )
 
-                            val shader = buildLightingShader(
-                                primitive, false, terminalPremult = false,
-                                filterRegion, sx, sy, totalPadX, totalPadY,
+                            val (shader, lightingEffect) = createDiffuseLightingShaderEffect(
+                                primitive, filterRegion, sx, sy, totalPadX, totalPadY, primitiveRegion, "uInput",
                             ) ?: return null
-                            shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
-                            shader.setFloatUniform("uInvCanvasScale", 1f / sx, 1f / sy)
-                            shader.setFloatUniform("uOffset", totalPadX.toFloat(), totalPadY.toFloat())
-                            shader.setRectFUniform("uPrimitiveRegion", primitiveRegion)
 
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                            lightingEffect.chainWith(inputEffect)
                         }
 
                         is FeSpecularLightingRenderNode -> {
@@ -299,49 +274,44 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             // path (full light color + intensity alpha); mirror it.
                             val terminalPremult =
                                 primitive === filterNode.primitives.lastOrNull()
-                            val shader = buildLightingShader(
-                                primitive, true, terminalPremult,
-                                filterRegion, sx, sy, totalPadX, totalPadY,
+                            val (shader, lightingEffect) = createSpecularLightingShaderEffect(
+                                primitive, terminalPremult,
+                                filterRegion, sx, sy, totalPadX, totalPadY, primitiveRegion, "uInput",
                             ) ?: return null
-                            shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
-                            shader.setFloatUniform("uInvCanvasScale", 1f / sx, 1f / sy)
-                            shader.setFloatUniform("uOffset", totalPadX.toFloat(), totalPadY.toFloat())
-                            shader.setFloatUniform(
-                                "uPrimitiveRegion",
-                                primitiveRegion.left, primitiveRegion.top,
-                                primitiveRegion.right, primitiveRegion.bottom
-                            )
 
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                            lightingEffect.chainWith(inputEffect)
                         }
 
                         is FeComponentTransferRenderNode -> {
-                            val shader = buildComponentTransferShader(primitive)
-                            // Region guard (same mapping as morphology uInterior):
-                            // the CPU kernel writes the clip only.
-                            shader.setFloatUniform(
-                                "uPrimitiveRegion",
+                            // Map to buffer space: (user - filterRegion.left) * sx + padX
+                            // (the CPU kernel writes the clip only).
+                            primitiveRegion.set(
                                 (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
                                 (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
                                 (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY,
+                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                            )
+
+                            val (shader, transferEffect) = createComponentTransferShaderEffect(
+                                primitive, primitiveRegion, "uInput",
                             )
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                            transferEffect.chainWith(inputEffect)
                         }
 
                         is FeConvolveMatrixRenderNode -> {
-                            val shader = buildConvolveMatrixShader(
+                            val (shader, convolveEffect) = createConvolveMatrixShaderEffect(
                                 primitive,
                                 filterRegion,
                                 sx,
                                 sy,
                                 totalPadX,
                                 totalPadY,
+                                "uInput",
                             ) ?: return null
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                            convolveEffect.chainWith(inputEffect)
                         }
 
                         is FeBlendRenderNode -> {
@@ -373,32 +343,27 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 } else {
                                     val in2Shader = composite.in2?.let { resultShaders[it] }
                                     if (in2Shader != null) {
-                                        val shader = RuntimeShader(COMPOSITE_SHADER)
-                                        shader.setInputShader("uIn2", in2Shader)
-                                        shader.setIntUniform("uOperator", 5)
-                                        shader.setFloatUniform(
-                                            "uK",
-                                            composite.k1,
-                                            composite.k2,
-                                            composite.k3,
-                                            composite.k4
-                                        )
-                                        // Region guard (same mapping as
-                                        // morphology uInterior): the CPU
-                                        // kernel writes the clip only. The
-                                        // shader itself applies it for the
-                                        // arithmetic operator only, so the
-                                        // shared blend paths are untouched.
-                                        shader.setFloatUniform(
-                                            "uPrimitiveRegion",
+                                        // Map to buffer space: (user - filterRegion.left) * sx + padX
+                                        // (the CPU kernel writes the clip only).
+                                        primitiveRegion.set(
                                             (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
                                             (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
                                             (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                            (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY,
+                                            (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                                        )
+
+                                        val (shader, compositeEffect) = createArithmeticCompositeShaderEffect(
+                                            composite.k1,
+                                            composite.k2,
+                                            composite.k3,
+                                            composite.k4,
+                                            primitiveRegion,
+                                            in2Shader,
+                                            "uInput",
                                         )
 
                                         resultShaders[resultName ?: ""] = shader
-                                        RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                                        compositeEffect.chainWith(inputEffect)
                                     } else {
                                         return null
                                     }
@@ -412,10 +377,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         is FeDisplacementMapRenderNode -> {
                             val disp = primitive.sourceElement
                             val mapShader = resultShaders[disp.in2] ?: return null
-                            val shader = buildDisplacementMapShader(primitive, scaleX, scaleY)
-                            shader.setInputShader("uMap", mapShader)
+                            val (shader, displacementEffect) = createDisplacementMapShaderEffect(
+                                primitive, scaleX, scaleY, mapShader, "uInput",
+                            )
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                            displacementEffect.chainWith(inputEffect)
                         }
 
                         is FeTurbulenceRenderNode -> {
@@ -437,25 +403,29 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 return null
                             }
 
-                            val shader = buildTurbulenceShader(
+                            // Terminal turbulence under linearRGB gets the linear->sRGB transfer
+                            // (CPU unLinearizeBitmap equivalent); anything else stays linear.
+                            val unlinearize = primitive === filterNode.primitives.lastOrNull() &&
+                                filterNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+                            val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
+                            val (shader, turbulenceEffect) = createTurbulenceShaderEffect(
                                 node = primitive,
-                                pScaleX = scaleX,
-                                pScaleY = scaleY,
+                                primitiveScaleX = scaleX,
+                                primitiveScaleY = scaleY,
                                 filterRegion = filterRegion,
                                 canvasScaleX = sx,
                                 canvasScaleY = sy,
                                 padX = totalPadX,
                                 padY = totalPadY,
-                                filterNode = filterNode,
+                                unlinearize = unlinearize,
+                                primitiveUnitsAreUser = primitiveUnitsAreUser,
                                 boundingBox = boundingBox,
-                            )
-                            shader.setFloatUniform(
-                                "uPrimitiveRegion",
-                                primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom
+                                primitiveRegion = primitiveRegion,
+                                inputUniformName = "in_source",
                             )
 
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "in_source")
+                            turbulenceEffect
                         }
 
                         is FeFloodRenderNode -> {
@@ -467,14 +437,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             )
 
                             val color = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
-                            val shader = RuntimeShader(FLOOD_SHADER)
-                            shader.setColorUniform("uColor", color)
-                            shader.setFloatUniform(
-                                "uPrimitiveRegion",
-                                primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom
-                            )
+                            val (shader, floodEffect) = createFloodShaderEffect(color, primitiveRegion, "uInput")
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "uInput")
+                            floodEffect
                         }
 
                         is FeMergeRenderNode -> {
@@ -507,10 +472,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                             )
 
-                            val shader = RuntimeShader(TILE_SHADER)
-                            shader.setRectFUniform("uRect", primitiveRegion)
+                            val (shader, tileEffect) = createTileShaderEffect(primitiveRegion, "uInput")
                             resultShaders[resultName ?: ""] = shader
-                            RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
+                            tileEffect.chainWith(inputEffect)
                         }
 
                         is FeDropShadowRenderNode -> {
@@ -583,10 +547,6 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             deviceLeft = deviceRegion.left,
             deviceTop = deviceRegion.top
         )
-    }
-
-    private fun RuntimeShader.setRectFUniform(name: String, rect: RectF) {
-        setFloatUniform(name, rect.left, rect.top, rect.right, rect.bottom)
     }
 
     private fun createBlendModeRenderEffect(
@@ -768,326 +728,6 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             canvas.drawRenderNode(gpuNode)
         }
     }
-
-    private fun buildLightingShader(
-        node: FilterPrimitiveRenderNode<*>,
-        isSpecular: Boolean,
-        terminalPremult: Boolean,
-        filterRegion: RectF,
-        sx: Float,
-        sy: Float,
-        padX: Int,
-        padY: Int,
-    ): RuntimeShader? {
-        val shader = RuntimeShader(LIGHTING_SHADER)
-        val light: Lighting?
-        val surfaceScale: Float
-        val constant: Float
-        val exponent: Float
-        val baseStyle = node.sourceElement.baseStyle
-        val styleColor = ((baseStyle?.lightingColor ?: baseStyle?.color) as? ColorValue)?.value ?: COLOR_WHITE
-
-        when (node) {
-            is FeDiffuseLightingRenderNode -> {
-                val diff = node.sourceElement
-                light = diff.light
-                surfaceScale = diff.surfaceScale
-                constant = diff.diffuseConstant
-                exponent = 1f
-            }
-
-            is FeSpecularLightingRenderNode -> {
-                val spec = node.sourceElement
-                light = spec.light
-                surfaceScale = spec.surfaceScale
-                constant = spec.specularConstant
-                exponent = spec.specularExponent
-            }
-
-            else -> {
-                return null
-            }
-        }
-
-        if (light == null) return null
-
-        shader.setFloatUniform("uSurfaceScale", surfaceScale)
-        shader.setFloatUniform("uConstant", constant)
-        shader.setFloatUniform("uExponent", exponent)
-        // Exact sRGB->linear table lookup (same tables as the CPU kernel);
-        // the linearized color feeds the useLinear path, the raw color the
-        // terminal-specular premultiplied output (which skips the EOTF).
-        val useLinear = node.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
-        val lut = ColorLuts.SRGB_TO_LINEAR
-        val linR = lut[styleColor.red].toFloat()
-        val linG = lut[styleColor.green].toFloat()
-        val linB = lut[styleColor.blue].toFloat()
-        if (useLinear) {
-            shader.setFloatUniform("uLightColor", linR / 255f, linG / 255f, linB / 255f)
-        } else {
-            shader.setFloatUniform(
-                "uLightColor",
-                styleColor.red / 255f, styleColor.green / 255f, styleColor.blue / 255f,
-            )
-        }
-        shader.setFloatUniform(
-            "uLightColorRaw",
-            styleColor.red / 255f, styleColor.green / 255f, styleColor.blue / 255f,
-        )
-        shader.setIntUniform("uUseLinear", if (useLinear) 1 else 0)
-        shader.setIntUniform("uTerminalPremult", if (terminalPremult) 1 else 0)
-        shader.setIntUniform("uIsSpecular", if (isSpecular) 1 else 0)
-
-        when (light) {
-            is FeDistantLight -> {
-                shader.setIntUniform("uLightType", 0)
-                val azimuthRad = Math.toRadians(light.azimuth.toDouble())
-                val elevationRad = Math.toRadians(light.elevation.toDouble())
-                val lx = cos(azimuthRad) * cos(elevationRad)
-                val ly = sin(azimuthRad) * cos(elevationRad)
-                val lz = sin(elevationRad)
-                shader.setFloatUniform("uLightPosDir", lx.toFloat(), ly.toFloat(), lz.toFloat())
-            }
-
-            is FePointLight -> {
-                shader.setIntUniform("uLightType", 1)
-                shader.setFloatUniform("uLightPosDir", light.x, light.y, light.z)
-            }
-
-            is FeSpotLight -> {
-                shader.setIntUniform("uLightType", 2)
-                shader.setFloatUniform("uLightPosDir", light.x, light.y, light.z)
-                shader.setFloatUniform("uPointsAt", light.pointsAtX, light.pointsAtY, light.pointsAtZ)
-                // Spot cone factor inputs, mirroring the CPU kernel bit-for-bit
-                // where it matters (Double math on the same widened values;
-                // NaN cone = no cutoff = cosine -1, like the kernel).
-                val spotDx = light.pointsAtX.toDouble() - light.x.toDouble()
-                val spotDy = light.pointsAtY.toDouble() - light.y.toDouble()
-                val spotDz = light.pointsAtZ.toDouble() - light.z.toDouble()
-                val spotLen = sqrt(spotDx * spotDx + spotDy * spotDy + spotDz * spotDz)
-                if (spotLen == 0.0) {
-                    shader.setIntUniform("uHasSpotTarget", 0)
-                    shader.setFloatUniform("uSpotDir", 0f, 0f, 0f)
-                    shader.setFloatUniform("uSpotCosine", -1f)
-                } else {
-                    shader.setIntUniform("uHasSpotTarget", 1)
-                    shader.setFloatUniform(
-                        "uSpotDir",
-                        (spotDx / spotLen).toFloat(),
-                        (spotDy / spotLen).toFloat(),
-                        (spotDz / spotLen).toFloat(),
-                    )
-                    val cone = light.limitingConeAngle?.toDouble() ?: Double.NaN
-                    shader.setFloatUniform(
-                        "uSpotCosine",
-                        if (cone.isNaN()) -1f else cos(cone * Math.PI / 180.0).toFloat(),
-                    )
-                }
-            }
-        }
-        // Height-tap extent for the Sobel clamp (mirrors the CPU
-        // clamped window; texel-center inset like convolve uBounds).
-        shader.setFloatUniform(
-            "uBounds",
-            padX + 0.5f,
-            padY + 0.5f,
-            padX + filterRegion.width() * sx - 0.5f,
-            padY + filterRegion.height() * sy - 0.5f,
-        )
-        return shader
-    }
-
-    private fun buildComponentTransferShader(node: FeComponentTransferRenderNode): RuntimeShader {
-        val shader = RuntimeShader(COMPONENT_TRANSFER_SHADER)
-        // NB: lutTables is lazily built by the CPU path; on a pure-GPU render it
-        // is still null here, so build the real tables (same as the CPU kernel
-        // uses) instead of falling back to zeros (which would zero the alpha).
-        val lut = node.lutTables ?: buildTransferLutTables(
-            node.transferFunctions,
-            node.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
-        ).also { node.lutTables = it }
-        // Two opaque textures (RGB tables + alpha table as gray): data bitmaps
-        // MUST stay opaque because GPU uploads premultiply, corrupting any data
-        // byte packed into RGB wherever alpha < 255.
-        var rgb = node.gpuLutBitmap
-        if (rgb == null || rgb.isRecycled) {
-            rgb = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
-            node.gpuLutBitmap = rgb
-        }
-        var alpha = node.gpuLutAlphaBitmap
-        if (alpha == null || alpha.isRecycled) {
-            alpha = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
-            node.gpuLutAlphaBitmap = alpha
-        }
-        val rgbPixels = IntArray(256)
-        val alphaPixels = IntArray(256)
-        for (i in 0 until 256) {
-            val a = (lut[0][i] ushr 24) and 0xFF
-            rgbPixels[i] = -0x1000000 or lut[1][i] or lut[2][i] or lut[3][i]
-            alphaPixels[i] = -0x1000000 or (a shl 16) or (a shl 8) or a
-        }
-        rgb.setPixels(rgbPixels, 0, 256, 0, 0, 256, 1)
-        alpha.setPixels(alphaPixels, 0, 256, 0, 0, 256, 1)
-        shader.setInputShader("uLutRgb", BitmapShader(rgb, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
-        shader.setInputShader("uLutA", BitmapShader(alpha, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
-        return shader
-    }
-
-    private fun buildConvolveMatrixShader(
-        node: FeConvolveMatrixRenderNode,
-        filterRegion: RectF,
-        sx: Float,
-        sy: Float,
-        padX: Int,
-        padY: Int,
-    ): RuntimeShader? {
-        val size = node.orderX * node.orderY
-        val kernel = node.kernel ?: FloatArray(size)
-        if (size > 25 || kernel.size > 25) return null
-        // The AGSL sampling below clamps out-of-bounds taps (Skia child
-        // clamping), which is only correct for edgeMode=duplicate. wrap/none
-        // would silently compute the wrong edges on the GPU, so decline the
-        // chain and let the software backend handle them (round-B fallback
-        // coverage in GpuConvolveCorpusParityTest).
-        if (node.edgeMode != ConvolveMatrixEdgeMode.duplicate) return null
-        val shader = RuntimeShader(CONVOLVE_MATRIX_SHADER)
-        val paddedKernel = FloatArray(25)
-        kernel.copyInto(paddedKernel)
-        shader.setFloatUniform("uKernel", paddedKernel)
-        shader.setIntUniform("uOrderX", node.orderX)
-        shader.setIntUniform("uOrderY", node.orderY)
-        shader.setIntUniform("uTargetX", node.targetX)
-        shader.setIntUniform("uTargetY", node.targetY)
-        shader.setFloatUniform("uDivisor", node.divisor)
-        shader.setFloatUniform("uBias", node.bias)
-        shader.setIntUniform("uPreserveAlpha", if (node.preserveAlpha) 1 else 0)
-        // Input extent for tap clamping (mirrors the CPU bitmap bounds).
-        // Inset by half a texel: clamped taps must land on texel CENTERS
-        // (integer-corner clamping would bilinearly blend two edge texels
-        // where the CPU samples the single clamped index exactly).
-        shader.setFloatUniform(
-            "uBounds",
-            padX + 0.5f,
-            padY + 0.5f,
-            padX + filterRegion.width() * sx - 0.5f,
-            padY + filterRegion.height() * sy - 0.5f,
-        )
-        return shader
-    }
-
-    private fun buildDisplacementMapShader(
-        node: FeDisplacementMapRenderNode,
-        pScaleX: Float,
-        pScaleY: Float
-    ): RuntimeShader {
-        val element = node.sourceElement
-        val shader = RuntimeShader(DISPLACEMENT_MAP_SHADER)
-        shader.setFloatUniform("uScale", element.scale * pScaleX, element.scale * pScaleY)
-        shader.setIntUniform("uXChannel", element.xChannelSelector.ordinal)
-        shader.setIntUniform("uYChannel", element.yChannelSelector.ordinal)
-        return shader
-    }
-
-    private fun buildTurbulenceShader(
-        node: FeTurbulenceRenderNode,
-        pScaleX: Float,
-        pScaleY: Float,
-        filterRegion: RectF,
-        canvasScaleX: Float,
-        canvasScaleY: Float,
-        padX: Int,
-        padY: Int,
-        filterNode: FilterRenderNode,
-        boundingBox: Box,
-    ): RuntimeShader {
-        val shader = RuntimeShader(TURBULENCE_SHADER)
-        val element = node.sourceElement
-        val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
-        val originX = if (primitiveUnitsAreUser) 0f else boundingBox.minX
-        val originY = if (primitiveUnitsAreUser) 0f else boundingBox.minY
-        // Size of one primitive unit in user units (matches the CPU FilterGeneration math).
-        val unitSizeX = pScaleX / canvasScaleX
-        val unitSizeY = pScaleY / canvasScaleY
-
-        shader.setFloatUniform(
-            /* uniformName = */ "uBaseFrequency",
-            /* value1 = */ element.baseFrequencyX,
-            /* value2 = */ element.baseFrequencyY
-        )
-        shader.setIntUniform("uNumOctaves", element.numOctaves)
-        shader.setIntUniform("uIsFractal", if (element.type == FeTurbulenceType.fractalNoise) 1 else 0)
-        shader.setFloatUniform("uTilePeriod", 0f, 0f) // stitchTiles="stitch" not yet GPU-supported
-        shader.setFloatUniform("uOrigin", originX, originY)
-        shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
-        shader.setFloatUniform("uInvCanvasScale", 1f / canvasScaleX, 1f / canvasScaleY)
-        shader.setFloatUniform("uPrimitiveUnitSize", unitSizeX, unitSizeY)
-        // fragCoord is in gpuNode-local buffer space; the filter region top-left sits at (padX, padY).
-        shader.setFloatUniform("uOffset", padX.toFloat(), padY.toFloat())
-        // Terminal turbulence under linearRGB gets the linear->sRGB transfer
-        // (CPU unLinearizeBitmap equivalent); anything else stays linear.
-        val unlinearize = node === filterNode.primitives.lastOrNull() &&
-            filterNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
-        shader.setIntUniform("uUnlinearize", if (unlinearize) 1 else 0)
-
-        val lattice = obtainLatticeBitmap(node)
-        shader.setInputShader("uLattice", BitmapShader(lattice, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
-        val latticeB = obtainLatticeBitmapB(node)
-        shader.setInputShader("uLatticeB", BitmapShader(latticeB, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
-        return shader
-    }
-
-    private fun obtainLatticeBitmap(node: FeTurbulenceRenderNode): Bitmap {
-        val cached = node.gpuLatticeBitmap
-        if (cached != null) {
-            return cached
-        }
-        val generators = node.generators
-        // 256x4 data texture: row k holds channel k's (permutation,
-        // gradientX-hi, gradientX-lo) in RGB with opaque alpha. Data bitmaps
-        // MUST stay opaque: the GPU backend uploads textures premultiplied,
-        // which corrupts any data byte packed into RGB wherever alpha < 255.
-        // Gradients are 16-bit (hi/lo bytes): 8-bit packing leaves ~1-2 LSB
-        // of Perlin noise error, amplified by the terminal EOTF.
-        val bitmap = createBitmap(256, 4)
-        val pixels = IntArray(256 * 4)
-        for (i in 0 until 256) {
-            pixels[i] = packLattice(generators[0].p[i], packGradient16(generators[0].gx[i]))
-            pixels[256 + i] = packLattice(generators[1].p[i], packGradient16(generators[1].gx[i]))
-            pixels[512 + i] = packLattice(generators[2].p[i], packGradient16(generators[2].gx[i]))
-            pixels[768 + i] = packLattice(generators[3].p[i], packGradient16(generators[3].gx[i]))
-        }
-        bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 4)
-        node.gpuLatticeBitmap = bitmap
-        return bitmap
-    }
-
-    private fun obtainLatticeBitmapB(node: FeTurbulenceRenderNode): Bitmap {
-        val cached = node.gpuLatticeBitmapB
-        if (cached != null) {
-            return cached
-        }
-        val generators = node.generators
-        // Companion to [obtainLatticeBitmap]: row k holds channel k's
-        // (permutation, gradientY-hi, gradientY-lo), opaque.
-        val bitmap = createBitmap(256, 4)
-        val pixels = IntArray(256 * 4)
-        for (i in 0 until 256) {
-            pixels[i] = packLattice(generators[0].p[i], packGradient16(generators[0].gy[i]))
-            pixels[256 + i] = packLattice(generators[1].p[i], packGradient16(generators[1].gy[i]))
-            pixels[512 + i] = packLattice(generators[2].p[i], packGradient16(generators[2].gy[i]))
-            pixels[768 + i] = packLattice(generators[3].p[i], packGradient16(generators[3].gy[i]))
-        }
-        bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 4)
-        node.gpuLatticeBitmapB = bitmap
-        return bitmap
-    }
-
-    private fun packLattice(p: Int, g16: Int): Int {
-        return -0x1000000 or ((p and 0xFF) shl 16) or (((g16 shr 8) and 0xFF) shl 8) or (g16 and 0xFF)
-    }
-
-    private fun packGradient16(g: Double): Int =
-        (((g + 1.0) * 32767.5 + 0.5).toInt()).coerceIn(0, 65535)
 
     companion object {
         private fun FeBlendMode.toBlendMode(): BlendMode? = when (this) {

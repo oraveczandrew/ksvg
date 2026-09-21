@@ -16,7 +16,7 @@
 
 @file:Suppress("SpellCheckingInspection") // AGSL builtins
 
-package hu.oandras.ksvg.render.filters.pipeline.shaders
+package hu.oandras.ksvg.render.filters.pipeline.effects
 
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader

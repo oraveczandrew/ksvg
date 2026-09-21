@@ -1,0 +1,401 @@
+/*
+ *    Copyright 2026 András Oravecz <info@oandras.hu>
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+@file:Suppress("SpellCheckingInspection") // AGSL builtins
+
+package hu.oandras.ksvg.render.filters.pipeline.effects
+
+import android.graphics.RectF
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
+import android.os.Build
+import androidx.annotation.RequiresApi
+import hu.oandras.ksvg.dom.COLOR_WHITE
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
+import hu.oandras.ksvg.dom.filter.FeDistantLight
+import hu.oandras.ksvg.dom.filter.FePointLight
+import hu.oandras.ksvg.dom.filter.FeSpotLight
+import hu.oandras.ksvg.dom.filter.Lighting
+import hu.oandras.ksvg.dom.style.ColorValue
+import hu.oandras.ksvg.filtering.ColorLuts
+import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
+import hu.oandras.ksvg.render.FeSpecularLightingRenderNode
+import hu.oandras.ksvg.render.FilterPrimitiveRenderNode
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+private const val LIGHTING_SHADER: String = """
+            uniform shader uInput;
+            uniform float uSurfaceScale;
+            uniform float uConstant;
+            uniform float uExponent;
+            // Linearized light color when uUseLinear != 0 (exact sRGB->linear
+            // table lookup on the Kotlin side), raw sRGB otherwise.
+            uniform float3 uLightColor;
+            // Always the raw sRGB light color: terminal specular output carries
+            // the full-strength light color (no EOTF), matching the CPU kernel.
+            uniform float3 uLightColorRaw;
+            // Linear-RGB EOTF on the straight output (color-interpolation-
+            // filters: linearRGB, the default), matching the CPU kernel.
+            uniform int uUseLinear;
+            // Terminal feSpecularLighting emits premultiplied output
+            // (full light color + intensity alpha), matching the CPU kernel.
+            uniform int uTerminalPremult;
+            uniform int uIsSpecular;
+            uniform int uLightType;
+            uniform float3 uLightPosDir;
+            uniform float3 uPointsAt;
+            uniform float3 uSpotDir;
+            uniform float uSpotCosine;
+            uniform int uHasSpotTarget;
+
+            uniform float2 uUserLeftTop;
+            uniform float2 uInvCanvasScale;
+            uniform float2 uOffset;
+            uniform float4 uPrimitiveRegion;
+            uniform float4 uBounds;
+
+            float hAt(float2 p) {
+                // Height taps clamp to the input extent (mirrors the CPU
+                // clamped Sobel window); Skia child sampling outside is
+                // undefined on Adreno. Inset to texel centers like the
+                // convolve uBounds (corner-clamped bilinear would blend).
+                float2 c = clamp(p, uBounds.xy, uBounds.zw);
+                return uInput.eval(c).a;
+            }
+
+            float3 getNormal(float2 fragCoord) {
+                float h0 = hAt(fragCoord + float2(-1.0, -1.0));
+                float h1 = hAt(fragCoord + float2(0.0, -1.0));
+                float h2 = hAt(fragCoord + float2(1.0, -1.0));
+                float h3 = hAt(fragCoord + float2(-1.0, 0.0));
+                float h5 = hAt(fragCoord + float2(1.0, 0.0));
+                float h6 = hAt(fragCoord + float2(-1.0, 1.0));
+                float h7 = hAt(fragCoord + float2(0.0, 1.0));
+                float h8 = hAt(fragCoord + float2(1.0, 1.0));
+
+                float dx = (h2 + 2.0*h5 + h8) - (h0 + 2.0*h3 + h6);
+                float dy = (h6 + 2.0*h7 + h8) - (h0 + 2.0*h1 + h2);
+
+                // SVG spec kernel: Nx = -surfaceScale * dx / 4.0.
+                // Since samples are separated by 2 pixels, Nx is the slope per pixel.
+                // We multiply by uInvCanvasScale to get user-space slopes.
+                float Nx = -dx * 0.25 * uSurfaceScale * uInvCanvasScale.x;
+                float Ny = -dy * 0.25 * uSurfaceScale * uInvCanvasScale.y;
+
+                float3 n = float3(Nx, Ny, 1.0);
+                return normalize(n);
+            }
+
+            // Linear->sRGB EOTF matching the CPU linearToSrgb table
+            // (threshold branch identical; float rounding may differ by 1 LSB
+            // at table rounding boundaries).
+            float3 srgbEotf(float3 c) {
+                float3 lo = c * 12.92;
+                float3 hi = 1.055 * pow(c, float3(1.0 / 2.4)) - 0.055;
+                return float3(
+                    c.r <= 0.0031308 ? lo.r : hi.r,
+                    c.g <= 0.0031308 ? lo.g : hi.g,
+                    c.b <= 0.0031308 ? lo.b : hi.b
+                );
+            }
+
+            half4 main(float2 fragCoord) {
+                // fragCoord samples pixel centers: keep exactly the pixels the CPU
+                // kernels keep (their clip rects truncate region bounds to ints).
+                // The ±1e-3 slack keeps exact-boundary centers (knife-edge strict
+                // comparisons flip them via per-pixel fragCoord dust on Adreno —
+                // same mechanism as the flood guard; true outsiders sit a full
+                // pixel away).
+                if (fragCoord.x < floor(uPrimitiveRegion.x) + 0.5 - 1e-3 ||
+                    fragCoord.x > ceil(uPrimitiveRegion.z) - 0.5 + 1e-3 ||
+                    fragCoord.y < floor(uPrimitiveRegion.y) + 0.5 - 1e-3 ||
+                    fragCoord.y > ceil(uPrimitiveRegion.w) - 0.5 + 1e-3) {
+                    return half4(0.0);
+                }
+
+                float3 n = getNormal(fragCoord);
+                float3 l;
+                if (uLightType == 0) {
+                    l = normalize(uLightPosDir);
+                } else {
+                    float2 local = fragCoord - uOffset;
+                    float2 user = uUserLeftTop + local * uInvCanvasScale;
+
+                    float3 p = float3(user, uInput.eval(fragCoord).a * uSurfaceScale);
+                    l = normalize(uLightPosDir - p);
+                }
+
+            float dotNL = max(dot(n, l), 0.0);
+            // Spot cone factor (mirrors the CPU kernel: unshaped dot gated
+            // by the cone cosine; factor 1 for point lights, degenerate
+            // targets, and NaN cone angles — all encoded host-side).
+            float spotFactor = 1.0;
+            if (uLightType == 2 && uHasSpotTarget != 0) {
+                float sd = dot(-l, uSpotDir);
+                float f = clamp(sd, -1.0, 1.0);
+                if (f < uSpotCosine) f = 0.0;
+                spotFactor = max(f, 0.0);
+            }
+            float3 color;
+            float a = 1.0;
+            if (uIsSpecular == 0) {
+                float intensity = clamp(dotNL * uConstant * spotFactor, 0.0, 1.0);
+                float3 lin = uLightColor * intensity;
+                color = (uUseLinear != 0) ? srgbEotf(floor(lin * 255.0 + 0.5) / 255.0) : lin;
+            } else {
+                float3 v = float3(0.0, 0.0, 1.0);
+                float3 h = normalize(l + v);
+                float intensity = clamp(uConstant * pow(max(dot(n, h), 0.0), uExponent) * spotFactor, 0.0, 1.0);
+                if (uTerminalPremult != 0) {
+                    // Mirror the CPU byte rounding (round-half-up): intensities
+                    // below half an alpha LSB come out transparent there, while
+                    // fp dust here would emit near-white with alpha 1.
+                    if (intensity * 255.0 < 0.5) {
+                        return half4(0.0);
+                    }
+                    // Terminal output: full-strength light color like the CPU
+                    // premultiplied form — linearized under useLinear (the
+                    // CPU linearizes the light color there too).
+                    float3 termColor = (uUseLinear != 0) ? uLightColor : uLightColorRaw;
+                    return half4(termColor, intensity);
+                }
+                float3 lin = uLightColor * intensity;
+                color = (uUseLinear != 0) ? srgbEotf(floor(lin * 255.0 + 0.5) / 255.0) : lin;
+                a = max(max(color.r, color.g), color.b);
+            }
+
+            return half4(color, a);
+        }
+        """
+
+/**
+ * Builds the diffuse-lighting step of an Impl33 chain: the configured
+ * [RuntimeShader] (kept by the caller for downstream `resultShaders`
+ * lookups) plus the [RenderEffect] wrapping it under [inputUniformName].
+ *
+ * The caller chains the effect onto the primitive input and registers the
+ * shader. The height map is read from the input alpha on both backends.
+ *
+ * @param node the diffuse-lighting render node (surfaceScale,
+ * diffuseConstant, light, color space)
+ * @param filterRegion the filter region in user space
+ * @param canvasScaleX canvasScaleY the canvas scale in device pixels per
+ * user unit
+ * @param padX padY the device-space padding of the filter region top-left
+ * @param primitiveRegion the primitive subregion in buffer space (already
+ * remapped from user space by the caller)
+ * @param inputUniformName the shader-input uniform name (`uInput`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createDiffuseLightingShaderEffect(
+    node: FeDiffuseLightingRenderNode,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+    padX: Int,
+    padY: Int,
+    primitiveRegion: RectF,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect>? {
+    val diff = node.sourceElement
+    val shader = createLightingShader(
+        node = node,
+        light = diff.light,
+        surfaceScale = diff.surfaceScale,
+        constant = diff.diffuseConstant,
+        exponent = 1f,
+        isSpecular = false,
+        terminalPremult = false,
+        filterRegion = filterRegion,
+        canvasScaleX = canvasScaleX,
+        canvasScaleY = canvasScaleY,
+        padX = padX,
+        padY = padY,
+        primitiveRegion = primitiveRegion,
+    ) ?: return null
+    return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
+}
+
+/**
+ * Builds the specular-lighting step of an Impl33 chain: the configured
+ * [RuntimeShader] (kept by the caller for downstream `resultShaders`
+ * lookups) plus the [RenderEffect] wrapping it under [inputUniformName].
+ *
+ * The caller chains the effect onto the primitive input and registers the
+ * shader. Terminal specular emits premultiplied output on both backends
+ * (full light color + intensity alpha); non-terminal output is straight
+ * with alpha derived from the color peak.
+ *
+ * @param node the specular-lighting render node (surfaceScale,
+ * specularConstant, specularExponent, light, color space)
+ * @param terminalPremult true when this primitive is the last of the
+ * filter (terminal premultiplied output, mirroring the CPU path)
+ * @param filterRegion the filter region in user space
+ * @param canvasScaleX canvasScaleY the canvas scale in device pixels per
+ * user unit
+ * @param padX padY the device-space padding of the filter region top-left
+ * @param primitiveRegion the primitive subregion in buffer space (already
+ * remapped from user space by the caller)
+ * @param inputUniformName the shader-input uniform name (`uInput`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createSpecularLightingShaderEffect(
+    node: FeSpecularLightingRenderNode,
+    terminalPremult: Boolean,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+    padX: Int,
+    padY: Int,
+    primitiveRegion: RectF,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect>? {
+    val spec = node.sourceElement
+    val shader = createLightingShader(
+        node = node,
+        light = spec.light,
+        surfaceScale = spec.surfaceScale,
+        constant = spec.specularConstant,
+        exponent = spec.specularExponent,
+        isSpecular = true,
+        terminalPremult = terminalPremult,
+        filterRegion = filterRegion,
+        canvasScaleX = canvasScaleX,
+        canvasScaleY = canvasScaleY,
+        padX = padX,
+        padY = padY,
+        primitiveRegion = primitiveRegion,
+    ) ?: return null
+    return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
+}
+
+private fun createLightingShader(
+    node: FilterPrimitiveRenderNode<*>,
+    light: Lighting?,
+    surfaceScale: Float,
+    constant: Float,
+    exponent: Float,
+    isSpecular: Boolean,
+    terminalPremult: Boolean,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+    padX: Int,
+    padY: Int,
+    primitiveRegion: RectF,
+): RuntimeShader? {
+    if (light == null) return null
+    val shader = RuntimeShader(LIGHTING_SHADER)
+    val baseStyle = node.sourceElement.baseStyle
+    val styleColor = ((baseStyle?.lightingColor ?: baseStyle?.color) as? ColorValue)?.value ?: COLOR_WHITE
+
+    shader.setFloatUniform("uSurfaceScale", surfaceScale)
+    shader.setFloatUniform("uConstant", constant)
+    shader.setFloatUniform("uExponent", exponent)
+    // Exact sRGB->linear table lookup (same tables as the CPU kernel);
+    // the linearized color feeds the useLinear path, the raw color the
+    // terminal-specular premultiplied output (which skips the EOTF).
+    val useLinear = node.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+    val lut = ColorLuts.SRGB_TO_LINEAR
+    val linR = lut[styleColor.red].toFloat()
+    val linG = lut[styleColor.green].toFloat()
+    val linB = lut[styleColor.blue].toFloat()
+    if (useLinear) {
+        shader.setFloatUniform("uLightColor", linR / 255f, linG / 255f, linB / 255f)
+    } else {
+        shader.setFloatUniform(
+            "uLightColor",
+            styleColor.red / 255f, styleColor.green / 255f, styleColor.blue / 255f,
+        )
+    }
+    shader.setFloatUniform(
+        "uLightColorRaw",
+        styleColor.red / 255f, styleColor.green / 255f, styleColor.blue / 255f,
+    )
+    shader.setIntUniform("uUseLinear", if (useLinear) 1 else 0)
+    shader.setIntUniform("uTerminalPremult", if (terminalPremult) 1 else 0)
+    shader.setIntUniform("uIsSpecular", if (isSpecular) 1 else 0)
+
+    when (light) {
+        is FeDistantLight -> {
+            shader.setIntUniform("uLightType", 0)
+            val azimuthRad = Math.toRadians(light.azimuth.toDouble())
+            val elevationRad = Math.toRadians(light.elevation.toDouble())
+            val lx = cos(azimuthRad) * cos(elevationRad)
+            val ly = sin(azimuthRad) * cos(elevationRad)
+            val lz = sin(elevationRad)
+            shader.setFloatUniform("uLightPosDir", lx.toFloat(), ly.toFloat(), lz.toFloat())
+        }
+
+        is FePointLight -> {
+            shader.setIntUniform("uLightType", 1)
+            shader.setFloatUniform("uLightPosDir", light.x, light.y, light.z)
+        }
+
+        is FeSpotLight -> {
+            shader.setIntUniform("uLightType", 2)
+            shader.setFloatUniform("uLightPosDir", light.x, light.y, light.z)
+            shader.setFloatUniform("uPointsAt", light.pointsAtX, light.pointsAtY, light.pointsAtZ)
+            // Spot cone factor inputs, mirroring the CPU kernel bit-for-bit
+            // where it matters (Double math on the same widened values;
+            // NaN cone = no cutoff = cosine -1, like the kernel).
+            val spotDx = light.pointsAtX.toDouble() - light.x.toDouble()
+            val spotDy = light.pointsAtY.toDouble() - light.y.toDouble()
+            val spotDz = light.pointsAtZ.toDouble() - light.z.toDouble()
+            val spotLen = sqrt(spotDx * spotDx + spotDy * spotDy + spotDz * spotDz)
+            if (spotLen == 0.0) {
+                shader.setIntUniform("uHasSpotTarget", 0)
+                shader.setFloatUniform("uSpotDir", 0f, 0f, 0f)
+                shader.setFloatUniform("uSpotCosine", -1f)
+            } else {
+                shader.setIntUniform("uHasSpotTarget", 1)
+                shader.setFloatUniform(
+                    "uSpotDir",
+                    (spotDx / spotLen).toFloat(),
+                    (spotDy / spotLen).toFloat(),
+                    (spotDz / spotLen).toFloat(),
+                )
+                val cone = light.limitingConeAngle?.toDouble() ?: Double.NaN
+                shader.setFloatUniform(
+                    "uSpotCosine",
+                    if (cone.isNaN()) -1f else cos(cone * Math.PI / 180.0).toFloat(),
+                )
+            }
+        }
+    }
+    shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
+    shader.setFloatUniform("uInvCanvasScale", 1f / canvasScaleX, 1f / canvasScaleY)
+    shader.setFloatUniform("uOffset", padX.toFloat(), padY.toFloat())
+    shader.setFloatUniform(
+        "uPrimitiveRegion",
+        primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom,
+    )
+    // Height-tap extent for the Sobel clamp (mirrors the CPU
+    // clamped window; texel-center inset like convolve uBounds).
+    shader.setFloatUniform(
+        "uBounds",
+        padX + 0.5f,
+        padY + 0.5f,
+        padX + filterRegion.width() * canvasScaleX - 0.5f,
+        padY + filterRegion.height() * canvasScaleY - 0.5f,
+    )
+    return shader
+}

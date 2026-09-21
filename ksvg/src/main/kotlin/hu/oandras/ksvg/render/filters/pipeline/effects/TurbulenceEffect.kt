@@ -5,7 +5,7 @@
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *        https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,22 @@
 
 @file:Suppress("SpellCheckingInspection") // AGSL builtins
 
-package hu.oandras.ksvg.render.filters.pipeline.shaders
+package hu.oandras.ksvg.render.filters.pipeline.effects
 
-internal const val TURBULENCE_SHADER: String = """
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
+import android.graphics.RectF
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
+import android.graphics.Shader
+import android.os.Build
+import androidx.annotation.RequiresApi
+import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.filter.FeTurbulenceType
+import hu.oandras.ksvg.render.FeTurbulenceRenderNode
+import hu.oandras.ksvg.render.createBitmap
+
+private const val TURBULENCE_SHADER: String = """
             uniform shader uLattice;
             // Companion lattice texture: row k holds channel k's
             // (permutation, gradientY-hi, gradientY-lo); X gradients live in
@@ -148,7 +161,7 @@ internal const val TURBULENCE_SHADER: String = """
             half4 main(float2 fragCoord) {
                 // fragCoord samples pixel centers: keep exactly the pixels the CPU
                 // kernels keep (their clip rects truncate region bounds to ints).
-                // The 1e-3 epsilon (FloodShader precedent) keeps exact-boundary
+                // The 1e-3 epsilon (flood-effect guard precedent) keeps exact-boundary
                 // pixel centers inside: without it Adreno resolves integral
                 // region edges landing exactly on pixel centers as CUT for
                 // scattered edge pixels (float interpolation error).
@@ -187,3 +200,135 @@ internal const val TURBULENCE_SHADER: String = """
                 return half4(outRgb, finalVal.a);
             }
         """
+
+/**
+ * Builds the turbulence step of an Impl33 chain: the configured
+ * [RuntimeShader] (kept by the caller for downstream `resultShaders`
+ * lookups) plus the [RenderEffect] wrapping it under [inputUniformName].
+ *
+ * Turbulence is generative: the returned effect stands alone (wired under
+ * `in_source`, never chained onto the primitive input). The caller
+ * registers the shader for downstream `in2` references (displacement).
+ *
+ * @param node the turbulence render node (seed-built lattice generators)
+ * @param primitiveScaleX primitiveScaleY one primitive unit in user units
+ * (matches the CPU FilterGeneration math)
+ * @param filterRegion the filter region in user space
+ * @param canvasScaleX canvasScaleY the canvas scale in device pixels per
+ * user unit
+ * @param padX padY the device-space padding of the filter region top-left
+ * @param unlinearize true for terminal turbulence under linearRGB
+ * (linear->sRGB transfer, the CPU unLinearizeBitmap equivalent)
+ * @param primitiveUnitsAreUser false when primitive units are
+ * objectBoundingBox (origin at the bounding box instead of 0,0)
+ * @param boundingBox the filtered element bounding box (only read when
+ * primitive units are objectBoundingBox)
+ * @param primitiveRegion the primitive subregion in buffer space (already
+ * remapped from user space by the caller)
+ * @param inputUniformName the shader-input uniform name (`in_source`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createTurbulenceShaderEffect(
+    node: FeTurbulenceRenderNode,
+    primitiveScaleX: Float,
+    primitiveScaleY: Float,
+    filterRegion: RectF,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+    padX: Int,
+    padY: Int,
+    unlinearize: Boolean,
+    primitiveUnitsAreUser: Boolean,
+    boundingBox: Box,
+    primitiveRegion: RectF,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect> {
+    val shader = RuntimeShader(TURBULENCE_SHADER)
+    val element = node.sourceElement
+    val originX = if (primitiveUnitsAreUser) 0f else boundingBox.minX
+    val originY = if (primitiveUnitsAreUser) 0f else boundingBox.minY
+    // Size of one primitive unit in user units (matches the CPU FilterGeneration math).
+    val unitSizeX = primitiveScaleX / canvasScaleX
+    val unitSizeY = primitiveScaleY / canvasScaleY
+
+    shader.setFloatUniform(
+        /* uniformName = */ "uBaseFrequency",
+        /* value1 = */ element.baseFrequencyX,
+        /* value2 = */ element.baseFrequencyY
+    )
+    shader.setIntUniform("uNumOctaves", element.numOctaves)
+    shader.setIntUniform("uIsFractal", if (element.type == FeTurbulenceType.fractalNoise) 1 else 0)
+    shader.setFloatUniform("uTilePeriod", 0f, 0f) // stitchTiles="stitch" not yet GPU-supported
+    shader.setFloatUniform("uOrigin", originX, originY)
+    shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
+    shader.setFloatUniform("uInvCanvasScale", 1f / canvasScaleX, 1f / canvasScaleY)
+    shader.setFloatUniform("uPrimitiveUnitSize", unitSizeX, unitSizeY)
+    // fragCoord is in gpuNode-local buffer space; the filter region top-left sits at (padX, padY).
+    shader.setFloatUniform("uOffset", padX.toFloat(), padY.toFloat())
+    // Terminal turbulence under linearRGB gets the linear->sRGB transfer
+    // (CPU unLinearizeBitmap equivalent); anything else stays linear.
+    shader.setIntUniform("uUnlinearize", if (unlinearize) 1 else 0)
+
+    val lattice = obtainLatticeBitmap(node)
+    shader.setInputShader("uLattice", BitmapShader(lattice, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
+    val latticeB = obtainLatticeBitmapB(node)
+    shader.setInputShader("uLatticeB", BitmapShader(latticeB, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
+    shader.setFloatUniform(
+        "uPrimitiveRegion",
+        primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom,
+    )
+    return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
+}
+
+private fun obtainLatticeBitmap(node: FeTurbulenceRenderNode): Bitmap {
+    val cached = node.gpuLatticeBitmap
+    if (cached != null) {
+        return cached
+    }
+    val generators = node.generators
+    // 256x4 data texture: row k holds channel k's (permutation,
+    // gradientX-hi, gradientX-lo) in RGB with opaque alpha. Data bitmaps
+    // MUST stay opaque: the GPU backend uploads textures premultiplied,
+    // which corrupts any data byte packed into RGB wherever alpha < 255.
+    // Gradients are 16-bit (hi/lo bytes): 8-bit packing leaves ~1-2 LSB
+    // of Perlin noise error, amplified by the terminal EOTF.
+    val bitmap = createBitmap(256, 4)
+    val pixels = IntArray(256 * 4)
+    for (i in 0 until 256) {
+        pixels[i] = packLattice(generators[0].p[i], packGradient16(generators[0].gx[i]))
+        pixels[256 + i] = packLattice(generators[1].p[i], packGradient16(generators[1].gx[i]))
+        pixels[512 + i] = packLattice(generators[2].p[i], packGradient16(generators[2].gx[i]))
+        pixels[768 + i] = packLattice(generators[3].p[i], packGradient16(generators[3].gx[i]))
+    }
+    bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 4)
+    node.gpuLatticeBitmap = bitmap
+    return bitmap
+}
+
+private fun obtainLatticeBitmapB(node: FeTurbulenceRenderNode): Bitmap {
+    val cached = node.gpuLatticeBitmapB
+    if (cached != null) {
+        return cached
+    }
+    val generators = node.generators
+    // Companion to [obtainLatticeBitmap]: row k holds channel k's
+    // (permutation, gradientY-hi, gradientY-lo), opaque.
+    val bitmap = createBitmap(256, 4)
+    val pixels = IntArray(256 * 4)
+    for (i in 0 until 256) {
+        pixels[i] = packLattice(generators[0].p[i], packGradient16(generators[0].gy[i]))
+        pixels[256 + i] = packLattice(generators[1].p[i], packGradient16(generators[1].gy[i]))
+        pixels[512 + i] = packLattice(generators[2].p[i], packGradient16(generators[2].gy[i]))
+        pixels[768 + i] = packLattice(generators[3].p[i], packGradient16(generators[3].gy[i]))
+    }
+    bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 4)
+    node.gpuLatticeBitmapB = bitmap
+    return bitmap
+}
+
+private fun packLattice(p: Int, g16: Int): Int {
+    return -0x1000000 or ((p and 0xFF) shl 16) or (((g16 shr 8) and 0xFF) shl 8) or (g16 and 0xFF)
+}
+
+private fun packGradient16(g: Double): Int =
+    (((g + 1.0) * 32767.5 + 0.5).toInt()).coerceIn(0, 65535)

@@ -5,7 +5,7 @@
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *        https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,15 @@
 
 @file:Suppress("SpellCheckingInspection") // AGSL builtins
 
-package hu.oandras.ksvg.render.filters.pipeline.shaders
+package hu.oandras.ksvg.render.filters.pipeline.effects
 
-internal const val TILE_SHADER: String = """
+import android.graphics.RectF
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
+import android.os.Build
+import androidx.annotation.RequiresApi
+
+private const val TILE_SHADER: String = """
             uniform shader uInput;
             uniform float4 uRect;
             half4 main(float2 fragCoord) {
@@ -36,3 +42,28 @@ internal const val TILE_SHADER: String = """
                 return uInput.eval(coord);
             }
         """
+
+/**
+ * Builds the tile step of an Impl33 chain: the configured [RuntimeShader]
+ * (kept by the caller for downstream `resultShaders` lookups) plus the
+ * [RenderEffect] wrapping it under [inputUniformName].
+ *
+ * The caller chains the effect onto the primitive input and registers the
+ * shader.
+ *
+ * @param tileRegion the tile subregion in buffer space (already remapped
+ * from user space by the caller)
+ * @param inputUniformName the shader-input uniform name (`uInput`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createTileShaderEffect(
+    tileRegion: RectF,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect> {
+    val shader = RuntimeShader(TILE_SHADER)
+    shader.setFloatUniform(
+        "uRect",
+        tileRegion.left, tileRegion.top, tileRegion.right, tileRegion.bottom,
+    )
+    return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
+}
