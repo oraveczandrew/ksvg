@@ -18,12 +18,23 @@
 
 package hu.oandras.ksvg.render.filters.pipeline.shaders
 
+/**
+ * Porter-Duff-style compositing plus `arithmetic` (`uOperator == 5`).
+ * The arithmetic branch is additionally gated by `uPrimitiveRegion`
+ * (transparent outside — mirrors the CPU kernel, which writes the clip
+ * only). Other operators are unaffected by the region uniform.
+ */
 internal const val COMPOSITE_SHADER: String = """
             uniform shader uInput;
             uniform shader uIn2;
             uniform int uOperator;
             uniform float4 uK;
+            uniform float4 uPrimitiveRegion;
             half4 main(float2 fragCoord) {
+                if (uOperator == 5 && (fragCoord.x < uPrimitiveRegion.x || fragCoord.x >= uPrimitiveRegion.z ||
+                    fragCoord.y < uPrimitiveRegion.y || fragCoord.y >= uPrimitiveRegion.w)) {
+                    return half4(0.0);
+                }
                 float4 src = uInput.eval(fragCoord);
                 float4 dst = uIn2.eval(fragCoord);
                 if (uOperator == 0) return half4(src + dst * (1.0 - src.a));
@@ -33,7 +44,13 @@ internal const val COMPOSITE_SHADER: String = """
                 if (uOperator == 4) return half4(src * (1.0 - dst.a) + dst * (1.0 - src.a));
                 if (uOperator == 5) {
                     float4 res = uK.x * dst * src + uK.y * src + uK.z * dst + uK.w;
-                    return half4(clamp(res, 0.0, 1.0));
+                    res = clamp(res, 0.0, 1.0);
+                    // Match the CPU reference display: it computes straight
+                    // channel values and premultiplies on store, so the
+                    // emitted pixel must be premultiplied too (a no-op for
+                    // opaque output, exact for k4-style constants).
+                    res.rgb *= res.a;
+                    return half4(res);
                 }
                 return half4(dst);
             }

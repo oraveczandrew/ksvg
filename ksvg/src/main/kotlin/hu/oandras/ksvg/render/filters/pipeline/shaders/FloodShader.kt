@@ -25,8 +25,14 @@ internal const val FLOOD_SHADER: String = """
             half4 main(float2 fragCoord) {
                 // fragCoord samples pixel centers: keep exactly the pixels the CPU
                 // kernels keep (their clip rects truncate region bounds to ints).
-                if (fragCoord.x < floor(uPrimitiveRegion.x) + 0.5 || fragCoord.x > ceil(uPrimitiveRegion.z) - 0.5 ||
-                    fragCoord.y < floor(uPrimitiveRegion.y) + 0.5 || fragCoord.y > ceil(uPrimitiveRegion.w) - 0.5) {
+                // The ±1e-3 slack keeps exact-boundary centers (knife-edge
+                // strict comparisons flip them via per-pixel fragCoord dust
+                // on Adreno — measured: scattered transparent pixels along
+                // the top row); true outsiders sit a full pixel away.
+                if (fragCoord.x < floor(uPrimitiveRegion.x) + 0.5 - 1e-3 ||
+                    fragCoord.x > ceil(uPrimitiveRegion.z) - 0.5 + 1e-3 ||
+                    fragCoord.y < floor(uPrimitiveRegion.y) + 0.5 - 1e-3 ||
+                    fragCoord.y > ceil(uPrimitiveRegion.w) - 0.5 + 1e-3) {
                     return half4(0.0);
                 }
                 return uColor;

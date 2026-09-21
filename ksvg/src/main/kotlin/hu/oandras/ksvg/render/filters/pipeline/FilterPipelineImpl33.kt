@@ -355,6 +355,15 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 resolveEffect(composite.in2, previousResult, first, chain, resultEffects) ?: return null
 
                             if (composite.operator == FeCompositeOperator.arithmetic) {
+                                // Linear-light arithmetic has no GPU support (the
+                                // shader computes on raw taps, while the CPU
+                                // linearizes via LUTs): decline the chain so the
+                                // software reference renders instead of silently
+                                // wrong clamps (round-B fallback coverage in
+                                // GpuArithmeticCompositeCorpusParityTest).
+                                if (primitive.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB) {
+                                    return null
+                                }
                                 if (composite.k1 == 0f && composite.k2 == 1f && composite.k3 == 1f && composite.k4 == 0f) {
                                     createBlendModeRenderEffect(in2Effect, inputEffect, BlendMode.PLUS)
                                 } else {
@@ -369,6 +378,19 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                             composite.k2,
                                             composite.k3,
                                             composite.k4
+                                        )
+                                        // Region guard (same mapping as
+                                        // morphology uInterior): the CPU
+                                        // kernel writes the clip only. The
+                                        // shader itself applies it for the
+                                        // arithmetic operator only, so the
+                                        // shared blend paths are untouched.
+                                        shader.setFloatUniform(
+                                            "uPrimitiveRegion",
+                                            (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
+                                            (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
+                                            (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
+                                            (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY,
                                         )
 
                                         resultShaders[resultName ?: ""] = shader

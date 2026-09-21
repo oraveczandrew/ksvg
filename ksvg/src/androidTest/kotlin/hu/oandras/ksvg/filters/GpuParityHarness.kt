@@ -173,6 +173,26 @@ internal fun premultipliedCopy(src: Bitmap): Bitmap {
     return out
 }
 
+/**
+ * Keeps alpha, zeroes RGB. For asserting transparent output: RGB under
+ * alpha-zero is display-invisible, and straight vs premultiplied pipelines
+ * legitimately store different RGB there (e.g. arithmetic-sub terminal
+ * output: straight residue vs premultiplied zero) while displaying (and
+ * CPU-storing) identically.
+ */
+internal fun alphaOnlyCopy(src: Bitmap): Bitmap {
+    val w = src.width
+    val h = src.height
+    val px = IntArray(w * h)
+    src.getPixels(px, 0, w, 0, 0, w, h)
+    for (i in px.indices) {
+        px[i] = px[i] and -0x1000000
+    }
+    val out = createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    out.setPixels(px, 0, w, 0, 0, w, h)
+    return out
+}
+
 internal data class ParityStats(
     @JvmField val maxAbs: Int,
     @JvmField val meanAbs: Double,
@@ -184,7 +204,12 @@ internal data class ParityStats(
     @JvmField val worstB: Int = 0,
 )
 
-internal fun parityStats(sw: Bitmap, hw: Bitmap, ignoreBoundaryFringe: Boolean = false): ParityStats {
+internal fun parityStats(
+    sw: Bitmap,
+    hw: Bitmap,
+    ignoreBoundaryFringe: Boolean = false,
+    ignoreTransparent: Boolean = false,
+): ParityStats {
     assertEquals("Bitmap widths differ", sw.width, hw.width)
     assertEquals("Bitmap heights differ", sw.height, hw.height)
     val w = sw.width
@@ -220,6 +245,7 @@ internal fun parityStats(sw: Bitmap, hw: Bitmap, ignoreBoundaryFringe: Boolean =
         for (x in 0 until w) {
             val i = y * w + x
             if (isFringe(x, y)) continue
+            if (ignoreTransparent && (swPx[i] ushr 24) == 0 && (hwPx[i] ushr 24) == 0) continue
             total++
             val a = swPx[i]
             val b = hwPx[i]
@@ -275,6 +301,13 @@ internal fun parityStats(sw: Bitmap, hw: Bitmap, ignoreBoundaryFringe: Boolean =
  * opaque, hence unaffected). Multiplication attenuates conversion noise
  * (unlike unpremultiplying the hardware side, which amplifies it at
  * small alpha).
+ * @param ignoreTransparent when true, pixels transparent in BOTH bitmaps
+ * are excluded from both gates. Alpha-zero output carries no visible
+ * content, but straight and premultiplied pipelines legitimately store
+ * different RGB under alpha-zero (e.g., arithmetic-subterminal output) —
+ * comparing them would fail byte-exactness on invisible pixels. Opt-in;
+ * Round-A cases are unaffected (their transparent pixels already match
+ * exactly).
  */
 internal fun assertParity(
     name: String,
@@ -284,9 +317,10 @@ internal fun assertParity(
     maxOutlierRatio: Double = GPU_PARITY_MAX_OUTLIER_RATIO,
     ignoreBoundaryFringe: Boolean = false,
     premultiplyReference: Boolean = false,
+    ignoreTransparent: Boolean = false,
 ) {
     val reference = if (premultiplyReference) premultipliedCopy(sw) else sw
-    val stats = parityStats(reference, hw, ignoreBoundaryFringe)
+    val stats = parityStats(reference, hw, ignoreBoundaryFringe, ignoreTransparent)
     val outlierRatio = stats.outlierCount.toDouble() / stats.total
     if (stats.maxAbs > maxAbsTol || outlierRatio > maxOutlierRatio) {
         dumpParityBitmaps(name, reference, hw, stats)
@@ -306,12 +340,12 @@ internal fun assertParity(
 
 /**
  * Loads a golden reference PNG from androidTest assets into [outBitmap].
- * Used where the on-device software reference is itself untrusted (e.g. a
+ * Used where the on-device software reference is itself untrusted (e.g., a
  * divergent native kernel); the golden is generated host-side from the
  * pure-Kotlin reference (see `tmp/GPU_SCALAR_PARITY_REPORT.md`).
  */
 internal fun loadGoldenAsset(assetPath: String, outBitmap: Bitmap): Bitmap {
-    val assets = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().context.assets
+    val assets = InstrumentationRegistry.getInstrumentation().context.assets
     return assets.open(assetPath).use {
         // Straight (non-premultiplied), unscaled decode: the golden bytes must
         // land in the bitmap untouched. The defaults (premultiplied + scaled)
@@ -321,7 +355,7 @@ internal fun loadGoldenAsset(assetPath: String, outBitmap: Bitmap): Bitmap {
             o.inPremultiplied = false
             o.inScaled = false
         }
-        hu.oandras.ksvg.test.decodePng(it, outBitmap, opts)
+        decodePng(it, outBitmap, opts)
             ?: throw AssertionError("GpuParityHarness: cannot decode golden $assetPath")
     }
 }
