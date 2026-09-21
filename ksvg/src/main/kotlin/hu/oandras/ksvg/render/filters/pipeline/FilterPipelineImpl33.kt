@@ -92,6 +92,7 @@ import hu.oandras.ksvg.utils.red
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * AGSL (RuntimeShader) GPU backend (API 33+, hardware canvas only).
@@ -274,6 +275,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
                             val shader = buildLightingShader(
                                 primitive, false, terminalPremult = false,
+                                filterRegion, sx, sy, totalPadX, totalPadY,
                             ) ?: return null
                             shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
                             shader.setFloatUniform("uInvCanvasScale", 1f / sx, 1f / sy)
@@ -298,6 +300,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 primitive === filterNode.primitives.lastOrNull()
                             val shader = buildLightingShader(
                                 primitive, true, terminalPremult,
+                                filterRegion, sx, sy, totalPadX, totalPadY,
                             ) ?: return null
                             shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
                             shader.setFloatUniform("uInvCanvasScale", 1f / sx, 1f / sy)
@@ -759,6 +762,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         node: FilterPrimitiveRenderNode<*>,
         isSpecular: Boolean,
         terminalPremult: Boolean,
+        filterRegion: RectF,
+        sx: Float,
+        sy: Float,
+        padX: Int,
+        padY: Int,
     ): RuntimeShader? {
         val shader = RuntimeShader(LIGHTING_SHADER)
         val light: Lighting?
@@ -839,9 +847,42 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                 shader.setIntUniform("uLightType", 2)
                 shader.setFloatUniform("uLightPosDir", light.x, light.y, light.z)
                 shader.setFloatUniform("uPointsAt", light.pointsAtX, light.pointsAtY, light.pointsAtZ)
-                shader.setFloatUniform("uSpotParams", 1f, light.limitingConeAngle ?: 0f)
+                // Spot cone factor inputs, mirroring the CPU kernel bit-for-bit
+                // where it matters (Double math on the same widened values;
+                // NaN cone = no cutoff = cosine -1, like the kernel).
+                val spotDx = light.pointsAtX.toDouble() - light.x.toDouble()
+                val spotDy = light.pointsAtY.toDouble() - light.y.toDouble()
+                val spotDz = light.pointsAtZ.toDouble() - light.z.toDouble()
+                val spotLen = sqrt(spotDx * spotDx + spotDy * spotDy + spotDz * spotDz)
+                if (spotLen == 0.0) {
+                    shader.setIntUniform("uHasSpotTarget", 0)
+                    shader.setFloatUniform("uSpotDir", 0f, 0f, 0f)
+                    shader.setFloatUniform("uSpotCosine", -1f)
+                } else {
+                    shader.setIntUniform("uHasSpotTarget", 1)
+                    shader.setFloatUniform(
+                        "uSpotDir",
+                        (spotDx / spotLen).toFloat(),
+                        (spotDy / spotLen).toFloat(),
+                        (spotDz / spotLen).toFloat(),
+                    )
+                    val cone = light.limitingConeAngle?.toDouble() ?: Double.NaN
+                    shader.setFloatUniform(
+                        "uSpotCosine",
+                        if (cone.isNaN()) -1f else cos(cone * Math.PI / 180.0).toFloat(),
+                    )
+                }
             }
         }
+        // Height-tap extent for the Sobel clamp (mirrors the CPU
+        // clamped window; texel-center inset like convolve uBounds).
+        shader.setFloatUniform(
+            "uBounds",
+            padX + 0.5f,
+            padY + 0.5f,
+            padX + filterRegion.width() * sx - 0.5f,
+            padY + filterRegion.height() * sy - 0.5f,
+        )
         return shader
     }
 

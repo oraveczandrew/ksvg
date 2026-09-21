@@ -39,22 +39,34 @@ internal const val LIGHTING_SHADER: String = """
             uniform int uLightType;
             uniform float3 uLightPosDir;
             uniform float3 uPointsAt;
-            uniform float2 uSpotParams;
+            uniform float3 uSpotDir;
+            uniform float uSpotCosine;
+            uniform int uHasSpotTarget;
 
             uniform float2 uUserLeftTop;
             uniform float2 uInvCanvasScale;
             uniform float2 uOffset;
             uniform float4 uPrimitiveRegion;
+            uniform float4 uBounds;
+
+            float hAt(float2 p) {
+                // Height taps clamp to the input extent (mirrors the CPU
+                // clamped Sobel window); Skia child sampling outside is
+                // undefined on Adreno. Inset to texel centers like the
+                // convolve uBounds (corner-clamped bilinear would blend).
+                float2 c = clamp(p, uBounds.xy, uBounds.zw);
+                return uInput.eval(c).a;
+            }
 
             float3 getNormal(float2 fragCoord) {
-                float h0 = uInput.eval(fragCoord + float2(-1.0, -1.0)).a;
-                float h1 = uInput.eval(fragCoord + float2(0.0, -1.0)).a;
-                float h2 = uInput.eval(fragCoord + float2(1.0, -1.0)).a;
-                float h3 = uInput.eval(fragCoord + float2(-1.0, 0.0)).a;
-                float h5 = uInput.eval(fragCoord + float2(1.0, 0.0)).a;
-                float h6 = uInput.eval(fragCoord + float2(-1.0, 1.0)).a;
-                float h7 = uInput.eval(fragCoord + float2(0.0, 1.0)).a;
-                float h8 = uInput.eval(fragCoord + float2(1.0, 1.0)).a;
+                float h0 = hAt(fragCoord + float2(-1.0, -1.0));
+                float h1 = hAt(fragCoord + float2(0.0, -1.0));
+                float h2 = hAt(fragCoord + float2(1.0, -1.0));
+                float h3 = hAt(fragCoord + float2(-1.0, 0.0));
+                float h5 = hAt(fragCoord + float2(1.0, 0.0));
+                float h6 = hAt(fragCoord + float2(-1.0, 1.0));
+                float h7 = hAt(fragCoord + float2(0.0, 1.0));
+                float h8 = hAt(fragCoord + float2(1.0, 1.0));
                 
                 float dx = (h2 + 2.0*h5 + h8) - (h0 + 2.0*h3 + h6);
                 float dy = (h6 + 2.0*h7 + h8) - (h0 + 2.0*h1 + h2);
@@ -85,8 +97,14 @@ internal const val LIGHTING_SHADER: String = """
             half4 main(float2 fragCoord) {
                 // fragCoord samples pixel centers: keep exactly the pixels the CPU
                 // kernels keep (their clip rects truncate region bounds to ints).
-                if (fragCoord.x < floor(uPrimitiveRegion.x) + 0.5 || fragCoord.x > ceil(uPrimitiveRegion.z) - 0.5 ||
-                    fragCoord.y < floor(uPrimitiveRegion.y) + 0.5 || fragCoord.y > ceil(uPrimitiveRegion.w) - 0.5) {
+                // The ±1e-3 slack keeps exact-boundary centers (knife-edge strict
+                // comparisons flip them via per-pixel fragCoord dust on Adreno —
+                // same mechanism as the flood guard; true outsiders sit a full
+                // pixel away).
+                if (fragCoord.x < floor(uPrimitiveRegion.x) + 0.5 - 1e-3 ||
+                    fragCoord.x > ceil(uPrimitiveRegion.z) - 0.5 + 1e-3 ||
+                    fragCoord.y < floor(uPrimitiveRegion.y) + 0.5 - 1e-3 ||
+                    fragCoord.y > ceil(uPrimitiveRegion.w) - 0.5 + 1e-3) {
                     return half4(0.0);
                 }
 
@@ -103,18 +121,38 @@ internal const val LIGHTING_SHADER: String = """
                 }
                 
             float dotNL = max(dot(n, l), 0.0);
+            // Spot cone factor (mirrors the CPU kernel: unshaped dot gated
+            // by the cone cosine; factor 1 for point lights, degenerate
+            // targets, and NaN cone angles — all encoded host-side).
+            float spotFactor = 1.0;
+            if (uLightType == 2 && uHasSpotTarget != 0) {
+                float sd = dot(-l, uSpotDir);
+                float f = clamp(sd, -1.0, 1.0);
+                if (f < uSpotCosine) f = 0.0;
+                spotFactor = max(f, 0.0);
+            }
             float3 color;
             float a = 1.0;
             if (uIsSpecular == 0) {
-                float intensity = clamp(dotNL * uConstant, 0.0, 1.0);
+                float intensity = clamp(dotNL * uConstant * spotFactor, 0.0, 1.0);
                 float3 lin = uLightColor * intensity;
                 color = (uUseLinear != 0) ? srgbEotf(floor(lin * 255.0 + 0.5) / 255.0) : lin;
             } else {
                 float3 v = float3(0.0, 0.0, 1.0);
                 float3 h = normalize(l + v);
-                float intensity = clamp(uConstant * pow(max(dot(n, h), 0.0), uExponent), 0.0, 1.0);
+                float intensity = clamp(uConstant * pow(max(dot(n, h), 0.0), uExponent) * spotFactor, 0.0, 1.0);
                 if (uTerminalPremult != 0) {
-                    return half4(uLightColorRaw, intensity);
+                    // Mirror the CPU byte rounding (round-half-up): intensities
+                    // below half an alpha LSB come out transparent there, while
+                    // fp dust here would emit near-white with alpha 1.
+                    if (intensity * 255.0 < 0.5) {
+                        return half4(0.0);
+                    }
+                    // Terminal output: full-strength light color like the CPU
+                    // premultiplied form — linearized under useLinear (the
+                    // CPU linearizes the light color there too).
+                    float3 termColor = (uUseLinear != 0) ? uLightColor : uLightColorRaw;
+                    return half4(termColor, intensity);
                 }
                 float3 lin = uLightColor * intensity;
                 color = (uUseLinear != 0) ? srgbEotf(floor(lin * 255.0 + 0.5) / 255.0) : lin;
