@@ -148,8 +148,12 @@ internal const val TURBULENCE_SHADER: String = """
             half4 main(float2 fragCoord) {
                 // fragCoord samples pixel centers: keep exactly the pixels the CPU
                 // kernels keep (their clip rects truncate region bounds to ints).
-                if (fragCoord.x < floor(uPrimitiveRegion.x) + 0.5 || fragCoord.x > ceil(uPrimitiveRegion.z) - 0.5 ||
-                    fragCoord.y < floor(uPrimitiveRegion.y) + 0.5 || fragCoord.y > ceil(uPrimitiveRegion.w) - 0.5) {
+                // The 1e-3 epsilon (FloodShader precedent) keeps exact-boundary
+                // pixel centers inside: without it Adreno resolves integral
+                // region edges landing exactly on pixel centers as CUT for
+                // scattered edge pixels (float interpolation error).
+                if (fragCoord.x < floor(uPrimitiveRegion.x) + 0.5 - 1e-3 || fragCoord.x > ceil(uPrimitiveRegion.z) - 0.5 + 1e-3 ||
+                    fragCoord.y < floor(uPrimitiveRegion.y) + 0.5 - 1e-3 || fragCoord.y > ceil(uPrimitiveRegion.w) - 0.5 + 1e-3) {
                     return half4(0.0);
                 }
 

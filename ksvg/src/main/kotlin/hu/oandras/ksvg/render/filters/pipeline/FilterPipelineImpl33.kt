@@ -36,6 +36,7 @@ import hu.oandras.ksvg.dom.filter.FeCompositeOperator
 import hu.oandras.ksvg.dom.filter.FeDistantLight
 import hu.oandras.ksvg.dom.filter.FePointLight
 import hu.oandras.ksvg.dom.filter.FeSpotLight
+import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
 import hu.oandras.ksvg.dom.filter.Lighting
@@ -425,6 +426,16 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
                                 (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                             )
+
+                            // stitchTiles="stitch" has no GPU support (the
+                            // shader hardcodes uTilePeriod=0 = no stitching and
+                            // would silently compute the wrong tile field):
+                            // decline the chain so the software reference
+                            // renders instead (round-B fallback coverage in
+                            // GpuTurbulenceCorpusParityTest).
+                            if (primitive.sourceElement.stitchTiles != FeStitchTiles.noStitch) {
+                                return null
+                            }
 
                             val shader = buildTurbulenceShader(
                                 node = primitive,

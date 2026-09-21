@@ -202,6 +202,11 @@ internal data class ParityStats(
     @JvmField val worstY: Int = -1,
     @JvmField val worstA: Int = 0,
     @JvmField val worstB: Int = 0,
+    /**
+     * Pixels whose channel diff exceeds the per-pixel alpha-scaled bound
+     * (only populated when [parityStats] runs with `translucentQuantK > 0`).
+     */
+    @JvmField val boundExceeded: Int = 0,
 )
 
 internal fun parityStats(
@@ -209,6 +214,7 @@ internal fun parityStats(
     hw: Bitmap,
     ignoreBoundaryFringe: Boolean = false,
     ignoreTransparent: Boolean = false,
+    translucentQuantK: Int = 0,
 ): ParityStats {
     assertEquals("Bitmap widths differ", sw.width, hw.width)
     assertEquals("Bitmap heights differ", sw.height, hw.height)
@@ -241,6 +247,7 @@ internal fun parityStats(
     var worstY = -1
     var worstA = 0
     var worstB = 0
+    var boundExceeded = 0
     for (y in 0 until h) {
         for (x in 0 until w) {
             val i = y * w + x
@@ -263,7 +270,21 @@ internal fun parityStats(
                 worstB = b
             }
             sumAbs += d
-            if (d > GPU_PARITY_MAX_ABS) outliers++
+            // Alpha-scaled quantization bound (opt-in): straight RGB at
+            // alpha `pa` has only `pa + 1` representable levels through
+            // premultiplied 8-bit storage, so two pipelines' independent
+            // store roundings legitimately differ up to ~2 * 255 / pa.
+            // Outliers are counted against this bound when active.
+            val bound = if (translucentQuantK > 0) {
+                val pa = maxOf(a.alpha, b.alpha, 1)
+                maxOf(GPU_PARITY_MAX_ABS, (translucentQuantK + pa - 1) / pa)
+            } else {
+                GPU_PARITY_MAX_ABS
+            }
+            if (d > bound) {
+                outliers++
+                boundExceeded++
+            }
         }
     }
     return ParityStats(
@@ -275,6 +296,7 @@ internal fun parityStats(
         worstY,
         worstA,
         worstB,
+        boundExceeded,
     )
 }
 
@@ -308,6 +330,16 @@ internal fun parityStats(
  * comparing them would fail byte-exactness on invisible pixels. Opt-in;
  * Round-A cases are unaffected (their transparent pixels already match
  * exactly).
+ * @param translucentQuantK when positive, each pixel's failure/outlier bound
+ * is `max(maxAbsTol, ceil(translucentQuantK / max(alpha)))` instead of a
+ * flat `maxAbsTol`. Generative noise (feTurbulence `type=turbulence`) emits
+ * near-zero alpha pixels whose straight RGB is unrepresentable through
+ * premultiplied 8-bit storage: two pipelines' independent store roundings
+ * legitimately differ up to ~2 * 255 / alpha there (validated: 510 covers
+ * Adreno readback + software Bitmap round-trips with zero excess on the
+ * bisection configs). The bound stays tight (== maxAbsTol) at alpha 255 and
+ * still catches real kernel errors, which shift all alphas. Opt-in; 0 keeps
+ * the legacy flat gates for every other runner.
  */
 internal fun assertParity(
     name: String,
@@ -318,18 +350,23 @@ internal fun assertParity(
     ignoreBoundaryFringe: Boolean = false,
     premultiplyReference: Boolean = false,
     ignoreTransparent: Boolean = false,
+    translucentQuantK: Int = 0,
 ) {
     val reference = if (premultiplyReference) premultipliedCopy(sw) else sw
-    val stats = parityStats(reference, hw, ignoreBoundaryFringe, ignoreTransparent)
+    val stats = parityStats(reference, hw, ignoreBoundaryFringe, ignoreTransparent, translucentQuantK)
     val outlierRatio = stats.outlierCount.toDouble() / stats.total
-    if (stats.maxAbs > maxAbsTol || outlierRatio > maxOutlierRatio) {
+    // With the alpha-scaled bound active, the raw maxAbs is dominated by
+    // unrepresentable low-alpha levels; gate on bound excess instead.
+    val maxFailed = if (translucentQuantK > 0) stats.boundExceeded > 0 else stats.maxAbs > maxAbsTol
+    if (maxFailed || outlierRatio > maxOutlierRatio) {
         dumpParityBitmaps(name, reference, hw, stats)
     }
     assertTrue(
         "$name: maxAbsDiff=${stats.maxAbs} exceeds $maxAbsTol " +
-            "(meanAbs=${"%.4f".format(stats.meanAbs)}, " +
+            "(boundExceeded=${stats.boundExceeded}, " +
+            "meanAbs=${"%.4f".format(stats.meanAbs)}, " +
             "outliers=${stats.outlierCount}/${stats.total})",
-        stats.maxAbs <= maxAbsTol,
+        !maxFailed,
     )
     assertTrue(
         "$name: outlierRatio=${"%.5f".format(outlierRatio)} exceeds $maxOutlierRatio " +
