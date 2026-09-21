@@ -18,11 +18,22 @@
 
 package hu.oandras.ksvg.render.filters.pipeline.shaders
 
+/**
+ * Straight-then-premult transfer lookup. Out-of-`uPrimitiveRegion` pixels
+ * emit transparent (mirrors the CPU kernel, which writes the clip only) —
+ * without this the transfer would run over the whole filter region while
+ * the reference keeps outside-clip transparent.
+ */
 internal const val COMPONENT_TRANSFER_SHADER: String = """
             uniform shader uInput;
             uniform shader uLutRgb;
             uniform shader uLutA;
+            uniform float4 uPrimitiveRegion;
             half4 main(float2 fragCoord) {
+                if (fragCoord.x < uPrimitiveRegion.x || fragCoord.x >= uPrimitiveRegion.z ||
+                    fragCoord.y < uPrimitiveRegion.y || fragCoord.y >= uPrimitiveRegion.w) {
+                    return half4(0.0);
+                }
                 float4 color = uInput.eval(fragCoord);
                 float alpha = color.a;
                 if (alpha > 0.0) color.rgb /= alpha;

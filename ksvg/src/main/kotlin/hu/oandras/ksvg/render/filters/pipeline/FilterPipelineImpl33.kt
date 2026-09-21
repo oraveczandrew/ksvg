@@ -314,6 +314,15 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
                         is FeComponentTransferRenderNode -> {
                             val shader = buildComponentTransferShader(primitive)
+                            // Region guard (same mapping as morphology uInterior):
+                            // the CPU kernel writes the clip only.
+                            shader.setFloatUniform(
+                                "uPrimitiveRegion",
+                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
+                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
+                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
+                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY,
+                            )
                             resultShaders[resultName ?: ""] = shader
                             RenderEffect.createRuntimeShaderEffect(shader, "uInput").chainWith(inputEffect)
                         }
