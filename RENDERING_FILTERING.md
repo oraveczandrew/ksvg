@@ -103,6 +103,20 @@ software backend and the HW chain) plus `calculatePrimitiveRegion`
 Key gotcha: use `listOf(input)` (NOT `listOfNotNull`) when forwarding a single
 `in` — a `null` input must be preserved to inherit the previous result.
 
+### 2.2 Forcing the software filter backend
+
+The renderer prefers the GPU/RenderEffect pipeline when the canvas is
+hardware-accelerated and the API level allows. To force the CPU/software filter
+backend, use `RenderOptions.softwareFiltering(enabled = true)`, e.g.
+`SVG.getFromString(svg).renderToCanvas(canvas, RenderOptions.create().softwareFiltering(true))`.
+The setter is annotated with `@SlowSoftwareFiltering` (a
+`kotlin.RequiresOptIn` marker at WARNING level) because software filtering is
+significantly slower — callers must opt in with
+`@OptIn(SlowSoftwareFiltering::class)` to acknowledge the cost. Use it for
+deterministic output (tests, golden comparisons) or for filter primitives the
+GPU backend does not yet support. The GPU path is selected automatically
+otherwise.
+
 ---
 
 ## 3. Lighting (`feDiffuseLighting` / `feSpecularLighting`)
@@ -264,16 +278,52 @@ emulator; a successful build alone does not prove that the library will load.
   Pass bare numbers as shift args (`CHANNEL ..., 24, ...`); keep `#` only in the
   macro body.
 
+### 4.3 JNI entry rules (`:filtering`)
+
+- **IDE errors are false positives**: "Cannot resolve symbol 'JNIEXPORT'" /
+  "no project target" means the IDE lacks the NDK toolchain — point its CMake
+  profile at the **SDK's** cmake/ninja + NDK toolchain file. Do not change the
+  code for these.
+- **NEVER mark a `@JvmStatic external fun` (JNI entry) `internal`**: Kotlin
+  mangles internal members (`apply` → `apply$...`), so the C++ symbol
+  (`Java_<pkg>_<Class>_<method>`) stops matching → `UnsatisfiedLinkError`.
+  Make the enclosing `object` `internal` instead.
+- When wiring in a third-party source (e.g. the RIR Toolkit `Blur` kernels),
+  confirm the exact symbol/ABI contract before calling into it; mismatched
+  calling conventions produce silent, hard-to-debug corruption.
+
 ---
 
 ## 5. Performance rules (REVIEW BEFORE HOT-PATH EDITS)
 
-- `render()` and `updateAnimations()` must not allocate: no new `Matrix`,
-  `PathShape`, `PathMeasure`, `RectF`, `FloatArray`.
-- Use `RenderContext` pools (`matrixPool`, `rectFPool`, `bitmapPool`,
-  `IntArrayBucket`), inline helpers (`forEachElement`), XFerModes constants.
-- No capturing lambdas / local function references in hot paths.
+- `render()` methods and animation updates (`updateAnimations()`) are
+  performance-critical. **NO NEW ALLOCATIONS**: no new `Matrix`, `PathShape`,
+  `PathMeasure`, `RectF`, or `FloatArray` objects during draw/update.
+- Always use the pools provided by the `RenderContext`:
+  ```kotlin
+  renderContext.matrixPool.withPooledObject { matrix -> /* usage */ }
+  ```
+  (`matrixPool`, `rectFPool`, `bitmapPool`, `IntArrayBucket`).
+- Never create `PorterDuffXfermode` instances. Use the pre-allocated constants
+  in `hu.oandras.ksvg.utils.XFerModes`.
+- Prefer non-allocating functions in `hu.oandras.ksvg.utils.Collections`, such
+  as `forEachElement` (inline and safe).
+- **No capturing lambdas / local function references in hot paths.** In render
+  and animation-update code, a lambda that captures locals, a `::localFun`
+  reference, or any non-inline higher-order call allocates Function objects on
+  EVERY invocation. Use private methods with explicit parameters, inline
+  helpers (`forEachElement`, pools), or pre-allocated state instead.
+- Drawables must be renderable off the main thread.
+- Do not introduce mutable shared or global state.
+- Do not use mutable singleton (`object`) helpers for allocation avoidance.
+- Reusable state must be owned by the current rendering operation and must not
+  be shared between threads.
 - Build-path (parse, tree-build, filter-cache) is lenient; per-frame path is not.
+- **Method count**: use `@JvmField` where possible to reduce method count.
+- Animations must respect `dur`, `repeatCount`, `repeatDur`, and `end`. Use
+  `hu.oandras.ksvg.utils.calculateProgress` and
+  `hu.oandras.ksvg.utils.isFinished` for all timing logic to ensure standard
+  compliance.
 
 ---
 
@@ -559,6 +609,13 @@ These are implementation invariants, not benchmark-specific optimizations:
   boundaries, odd-width tails, in-place and out-of-place buffers, and guarded
   memory regions through the actual JNI/native entry point. A backend that was
   only compiled is unverified.
+- Benchmark in one controlled session. Use the native harness, compare medians,
+  record validity/thermal classification, and do not compare absolute timings
+  from unrelated sessions.
+- Keep table mirrors and reference initialization identical. SIMD turbulence
+  tables must initialize the mirrored tail used by indexed lattice lookups,
+  and native random-seed normalization must match the Kotlin reference for
+  zero and negative seeds.
 
 ---
 
@@ -590,147 +647,3 @@ Pass the `-Dbenchmark.host.profile=true` system property to the test task.
 The output report will automatically include the **IPC** and **Cycles/Iter** columns in the Markdown table. If hardware counters are restricted by the OS (e.g., `perf_event_paranoid` on Linux), it gracefully falls back to raw timing.
 
 ---
-
-## 7. Change log (append)
-
-- 2026-08-30 — Document created. Recorded: two-phase render model, software/HW
-  backend parity, region subregion-defaulting, lighting straight-vs-premultiplied
-  finding (`lighting_point_spot`), spot-cone factor semantics from librsvg
-  `lighting.rs`.
-- 2026-08-31 — Implemented the `premultipliedOutput` flag for terminal
-  `feSpecularLighting` (details in §3.1). Threaded through
-  `SoftwareFilterBackend` → `FilterLighting.kt` → `KotlinKernels.lighting` +
-  `LightingNative.apply` (JNI) + native `lighting.cpp` (`applyScalar`/`applyVector`),
-  bit-exact. Validated: `lighting_point_spot` 0.425 → 0.722; `filter_specular.svg`
-  unchanged (0.981); native builds on all 4 ABIs. Residual gap to 0.95 is the
-  separate diffuse-brightness divergence (§3.3).
-- 2026-09-03 — Documented the `:filtering` kernel benchmark commands (host +
-  device) in §6.1 (see NATIVE_VALIDATION_WORKLOG 2026-09-02 for the measured
-  results). Added the `runDeviceBenchmark` wrapper task, which forwards
-  `-Pandroid.testInstrumentationRunnerArguments.*` (class/kernel/benchmark.quick)
-  to `connectedDebugAndroidTest`, then pulls `benchmarks_device*.csv` from the
-  device cache dir into `tmp/` and prints it as a Markdown table. The pull relies
-  on `android.injected.androidTest.leaveApksInstalledAfterRun=true`.
-- 2026-09-04 — Implemented the ARMv7-A NEON32 ConvolveMatrix interior kernel
-  (`convolve_neon32.S`), shared the edge-mode-parameterized scalar helpers in
-  `convolve_matrix_neon.cpp` across aarch64/arm32, and routed NEON32 through
-  `runForced`/`apply` in `convolve_matrix.cpp` (all `edgeMode`s supported, like
-  aarch64). Validation: all-ABI native build clean; host parity pass; on-device
-  parity 18/18. Added `-PfilterAbis` (32-bit-only test APK) to §6.1. On-device
-  quick benchmark: neon32 ConvolveMatrix **7.41x** @512x512 (16.1ms), **7.27x**
-  @2048x2048 (241.2ms) vs scalar.
-- 2026-09-05 — Completed the stable native benchmark harness (Steps 0-8,
-  spec `tmp/TEST_HARNESS.md`) and documented it in §6.2: `nativeBenchmark { }` DSL,
-  foreground window + focus wait, thread-priority keying, warmup/batch model,
-  per-batch cache normalization, thermal gating with cooldown/retry
-  (`ThermalStateMonitor` API 29+ status + API<29 probe fallback), stats + five-way
-  classification, environment/SoC/CPU-frequency report, summary+detail CSV
-  pull-compatible with `runDeviceBenchmark`. Migrated the device Turbulence driver
-  onto the harness (all backends × 512²/2048², `benchmark.kernel`/`benchmark.quick`
-  compat) and added the raw-vs-harness validation test (`HarnessValidationRawTest`,
-  spec §22). Key device finding: on the OnePlus 12 (SM8550) sustained mode is
-  unsupported and `currentThermalStatus` stays `NONE` while CPU frequency drifts
-  (sysfs `scaling_cur_freq` is the reliable signal); the batch-CV classifier flags
-  such drift as `UNSTABLE`.
-- 2026-09-05 — Generalised the harness to the whole device kernel suite:
-  `KernelPerformanceDeviceBenchmark` (src/androidTest) now runs **all** kernels
-  (UnLinearize, ComponentTransfer, Morphology, ArithmeticComposite non-linear +
-  linear, ConvolveMatrix, DisplacementMap, Lighting, Turbulence, GaussianBlur)
-  through `nativeBenchmark { }`, one harness block per (kernel, backend, size) cell,
-  replacing the old raw `KernelBenchmarkRunner` driver. `quick` = 512² only; 2048²
-  cells use 3 iterations/batch (vs 10 at 512²) to keep the larger kernels bounded.
-  Fixed two latent driver bugs while migrating: ConvolveMatrix now passes a proper
-  25-element 5x5 weight array (the old 9-float array + order-5 was an OOB read), and
-  the ArithmeticComposite `(linear)` variant now actually sets `useLinear=true`.
-  Removed the superseded Turbulence-only `TurbulenceNativeHarnessBenchmark`;
-  `KernelBenchmarkRunner` is host-JVM-only again.
-- 2026-09-05 — Replaced the AArch64 morphology interior loop (erode/dilate) with a
-  hand-written kernel (`morphology_neon64.S`): wired into CMake for arm64-v8a and into
-  both `applyForced`/`apply` via an `extern "C"` declaration under `__aarch64__`. Fixed
-  a critical register-aliasing bug in its tail loop (`w14`/`x14` — the per-row cursor
-  `mov x14, x15` trashed the tail counter held in `w14`, causing out-of-bounds reads /
-  effectively unbounded loops for every odd kernel width) and normalized the byte
-  stride to `sxtw(w2)`. Device parity (scalar + neon64 forced backends vs the Kotlin
-  reference across the `MorphologyValidationCorpus`): **OK (108 tests)**; host parity
-  and `buildHostNativeLib` green. Updated the §6.1 Device Results table with a harness
-  run: neon64 Morphology is now **12.6x** @512² (15.8 ms) and **13.7x** @2048²
-  (238.9 ms) vs scalar in the same run, where the previous inline NEON path measured
-  **0.44x**. CSVs: `tmp/benchmarks_device_harness_Morphology_*.csv`.
-- 2026-09-05 — Optimized `morphology_neon64.S` (points 1, 2, 3, 5, 7 of the code review):
-  fixed a critical bug where vertical accumulators were not reset per column group in the row kernel;
-  removed the reserved `x18` register on AArch64 (using post-indexed loads instead); clarified
-  the horizontal-only cache comment; implemented true 4-way independent accumulator chains in the
-  vector loops; structurally eliminated the `w14`/`x14` counter/cursor aliasing bug class using
-  a straight-line `tbz w12, #1` tail. Device parity re-run:
-  **OK (108 tests)**; harness medians re-measured in the same run: scalar 200.2 /
-  neon64 15.98 ms @512² (**12.5x**) and scalar 3295.6 / neon64 224.1 ms @2048²
-  (**14.7x**). The 2048² cell improved ~6% over the pre-optimization revision
-  (238.9 -> 224.1 ms); 512² is within noise. §6.1 table refreshed.
-- 2026-09-06 — Standardized assembly naming convention to `<feature>_<arch>_<isa>.S`
-  across the whole project (Morphology, Blur, Convolve, Turbulence, ArithmeticComposite, Lighting).
-  Integrated hand-written distant-light diffuse lighting assembly kernels for all
-  architectures (aarch64, armv7a, x86_64, i386) including SSE2, AVX2 and AVX512
-  variants for x86.
-- 2026-09-09 — Documented ARMv7 NEON assembly gotchas in §4.2 (16-entry VTBL2
-  LUT-scan bound; LLVM `.macro` token-paste for shift args).
-- 2026-09-10 — Consolidated validated native-kernel guidance: parity-first
-  arithmetic, production-vs-forced dispatch, ARM32 ABI/PIC hazards, scalar
-  thin-edge specialization, and the measured 128-bit LUT exception (§6.3).
-- 2026-09-10 — Added the closed turbulence findings: kernel parity against
-  librsvg, device-pixel stitch tile quantization, and the narrowly scoped
-  straight-linearRGB terminal transfer (§3.4).
-- 2026-09-13 — Removed the i386 AVX-512 assembly rows
-  (`morphology_i386_avx512.S`, `lighting_distant_specular_i386_avx512.S`, and the
-  never-built WIP `lighting_distant_diffuse_i386_avx512.S`). They were untestable
-  everywhere: the Android emulator's HVF guest masks every AVX-512 CPUID bit on
-  both x86 and x86_64 (verified on API 26/30/37), 32-bit x86 images end at
-  API 30, and there is no host i386 toolchain to validate against. The x86_64
-  AVX-512 rows stay (host-native build + host benchmarks validate them). i386
-  morphology now dispatches SSE2/AVX2 only; i386 specular lighting SSE2/AVX2;
-  `nativeBackendForAbi` on i386 never advertises `SIMD_BACKEND_AVX512` (lighting,
-  convolve report functions fixed to match: AVX512 gated on x86_64 only).
-- 2026-09-13 — Fixed sibling AVX2-detection bug uncovered by the same emulator
-  CPUID audit: `detectSimdLevel()` keyed AVX2 on `__builtin_cpu_supports("avx2")`,
-  which in the emulator guest additionally demands `CPUID.1:ECX.OSXSAVE`; the
-  HVF mask clears that bit even though `XCR0.YMM` is provably enabled and the
-  AVX-256 kernels execute correctly (execution probe verified on API 37). New
-  `cpuHasAvx2Raw()` in `cpu_dispatch.h` reads the real state instead of the
-  OSXSAVE *report*: CPUID leaf1 XSAVE (a sanity precondition for XCR0/XGETBV)
-  → actual `XCR0.YMM` via `xgetbv` (proves the OS saves/restores the YMM state
-  AVX requires) → CPUID leaf7 EBX bit5. On real silicon the result equals
-  normal detection (host probe: level=AVX512), because XCR0.YMM and the
-  OSXSAVE bit are always set together there. AVX-512 detection deliberately
-  stays on `__builtin_cpu_supports` — raw detection must never unlock a backend
-  that would `#UD` in the emulator. Emulator now detects **AVX2** instead of
-  SSSE3.
-- 2026-09-13 — Added NEON `useLinear` (linearRGB) distant-diffuse rows to match
-  the x86 `*Linear` kernels (§3.3): `ksvgLightingDistantDiffuseRowNeon64Linear`
-  (aarch64; full-256-LUT `tbl` conversion, LUT resident in v16-v31) and
-  `ksvgLightingDistantDiffuseRowNeon32Linear` (armv7a; scalar per-pixel `ldrb`
-  lookups into the reference `ksvg_linear_to_srgb_lut`, mirroring the i386
-  SSSE3 `*Linear` row because only 16 q-regs are available). `lighting.cpp`
-  wires both and sets `allowDiffuseLinear = true` unconditionally. Parity on
-  CPH2449: NEON64 16/16 and NEON32 16/16 (`LightingNativeParityTest`, incl.
-  `distant diffuse linear 16x16`); host x86_64 24/24. Previously this combo
-  silently used the scalar fallback on ARM.
-- 2026-09-13 — Replaced the x86_64 distant-light baseline rows: the SSE2
-  lighting asm (`lighting_distant_{diffuse,specular}_x86_64_sse2.S`) was
-  rewritten/renamed to SSSE3 (`*_ssse3.S`, symbols `...RowSsse3`), gaining new
-  `...Linear` entry points that amortize the linear->sRGB byte mapping in place.
-  Wired dispatch, `simd_x86.h` externs, and CMake source lists (base + host).
-  x86_64 lighting now advertises `SIMD_BACKEND_SSSE3` as its baseline (i386
-  stays SSE2); the parity test forces scalar/ssse3/avx2 over the corpus.
-- 2026-09-13 — Dropped the x86_64 AVX-512 distant-light kernels
-  (`lighting_distant_{diffuse,specular}_x86_64_avx512.S`). The 16-lane loops
-  crashed the full suite with SIGABRT in `.L_loop_avx512` (host benchmark runs;
-  the parity corpus never exercised them because widths ≤ 16 leave 0 avx512
-  lanes). Removed the dispatch case, the `simd_x86.h` externs, the CMake source
-  entries (main + host), and the AVX512 advertisement from
-  `nativeBackendForAbi`/`apply`. x86_64 lighting now tops out at `AVX2` (`avx2`
-  rows become the widest advertised backend; parity forces scalar/ssse3/avx2).
-  Parity still green (21 cases), full `:filtering` suite no longer crashes.
-- 2026-09-14 — Integrated host-compatible hardware profiling (Intel/ARM macOS and
-  Linux) into the kernel benchmark runner. Added JNI wrappers for the macOS `kpc`
-  API and Linux `perf_event_open` syscall to measure IPC and CPU cycles for hot-path
-  auditing. Moved `KernelBenchmarkRunner` to the `:filtering` test source set to
-  isolate host-only dependencies.
