@@ -18,15 +18,26 @@
 
 package hu.oandras.ksvg.render.filters.pipeline.effects
 
+import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
 
+/**
+ * Straight-tap color matrix with premultiplied output, clipped to
+ * `uPrimitiveRegion` (transparent outside — mirrors the CPU kernel, which
+ * clipRects to the primitive region).
+ */
 private const val COLOR_MATRIX_SHADER: String = """
             uniform shader uInput;
             uniform float uMatrix[20];
+            uniform float4 uPrimitiveRegion;
             half4 main(float2 fragCoord) {
+                if (fragCoord.x < uPrimitiveRegion.x || fragCoord.x >= uPrimitiveRegion.z ||
+                    fragCoord.y < uPrimitiveRegion.y || fragCoord.y >= uPrimitiveRegion.w) {
+                    return half4(0.0);
+                }
                 float4 c = uInput.eval(fragCoord);
                 float alpha = c.a;
                 if (alpha > 0.0) c.rgb /= alpha;
@@ -50,14 +61,22 @@ private const val COLOR_MATRIX_SHADER: String = """
  * the CPU kernel uses).
  *
  * @param matrix the 20-float color matrix in row-major RGBA+offset order
+ * @param primitiveRegion the primitive subregion in buffer space (already
+ * remapped from user space by the caller); the CPU kernel writes the clip
+ * only
  * @param inputUniformName the shader-input uniform name (`uInput`)
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 internal fun createColorMatrixShaderEffect(
     matrix: FloatArray,
+    primitiveRegion: RectF,
     inputUniformName: String,
 ): Pair<RuntimeShader, RenderEffect> {
     val shader = RuntimeShader(COLOR_MATRIX_SHADER)
     shader.setFloatUniform("uMatrix", matrix)
+    shader.setFloatUniform(
+        "uPrimitiveRegion",
+        primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom,
+    )
     return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
 }

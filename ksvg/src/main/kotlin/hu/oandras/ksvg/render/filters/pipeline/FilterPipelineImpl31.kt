@@ -176,6 +176,7 @@ internal open class FilterPipelineImpl31 internal constructor(
     // Caller-owned mutable state; a backend instance is owned by a single
     // render operation and never shared between threads.
     private var recordingActive: Boolean = false
+    private var activeSlot: GpuFilterSlot? = null
 
     final override fun supports(primitives: FilterPrimitiveSet): Boolean {
         return primitives.bits != 0 && (primitives.bits and supportedMask.inv()) == 0
@@ -183,6 +184,7 @@ internal open class FilterPipelineImpl31 internal constructor(
 
     context(renderContext: RenderContext)
     internal fun tryBuildChain(
+        element: RenderNode<*>,
         filterNode: FilterRenderNode,
         scaleX: Float,
         scaleY: Float,
@@ -192,16 +194,19 @@ internal open class FilterPipelineImpl31 internal constructor(
         sy: Float,
         boundingBox: Box,
     ): Chain? {
-        // Node-keyed chain cache: the chain depends only on the filter's
+        // Element-keyed chain cache: the chain depends only on the filter's
         // attributes (version) and the primitive scales - not on the rendered
-        // content - so it survives across frames while the keys match.
-        val cached = filterNode.gpuChain
+        // content - so it survives across frames while the keys match. The
+        // slot is per element because several elements may share one filter
+        // node (each needs its own chain: regions/positions differ).
+        val slot = filterNode.gpuSlotFor(element)
+        val cached = slot.gpuChain
         if (cached != null &&
-            filterNode.gpuChainVersion == filterNode.version &&
-            filterNode.gpuChainScaleX == scaleX &&
-            filterNode.gpuChainScaleY == scaleY &&
-            filterNode.gpuChainDeviceLeft == deviceRegion.left &&
-            filterNode.gpuChainDeviceTop == deviceRegion.top
+            slot.gpuChainVersion == filterNode.version &&
+            slot.gpuChainScaleX == scaleX &&
+            slot.gpuChainScaleY == scaleY &&
+            slot.gpuChainDeviceLeft == deviceRegion.left &&
+            slot.gpuChainDeviceTop == deviceRegion.top
         ) {
             return cached
         }
@@ -218,12 +223,12 @@ internal open class FilterPipelineImpl31 internal constructor(
         )
 
         if (chain != null) {
-            filterNode.gpuChain = chain
-            filterNode.gpuChainVersion = filterNode.version
-            filterNode.gpuChainScaleX = scaleX
-            filterNode.gpuChainScaleY = scaleY
-            filterNode.gpuChainDeviceLeft = deviceRegion.left
-            filterNode.gpuChainDeviceTop = deviceRegion.top
+            slot.gpuChain = chain
+            slot.gpuChainVersion = filterNode.version
+            slot.gpuChainScaleX = scaleX
+            slot.gpuChainScaleY = scaleY
+            slot.gpuChainDeviceLeft = deviceRegion.left
+            slot.gpuChainDeviceTop = deviceRegion.top
         }
 
         return chain
@@ -267,6 +272,17 @@ internal open class FilterPipelineImpl31 internal constructor(
 
             val effect = when (primitive) {
                 is FeColorMatrixRenderNode -> {
+                    // Skia color-filter ignores the primitive subregion (no
+                    // region guard on this path; the CPU kernel clipRects).
+                    // Decline so software renders the clip instead. (On the
+                    // Impl33 path the AGSL shader carries a uPrimitiveRegion
+                    // guard, so no decline is needed there.)
+                    val matrixElement = primitive.sourceElement
+                    if (matrixElement.x != null || matrixElement.y != null ||
+                        matrixElement.width != null || matrixElement.height != null
+                    ) {
+                        return null
+                    }
                     val element = primitive.sourceElement
                     val colorFilter = android.graphics.ColorMatrixColorFilter(
                         buildColorMatrix(element.type, element.values)
@@ -275,6 +291,16 @@ internal open class FilterPipelineImpl31 internal constructor(
                 }
 
                 is FeGaussianBlurRenderNode -> {
+                    // Skia blur ignores the primitive subregion (no region
+                    // guard on this path): an explicit x/y/width/height would
+                    // silently blur the whole input (endpoint geometry_units
+                    // precedent). Decline so software renders the clip instead.
+                    val blurElement = primitive.sourceElement
+                    if (blurElement.x != null || blurElement.y != null ||
+                        blurElement.width != null || blurElement.height != null
+                    ) {
+                        return null
+                    }
                     val sigmaX = primitive.stdDeviationX * scaleX
                     val sigmaY = primitive.stdDeviationY * scaleY
                     if (sigmaX <= 0f && sigmaY <= 0f) {
@@ -288,6 +314,15 @@ internal open class FilterPipelineImpl31 internal constructor(
                 }
 
                 is FeOffsetRenderNode -> {
+                    // Skia offset ignores the primitive subregion (same class
+                    // as the blur decline above). Decline so software renders
+                    // the clip instead.
+                    val offsetElement = primitive.sourceElement
+                    if (offsetElement.x != null || offsetElement.y != null ||
+                        offsetElement.width != null || offsetElement.height != null
+                    ) {
+                        return null
+                    }
                     val dx = filterPrimitiveLengthX(
                         length = primitive.sourceElement.dx,
                         primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
@@ -344,6 +379,7 @@ internal open class FilterPipelineImpl31 internal constructor(
         boundingBox: Box,
     ): Canvas? {
         val chain = obtainChain(
+            element = node,
             filterNode = filterNode,
             sx = sx,
             sy = sy,
@@ -354,18 +390,19 @@ internal open class FilterPipelineImpl31 internal constructor(
 
         if (recordingActive) return null
 
+        val slot = filterNode.gpuSlotFor(node)
         val padX = chain.padX
         val padY = chain.padY
         val contentVersion = node.contentVersion
-        var gpuNode = filterNode.gpuNode
+        var gpuNode = slot.gpuNode
         val valid = gpuNode != null &&
                 gpuNode.hasDisplayList() &&
-                filterNode.gpuSourceVersion == contentVersion &&
-                filterNode.gpuFilterVersion == filterNode.version &&
-                filterNode.gpuScaleX == sx && filterNode.gpuScaleY == sy &&
-                filterNode.gpuWidth == width && filterNode.gpuHeight == height &&
-                filterNode.gpuPadX == padX && filterNode.gpuPadY == padY &&
-                matrix == filterNode.gpuSourceMatrix
+                slot.gpuSourceVersion == contentVersion &&
+                slot.gpuFilterVersion == filterNode.version &&
+                slot.gpuScaleX == sx && slot.gpuScaleY == sy &&
+                slot.gpuWidth == width && slot.gpuHeight == height &&
+                slot.gpuPadX == padX && slot.gpuPadY == padY &&
+                matrix == slot.gpuSourceMatrix
         if (!valid) {
             gpuNode = gpuNode ?: AndroidRenderNode("ksvg-filter-source")
             val recording = gpuNode.beginRecording(width + 2 * padX, height + 2 * padY)
@@ -375,19 +412,20 @@ internal open class FilterPipelineImpl31 internal constructor(
             // display list; snapshot the matrix so a later CTM change (e.g. an
             // animated transform, or an ancestor moving) forces a re-record
             // instead of reusing the stale, frozen content.
-            val sourceMatrix = filterNode.gpuSourceMatrix ?: Matrix().also { filterNode.gpuSourceMatrix = it }
+            val sourceMatrix = slot.gpuSourceMatrix ?: Matrix().also { slot.gpuSourceMatrix = it }
             sourceMatrix.set(matrix)
-            filterNode.gpuNode = gpuNode
-            filterNode.gpuSourceVersion = contentVersion
-            filterNode.gpuFilterVersion = filterNode.version
-            filterNode.gpuScaleX = sx
-            filterNode.gpuScaleY = sy
-            filterNode.gpuWidth = width
-            filterNode.gpuHeight = height
-            filterNode.gpuPadX = padX
-            filterNode.gpuPadY = padY
+            slot.gpuNode = gpuNode
+            slot.gpuSourceVersion = contentVersion
+            slot.gpuFilterVersion = filterNode.version
+            slot.gpuScaleX = sx
+            slot.gpuScaleY = sy
+            slot.gpuWidth = width
+            slot.gpuHeight = height
+            slot.gpuPadX = padX
+            slot.gpuPadY = padY
             gpuNode.setPosition(0, 0, width + 2 * padX, height + 2 * padY)
             recordingActive = true
+            activeSlot = slot
             return recording
         }
 
@@ -397,8 +435,9 @@ internal open class FilterPipelineImpl31 internal constructor(
 
     override fun endRecording(filterNode: FilterRenderNode) {
         if (recordingActive) {
-            filterNode.gpuNode?.endRecording()
+            activeSlot?.gpuNode?.endRecording()
             recordingActive = false
+            activeSlot = null
         }
     }
 
@@ -415,8 +454,9 @@ internal open class FilterPipelineImpl31 internal constructor(
         boundingBox: Box,
         state: RendererState,
     ) {
-        val chain = filterNode.gpuChain ?: return
-        val gpuNode = filterNode.gpuNode ?: return
+        val slot = filterNode.gpuSlotFor(node)
+        val chain = slot.gpuChain ?: return
+        val gpuNode = slot.gpuNode ?: return
         gpuNode.setRenderEffect(chain.effect)
         canvas.withSave {
             @Suppress("DEPRECATION")
@@ -432,6 +472,7 @@ internal open class FilterPipelineImpl31 internal constructor(
     }
 
     protected open fun obtainChain(
+        element: RenderNode<*>,
         filterNode: FilterRenderNode,
         sx: Float,
         sy: Float,
@@ -444,7 +485,7 @@ internal open class FilterPipelineImpl31 internal constructor(
             val pScaleX = if (primitiveUnitsAreUser) sx else boundingBox.width * sx
             val pScaleY = if (primitiveUnitsAreUser) sy else boundingBox.height * sy
             tryBuildChain(
-                filterNode, pScaleX, pScaleY,
+                element, filterNode, pScaleX, pScaleY,
                 filterRegion, deviceRegion, sx, sy, boundingBox
             )
         }
@@ -470,6 +511,7 @@ internal open class FilterPipelineImpl31 internal constructor(
 
     override fun release() {
         recordingActive = false
+        activeSlot = null
     }
 
     internal fun RenderEffect.chainWith(input: RenderEffect?): RenderEffect {

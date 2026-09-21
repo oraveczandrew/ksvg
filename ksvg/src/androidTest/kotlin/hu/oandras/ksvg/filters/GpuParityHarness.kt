@@ -215,6 +215,7 @@ internal fun parityStats(
     ignoreBoundaryFringe: Boolean = false,
     ignoreTransparent: Boolean = false,
     translucentQuantK: Int = 0,
+    matchRadius: Int = 0,
 ): ParityStats {
     assertEquals("Bitmap widths differ", sw.width, hw.width)
     assertEquals("Bitmap heights differ", sw.height, hw.height)
@@ -255,7 +256,44 @@ internal fun parityStats(
             if (ignoreTransparent && (swPx[i] ushr 24) == 0 && (hwPx[i] ushr 24) == 0) continue
             total++
             val a = swPx[i]
-            val b = hwPx[i]
+            // Shift-tolerant matching (opt-in): edge-amplifying kernels
+            // (convolve edge-detect, morphology, blur halos) turn ±1px base-
+            // scene rasterization differences into huge channel diffs. With
+            // matchRadius=1 the pixel passes when it matches ANY pixel in
+            // the other's 3x3 window. This blinds ≤1px geometry shifts
+            // (covered precisely, shift-sensitively, in Round-B/C); value
+            // errors still fail everywhere. Test-only cost (9 taps/px).
+            val b = if (matchRadius <= 0) {
+                hwPx[i]
+            } else {
+                var best = hwPx[i]
+                var bestD = maxOf(
+                    abs(a.alpha - best.alpha),
+                    abs(a.red - best.red),
+                    abs(a.green - best.green),
+                    abs(a.blue - best.blue),
+                )
+                for (dy in -matchRadius..matchRadius) {
+                    val ny = y + dy
+                    if (ny < 0 || ny >= h) continue
+                    for (dx in -matchRadius..matchRadius) {
+                        val nx = x + dx
+                        if (nx < 0 || nx >= w) continue
+                        val c = hwPx[ny * w + nx]
+                        val d = maxOf(
+                            abs(a.alpha - c.alpha),
+                            abs(a.red - c.red),
+                            abs(a.green - c.green),
+                            abs(a.blue - c.blue),
+                        )
+                        if (d < bestD) {
+                            bestD = d
+                            best = c
+                        }
+                    }
+                }
+                best
+            }
             val d = maxOf(
                 abs(a.alpha - b.alpha),
                 abs(a.red - b.red),
@@ -346,6 +384,14 @@ internal fun parityStats(
  * into selection flips (displacement: trunc(scale*(ch-0.5)) flips the
  * sampled texel wherever the map sits within ±1 LSB of an integer
  * boundary, at a rate growing with |scale|).
+ * @param matchRadius when positive, each software pixel passes when ANY
+ * hardware pixel in its `(2 * matchRadius + 1)^2` window matches
+ * (shift-tolerant matching, 1 = 3x3). For edge-amplifying kernels
+ * (convolve edge-detect, morphology, blur halos) that turn ±1px
+ * base-scene rasterization differences into huge channel diffs. This
+ * blinds ≤1px geometry shifts — acceptable only where shift-sensitive
+ * unit coverage exists elsewhere (Round-B/C corpora); value errors
+ * still fail everywhere. Opt-in; 0 keeps exact matching.
  */
 internal fun assertParity(
     name: String,
@@ -357,9 +403,10 @@ internal fun assertParity(
     premultiplyReference: Boolean = false,
     ignoreTransparent: Boolean = false,
     translucentQuantK: Int = 0,
+    matchRadius: Int = 0,
 ) {
     val reference = if (premultiplyReference) premultipliedCopy(sw) else sw
-    val stats = parityStats(reference, hw, ignoreBoundaryFringe, ignoreTransparent, translucentQuantK)
+    val stats = parityStats(reference, hw, ignoreBoundaryFringe, ignoreTransparent, translucentQuantK, matchRadius)
     val outlierRatio = stats.outlierCount.toDouble() / stats.total
     // With the alpha-scaled bound active, the raw maxAbs is dominated by
     // unrepresentable low-alpha levels; the bound-exceeding pixels are the

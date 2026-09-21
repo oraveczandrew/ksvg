@@ -286,6 +286,24 @@ class GpuChainParityTest {
         )
     }
 
+    @Test
+    fun subregionColorMatrix() {
+        // C13: saturate-0 colormatrix confined to a user-space subregion —
+        // proves the uPrimitiveRegion guard (the Skia/AGSL paths used to
+        // ignore it; geometry_units precedent for blur). Premultiplied
+        // comparison for the antialiased rect fringe.
+        checkParity(
+            name = "chainC13",
+            svg = chainSvg(
+                """
+                <feColorMatrix in="SourceGraphic" type="saturate" values="0" x="48" y="48" width="100" height="100"/>
+                """.trimIndent(),
+                filterAttrs = """ primitiveUnits="userSpaceOnUse"""",
+            ),
+            premultiplyReference = true,
+        )
+    }
+
     private fun checkParity(
         name: String,
         svg: String,

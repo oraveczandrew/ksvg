@@ -1,0 +1,17 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -->
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="mix" filterUnits="userSpaceOnUse" x="0" y="0" width="240" height="220">
+      <feImage href="#source" result="img"/>
+      <feBlend in="SourceGraphic" in2="img" mode="screen"/>
+    </filter>
+    <circle id="source" cx="120" cy="100" r="55" fill="gold"/>
+  </defs>
+  <rect x="0" y="0" width="240" height="180" fill="midnightblue"/>
+  <circle cx="120" cy="100" r="70" fill="tomato" filter="url(#mix)"/>
+</svg>

@@ -1,0 +1,55 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
+    </filter>
+    <filter id="gray">
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <filter id="cm" x="-20%" y="-20%" width="140%" height="140%">
+      <feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 1 0"/>
+    </filter>
+    <filter id="morph" x="-20%" y="-20%" width="140%" height="140%">
+      <feMorphology in="SourceGraphic" operator="dilate" radius="3"/>
+    </filter>
+    <filter id="offset">
+      <feOffset in="SourceGraphic" dx="10" dy="10" result="off"/>
+      <feFlood flood-color="black" flood-opacity="0.4" result="fl"/>
+      <feComposite in="fl" in2="off" operator="in" result="sh"/>
+      <feMerge>
+        <feMergeNode in="sh"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="blend" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.1" numOctaves="2" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red"/>
+      <feBlend in="SourceGraphic" in2="red" mode="multiply"/>
+    </filter>
+    <filter id="ct" x="-20%" y="-20%" width="140%" height="140%">
+      <feComponentTransfer>
+        <feFuncR type="linear" slope="0.5"/>
+        <feFuncG type="linear" slope="1.5"/>
+      </feComponentTransfer>
+    </filter>
+    <filter id="disp" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="20"/>
+    </filter>
+    <filter id="light" x="0" y="0" width="100%" height="100%">
+      <feTurbulence baseFrequency="0.04" numOctaves="1" result="n"/>
+      <feDiffuseLighting in="n" surfaceScale="4" diffuseConstant="1" lighting-color="white">
+        <feDistantLight azimuth="45" elevation="55"/>
+      </feDiffuseLighting>
+    </filter>
+  </defs>
+  <rect x="10" y="10" width="50" height="50" fill="red" filter="url(#blur)"/>
+  <rect x="80" y="10" width="50" height="50" fill="green" filter="url(#gray)"/>
+  <rect x="150" y="10" width="50" height="50" fill="blue" filter="url(#cm)"/>
+  <rect x="10" y="80" width="50" height="50" fill="orange" filter="url(#morph)"/>
+  <rect x="80" y="80" width="50" height="50" fill="purple" filter="url(#offset)"/>
+  <rect x="150" y="80" width="50" height="50" fill="cyan" filter="url(#blend)"/>
+  <rect x="10" y="150" width="50" height="50" fill="magenta" filter="url(#ct)"/>
+  <rect x="80" y="150" width="50" height="50" fill="lime" filter="url(#disp)"/>
+  <rect x="150" y="150" width="50" height="50" fill="yellow" filter="url(#light)"/>
+</svg>

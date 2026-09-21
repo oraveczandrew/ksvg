@@ -71,8 +71,9 @@ import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.filters.LightVector
 import hu.oandras.ksvg.render.filters.NormalVector
-import hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31
 import hu.oandras.ksvg.render.filters.pipeline.FilterPrimitiveSet
+import hu.oandras.ksvg.render.filters.pipeline.GpuFilterSlot
+import androidx.collection.ArrayMap
 import hu.oandras.ksvg.render.pool.BitmapPool
 import hu.oandras.ksvg.render.pool.FloatArrayBucket
 import hu.oandras.ksvg.render.pool.IntArrayBucket
@@ -577,27 +578,14 @@ internal class FilterRenderNode(
     @JvmField val primitives: List<FilterPrimitiveRenderNode<*>>
 ) {
     // GPU fast-path state (touched only on hardware canvases, API 31+).
-    @JvmField var gpuNode: android.graphics.RenderNode? = null
-    @JvmField var gpuSourceVersion: Int = -1
-    @JvmField var gpuFilterVersion: Int = -1
-    @JvmField var gpuScaleX: Float = 0f
-    @JvmField var gpuScaleY: Float = 0f
-    @JvmField var gpuWidth: Int = 0
-    @JvmField var gpuHeight: Int = 0
-    @JvmField var gpuPadX: Int = 0
-    @JvmField var gpuPadY: Int = 0
-    // The CTM captured when the source display list was recorded. Content and
-    // matrix are baked into the display list, so either changing invalidates
-    // it (e.g. an animated transform must force a re-record every frame).
-    @JvmField var gpuSourceMatrix: Matrix? = null
-    // Built effect chain cache: depends on the filter's attributes (version)
-    // and the primitive scales, not on the rendered content.
-    @JvmField var gpuChain: FilterPipelineImpl31.Chain? = null
-    @JvmField var gpuChainVersion: Int = -1
-    @JvmField var gpuChainScaleX: Float = 0f
-    @JvmField var gpuChainScaleY: Float = 0f
-    @JvmField var gpuChainDeviceLeft: Float = 0f
-    @JvmField var gpuChainDeviceTop: Float = 0f
+    // Per ELEMENT, not per filter: several elements may share one filter
+    // node, and each needs its own source recording + effect chain (a single
+    // shared slot makes all but the last element draw the last one's
+    // content on deferred HW canvases — endpoint filters.svg precedent).
+    // Entries die with the filter node; the key set is bounded by the
+    // elements referencing the filter.
+    @JvmField
+    val gpuSlots: ArrayMap<RenderNode<*>, GpuFilterSlot> = ArrayMap()
     @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
     @JvmField val renderState: RendererState = RendererState()
 

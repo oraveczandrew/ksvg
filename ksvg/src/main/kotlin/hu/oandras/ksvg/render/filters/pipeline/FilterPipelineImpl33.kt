@@ -215,6 +215,18 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
                     when (primitive) {
                         is FeOffsetRenderNode -> {
+                            // Skia offset ignores the primitive subregion (no
+                            // region guard on this path): an explicit
+                            // x/y/width/height would silently shift the whole
+                            // input (endpoint geometry_units precedent for the
+                            // Skia blur). Decline so software renders the clip
+                            // instead.
+                            val offsetElement = primitive.sourceElement
+                            if (offsetElement.x != null || offsetElement.y != null ||
+                                offsetElement.width != null || offsetElement.height != null
+                            ) {
+                                return null
+                            }
                             val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
                             val dx = filterPrimitiveLengthX(
                                 length = primitive.sourceElement.dx,
@@ -238,6 +250,17 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         }
 
                         is FeGaussianBlurRenderNode -> {
+                            // Skia blur ignores the primitive subregion (no
+                            // region guard on this path): an explicit
+                            // x/y/width/height would silently blur the whole
+                            // input (endpoint geometry_units precedent).
+                            // Decline so software renders the clip instead.
+                            val blurElement = primitive.sourceElement
+                            if (blurElement.x != null || blurElement.y != null ||
+                                blurElement.width != null || blurElement.height != null
+                            ) {
+                                return null
+                            }
                             val sigmaX = primitive.stdDeviationX * scaleX
                             val sigmaY = primitive.stdDeviationY * scaleY
                             if (sigmaX <= 0f && sigmaY <= 0f) {
@@ -299,7 +322,18 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         is FeColorMatrixRenderNode -> {
                             val colorMatrix = primitive.sourceElement
                             val matrix = buildColorMatrix(colorMatrix.type, colorMatrix.values)
-                            val (shader, colorMatrixEffect) = createColorMatrixShaderEffect(matrix.array, "uInput")
+                            // Map to buffer space: (user - filterRegion.left) * sx + padX
+                            // (the CPU kernel writes the clip only).
+                            primitiveRegion.set(
+                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
+                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
+                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
+                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                            )
+
+                            val (shader, colorMatrixEffect) = createColorMatrixShaderEffect(
+                                matrix.array, primitiveRegion, "uInput",
+                            )
                             trackRawShader(shader, resultName, input, previousResult, first, generative = false)
                             colorMatrixEffect.chainWith(inputEffect)
                         }
@@ -776,11 +810,13 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         boundingBox: Box,
         state: RendererState,
     ) {
-        var chain = filterNode.gpuChain ?: return
+        val slot = filterNode.gpuSlotFor(node)
+        var chain = slot.gpuChain ?: return
         if (chain.deviceLeft != deviceRegion.left || chain.deviceTop != deviceRegion.top) {
             // Screen position changed (e.g. scroll): re-create chain to update absolute uniforms.
             with(renderContext) {
                 chain = tryBuildChain(
+                    element = node,
                     filterNode = filterNode,
                     scaleX = sx,
                     scaleY = sy,
@@ -793,7 +829,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
             }
         }
 
-        val gpuNode = filterNode.gpuNode ?: return
+        val gpuNode = slot.gpuNode ?: return
         gpuNode.setRenderEffect(chain.effect)
         canvas.withSave {
             @Suppress("DEPRECATION")

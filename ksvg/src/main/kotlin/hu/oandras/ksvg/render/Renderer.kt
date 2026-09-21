@@ -1024,7 +1024,7 @@ internal class Renderer internal constructor(
                             val width = deviceRegion.width().ceilToInt()
                             val height = deviceRegion.height().ceilToInt()
 
-                            val backend = obtainFilterBackend(canvas, filterNode, sx, sy, region, deviceRegion, boundingBox)
+                            val backend = obtainFilterBackend(canvas, node, filterNode, sx, sy, region, deviceRegion, boundingBox)
                             val recCanvas = backend.beginRecording(
                                 node = node,
                                 filterNode = filterNode,
@@ -1215,6 +1215,7 @@ internal class Renderer internal constructor(
 
     private fun obtainFilterBackend(
         canvas: Canvas,
+        element: RenderNode<*>,
         filterNode: FilterRenderNode,
         sx: Float,
         sy: Float,
@@ -1255,6 +1256,7 @@ internal class Renderer internal constructor(
                     // Specific check for Impl31/33 linear chains + attributes.
                     val supported = when (gpu) {
                         is FilterPipelineImpl31 -> gpu.tryBuildChain(
+                            element = element,
                             filterNode = filterNode,
                             scaleX = pScaleX,
                             scaleY = pScaleY,

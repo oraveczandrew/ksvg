@@ -1,0 +1,14 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -->
+<svg width="240" height="220" viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="edge" x="-20%" y="-20%" width="140%" height="140%">
+      <feConvolveMatrix in="SourceGraphic" order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" divisor="1" bias="0" targetX="1" targetY="1" edgeMode="duplicate" preserveAlpha="true"/>
+    </filter>
+  </defs>
+  <rect x="35" y="35" width="170" height="120" rx="18" fill="salmon" filter="url(#edge)"/>
+</svg>
