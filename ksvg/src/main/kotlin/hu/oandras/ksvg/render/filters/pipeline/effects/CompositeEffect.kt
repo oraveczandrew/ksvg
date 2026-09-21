@@ -49,7 +49,14 @@ private const val COMPOSITE_SHADER: String = """
                 if (uOperator == 3) return half4(src * dst.a + dst * (1.0 - src.a));
                 if (uOperator == 4) return half4(src * (1.0 - dst.a) + dst * (1.0 - src.a));
                 if (uOperator == 5) {
-                    float4 res = uK.x * dst * src + uK.y * src + uK.z * dst + uK.w;
+                    // The k-polynomial is straight math (like colorMatrix/
+                    // componentTransfer/morphology taps): unpremultiply the
+                    // premultiplied chain taps first. Under transparent
+                    // pixels straight is 0 (the CPU getPixels contract);
+                    // alpha is alpha in both spaces, carried through.
+                    float4 s = float4(src.a > 0.0 ? src.rgb / src.a : float3(0.0), src.a);
+                    float4 t = float4(dst.a > 0.0 ? dst.rgb / dst.a : float3(0.0), dst.a);
+                    float4 res = uK.x * t * s + uK.y * s + uK.z * t + uK.w;
                     res = clamp(res, 0.0, 1.0);
                     // Match the CPU reference display: it computes straight
                     // channel values and premultiplies on store, so the

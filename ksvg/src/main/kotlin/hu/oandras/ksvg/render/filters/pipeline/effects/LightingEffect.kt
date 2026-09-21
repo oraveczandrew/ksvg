@@ -182,7 +182,13 @@ private const val LIGHTING_SHADER: String = """
                 a = max(max(color.r, color.g), color.b);
             }
 
-            return half4(color, a);
+            // Premultiplied chain convention (morphology-kdoc): the CPU
+            // kernel stores straight (color, peak) through premultiplied
+            // Bitmap storage, so downstream getPixels reads see straight.
+            // Emit premultiplied here to match (the diffuse a=1.0 case is
+            // unaffected; the terminal-specular early return above keeps
+            // the special (lightColor, intensity) form).
+            return half4(color * a, a);
         }
         """
 
