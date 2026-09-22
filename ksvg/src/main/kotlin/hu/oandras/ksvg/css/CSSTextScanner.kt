@@ -240,11 +240,11 @@ internal class CSSTextScanner(input: String) : TextScanner(
         skipWhitespace()
 
         val result = when {
-            consume("odd") -> {
+            consumeIgnoreCase("odd") -> {
                 AnPlusB(2, 1)
             }
 
-            consume("even") -> {
+            consumeIgnoreCase("even") -> {
                 AnPlusB(2, 0)
             }
 
@@ -596,7 +596,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
     fun nextURL(): String? {
         if (empty()) return null
         val start = position
-        if (!consume("url(")) return null
+        if (!consumeIgnoreCase("url(")) return null
 
         skipWhitespace()
 

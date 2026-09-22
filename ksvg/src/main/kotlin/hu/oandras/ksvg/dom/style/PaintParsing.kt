@@ -43,7 +43,7 @@ internal fun parsePaintSpecifier(valueParam: String): SvgPaint {
     if (trimmed.equals("context-fill", ignoreCase = true)) return ContextFill
 
     var value = valueParam
-    return if (value.startsWith("url(")) {
+    return if (value.startsWith("url(", ignoreCase = true)) {
         val closeBracket = value.indexOf(')')
         if (closeBracket != -1) {
             val href = value.substring(4, closeBracket).trimLowerThanSpace()

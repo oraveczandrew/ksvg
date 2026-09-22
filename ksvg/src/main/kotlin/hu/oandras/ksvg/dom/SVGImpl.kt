@@ -47,17 +47,16 @@ import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.Svg
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.core.View
-import hu.oandras.ksvg.dom.text.A
 import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.parser.SVGParser
 import hu.oandras.ksvg.parser.SVGParserImpl
 import hu.oandras.ksvg.parser.parseLength
-import hu.oandras.ksvg.render.GroupRenderNode
 import hu.oandras.ksvg.render.PathConverter
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.render.RenderScene
 import hu.oandras.ksvg.render.Renderer
+import hu.oandras.ksvg.render.collectHitRegions
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
 import java.io.ByteArrayInputStream
@@ -156,7 +155,7 @@ internal class SVGImpl internal constructor(
         }
 
         val regions = mutableListOf<HitRegion>()
-        collectHitRegionsRecursive(node, regions)
+        collectHitRegions(node, regions)
 
         val rootTransform = node.transform
         if (rootTransform != null) {
@@ -169,31 +168,6 @@ internal class SVGImpl internal constructor(
         }
 
         hitRegions = regions
-    }
-
-    private fun collectHitRegionsRecursive(
-        node: RenderNode<*>,
-        regions: MutableList<HitRegion>
-    ) {
-        if (node is GroupRenderNode<*>) {
-            val sourceElement = node.sourceElement
-            if (sourceElement is A) {
-                val a: A = sourceElement
-                val href = a.href
-                if (href != null) {
-                    val bb = node.boundingBox
-                    if (bb != null) {
-                        regions.add(HitRegion(href, bb.toRectF()))
-                    }
-                }
-            }
-        }
-
-        if (node is GroupRenderNode<*>) {
-            node.children.forEachElement { child ->
-                collectHitRegionsRecursive(child, regions)
-            }
-        }
     }
 
     /**

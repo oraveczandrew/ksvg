@@ -1416,7 +1416,7 @@ internal class SVGParserImpl(
 
         attributes.forEachKeyValue { _, attr, value ->
             when (attr) {
-                SVGAttr.type -> isTextCSS = value == CSSParser.CSS_MIME_TYPE
+                SVGAttr.type -> isTextCSS = value.equals(CSSParser.CSS_MIME_TYPE, ignoreCase = true)
                 SVGAttr.media -> media = value
                 else -> {}
             }

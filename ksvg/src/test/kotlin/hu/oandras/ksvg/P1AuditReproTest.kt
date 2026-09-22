@@ -164,6 +164,66 @@ class P1AuditReproTest {
     }
 
     @Test
+    fun uppercaseUrlPaintReferenceResolves() {
+        val svg = SVG.getFromString(
+            svg = """
+                <svg width="100" height="100" viewBox="0 0 100 100">
+                  <defs>
+                    <linearGradient id="g">
+                      <stop offset="0%" stop-color="red"/>
+                      <stop offset="100%" stop-color="blue"/>
+                    </linearGradient>
+                  </defs>
+                  <rect width="100" height="100" fill="URL(#g)"/>
+                </svg>
+            """.trimIndent()
+        ) as SVGImpl
+
+        // Uppercase URL( must resolve the gradient (midpoint is purple).
+        // (Before the fix the paint fell back to black.)
+        val mid = drawAt(svg, 0L)
+        assertTrue("expected purple midpoint, got r=${mid.red} b=${mid.blue}", mid.red > 80 && mid.blue > 80)
+    }
+
+    @Test
+    fun uppercaseNthChildOddMatches() {
+        val svg = SVG.getFromString(
+            svg = """
+                <svg width="100" height="100" viewBox="0 0 100 100">
+                  <style>rect:nth-child(ODD) { fill: blue; }</style>
+                  <rect x="0" y="0" width="50" height="100" fill="red"/>
+                  <rect x="50" y="0" width="50" height="100" fill="red"/>
+                </svg>
+            """.trimIndent()
+        ) as SVGImpl
+
+        val drawable = KSVGDrawable(svg)
+        val bitmap = createBitmap(100, 100)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, 100, 100)
+        drawable.draw(canvas)
+
+        // First rect matches :nth-child(ODD) -> blue; second stays red.
+        assertEquals(255, bitmap.getPixel(25, 50).blue)
+        assertEquals(255, bitmap.getPixel(75, 50).red)
+    }
+
+    @Test
+    fun uppercaseDegHueParses() {
+        val svg = SVG.getFromString(
+            svg = """
+                <svg width="100" height="100" viewBox="0 0 100 100">
+                  <rect width="100" height="100" fill="hsl(120DEG 100% 50%)"/>
+                </svg>
+            """.trimIndent()
+        ) as SVGImpl
+
+        // hsl(120deg) is pure green.
+        val px = drawAt(svg, 0L)
+        assertEquals(255, px.green)
+    }
+
+    @Test
     fun uppercaseImportantDoesNotDropRestOfStylesheet() {
         val svg = SVG.getFromString(
             svg = """

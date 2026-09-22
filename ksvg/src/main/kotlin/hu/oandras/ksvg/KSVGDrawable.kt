@@ -22,14 +22,11 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import hu.oandras.ksvg.dom.SVGImpl
-import hu.oandras.ksvg.dom.text.A
-import hu.oandras.ksvg.render.GroupRenderNode
-import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.render.RenderScene
 import hu.oandras.ksvg.render.Renderer
+import hu.oandras.ksvg.render.collectHitRegions
 import hu.oandras.ksvg.render.pool.PoolOwner
-import hu.oandras.ksvg.utils.forEachElement
 
 /**
  * A [Drawable] backed by an [SVG] document.
@@ -240,7 +237,7 @@ public open class KSVGDrawable @JvmOverloads public constructor(
 
 
         val regions = mutableListOf<HitRegion>()
-        collectHitRegionsRecursive(node, regions)
+        collectHitRegions(node, regions)
 
         val rootTransform = node.transform
         if (rootTransform != null) {
@@ -258,26 +255,6 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         }
 
         hitRegions = regions
-    }
-
-    private fun collectHitRegionsRecursive(
-        node: RenderNode<*>,
-        regions: MutableList<HitRegion>
-    ) {
-        if (node is GroupRenderNode<*> && node.sourceElement is A) {
-            val href = node.sourceElement.href
-            if (href != null) {
-                val bb = node.boundingBox
-                if (bb != null) {
-                    regions.add(HitRegion(href, bb.toRectF()))
-                }
-            }
-        }
-        if (node is GroupRenderNode<*>) {
-            node.children.forEachElement { child ->
-                collectHitRegionsRecursive(child, regions)
-            }
-        }
     }
 
     private fun validatedDocumentSize(reportedSize: Float): Int {

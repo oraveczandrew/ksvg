@@ -187,7 +187,7 @@ internal abstract class ElementBase(
                 if (scan.consume('!')) {
                     scan.skipWhitespace()
                     // Be forgiving about malformed '!important' in inline styles.
-                    important = scan.consume("important")
+                    important = scan.consumeIgnoreCase("important")
                     scan.skipWhitespace()
                 }
                 if (scan.empty() || scan.consume(';')) {

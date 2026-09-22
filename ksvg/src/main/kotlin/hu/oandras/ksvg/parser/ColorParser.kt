@@ -115,7 +115,7 @@ internal object ColorParser {
 
                 val hue = scan.nextFloat()
                 require(!hue.isNaN()) { "Invalid hue component in hsl color: $value" }
-                scan.consume("deg") // Optional units
+                scan.consumeIgnoreCase("deg") // Optional units
 
                 // If there is a comma, then it is the "legacy" format: rgb(r, g, b, a?).
                 // Otherwise, we assume it is the new format: rgb[a?](r g b / a?).

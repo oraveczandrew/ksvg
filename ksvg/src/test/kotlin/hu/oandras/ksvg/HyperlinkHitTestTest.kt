@@ -180,6 +180,71 @@ class HyperlinkHitTestTest {
     }
 
     @Test
+    fun hitTest_nestedGroupTransform_regionFollowsTransform() {
+        val svg = renderSvg(
+            """
+                <svg width="200" height="200">
+                  <g transform="translate(50, 0)">
+                    <a href="https://example.com">
+                      <rect x="10" y="10" width="100" height="50" fill="red"/>
+                    </a>
+                  </g>
+                </svg>
+            """.trimIndent()
+        )
+        val regions = svg.getHitRegions()
+        assertEquals(1, regions.size)
+        val bounds = regions[0].bounds
+        assertEquals(60f, bounds.left, 0.5f)
+        assertEquals(10f, bounds.top, 0.5f)
+        assertEquals(160f, bounds.right, 0.5f)
+        assertEquals(60f, bounds.bottom, 0.5f)
+
+        // Inside the translated rect -> hit; old untranslated position -> miss.
+        assertEquals("https://example.com", svg.hitTest(110f, 25f))
+        assertNull(svg.hitTest(20f, 25f))
+    }
+
+    @Test
+    fun hitTest_nestedTransformsOnAnchorItself() {
+        val svg = renderSvg(
+            """
+                <svg width="200" height="200">
+                  <a href="https://example.com" transform="translate(0, 100)">
+                    <rect x="10" y="10" width="100" height="50" fill="red"/>
+                  </a>
+                </svg>
+            """.trimIndent()
+        )
+        val regions = svg.getHitRegions()
+        assertEquals(1, regions.size)
+        assertEquals("https://example.com", svg.hitTest(50f, 125f))
+        assertNull(svg.hitTest(50f, 25f))
+    }
+
+    @Test
+    fun hitTest_useInstance_regionFollowsInstanceTransform() {
+        val svg = renderSvg(
+            """
+                <svg width="200" height="200">
+                  <defs>
+                    <rect id="r" x="10" y="10" width="100" height="50" fill="red"/>
+                  </defs>
+                  <a href="https://example.com">
+                    <use href="#r" x="50" y="0"/>
+                  </a>
+                </svg>
+            """.trimIndent()
+        )
+        val regions = svg.getHitRegions()
+        assertEquals(1, regions.size)
+        val bounds = regions[0].bounds
+        assertEquals(60f, bounds.left, 0.5f)
+        assertEquals(160f, bounds.right, 0.5f)
+        assertEquals("https://example.com", svg.hitTest(110f, 25f))
+    }
+
+    @Test
     fun hitTest_regionBoundsAreCorrect() {
         val svg = renderSvg(
             """

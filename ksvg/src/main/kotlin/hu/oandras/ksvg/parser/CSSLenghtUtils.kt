@@ -88,7 +88,7 @@ internal fun parseLengthList(value: String): List<CSSLength> {
 }
 
 internal fun parseLengthOrAuto(scan: TextScanner): CSSLength {
-    return if (scan.consume("auto")) {
+    return if (scan.consumeIgnoreCase("auto")) {
         CSSLength.ZERO
     } else {
         scan.nextLength() ?: CSSLength.ZERO

@@ -18,6 +18,7 @@
 package hu.oandras.ksvg.css
 
 import android.util.ArrayMap
+import java.util.Locale
 
 // Supported SVG attributes
 @Suppress("EnumEntryName")
@@ -67,7 +68,8 @@ internal enum class PseudoClassIdentifiers {
 
         @JvmStatic
         fun fromString(str: String?): PseudoClassIdentifiers {
-            return cache[str] ?: UNSUPPORTED
+            // CSS pseudo-classes are ASCII case-insensitive.
+            return cache[str?.lowercase(Locale.US)] ?: UNSUPPORTED
         }
     }
 }

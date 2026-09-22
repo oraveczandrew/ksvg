@@ -209,7 +209,7 @@ internal data class CSSFontVariationSettings private constructor(
             val scan = TextScanner(value)
             scan.skipWhitespace()
 
-            if (scan.consume(NORMAL)) {
+            if (scan.consumeIgnoreCase(NORMAL)) {
                 return null
             }
 
