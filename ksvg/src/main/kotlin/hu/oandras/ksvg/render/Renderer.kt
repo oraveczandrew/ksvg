@@ -1823,6 +1823,28 @@ internal class Renderer internal constructor(
                     return
                 }
 
+                // Straight-space correction (F2): the platform lerps
+                // premultiplied, which diverges from straight (spec/rsvg)
+                // when stop alphas differ. Subdivide into dense
+                // straight-lerped stops; uniform-alpha gradients keep the
+                // exact existing arrays (colorsChanged() still hashes the
+                // straight stops, so shader caching is untouched).
+                val effColors: IntArray
+                val effPositions: FloatArray
+                if (needsDensify(colors, numStops)) {
+                    val m = denseCount(numStops)
+                    if (resolved.denseColors.size != m) {
+                        resolved.denseColors = IntArray(m)
+                        resolved.densePositions = FloatArray(m)
+                    }
+                    densifyStops(colors, positions, numStops, resolved.denseColors, resolved.densePositions)
+                    effColors = resolved.denseColors
+                    effPositions = resolved.densePositions
+                } else {
+                    effColors = colors
+                    effPositions = positions
+                }
+
                 // Convert spreadMethod->TileMode
                 val tileMode: TileMode = when (gradient.spreadMethod) {
                     GradientSpread.reflect -> TileMode.MIRROR
@@ -1837,7 +1859,7 @@ internal class Renderer internal constructor(
                     prevGradient == null ||
                     resolved.colorsChanged()
                 ) {
-                    LinearGradient(_x1, _y1, _x2, _y2, colors, positions, tileMode).also {
+                    LinearGradient(_x1, _y1, _x2, _y2, effColors, effPositions, tileMode).also {
                         resolved.shader = it
                         resolved.markColorsClean()
                     }
@@ -1943,8 +1965,10 @@ internal class Renderer internal constructor(
                         GradientColorArray.Ints(IntArray(numStops))
                     }
                     resolved.positions = FloatArray(numStops)
+                    resolved.straightColors = IntArray(numStops)
                 }
                 val colors = resolved.colors!!
+                val straightColors = resolved.straightColors
                 val positions = resolved.positions
                 var lastOffset = -1f
                 for (i in 0 until numStops) {
@@ -1967,7 +1991,9 @@ internal class Renderer internal constructor(
                             val style = builder.build()
                             st5.style = style
                             val col = style.stopColor as ColorValue? ?: ColorValue.BLACK
-                            colors[i] = col.value.colorWithOpacity(style.stopOpacity)
+                            val stopColor = col.value.colorWithOpacity(style.stopOpacity)
+                            colors.set(i, stopColor)
+                            straightColors[i] = stopColor
                         }
                     }
                 }
@@ -1976,6 +2002,41 @@ internal class Renderer internal constructor(
                 if (_r == 0f || numStops == 1) {
                     colors.setOnPaint(paint, numStops - 1)
                     return
+                }
+
+                // Straight-space correction (F2): like the linear path, but
+                // the write-only GradientColorArray cannot feed expansion —
+                // densify from the straight mirror into flavor-matched dense
+                // storage (extra pack pass, no allocation).
+                val effColors: GradientColorArray
+                val effPositions: FloatArray
+                if (needsDensify(straightColors, numStops)) {
+                    val m = denseCount(numStops)
+                    var dense = resolved.denseColors
+                    if (dense == null || dense.size != m) {
+                        dense = if (SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS) {
+                            GradientColorArray.Longs(LongArray(m))
+                        } else {
+                            GradientColorArray.Ints(IntArray(m))
+                        }
+                        resolved.denseColors = dense
+                        resolved.densePositions = FloatArray(m)
+                    }
+                    if (resolved.denseInts.size != m) {
+                        resolved.denseInts = IntArray(m)
+                    }
+                    densifyStops(
+                        straightColors, positions, numStops,
+                        resolved.denseInts, resolved.densePositions,
+                    )
+                    for (i in 0 until m) {
+                        dense.set(i, resolved.denseInts[i])
+                    }
+                    effColors = dense
+                    effPositions = resolved.densePositions
+                } else {
+                    effColors = colors
+                    effPositions = positions
                 }
 
                 // Convert spreadMethod->TileMode
@@ -1992,7 +2053,7 @@ internal class Renderer internal constructor(
                     prevGradient == null ||
                     resolved.colorsChanged()
                 ) {
-                    when (colors) {
+                    when (effColors) {
                         is GradientColorArray.Longs -> {
                             @Suppress("NewApi")
                             RadialGradient(
@@ -2002,8 +2063,8 @@ internal class Renderer internal constructor(
                                 /* endX = */ _cx,
                                 /* endY = */ _cy,
                                 /* endRadius = */ _r,
-                                /* colors = */ colors.array,
-                                /* stops = */ positions,
+                                /* colors = */ effColors.array,
+                                /* stops = */ effPositions,
                                 /* tileMode = */ tileMode
                             )
                         }
@@ -2013,8 +2074,8 @@ internal class Renderer internal constructor(
                                 /* centerX = */ _cx,
                                 /* centerY = */ _cy,
                                 /* radius = */ _r,
-                                /* colors = */ colors.array,
-                                /* stops = */ positions,
+                                /* colors = */ effColors.array,
+                                /* stops = */ effPositions,
                                 /* tileMode = */ tileMode
                             )
                         }
