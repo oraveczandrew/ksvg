@@ -641,6 +641,9 @@ internal class SoftwareFilterBackend internal constructor(
                     inputBitmap = inputBitmap,
                     canvasScaleX = canvasScaleX,
                     canvasScaleY = canvasScaleY,
+                    filterRegionLeft = filterRegion.left,
+                    filterRegionTop = filterRegion.top,
+                    primitiveRegion = primitiveRegion,
                 )
             }
 

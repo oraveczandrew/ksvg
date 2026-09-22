@@ -67,8 +67,8 @@ private const val IMAGE_SHADER: String = """
  * The primitive is generative (ignores its input): the caller registers
  * the shader but does NOT chain the effect. Returns null when there is no
  * decoded bitmap (missing file, unresolvable href — including element
- * references, whose `referencedNode` the CPU backend leaves unrasterized
- * too): the caller declines so software renders instead.
+ * references, whose `referencedNode` only the CPU backend rasterizes
+ * (F10)): the caller declines so software renders instead.
  *
  * @param node the image render node (decoded bitmap)
  * @param padX padY the device-space padding of the filter region top-left

@@ -673,9 +673,14 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                         is FeImageRenderNode -> {
                             // Raster feImage only (F8): element references
-                            // (`referencedNode`) have no decoded bitmap — the
-                            // CPU backend leaves them unrasterized too — so
+                            // (`referencedNode`) have no decoded bitmap — only
+                            // the CPU backend rasterizes them (F10) — so
                             // decline and let software render instead.
+                            // Pre-rasterizing into a BitmapShader input is
+                            // deliberately NOT done: chains are cached per
+                            // element slot across frames, so baked content
+                            // would go stale (and freeze animations inside
+                            // the referenced subtree).
                             val (shader, imageEffect) = createImageShaderEffect(
                                 primitive,
                                 totalPadX,

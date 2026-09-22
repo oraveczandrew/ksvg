@@ -53,6 +53,19 @@ class RenderBugFixesTest {
     }
 
     @Test
+    fun feImageElementReferenceHonorsPrimitiveSubregion() {
+        // The feImage subregion is disjoint from the referenced circle: the img
+        // result must be fully transparent, so no gold may appear. Together with
+        // feImageRendersElementReference (full-region clip renders gold) this pins
+        // both directions of the subregion clip.
+        val bitmap = renderFixture("filter_feImage_subregion.svg")
+        val gold = countPixels(bitmap) { c ->
+            c.red > 200 && c.green > 150 && c.blue < 120
+        }
+        assertTrue("feImage outside its primitive subregion should render nothing, found $gold gold pixels", gold == 0)
+    }
+
+    @Test
     fun trefRendersWhenNotInsideText() {
         // A top-level <tref> must be wrapped in a synthetic text root and render.
         val bitmap = renderFixture("tref_basic.svg")

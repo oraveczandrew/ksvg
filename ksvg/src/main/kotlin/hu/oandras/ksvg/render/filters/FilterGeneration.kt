@@ -28,6 +28,7 @@ import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.FilterSourceMap
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.render.pool.withPooledObject
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -163,12 +164,43 @@ internal fun doFeDisplacementMapFilter(
 }
 
 @SuppressLint("UseKtx")
+context(renderContext: RenderContext)
 internal fun doFeImageFilter(
     primitiveNode: FeImageRenderNode,
     @Suppress("UNUSED_PARAMETER") inputBitmap: Bitmap,
     canvasScaleX: Float,
     canvasScaleY: Float,
+    // User-space filter-region origin: the output bitmap maps exactly onto
+    // the filter region, so referenced content (absolute user coords) is
+    // translated by -origin*scale before the device-scale.
+    filterRegionLeft: Float,
+    filterRegionTop: Float,
+    // Bitmap-pixel-space primitive subregion (relative to the region-sized
+    // output bitmap origin): element-reference content is intersect-clipped
+    // to it before rendering (F10b). The clip runs in device space, ahead of
+    // the user-space translate/scale below. The raster path intentionally
+    // stays unclipped (C20 precedent).
+    primitiveRegion: RectF,
 ): Bitmap {
+    val referencedNode = primitiveNode.referencedNode
+    if (referencedNode != null) {
+        // Element reference (e.g. `href="#source"`): render the referenced
+        // subtree into a region-sized bitmap (F10; restores the Aug-29 behavior
+        // dropped by the raster-only rewrite). `acquireSameAs` hands back a
+        // fully erased bitmap, so an empty subregion (empty clip) correctly
+        // yields transparent with no extra guard.
+        val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
+        renderContext.canvasPool.withPooledObject { c ->
+            c.setBitmap(res)
+            c.save()
+            c.clipRect(primitiveRegion)
+            c.translate(-filterRegionLeft * canvasScaleX, -filterRegionTop * canvasScaleY)
+            c.scale(canvasScaleX, canvasScaleY)
+            renderContext.renderNode(c, referencedNode)
+            c.restore()
+        }
+        return res
+    }
     val bitmap = primitiveNode.image ?: return createBitmap(1, 1)
     // feImage output size is determined by its primitive subregion, but the
     // source bitmap might be different size, so we scale by the canvas (device) scale.
