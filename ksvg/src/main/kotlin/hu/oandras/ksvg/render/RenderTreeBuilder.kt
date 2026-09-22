@@ -23,6 +23,7 @@ import android.graphics.Path
 import android.graphics.PathMeasure
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
+import androidx.collection.FloatList
 import androidx.collection.MutableFloatList
 import androidx.collection.MutableIntList
 import hu.oandras.ksvg.ExternalFileResolver
@@ -439,6 +440,26 @@ internal class RenderTreeBuilder(
         return list
     }
 
+    /**
+     * Identity keyframe for one `animateTransform` type, with pivot taken from
+     * [ref] for rotate. `to`-only / `by`-only animations resolve as delta ramps
+     * (identity → target) because the renderer composes animation transforms
+     * onto the base (`preConcat` in `updateAnimations`) — the same way
+     * from/to values already behave (see `animateTransformFreezesAtEnd`).
+     */
+    private fun identityTransformValues(type: TransformType, ref: FloatList): FloatArray {
+        return when (type) {
+            TransformType.translate -> floatArrayOf(0f, 0f)
+            TransformType.scale -> floatArrayOf(1f, 1f)
+            TransformType.rotate -> floatArrayOf(
+                0f,
+                if (ref.size > 1) ref[1] else 0f,
+                if (ref.size > 2) ref[2] else 0f
+            )
+            TransformType.skewX, TransformType.skewY -> floatArrayOf(0f)
+        }
+    }
+
     private fun buildAnimationNode(animation: Animation): AnimationNode? {
         if (!animation.isValid()) return null
 
@@ -493,6 +514,7 @@ internal class RenderTreeBuilder(
                     val fromVal = animation.from
                     val toVal = animation.to
                     val byVal = animation.by
+                    val discrete = animation.calcMode == CalcMode.discrete
                     when {
                         fromVal != null && toVal != null -> {
                             val list = MutableFloatList(stride * 2)
@@ -515,10 +537,37 @@ internal class RenderTreeBuilder(
                             list
                         }
 
+                        toVal != null && !discrete -> {
+                            val identity = identityTransformValues(animation.transformType, toVal)
+                            val list = MutableFloatList(stride * 2)
+                            for (i in 0 until stride) list.add(identity[i])
+                            for (i in 0 until stride) list.add(toVal[i])
+                            list
+                        }
+
+                        byVal != null && !discrete -> {
+                            val identity = identityTransformValues(animation.transformType, byVal)
+                            val list = MutableFloatList(stride * 2)
+                            for (i in 0 until stride) list.add(identity[i])
+                            for (i in 0 until stride) {
+                                // Scale composes multiplicatively: 1 → 1+by.
+                                val b = byVal[i]
+                                list.add(if (animation.transformType == TransformType.scale) identity[i] + b else b)
+                            }
+                            list
+                        }
+
                         toVal != null -> {
                             val list = MutableFloatList(stride * 2)
                             for (i in 0 until stride) list.add(toVal[i])
                             for (i in 0 until stride) list.add(toVal[i])
+                            list
+                        }
+
+                        byVal != null -> {
+                            val list = MutableFloatList(stride * 2)
+                            for (i in 0 until stride) list.add(byVal[i])
+                            for (i in 0 until stride) list.add(byVal[i])
                             list
                         }
 

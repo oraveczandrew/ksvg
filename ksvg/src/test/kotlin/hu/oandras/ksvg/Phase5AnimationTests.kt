@@ -84,8 +84,7 @@ class Phase5AnimationTests {
     // --- animateTransform with fill=freeze keeps the final transform ---
 
     @Test
-    fun animateTransformFreezesAtEnd() {
-        val svg = """
+    fun animateTransformFreezesAtEnd() {        val svg = """
             <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
               <g transform="translate(10,10)">
                 <rect x="0" y="0" width="40" height="40" fill="red">
@@ -104,6 +103,35 @@ class Phase5AnimationTests {
 
         val after = renderAt(svg, 200)
         assertTrue("Frozen transform must move the rect", isRed(after, 80, 80))
+        assertTrue(!isRed(after, 20, 20))
+    }
+
+    // --- animateTransform to-only resolves as a delta composed onto the base ---
+
+    @Test
+    fun animateTransformToOnlyAnimatesFromIdentity() {
+        val svg = """
+            <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+              <g transform="translate(10,10)">
+                <rect x="0" y="0" width="40" height="40" fill="red">
+                  <animateTransform attributeName="transform" type="translate"
+                                    to="50 50" begin="0s" dur="100ms"
+                                    fill="freeze"/>
+                </rect>
+              </g>
+            </svg>
+        """.trimIndent()
+
+        // t=0: identity delta -> base only, rect at (10..50).
+        val before = renderAt(svg, 0)
+        assertTrue(isRed(before, 30, 30))
+        assertTrue(!isRed(before, 80, 80))
+
+        // Frozen end: base + delta(50,50) -> occupies (60..100).
+        // (Before the fix the animation froze at `to` for the whole duration,
+        // so `before` already showed the rect at (60..100).)
+        val after = renderAt(svg, 200)
+        assertTrue("Frozen to-only transform must move the rect", isRed(after, 80, 80))
         assertTrue(!isRed(after, 20, 20))
     }
 

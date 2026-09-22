@@ -271,8 +271,8 @@ supported (`!important` itself is honored in the cascade).
 | [`repeatDur`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/repeatDur)         | Full    | Duration for repetition                      |
 | [`fill`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/fill)                   | Full    | `freeze`, `remove`                           |
 | [`from`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/from)                   | Full    | Start value                                  |
-| [`to`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/to)                       | Partial | End value (float attributes animate base → target; color/transform/path freeze at target) |
-| [`by`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/by)                       | Partial | Relative end value (float attributes only; color/transform/path ignore lone `by`) |
+| [`to`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/to)                       | Partial | End value (float/color/transform per SMIL; path/dasharray freeze at target) |
+| [`by`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/by)                       | Partial | Relative end value (float/color/transform only; path/dasharray ignore lone `by`) |
 | [`values`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/values)               | Full    | Semicolon-separated keyframes                |
 | [`keyTimes`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/keyTimes)           | Full    |                                              |
 | [`keySplines`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/keySplines)       | Full    | Bezier control points                        |
