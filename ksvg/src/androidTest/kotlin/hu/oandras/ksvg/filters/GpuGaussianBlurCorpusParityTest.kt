@@ -20,7 +20,7 @@ import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.GaussianBlurValidationCorpus
 import hu.oandras.ksvg.filtering.parity.GaussianBlurParitySvg
-import org.junit.Assume
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -45,7 +45,7 @@ class GpuGaussianBlurCorpusParityTest(
 
     @Test
     fun gaussianBlurCorpusParity() {
-        Assume.assumeTrue(
+        assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )

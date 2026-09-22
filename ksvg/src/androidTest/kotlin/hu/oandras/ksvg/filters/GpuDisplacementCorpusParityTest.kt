@@ -20,7 +20,8 @@ import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.DisplacementMapValidationCorpus
 import hu.oandras.ksvg.filtering.parity.DisplacementMapParitySvg
-import org.junit.Assume
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -53,14 +54,14 @@ class GpuDisplacementCorpusParityTest(
 
     @Test
     fun displacementCorpusParity() {
-        Assume.assumeTrue(
+        assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )
         // Round-A precedent: the native displacement kernel SIGILL-crashes
         // on x86 emulators (native-dispatch issue, not GPU). Physical ARM64
         // covers these cases.
-        Assume.assumeFalse(
+        assumeFalse(
             "x86 emulator: native displacement kernel SIGILL (see report §5)",
             Build.SUPPORTED_ABIS.any { it.startsWith("x86") },
         )
@@ -71,7 +72,15 @@ class GpuDisplacementCorpusParityTest(
         val name = "displacement:$caseName"
         val sw = renderSoftware(svg, case.width, case.height)
         if (case.scale != 0f) {
-            assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
+            assertVisibleFilterEffect(
+                name = name,
+                filtered = sw,
+                unfiltered = renderSoftware(
+                    svgString = corpusBaseline(svg),
+                    width = case.width,
+                    height = case.height
+                )
+            )
         }
         val hw = renderOnHardware(svg, case.width, case.height)
         // Per-case gates (Adreno CPH2449 measured 2026-09-21; flip rate
@@ -97,9 +106,9 @@ class GpuDisplacementCorpusParityTest(
             else -> 4 to 0.85
         }
         assertParity(
-            "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-            sw,
-            hw,
+            name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
+            sw = sw,
+            hw = hw,
             maxAbsTol = maxAbsTol,
             maxOutlierRatio = maxOutlierRatio,
             // Premultiplied-space comparison (see class kdoc): the chain

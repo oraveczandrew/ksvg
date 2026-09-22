@@ -22,7 +22,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.TurbulenceValidationCorpus
 import hu.oandras.ksvg.filtering.UnLinearizeValidationCorpus
 import hu.oandras.ksvg.filtering.parity.TurbulenceParitySvg
-import org.junit.Assume
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -66,7 +66,7 @@ class GpuTurbulenceCorpusParityTest(
 
     @Test
     fun turbulenceCorpusParity() {
-        Assume.assumeTrue(
+        assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )
@@ -80,17 +80,21 @@ class GpuTurbulenceCorpusParityTest(
         )
         val name = "turbulence:$caseName"
         val sw = renderSoftware(svg, case.width, case.height)
-        assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
+        assertVisibleFilterEffect(
+            name = name,
+            filtered = sw,
+            unfiltered = renderSoftware(corpusBaseline(svg), case.width, case.height)
+        )
         val hw = renderOnHardware(svg, case.width, case.height)
         if (case.periodX == 0 && case.periodY == 0) {
             val golden = loadGoldenAsset(
-                "parity/turbulence/" + caseName.replace(Regex("[^A-Za-z0-9]+"), "_") + ".png",
-                Bitmap.createBitmap(case.width, case.height, Bitmap.Config.ARGB_8888),
+                assetPath = "parity/turbulence/" + caseName.replace(Regex("[^A-Za-z0-9]+"), "_") + ".png",
+                outBitmap = Bitmap.createBitmap(case.width, case.height, Bitmap.Config.ARGB_8888),
             )
             assertParity(
-                "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-                golden,
-                hw,
+                name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
+                sw = golden,
+                hw = hw,
                 // Round-A turbulence gates (fp32 + 8-bit gradient packing).
                 maxAbsTol = 4,
                 maxOutlierRatio = 0.005,
@@ -108,9 +112,9 @@ class GpuTurbulenceCorpusParityTest(
             // path would compute a non-stitched field and diverge hugely,
             // far outside the quantization bound).
             assertParity(
-                "$name (fallback, minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-                sw,
-                hw,
+                name = "$name (fallback, minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
+                sw = sw,
+                hw = hw,
                 maxAbsTol = 4,
                 translucentQuantK = 510,
                 // Premultiplied-space comparison: HW fallback output is

@@ -29,16 +29,17 @@ private const val FLOOD_SHADER: String = """
             layout(color) uniform half4 uColor;
             uniform float4 uPrimitiveRegion;
             half4 main(float2 fragCoord) {
-                // fragCoord samples pixel centers: keep exactly the pixels the CPU
-                // kernels keep (their clip rects truncate region bounds to ints).
-                // The ±1e-3 slack keeps exact-boundary centers (knife-edge
-                // strict comparisons flip them via per-pixel fragCoord dust
-                // on Adreno — measured: scattered transparent pixels along
-                // the top row); true outsiders sit a full pixel away.
-                if (fragCoord.x < floor(uPrimitiveRegion.x) + 0.5 - 1e-3 ||
-                    fragCoord.x > ceil(uPrimitiveRegion.z) - 0.5 + 1e-3 ||
-                    fragCoord.y < floor(uPrimitiveRegion.y) + 0.5 - 1e-3 ||
-                    fragCoord.y > ceil(uPrimitiveRegion.w) - 0.5 + 1e-3) {
+                // Keep exactly the pixels the CPU kernels keep (their clip
+                // rects truncate region bounds to ints): pixel-EXTENT form,
+                // not center±epsilon. The previous center-based guard left a
+                // 0.001 margin at boundary centers, which Adreno resolves as
+                // CUT systematically (float interpolation bias — same class
+                // as the turbulence guard-epsilon saga, exposed by C7 wrap
+                // taps landing exactly on flood edges). Pixel centers sit
+                // ≥0.5 from integer-truncated boundaries at 1:1, and true
+                // outsiders sit a full pixel away.
+                if (fragCoord.x < floor(uPrimitiveRegion.x) || fragCoord.x >= ceil(uPrimitiveRegion.z) ||
+                    fragCoord.y < floor(uPrimitiveRegion.y) || fragCoord.y >= ceil(uPrimitiveRegion.w)) {
                     return half4(0.0);
                 }
                 return uColor;
@@ -72,3 +73,4 @@ internal fun createFloodShaderEffect(
     )
     return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
 }
+

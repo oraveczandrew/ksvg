@@ -19,7 +19,8 @@ package hu.oandras.ksvg.filters
 import android.graphics.Bitmap
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import org.junit.Assume
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -137,7 +138,7 @@ class GpuPrimitiveParityTest {
         // premultiplied-output flag (emits straight non-EOTF output), so the
         // software reference is meaningless here — same broken-native family
         // as turbulence/displacement (see report §5). Physical ARM64 runs it.
-        Assume.assumeFalse(
+        assumeFalse(
             "x86_64 emulator: native specular-terminal flag ignored (see report §5)",
             Build.SUPPORTED_ABIS.any { it.startsWith("x86") },
         )
@@ -184,7 +185,7 @@ class GpuPrimitiveParityTest {
         // ILL_ILLOPN in DisplacementMapNative_apply) — a native-dispatch issue,
         // not a GPU one. Physical ARM64 covers this case; skip on x86 emulators
         // so one crashing case cannot abort the whole suite (process death).
-        Assume.assumeFalse(
+        assumeFalse(
             "x86_64 emulator: native displacement kernel SIGILL (see report §5)",
             Build.SUPPORTED_ABIS.any { it.startsWith("x86") },
         )
@@ -326,7 +327,7 @@ class GpuPrimitiveParityTest {
         // render still runs for the visible-effect guard.
         goldenAsset: String? = null,
     ) {
-        Assume.assumeTrue(
+        assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )

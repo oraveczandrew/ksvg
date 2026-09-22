@@ -26,7 +26,6 @@ import hu.oandras.ksvg.compat.toBlendModeCompat
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.style.CSSBlendMode
-import hu.oandras.ksvg.filtering.ColorLuts
 import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeBlendRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
@@ -92,7 +91,7 @@ internal class SoftwareFilterBackend internal constructor(
 
     /**
      * Reusable paint for compositing a filtered bitmap back onto the canvas.
-     * Must honour the element's own `opacity` and `mix-blend-mode`, which are
+     * Must honor the element's own `opacity` and `mix-blend-mode`, which are
      * otherwise silently dropped when a `filter` is present.
      * Kept per-backend-instance so it is never shared mutable state across
      * Drawables/threads.
@@ -251,11 +250,11 @@ internal class SoftwareFilterBackend internal constructor(
 
     /**
      * The filtered bitmap is composited back onto the original canvas. This paint must
-     * honour the element's own `opacity` and `mix-blend-mode`, otherwise they are silently
+     * honor the element's own `opacity` and `mix-blend-mode`, otherwise they are silently
      * dropped when a `filter` is present.
      *
      * When neither applies (fully opaque, normal blend) we return `null` so the bitmap is
-     * drawn exactly as before, preserving existing rendering/compositing behaviour.
+     * drawn exactly as before, preserving existing rendering/compositing behavior.
      */
     private fun configureFilterCompositePaint(state: RendererState): Paint? {
         val opacity = if (state.style.opacity.isNaN()) 1f else state.style.opacity
@@ -365,7 +364,7 @@ internal class SoftwareFilterBackend internal constructor(
                         else -> {
                             // `in` == null on a non-first primitive means "the result of the
                             // previous primitive", so the default subregion inherits the previous
-                            // primitive's subregion (lastResultRegion, initialised to the filter
+                            // primitive's subregion (lastResultRegion, initialized to the filter
                             // region for the first primitive / SourceGraphic). A named result uses
                             // its recorded subregion. Other standard-input names are never
                             // registered results, so `getResultRegion` returns null and the
@@ -455,7 +454,7 @@ internal class SoftwareFilterBackend internal constructor(
                 // emits straight (non-premultiplied) linear-RGB samples; apply the UNLINEARIZE
                 // LUT to those straight channels before compositing (the KSVG equivalent of
                 // librsvg's FilterContext::into_output). Other filter primitives already emit
-                // their own correct output colour space, so the transfer is scoped to
+                // their own correct output color space, so the transfer is scoped to
                 // feTurbulence terminals only.
                 if (terminalNode is FeTurbulenceRenderNode &&
                     filterNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB &&

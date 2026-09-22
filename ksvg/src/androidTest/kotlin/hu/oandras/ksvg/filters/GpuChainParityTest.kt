@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg.filters
 
-import android.graphics.Bitmap
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assume
@@ -89,7 +88,7 @@ class GpuChainParityTest {
     }
 
     @Test
-    fun nonterminalSpecularTransfer() {
+    fun nonTerminalSpecularTransfer() {
         // C3: turbulence height-map feeds specular in NON-terminal
         // position (premultiplied chain output, NOT the terminal
         // (lightColor, intensity) form), consumed by componentTransfer —
@@ -177,16 +176,31 @@ class GpuChainParityTest {
     }
 
     @Test
-    fun wrapConvolveFallback() {
-        // C7: wrap-convolve declines mid-chain → the WHOLE filter must
-        // fall back to software (stitch precedent). The assert is HW==SW:
-        // a taken GPU path would clamp taps (duplicate) and diverge.
-        checkFallback(
+    fun wrapConvolveChain() {
+        // C7: wrap-convolve mid-chain (F4: explicit mod-tap sampling, no
+        // more decline). Strict gates first, calibrated from measurement.
+        checkParity(
             name = "chainC7",
             svg = chainSvg(
                 """
                 <feFlood flood-color="#2020c0" result="b"/>
                 <feConvolveMatrix in="b" order="3" kernelMatrix="0 -1 0 -1 5 -1 0 -1 0" edgeMode="wrap" result="c"/>
+                <feComposite in="c" in2="SourceGraphic" operator="over"/>
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun noneConvolveChain() {
+        // C17: none-convolve (transparent out-of-bounds taps, F4).
+        // Strict gates first, calibrated from measurement.
+        checkParity(
+            name = "chainC17",
+            svg = chainSvg(
+                """
+                <feFlood flood-color="#2020c0" result="b"/>
+                <feConvolveMatrix in="b" order="3" kernelMatrix="0 -1 0 -1 5 -1 0 -1 0" edgeMode="none" result="c"/>
                 <feComposite in="c" in2="SourceGraphic" operator="over"/>
                 """.trimIndent(),
             ),
@@ -210,8 +224,8 @@ class GpuChainParityTest {
     }
 
     @Test
-    fun nonterminalArithmeticOver() {
-        // C9 (repuposed — see worklog): non-terminal sRGB arithmetic
+    fun nonTerminalArithmeticOver() {
+        // C9 (repurposed — see worklog): non-terminal sRGB arithmetic
         // consumed by composite-over. The linear-decline fallback originally
         // planned here is unmeasurable (native linear arithmetic is
         // nondeterministic run-to-run, Round-B arith worklog §2 — device-SW
@@ -271,7 +285,7 @@ class GpuChainParityTest {
     fun diffuseMerge() {
         // C12: turbulence height-map → diffuse lighting, merged over
         // SourceGraphic — two-branch merge of a computed result.
-        // Strict placeholder gates, calibrated after first run.
+        // Strict placeholder gates, calibrated after the first run.
         checkParity(
             name = "chainC12",
             svg = chainSvg(
@@ -304,19 +318,75 @@ class GpuChainParityTest {
         )
     }
 
+    @Test
+    fun implicitIn2Displacement() {
+        // C14: flood map feeds displacement through the IMPLICIT in2
+        // default (no in2 attribute = previous result, per spec) — proves
+        // the F1 defaulting, not just named references. Constant map:
+        // strict gates + premult (halo).
+        checkParity(
+            name = "chainC14",
+            svg = chainSvg(
+                """
+                <feFlood flood-color="#2020c0" result="map"/>
+                <feDisplacementMap in="SourceGraphic" scale="30" xChannelSelector="R" yChannelSelector="G"/>
+                """.trimIndent(),
+            ),
+            premultiplyReference = true,
+        )
+    }
+
+    @Test
+    fun subregionDropShadowFallback() {
+        // C15: dropShadow with an explicit subregion declines (the Skia
+        // composite ignores it — F2) → whole-chain software fallback.
+        // HW==SW assert (a taken path would paint the whole input).
+        // NOTE: the subregion must EXTEND past the rect (shadow lives at
+        // +10/+10 outside it); a rect-equal subregion clips the shadow
+        // away and the output trivially equals the baseline.
+        checkFallback(
+            name = "chainC15",
+            svg = chainSvg(
+                """
+                <feDropShadow dx="10" dy="10" stdDeviation="4" flood-color="#000000" flood-opacity="0.8" x="48" y="48" width="200" height="200"/>
+                """.trimIndent(),
+                filterAttrs = """ primitiveUnits="userSpaceOnUse"""",
+            ),
+        )
+    }
+
+    @Test
+    fun lightlessDiffusePassthrough() {
+        // C16: diffuse lighting WITHOUT a light child passes the input
+        // through on the CPU (`light ?: return inputBitmap`) — the GPU
+        // mirrors with passthrough (F3), no decline. No visible-effect
+        // guard (passthrough by design, like identity); parity is strict
+        // (bit-exact expected).
+        checkParity(
+            name = "chainC16",
+            svg = chainSvg(
+                """<feDiffuseLighting in="SourceGraphic" surfaceScale="2" diffuseConstant="1" lighting-color="#ffffff"/>""",
+            ),
+            skipVisibleEffectGuard = true,
+        )
+    }
+
     private fun checkParity(
         name: String,
         svg: String,
         maxAbsTol: Int = GPU_PARITY_MAX_ABS,
         maxOutlierRatio: Double = GPU_PARITY_MAX_OUTLIER_RATIO,
         premultiplyReference: Boolean = false,
+        skipVisibleEffectGuard: Boolean = false,
     ) {
         Assume.assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )
         val sw = renderSoftware(svg)
-        assertVisibleFilterEffect(name, sw, renderSoftware(chainBaseline(svg)))
+        if (!skipVisibleEffectGuard) {
+            assertVisibleFilterEffect(name, sw, renderSoftware(chainBaseline(svg)))
+        }
         val hw = renderOnHardware(svg)
         assertParity(
             "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",

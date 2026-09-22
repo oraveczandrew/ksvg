@@ -17,9 +17,11 @@
 package hu.oandras.ksvg.render.filters.pipeline
 
 import android.graphics.Canvas
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.RectF
 import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.os.Build
 import android.util.ArrayMap
 import androidx.annotation.RequiresApi
@@ -268,7 +270,13 @@ internal open class FilterPipelineImpl31 internal constructor(
             val resultName = sourceElement.result
             val input = sourceElement.`in`
 
-            val inputEffect = resolveEffect(input, previousResult, first, chainEffect, resultEffects) ?: return null
+            val inputEffect = resolveEffect(
+                input = input,
+                previousResult = previousResult,
+                first = first,
+                currentChain = chainEffect,
+                resultEffects = resultEffects
+            ) ?: return null
 
             val effect = when (primitive) {
                 is FeColorMatrixRenderNode -> {
@@ -284,7 +292,7 @@ internal open class FilterPipelineImpl31 internal constructor(
                         return null
                     }
                     val element = primitive.sourceElement
-                    val colorFilter = android.graphics.ColorMatrixColorFilter(
+                    val colorFilter = ColorMatrixColorFilter(
                         buildColorMatrix(element.type, element.values)
                     )
                     RenderEffect.createColorFilterEffect(colorFilter).chainWith(inputEffect)
@@ -307,8 +315,9 @@ internal open class FilterPipelineImpl31 internal constructor(
                         inputEffect
                     } else {
                         RenderEffect.createBlurEffect(
-                            skiaBlurRadiusForSigma(sigmaX), skiaBlurRadiusForSigma(sigmaY),
-                            android.graphics.Shader.TileMode.CLAMP
+                            /* radiusX = */ skiaBlurRadiusForSigma(sigmaX),
+                            /* radiusY = */ skiaBlurRadiusForSigma(sigmaY),
+                            /* edgeTreatment = */ Shader.TileMode.CLAMP
                         ).chainWith(inputEffect)
                     }
                 }
@@ -534,8 +543,8 @@ internal open class FilterPipelineImpl31 internal constructor(
          * matches the requested one; re-fit against [GpuPrimitiveParityTest]
          * if the blur changes.
          */
-        private val SKIA_BLUR_RESPONSE_SIGMA = floatArrayOf(1.05f, 1.55f, 1.75f, 2.80f, 3.75f, 3.95f)
-        private val SKIA_BLUR_RESPONSE_RADIUS = floatArrayOf(1.0f, 1.833f, 2.25f, 4.0f, 5.657f, 6.0f)
+        private val SKIA_BLUR_RESPONSE_SIGMA: FloatArray = floatArrayOf(1.05f, 1.55f, 1.75f, 2.80f, 3.75f, 3.95f)
+        private val SKIA_BLUR_RESPONSE_RADIUS: FloatArray = floatArrayOf(1.0f, 1.833f, 2.25f, 4.0f, 5.657f, 6.0f)
 
         /**
          * Skia blur radius whose effective sigma equals [sigma], by piecewise
@@ -562,9 +571,9 @@ internal open class FilterPipelineImpl31 internal constructor(
 
 
         @JvmField
-        internal val IDENTITY_EFFECT = RenderEffect.createOffsetEffect(0f, 0f)
+        internal val IDENTITY_EFFECT: RenderEffect = RenderEffect.createOffsetEffect(0f, 0f)
 
         @JvmField
-        internal val SOURCE_ALPHA_EFFECT = RenderEffect.createColorFilterEffect(ALPHA_MATRIX_COLOR_FILTER)
+        internal val SOURCE_ALPHA_EFFECT: RenderEffect = RenderEffect.createColorFilterEffect(ALPHA_MATRIX_COLOR_FILTER)
     }
 }

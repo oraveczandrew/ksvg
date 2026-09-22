@@ -20,7 +20,7 @@ import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.ConvolveValidationCorpus
 import hu.oandras.ksvg.filtering.parity.ConvolveParitySvg
-import org.junit.Assume
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -31,15 +31,11 @@ import org.junit.runners.Parameterized
  * [ConvolveParitySvg] (input pixels travel as a PNG data-URI `<image>`,
  * alpha pinned opaque — see `opaqueInput`) and is measured SW-vs-HW.
  *
- * Two assertion modes:
- * - duplicate edge mode: strict [assertParity] (the GPU implements clamp
- *   sampling, matching the CPU `duplicate` path).
- * - wrap/none edge modes: the GPU chain declines (`buildConvolveMatrixShader`
- *   returns null — clamp sampling would silently compute wrong edges), so
- *   the hardware side falls back to software. These assert bit-exact
- *   HW==SW ([assertParity] with zero tolerances): if the GPU ever took the
- *   path, clamp-vs-wrap/none would diverge hugely on noise, so equality
- *   proves the fallback instead of passing vacuously.
+ * All three edge modes take the GPU chain now (F4: duplicate/clamp,
+ * wrap/modulo, none/transparent taps): strict [assertParity] everywhere
+ * with `premultiplyReference` (same representation rationale as the
+ * morphology runner: corpus pipeline ends straight on SW, premultiplied
+ * on HW). Per-case gates below are Adreno-measured (see worklog).
  */
 @RunWith(Parameterized::class)
 class GpuConvolveCorpusParityTest(
@@ -49,41 +45,44 @@ class GpuConvolveCorpusParityTest(
 
     @Test
     fun convolveCorpusParity() {
-        Assume.assumeTrue(
+        assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )
         val svg = ConvolveParitySvg.toSvg(
-            case,
-            imageSource(opaqueInput(case.input), case.width, case.height),
+            case = case,
+            imageDataUri = imageSource(
+                input = opaqueInput(case.input),
+                width = case.width,
+                height = case.height
+            ),
         )
         val name = "convolve:$caseName"
-        val sw = renderSoftware(svg, case.width, case.height)
-        assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
+        val sw = renderSoftware(
+            svgString = svg,
+            width = case.width,
+            height = case.height
+        )
+        assertVisibleFilterEffect(
+            name = name,
+            filtered = sw,
+            unfiltered = renderSoftware(
+                svgString = corpusBaseline(svg),
+                width = case.width,
+                height = case.height
+            )
+        )
         val hw = renderOnHardware(svg, case.width, case.height)
-        if (case.edgeMode == 0) {
-            assertParity(
-                "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-                sw,
-                hw,
-                // Same representation rationale as the morphology runner:
-                // corpus pipeline ends straight on SW, premultiplied on HW.
-                premultiplyReference = true,
-            )
-        } else {
-            assertParity(
-                "$name (fallback, minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-                sw,
-                hw,
-                maxAbsTol = 0,
-                maxOutlierRatio = 0.0,
-                // Readback symmetry (see arithmetic runner): the HW readback
-                // double-converts while a raw SW read converts once; without
-                // this the assert would measure the readback on translucent
-                // pixels instead of the fallback. No-op at alpha 255.
-                premultiplyReference = true,
-            )
-        }
+        // NOTE (F4): wrap/none take the GPU chain now; strict placeholder
+        // gates for all modes, calibrated from measured stats (worklog).
+        assertParity(
+            name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
+            sw = sw,
+            hw = hw,
+            // Same representation rationale as the morphology runner:
+            // corpus pipeline ends straight on SW, premultiplied on HW.
+            premultiplyReference = true,
+        )
     }
 
     companion object {

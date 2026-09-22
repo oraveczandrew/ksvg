@@ -18,6 +18,7 @@ package hu.oandras.ksvg.render.filters.pipeline
 
 import android.graphics.BlendMode
 import android.graphics.Canvas
+import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.RectF
 import android.graphics.RenderEffect
@@ -61,7 +62,10 @@ import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.filters.pipeline.effects.createArithmeticCompositeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createColorMatrixShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createComponentTransferShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveMatrixShaderEffect
+import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
+import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveDuplicateShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveNoneShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveWrapShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createDiffuseLightingShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createDisplacementMapShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createFloodShaderEffect
@@ -269,8 +273,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 lastRawShader = null
                                 lastRawBound = false
                                 RenderEffect.createBlurEffect(
-                                    skiaBlurRadiusForSigma(sigmaX), skiaBlurRadiusForSigma(sigmaY),
-                                    Shader.TileMode.CLAMP,
+                                    /* radiusX = */ skiaBlurRadiusForSigma(sigmaX),
+                                    /* radiusY = */ skiaBlurRadiusForSigma(sigmaY),
+                                    /* edgeTreatment = */ Shader.TileMode.CLAMP,
                                 ).chainWith(inputEffect)
                             }
                         }
@@ -296,23 +301,23 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             val inputB = totalPadY + filterRegion.height() * sy
                             val (shader, morphEffect) = if (primitive.erode) {
                                 createMorphologyErodeShaderEffect(
-                                    radX,
-                                    radY,
-                                    maxOf(clipL, totalPadX + rxWs),
-                                    maxOf(clipT, totalPadY + ryWs),
-                                    minOf(clipR, inputR - rxWs),
-                                    minOf(clipB, inputB - ryWs),
-                                    "uInput",
+                                    radiusX = radX,
+                                    radiusY = radY,
+                                    interiorLeft = maxOf(clipL, totalPadX + rxWs),
+                                    interiorTop = maxOf(clipT, totalPadY + ryWs),
+                                    interiorRight = minOf(clipR, inputR - rxWs),
+                                    interiorBottom = minOf(clipB, inputB - ryWs),
+                                    inputUniformName = "uInput",
                                 )
                             } else {
                                 createMorphologyDilateShaderEffect(
-                                    radX,
-                                    radY,
-                                    clipL,
-                                    clipT,
-                                    clipR,
-                                    clipB,
-                                    "uInput",
+                                    radiusX = radX,
+                                    radiusY = radY,
+                                    interiorLeft = clipL,
+                                    interiorTop = clipT,
+                                    interiorRight = clipR,
+                                    interiorBottom = clipB,
+                                    inputUniformName = "uInput",
                                 )
                             }
                             trackRawShader(shader, resultName, input, previousResult, first, generative = false)
@@ -332,7 +337,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             )
 
                             val (shader, colorMatrixEffect) = createColorMatrixShaderEffect(
-                                matrix.array, primitiveRegion, "uInput",
+                                matrix = matrix.array,
+                                primitiveRegion = primitiveRegion,
+                                inputUniformName = "uInput",
                             )
                             trackRawShader(shader, resultName, input, previousResult, first, generative = false)
                             colorMatrixEffect.chainWith(inputEffect)
@@ -346,12 +353,31 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                             )
 
-                            val (shader, lightingEffect) = createDiffuseLightingShaderEffect(
-                                primitive, filterRegion, sx, sy, totalPadX, totalPadY, primitiveRegion, "uInput",
-                            ) ?: return null
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                            // No light source: the CPU passes the input through
+                            // (`doLightingFilter`: `light ?: return inputBitmap`).
+                            // Mirror with passthrough (F3); the output raw form
+                            // is the input raw form for downstream in2.
+                            if (primitive.sourceElement.light == null) {
+                                if (resultName != null && lastRawBound && lastRawShader != null) {
+                                    resultShaders[resultName] = lastRawShader
+                                    boundResults += resultName
+                                }
+                                inputEffect
+                            } else {
+                                val (shader, lightingEffect) = createDiffuseLightingShaderEffect(
+                                    node = primitive,
+                                    filterRegion = filterRegion,
+                                    canvasScaleX = sx,
+                                    canvasScaleY = sy,
+                                    padX = totalPadX,
+                                    padY = totalPadY,
+                                    primitiveRegion = primitiveRegion,
+                                    inputUniformName = "uInput",
+                                ) ?: return null
+                                trackRawShader(shader, resultName, input, previousResult, first, generative = false)
 
-                            lightingEffect.chainWith(inputEffect)
+                                lightingEffect.chainWith(inputEffect)
+                            }
                         }
 
                         is FeSpecularLightingRenderNode -> {
@@ -364,15 +390,31 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
                             // Terminal specular emits premultiplied output on the CPU
                             // path (full light color + intensity alpha); mirror it.
-                            val terminalPremult =
-                                primitive === filterNode.primitives.lastOrNull()
-                            val (shader, lightingEffect) = createSpecularLightingShaderEffect(
-                                primitive, terminalPremult,
-                                filterRegion, sx, sy, totalPadX, totalPadY, primitiveRegion, "uInput",
-                            ) ?: return null
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                            // No light source: input passthrough like diffuse (F3).
+                            if (primitive.sourceElement.light == null) {
+                                if (resultName != null && lastRawBound && lastRawShader != null) {
+                                    resultShaders[resultName] = lastRawShader
+                                    boundResults += resultName
+                                }
+                                inputEffect
+                            } else {
+                                val terminalPremult =
+                                    primitive === filterNode.primitives.lastOrNull()
+                                val (shader, lightingEffect) = createSpecularLightingShaderEffect(
+                                    node = primitive,
+                                    terminalPremult = terminalPremult,
+                                    filterRegion = filterRegion,
+                                    canvasScaleX = sx,
+                                    canvasScaleY = sy,
+                                    padX = totalPadX,
+                                    padY = totalPadY,
+                                    primitiveRegion = primitiveRegion,
+                                    inputUniformName = "uInput",
+                                ) ?: return null
+                                trackRawShader(shader, resultName, input, previousResult, first, generative = false)
 
-                            lightingEffect.chainWith(inputEffect)
+                                lightingEffect.chainWith(inputEffect)
+                            }
                         }
 
                         is FeComponentTransferRenderNode -> {
@@ -393,15 +435,35 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         }
 
                         is FeConvolveMatrixRenderNode -> {
-                            val (shader, convolveEffect) = createConvolveMatrixShaderEffect(
-                                primitive,
-                                filterRegion,
-                                sx,
-                                sy,
-                                totalPadX,
-                                totalPadY,
-                                "uInput",
-                            ) ?: return null
+                            val (shader, convolveEffect) = when (primitive.sourceElement.edgeMode) {
+                                ConvolveMatrixEdgeMode.wrap -> createConvolveWrapShaderEffect(
+                                    node = primitive,
+                                    filterRegion = filterRegion,
+                                    scaleX = sx,
+                                    scaleY = sy,
+                                    padX = totalPadX,
+                                    padY = totalPadY,
+                                    inputUniformName = "uInput",
+                                )
+                                ConvolveMatrixEdgeMode.none -> createConvolveNoneShaderEffect(
+                                    node = primitive,
+                                    filterRegion = filterRegion,
+                                    scaleX = sx,
+                                    scaleY = sy,
+                                    padX = totalPadX,
+                                    padY = totalPadY,
+                                    inputUniformName = "uInput",
+                                )
+                                else -> createConvolveDuplicateShaderEffect(
+                                    node = primitive,
+                                    filterRegion = filterRegion,
+                                    scaleX = sx,
+                                    scaleY = sy,
+                                    padX = totalPadX,
+                                    padY = totalPadY,
+                                    inputUniformName = "uInput",
+                                )
+                            } ?: return null
                             trackRawShader(shader, resultName, input, previousResult, first, generative = false)
                             convolveEffect.chainWith(inputEffect)
                         }
@@ -414,7 +476,11 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             lastRawShader = null
                             lastRawBound = false
 
-                            createBlendModeRenderEffect(in2Effect, inputEffect, mode)
+                            createBlendModeRenderEffect(
+                                dst = in2Effect,
+                                src = inputEffect,
+                                blendMode = mode
+                            )
                         }
 
                         is FeCompositeRenderNode -> {
@@ -438,13 +504,15 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                     createBlendModeRenderEffect(in2Effect, inputEffect, BlendMode.PLUS)
                                 } else {
                                     val in2Name = composite.in2
-                                    val in2Shader = in2Name?.let { resultShaders[it] }
-                                    // The raw in2 shader must be standalone-evaluable
-                                    // (bound): sampling an unbound one yields
-                                    // transparent and silently computes the wrong
-                                    // composite (C6 lesson). Decline instead.
-                                    if (in2Name == null || in2Shader == null || in2Name !in boundResults) {
-                                        return null
+                                    // Null in2 defaults to the previous result
+                                    // (spec): reuse its raw shader when bound,
+                                    // decline otherwise (F1).
+                                    val in2Shader = if (in2Name == null) {
+                                        if (!lastRawBound) return null
+                                        lastRawShader ?: return null
+                                    } else {
+                                        if (in2Name !in boundResults) return null
+                                        resultShaders[in2Name] ?: return null
                                     }
                                         // Map to buffer space: (user - filterRegion.left) * sx + padX
                                         // (the CPU kernel writes the clip only).
@@ -456,13 +524,13 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                         )
 
                                         val (shader, compositeEffect) = createArithmeticCompositeShaderEffect(
-                                            composite.k1,
-                                            composite.k2,
-                                            composite.k3,
-                                            composite.k4,
-                                            primitiveRegion,
-                                            in2Shader,
-                                            "uInput",
+                                            k1 = composite.k1,
+                                            k2 = composite.k2,
+                                            k3 = composite.k3,
+                                            k4 = composite.k4,
+                                            primitiveRegion = primitiveRegion,
+                                            in2Shader = in2Shader,
+                                            inputUniformName = "uInput",
                                         )
 
                                         trackRawShader(shader, resultName, input, previousResult, first, generative = false)
@@ -479,13 +547,23 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         is FeDisplacementMapRenderNode -> {
                             val disp = primitive.sourceElement
                             val mapName = disp.in2
-                            val mapShader = mapName?.let { resultShaders[it] }
-                            // Bound gate, like composite in2 (C6 lesson).
-                            if (mapName == null || mapShader == null || mapName !in boundResults) {
-                                return null
+                            // Null in2 defaults to the previous result (spec):
+                            // reuse its raw shader when bound, decline
+                            // otherwise (F1). Bound gate like composite in2
+                            // (C6 lesson).
+                            val mapShader = if (mapName == null) {
+                                if (!lastRawBound) return null
+                                lastRawShader ?: return null
+                            } else {
+                                if (mapName !in boundResults) return null
+                                resultShaders[mapName] ?: return null
                             }
                             val (shader, displacementEffect) = createDisplacementMapShaderEffect(
-                                primitive, scaleX, scaleY, mapShader, "uInput",
+                                node = primitive,
+                                scaleX = scaleX,
+                                scaleY = scaleY,
+                                mapShader = mapShader,
+                                inputUniformName = "uInput",
                             )
                             trackRawShader(shader, resultName, input, previousResult, first, generative = false)
                             displacementEffect.chainWith(inputEffect)
@@ -552,15 +630,13 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         is FeMergeRenderNode -> {
                             var mergeEffect: RenderEffect? = null
                             primitive.mergeNodes.forEach { inputName ->
-                                val inputNodeEffect =
-                                    resolveEffect(
-                                        inputName ?: "SourceGraphic",
-                                        previousResult,
-                                        first,
-                                        chain,
-                                        resultEffects
-                                    )
-                                        ?: return null
+                                val inputNodeEffect = resolveEffect(
+                                    input = inputName ?: "SourceGraphic",
+                                    previousResult = previousResult,
+                                    first = first,
+                                    currentChain = chain,
+                                    resultEffects = resultEffects
+                                ) ?: return null
                                 mergeEffect = if (mergeEffect == null) {
                                     inputNodeEffect
                                 } else {
@@ -587,6 +663,18 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         }
 
                         is FeDropShadowRenderNode -> {
+                            // The Skia dropShadow composite ignores the
+                            // primitive subregion (same class as the
+                            // blur/offset declines): an explicit
+                            // x/y/width/height would silently paint the whole
+                            // input. Decline so software renders the clip
+                            // instead (F2).
+                            val shadowElement = primitive.sourceElement
+                            if (shadowElement.x != null || shadowElement.y != null ||
+                                shadowElement.width != null || shadowElement.height != null
+                            ) {
+                                return null
+                            }
                             val alphaEffect = if (inputEffect == IDENTITY_EFFECT) {
                                 SOURCE_ALPHA_EFFECT
                             } else {
@@ -600,8 +688,10 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             val sigmaY = primitive.blurNode.stdDeviationY * scaleY
                             val blurredEffect = if (sigmaX > 0f || sigmaY > 0f) {
                                 RenderEffect.createBlurEffect(
-                                    skiaBlurRadiusForSigma(sigmaX), skiaBlurRadiusForSigma(sigmaY),
-                                    alphaEffect, Shader.TileMode.CLAMP,
+                                    /* radiusX = */ skiaBlurRadiusForSigma(sigmaX),
+                                    /* radiusY = */ skiaBlurRadiusForSigma(sigmaY),
+                                    /* inputEffect = */ alphaEffect,
+                                    /* edgeTreatment = */ Shader.TileMode.CLAMP,
                                 )
                             } else {
                                 alphaEffect
@@ -624,7 +714,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
                             val floodColor = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
                             val coloredShadowEffect = RenderEffect.createColorFilterEffect(
-                                PorterDuffColorFilter(floodColor, android.graphics.PorterDuff.Mode.SRC_IN),
+                                PorterDuffColorFilter(floodColor, PorterDuff.Mode.SRC_IN),
                                 offsetEffect
                             )
 
@@ -813,7 +903,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         val slot = filterNode.gpuSlotFor(node)
         var chain = slot.gpuChain ?: return
         if (chain.deviceLeft != deviceRegion.left || chain.deviceTop != deviceRegion.top) {
-            // Screen position changed (e.g. scroll): re-create chain to update absolute uniforms.
+            // Screen position changed (e.g., scroll): re-create chain to update absolute uniforms.
             with(renderContext) {
                 chain = tryBuildChain(
                     element = node,

@@ -46,7 +46,7 @@ internal class GpuFilterSlot internal constructor() {
     /**
      * The CTM captured when the source display list was recorded. Content
      * and matrix are baked into the display list, so either changing
-     * invalidates it (e.g. an animated transform must force a re-record
+     * invalidates it (e.g., an animated transform must force a re-record
      * every frame).
      */
     @JvmField var gpuSourceMatrix: Matrix? = null

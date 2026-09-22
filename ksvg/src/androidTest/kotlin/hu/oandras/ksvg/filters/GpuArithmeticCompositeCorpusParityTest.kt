@@ -85,11 +85,11 @@ class GpuArithmeticCompositeCorpusParityTest(
             Bitmap.createBitmap(case.width, case.height, Bitmap.Config.ARGB_8888),
         )
         if (isAllTransparent(golden)) {
-            // Fully-transparent output (e.g. sub with opaque inputs:
+            // Fully transparent output (e.g., sub with opaque inputs:
             // alpha-out is zero everywhere): assert the HW output is
             // transparent too via alpha-only comparison. RGB under
             // alpha-zero is invisible and legitimately differs
-            // (straight residue vs premultiplied zero).
+            // (straight residue vs. premultiplied zero).
             assertParity(
                 "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
                 alphaOnlyCopy(golden),

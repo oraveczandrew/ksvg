@@ -57,7 +57,11 @@ class GpuLightingCorpusParityTest(
         )
         val name = "lighting:$caseName"
         val sw = renderSoftware(svg, case.width, case.height)
-        assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
+        assertVisibleFilterEffect(
+            name = name,
+            filtered = sw,
+            unfiltered = renderSoftware(corpusBaseline(svg), case.width, case.height)
+        )
         val hw = renderOnHardware(svg, case.width, case.height)
         // Per-case gates (all Adreno-measured, see GPU_ROUNDB_LIGHT_WORKLOG):
         // - point specular (sRGB + linear): fp intensity noise amplified by

@@ -21,7 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.ComponentTransferValidationCorpus
 import hu.oandras.ksvg.filtering.parity.ComponentTransferParitySvg
-import org.junit.Assume
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -43,7 +43,7 @@ class GpuComponentTransferCorpusParityTest(
 
     @Test
     fun componentTransferCorpusParity() {
-        Assume.assumeTrue(
+        assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )
@@ -63,9 +63,9 @@ class GpuComponentTransferCorpusParityTest(
         // that single pixel on tiny images (1/63 = 1.6%).
         val singleRow = case.height == 1
         assertParity(
-            "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-            sw,
-            hw,
+            name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
+            sw = sw,
+            hw = hw,
             maxAbsTol = if (singleRow) 4 else GPU_PARITY_MAX_ABS,
             maxOutlierRatio = if (singleRow) 0.05 else GPU_PARITY_MAX_OUTLIER_RATIO,
             premultiplyReference = true,
@@ -141,8 +141,8 @@ class GpuComponentTransferFuncParityTest {
         )
     }
 
-    private fun checkFuncParity(name: String, funcs: String) {
-        Assume.assumeTrue(
+    private fun checkFuncParity(name: String, functions: String) {
+        assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )
@@ -160,7 +160,7 @@ class GpuComponentTransferFuncParityTest {
         val svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\">" +
             "<defs>" +
             "<filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"16\" height=\"16\">" +
-            "<feComponentTransfer color-interpolation-filters=\"sRGB\">$funcs</feComponentTransfer>" +
+            "<feComponentTransfer color-interpolation-filters=\"sRGB\">$functions</feComponentTransfer>" +
             "</filter>" +
             "</defs>" +
             "<image href=\"$uri\" x=\"0\" y=\"0\" width=\"16\" height=\"16\" filter=\"url(#f)\"/>" +
@@ -170,9 +170,9 @@ class GpuComponentTransferFuncParityTest {
         assertVisibleFilterEffect(fullName, sw, renderSoftware(corpusBaseline(svg), 16, 16))
         val hw = renderOnHardware(svg, 16, 16)
         assertParity(
-            "$fullName (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-            sw,
-            hw,
+            name = "$fullName (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
+            sw = sw,
+            hw = hw,
             premultiplyReference = true,
         )
     }
