@@ -81,7 +81,7 @@ extern "C" void ksvgBlurHorizontalAvx2_i386(void* dst, const void* pin,
 // safe to call concurrently from multiple threads (each render operation owns
 // its own instance). Buffers are only re-grown when the dimensions increase.
 struct GaussianScratch {
-    std::vector<float> bufA;   // premultiplied floats a,r,g,b interleaved (w*h*4)
+    std::vector<float> bufA;   // straight-channel floats a,r,g,b interleaved (w*h*4)
     std::vector<float> bufB;
     std::vector<uint8_t> paddedIn;   // zero-padded copy for the kernel path (pw*ph*4)
     std::vector<uint8_t> paddedOut;  // kernel path output (pw*ph*4)

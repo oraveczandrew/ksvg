@@ -125,6 +125,14 @@ internal fun doFeGaussianBlurFilter(
 
     primitiveNode.blurScratch.blur(pixels, width, height, stdDeviationX, stdDeviationY)
 
+    // The blur backends emit premultiplied (Kotlin stack-blur fallback) or
+    // straight (native true-Gaussian) channels; `setPixels` below stores
+    // straight. Unpremultiplying normalizes uniform regions exactly on both
+    // backends (halo chroma stays full while alpha fades — F1, rsvg
+    // reference); native straight edges stay approximate (premult-native is
+    // a separate :filtering tétel). In place, no allocation.
+    unpremultiplyInPlace(pixels)
+
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     res.setPixels(pixels, 0, width, 0, 0, width, height)
 
@@ -149,6 +157,26 @@ internal fun doFeGaussianBlurFilter(
         }
     }
     return res
+}
+
+/**
+ * In-place straight-normalization for blur output (F1): maps premultiplied
+ * channels back to straight (`c = c*255/a`, half-up) so halo chroma survives
+ * `setPixels` (straight-in store). Exact for uniform regions on both blur
+ * backends (premult-out fallback; straight-out native, where uniform
+ * r/a ratios restore full chroma); alpha untouched; a==0 stays 0, a==255
+ * is identity. No allocation.
+ */
+private fun unpremultiplyInPlace(pixels: IntArray) {
+    for (i in pixels.indices) {
+        val p = pixels[i]
+        val a = p ushr 24
+        if (a == 0 || a == 255) continue
+        val r = clamp(((p shr 16 and 0xff) * 255 + (a shr 1)) / a, 0, 255)
+        val g = clamp(((p shr 8 and 0xff) * 255 + (a shr 1)) / a, 0, 255)
+        val b = clamp(((p and 0xff) * 255 + (a shr 1)) / a, 0, 255)
+        pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
+    }
 }
 
 context(renderContext: RenderContext)

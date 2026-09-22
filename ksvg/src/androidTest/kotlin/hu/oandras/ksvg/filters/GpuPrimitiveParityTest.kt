@@ -53,6 +53,10 @@ class GpuPrimitiveParityTest {
             // regressions.
             maxAbsTol = 14,
             maxOutlierRatio = 0.006,
+            // Readback space: the HW chain emits premultiplied blur halos
+            // while SW stores straight (rsvg-correct bright halo, F1) —
+            // compare premultiplied (display-identical either way).
+            premultiplyReference = true,
         )
     }
 
@@ -68,6 +72,8 @@ class GpuPrimitiveParityTest {
             // Steep small-sigma edges amplify residual calibration error.
             maxAbsTol = 8,
             maxOutlierRatio = 0.002,
+            // Same readback-space reason as gaussianBlur (F1).
+            premultiplyReference = true,
         )
     }
 
@@ -80,6 +86,8 @@ class GpuPrimitiveParityTest {
             svg = filteredSvg("""<feGaussianBlur stdDeviation="1"/>"""),
             maxAbsTol = 6,
             maxOutlierRatio = 0.001,
+            // Same readback-space reason as gaussianBlur (F1).
+            premultiplyReference = true,
         )
     }
 
@@ -326,6 +334,10 @@ class GpuPrimitiveParityTest {
         // render against the asset instead of the software render. The SW
         // render still runs for the visible-effect guard.
         goldenAsset: String? = null,
+        // Readback space (F1): blur halos are stored straight SW-side
+        // (rsvg-correct) but read back premultiplied HW-side — compare
+        // premultiplied (display-identical either way).
+        premultiplyReference: Boolean = false,
     ) {
         assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
@@ -352,6 +364,7 @@ class GpuPrimitiveParityTest {
             maxAbsTol,
             maxOutlierRatio,
             ignoreBoundaryFringe,
+            premultiplyReference = premultiplyReference,
         )
     }
 

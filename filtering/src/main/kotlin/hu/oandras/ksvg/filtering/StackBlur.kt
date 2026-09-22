@@ -51,6 +51,12 @@ public object StackBlur {
     /**
      * High quality, fast alternative to Gaussian Blur.
      * Reusable buffers must be provided by the caller through a scratch object.
+     *
+     * Straight-in → premultiplied-out (F1): taps are weighted premultiplied
+     * exactly ONCE across both separable passes (the first executed pass
+     * premultiplies, the second blurs premultiplied channels directly —
+     * premultiplying per pass would square alpha). The caller unpremultiplies
+     * before straight storage (`setPixels`); see `doFeGaussianBlurFilter`.
      */
     public fun blur(
         pixels: IntArray,
@@ -63,8 +69,11 @@ public object StackBlur {
         val ry = max((stdDeviationY * 2.5f + 0.5f).toInt(), 0)
         val scratchX = StackBlurAxisScratch()
         val scratchY = StackBlurAxisScratch()
-        if (rx > 0) stackBlur(pixels, width, height, rx, true, scratchX)
-        if (ry > 0) stackBlur(pixels, width, height, ry, false, scratchY)
+        if (rx > 0) stackBlur(pixels, width, height, rx, true, scratchX, true)
+        // The horizontal pass already premultiplied (when it ran); the
+        // vertical pass must blur premultiplied channels as-is. When only
+        // the vertical pass runs it owns the single premultiply.
+        if (ry > 0) stackBlur(pixels, width, height, ry, false, scratchY, rx == 0)
     }
 
     internal fun stackBlur(
@@ -74,6 +83,7 @@ public object StackBlur {
         radius: Int,
         horizontal: Boolean,
         scratch: StackBlurAxisScratch,
+        premultiplyInput: Boolean,
     ) {
         scratch.ensure(radius)
         val dv = scratch.dv
@@ -85,7 +95,7 @@ public object StackBlur {
         val innerLimit = if (horizontal) w else h
         val innerMax = innerLimit - 1
 
-        // Pixels outside the source are transparent black (premultiplied 0), as required by the SVG
+        // Pixels outside the source are transparent black (0), as required by the SVG
         // spec (filter input outside the filter region is transparent). This makes blurred shapes
         // show a correct transition at the filter-region edge (e.g. feSpecularLighting height field).
         for (i in 0 until outerLimit) {
@@ -106,10 +116,13 @@ public object StackBlur {
                 val p = sample(pix, w, i, innerMax, horizontal, j)
                 val a = p shr 24 and 0xff
                 val sir = stack[j + radius]
+                // Single premultiply across passes (F1): premultiply here
+                // only when the input is still straight; the second pass
+                // receives premultiplied channels and must blur them as-is.
                 sir[0] = a
-                sir[1] = ((p shr 16 and 0xff) * a + 127) / 255
-                sir[2] = ((p shr 8 and 0xff) * a + 127) / 255
-                sir[3] = ((p and 0xff) * a + 127) / 255
+                sir[1] = if (premultiplyInput) ((p shr 16 and 0xff) * a + 127) / 255 else p shr 16 and 0xff
+                sir[2] = if (premultiplyInput) ((p shr 8 and 0xff) * a + 127) / 255 else p shr 8 and 0xff
+                sir[3] = if (premultiplyInput) ((p and 0xff) * a + 127) / 255 else p and 0xff
 
                 val rbs = r1 - abs(j)
                 aSum += sir[0] * rbs
@@ -156,9 +169,9 @@ public object StackBlur {
                 val p = sample(pix, w, i, innerMax, horizontal, j + r1)
                 val a = p shr 24 and 0xff
                 sir[0] = a
-                sir[1] = ((p shr 16 and 0xff) * a + 127) / 255
-                sir[2] = ((p shr 8 and 0xff) * a + 127) / 255
-                sir[3] = ((p and 0xff) * a + 127) / 255
+                sir[1] = if (premultiplyInput) ((p shr 16 and 0xff) * a + 127) / 255 else p shr 16 and 0xff
+                sir[2] = if (premultiplyInput) ((p shr 8 and 0xff) * a + 127) / 255 else p shr 8 and 0xff
+                sir[3] = if (premultiplyInput) ((p and 0xff) * a + 127) / 255 else p and 0xff
 
                 aInSum += sir[0]
                 rInSum += sir[1]

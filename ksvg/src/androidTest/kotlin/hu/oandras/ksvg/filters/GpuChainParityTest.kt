@@ -273,6 +273,9 @@ class GpuChainParityTest {
                 """.trimIndent(),
             ),
             maxAbsTol = 4,
+            // Readback space (F1): Skia-blur HW halo reads back
+            // premultiplied, SW stores straight — compare premultiplied.
+            premultiplyReference = true,
         )
     }
 

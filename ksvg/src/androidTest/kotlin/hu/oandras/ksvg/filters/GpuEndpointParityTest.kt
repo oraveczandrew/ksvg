@@ -205,12 +205,18 @@ class GpuEndpointParityTest(
             EndpointCase("filter_flood.svg", 256, 256, chainFilters = listOf("flood")),
             EndpointCase(
                 "filter_geometry_units.svg", 240, 220, fallback = true,
-                // Fallback-blit fringe (deterministic 902 px, max 78 — the
+                // Fallback-blit fringe (deterministic ~1.1k px — the
                 // software result composited onto the HW canvas differs at
                 // the blob edge; blob geometry + rsvg agree, decline proven
-                // by log). Still catches a broken decline (8000+ px).
+                // by log). F1 brightened the fringe chroma (SW now keeps
+                // straight chroma at a≈0 where premult stores zero), so the
+                // alpha-scaled bound (K=510) budgets it like turbulence:
+                // invisible low-alpha residue passes, opaque divergence
+                // still fails via maxAbs/ratio. Still catches a broken
+                // decline (8000+ px via the ratio).
                 maxAbsTol = 80,
                 maxOutlierRatio = 0.03,
+                translucentQuantK = 510,
                 chainFilters = listOf("f"),
             ),
             EndpointCase("filter_merge.svg", 256, 256, chainFilters = listOf("merge")),
@@ -224,6 +230,9 @@ class GpuEndpointParityTest(
                 maxAbsTol = 24,
                 maxOutlierRatio = 0.10,
                 chainFilters = listOf("a", "b"),
+                // Readback space (F1): blur halos straight SW-side,
+                // premultiplied HW-side.
+                premultiplyReference = true,
             ),
             EndpointCase(
                 "filter_primitives.svg", 256, 256,
@@ -259,6 +268,9 @@ class GpuEndpointParityTest(
                 maxAbsTol = 255,
                 maxOutlierRatio = 0.05,
                 chainFilters = listOf("blur", "shadow"),
+                // Readback space (F1): blur halo straight SW-side,
+                // premultiplied HW-side.
+                premultiplyReference = true,
                 // E6: `#shadow` is shared by the circle AND the text — both
                 // uses must draw on GPU (guards the per-element slot fix).
                 chainMinUses = mapOf("shadow" to 2),

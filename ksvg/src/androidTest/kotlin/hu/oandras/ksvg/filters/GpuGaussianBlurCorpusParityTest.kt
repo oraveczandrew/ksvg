@@ -77,12 +77,11 @@ class GpuGaussianBlurCorpusParityTest(
             hw,
             maxAbsTol = maxAbsTol,
             maxOutlierRatio = maxOutlierRatio,
-            // NOTE: no premultiplyReference here (unlike morphology/convolve):
-            // Skia blur emits straight-scale RGB sums (verified: SW-straight
-            // == HW readback at translucent blur edges, while premultiplied
-            // conversion diverges by the alpha factor). Both sides blur
-            // channels independently with darkened alpha; the readback
-            // round-trips (setPixels+getPixel) are identical on both sides.
+            // Readback space (F1): SW stores straight bright halos
+            // (rsvg-correct), HW reads back premultiplied — compare
+            // premultiplied (display-identical either way). Replaces the
+            // old dark-vs-dark accidental match.
+            premultiplyReference = true,
         )
     }
 

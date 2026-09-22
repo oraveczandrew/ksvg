@@ -31,9 +31,15 @@ import kotlin.math.max
 public sealed interface StackBlurScratch {
 
     /**
-     * Blurs [pixels] (ARGB, length [width] * [height]) in place. Pixels outside
-     * the bitmap are treated as transparent black, matching the SVG spec for
-     * filter-region edges (stdDeviation == Gaussian sigma).
+     * Blurs [pixels] (straight ARGB, length [width] * [height]) in place.
+     * Pixels outside the bitmap are treated as transparent black, matching
+     * the SVG spec for filter-region edges (stdDeviation == Gaussian sigma).
+     *
+     * Backend output convention differs: the native true-Gaussian path
+     * emits straight channels, the Kotlin stack-blur fallback emits
+     * premultiplied channels. The render boundary (`doFeGaussianBlurFilter`)
+     * unpremultiplies before straight storage, which is exact for uniform
+     * regions on both backends (F1).
      */
     public fun blur(
         pixels: IntArray,
@@ -86,8 +92,8 @@ private class FallbackScratch : StackBlurScratch {
     ) {
         val rx = max((stdDeviationX * 2.5f + 0.5f).toInt(), 0)
         val ry = max((stdDeviationY * 2.5f + 0.5f).toInt(), 0)
-        if (rx > 0) StackBlur.stackBlur(pixels, width, height, rx, true, scratchX)
-        if (ry > 0) StackBlur.stackBlur(pixels, width, height, ry, false, scratchY)
+        if (rx > 0) StackBlur.stackBlur(pixels, width, height, rx, true, scratchX, true)
+        if (ry > 0) StackBlur.stackBlur(pixels, width, height, ry, false, scratchY, rx == 0)
     }
 }
 
