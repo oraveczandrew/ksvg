@@ -392,6 +392,20 @@ class GpuChainParityTest {
         )
     }
 
+    @Test
+    fun subregionOffset() {
+        // C19: offset confined to a user-space subregion (F7: AGSL offset
+        // with region guard). Strict gates first, calibrated from
+        // measurement.
+        checkParity(
+            name = "chainC19",
+            svg = chainSvg(
+                """<feOffset in="SourceGraphic" dx="24" dy="-12" x="48" y="48" width="160" height="160"/>""",
+                filterAttrs = """ primitiveUnits="userSpaceOnUse"""",
+            ),
+        )
+    }
+
     private fun checkParity(
         name: String,
         svg: String,

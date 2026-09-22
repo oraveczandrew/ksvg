@@ -70,6 +70,7 @@ import hu.oandras.ksvg.render.filters.pipeline.effects.createDisplacementMapShad
 import hu.oandras.ksvg.render.filters.pipeline.effects.createFloodShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyDilateShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyErodeShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createOffsetShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createSpecularLightingShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createTileShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createTurbulenceShaderEffect
@@ -218,18 +219,6 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
 
                     when (primitive) {
                         is FeOffsetRenderNode -> {
-                            // Skia offset ignores the primitive subregion (no
-                            // region guard on this path): an explicit
-                            // x/y/width/height would silently shift the whole
-                            // input (endpoint geometry_units precedent for the
-                            // Skia blur). Decline so software renders the clip
-                            // instead.
-                            val offsetElement = primitive.sourceElement
-                            if (offsetElement.x != null || offsetElement.y != null ||
-                                offsetElement.width != null || offsetElement.height != null
-                            ) {
-                                return null
-                            }
                             val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
                             val dx = filterPrimitiveLengthX(
                                 length = primitive.sourceElement.dx,
@@ -246,9 +235,28 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             if (dx == 0f && dy == 0f) {
                                 inputEffect
                             } else {
-                                lastRawShader = null
-                                lastRawBound = false
-                                RenderEffect.createOffsetEffect(dx, dy).chainWith(inputEffect)
+                                // Map to buffer space: (user - filterRegion.left) * sx + padX
+                                // (the CPU kernel writes the clip only).
+                                primitiveRegion.set(
+                                    (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
+                                    (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
+                                    (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
+                                    (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                                )
+
+                                val (shader, offsetEffect) = createOffsetShaderEffect(
+                                    offsetX = dx,
+                                    offsetY = dy,
+                                    primitiveRegion = primitiveRegion,
+                                    filterRegion = filterRegion,
+                                    scaleX = sx,
+                                    scaleY = sy,
+                                    padX = totalPadX,
+                                    padY = totalPadY,
+                                    inputUniformName = "uInput",
+                                )
+                                trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                                offsetEffect.chainWith(inputEffect)
                             }
                         }
 
