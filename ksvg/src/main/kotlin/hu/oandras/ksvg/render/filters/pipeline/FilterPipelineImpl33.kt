@@ -41,6 +41,7 @@ import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
 import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
 import hu.oandras.ksvg.render.FeDropShadowRenderNode
 import hu.oandras.ksvg.render.FeFloodRenderNode
+import hu.oandras.ksvg.render.FeImageRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeMergeRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
@@ -68,6 +69,8 @@ import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveWrapShaderE
 import hu.oandras.ksvg.render.filters.pipeline.effects.createDiffuseLightingShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createDisplacementMapShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createFloodShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createImageShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearArithmeticCompositeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyDilateShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyErodeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createOffsetShaderEffect
@@ -102,6 +105,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                 FilterPrimitiveSet.FLAG_FLOOD or
                 FilterPrimitiveSet.FLAG_MERGE or
                 FilterPrimitiveSet.FLAG_TILE or
+                FilterPrimitiveSet.FLAG_IMAGE or
                 FilterPrimitiveSet.FLAG_DROP_SHADOW
 
     context(renderContext: RenderContext)
@@ -496,16 +500,13 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 resolveEffect(composite.in2, previousResult, first, chain, resultEffects) ?: return null
 
                             if (composite.operator == FeCompositeOperator.arithmetic) {
-                                // Linear-light arithmetic has no GPU support (the
-                                // shader computes on raw taps, while the CPU
-                                // linearizes via LUTs): decline the chain so the
-                                // software reference renders instead of silently
-                                // wrong clamps (round-B fallback coverage in
-                                // GpuArithmeticCompositeCorpusParityTest).
-                                if (primitive.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB) {
-                                    return null
-                                }
-                                if (composite.k1 == 0f && composite.k2 == 1f && composite.k3 == 1f && composite.k4 == 0f) {
+                                // Linear-light arithmetic runs linearized (F9);
+                                // the PLUS fast path below is sRGB-only (raw
+                                // tap addition), so linear always takes the
+                                // shader even for PLUS coefficients.
+                                val useLinear =
+                                    primitive.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+                                if (!useLinear && composite.k1 == 0f && composite.k2 == 1f && composite.k3 == 1f && composite.k4 == 0f) {
                                     lastRawShader = null
                                     lastRawBound = false
                                     createBlendModeRenderEffect(in2Effect, inputEffect, BlendMode.PLUS)
@@ -530,15 +531,27 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                             (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                                         )
 
-                                        val (shader, compositeEffect) = createArithmeticCompositeShaderEffect(
-                                            k1 = composite.k1,
-                                            k2 = composite.k2,
-                                            k3 = composite.k3,
-                                            k4 = composite.k4,
-                                            primitiveRegion = primitiveRegion,
-                                            in2Shader = in2Shader,
-                                            inputUniformName = "uInput",
-                                        )
+                                        val (shader, compositeEffect) = if (useLinear) {
+                                            createLinearArithmeticCompositeShaderEffect(
+                                                k1 = composite.k1,
+                                                k2 = composite.k2,
+                                                k3 = composite.k3,
+                                                k4 = composite.k4,
+                                                primitiveRegion = primitiveRegion,
+                                                in2Shader = in2Shader,
+                                                inputUniformName = "uInput",
+                                            )
+                                        } else {
+                                            createArithmeticCompositeShaderEffect(
+                                                k1 = composite.k1,
+                                                k2 = composite.k2,
+                                                k3 = composite.k3,
+                                                k4 = composite.k4,
+                                                primitiveRegion = primitiveRegion,
+                                                in2Shader = in2Shader,
+                                                inputUniformName = "uInput",
+                                            )
+                                        }
 
                                         trackRawShader(shader, resultName, input, previousResult, first, generative = false)
                                         compositeEffect.chainWith(inputEffect)
@@ -658,8 +671,22 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                             mergeEffect
                         }
 
-                        is FeTileRenderNode -> {
-                            // Transform user-space tile region to device-pixel space relative to the deviceRegion
+                        is FeImageRenderNode -> {
+                            // Raster feImage only (F8): element references
+                            // (`referencedNode`) have no decoded bitmap — the
+                            // CPU backend leaves them unrasterized too — so
+                            // decline and let software render instead.
+                            val (shader, imageEffect) = createImageShaderEffect(
+                                primitive,
+                                totalPadX,
+                                totalPadY,
+                                "uInput",
+                            ) ?: return null
+                            trackRawShader(shader, resultName, input, previousResult, first, generative = true)
+                            imageEffect
+                        }
+
+                        is FeTileRenderNode -> {                            // Transform user-space tile region to device-pixel space relative to the deviceRegion
                             primitiveRegion.set(
                                 (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
                                 (primitiveRegion.top - filterRegion.top) * sy + totalPadY,

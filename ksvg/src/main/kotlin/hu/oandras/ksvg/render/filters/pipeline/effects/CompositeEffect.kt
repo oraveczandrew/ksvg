@@ -18,11 +18,15 @@
 
 package hu.oandras.ksvg.render.filters.pipeline.effects
 
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
+import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
+import hu.oandras.ksvg.filtering.ColorLuts
 
 /**
  * Porter-Duff-style compositing plus `arithmetic` (`uOperator == 5`).
@@ -100,6 +104,113 @@ internal fun createArithmeticCompositeShaderEffect(
     val shader = RuntimeShader(COMPOSITE_SHADER)
     shader.setInputShader("uIn2", in2Shader)
     shader.setIntUniform("uOperator", 5)
+    shader.setFloatUniform("uK", k1, k2, k3, k4)
+    shader.setFloatUniform(
+        "uPrimitiveRegion",
+        primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom,
+    )
+    return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
+}
+
+/**
+ * Linear-light arithmetic transfer lookup. Same clip rule as the sRGB
+ * branch, but the k-polynomial runs on linearized taps (exact sRGB→linear
+ * table, mirroring the CPU `useLinear` path, which linearizes via LUTs)
+ * while alpha stays in byte space on both sides; the straight result gets
+ * the linear→sRGB transfer (CPU `linearToSrgb` table equivalent — float
+ * rounding may differ by 1 LSB at table rounding boundaries, the accepted
+ * lighting/turbulence class).
+ */
+private const val LINEAR_COMPOSITE_SHADER: String = """
+            uniform shader uInput;
+            uniform shader uIn2;
+            uniform shader uLutLin;
+            uniform float4 uK;
+            uniform float4 uPrimitiveRegion;
+            float3 toLinear(float3 c) {
+                return float3(
+                    uLutLin.eval(float2(c.r * 255.0 + 0.5, 0.5)).r,
+                    uLutLin.eval(float2(c.g * 255.0 + 0.5, 0.5)).g,
+                    uLutLin.eval(float2(c.b * 255.0 + 0.5, 0.5)).b
+                );
+            }
+            // Linear->sRGB EOTF matching the CPU linearToSrgb table
+            // (threshold branch identical; float rounding may differ by 1 LSB
+            // at table rounding boundaries).
+            float3 srgbEotf(float3 c) {
+                float3 lo = c * 12.92;
+                float3 hi = 1.055 * pow(c, float3(1.0 / 2.4)) - 0.055;
+                return float3(
+                    c.r <= 0.0031308 ? lo.r : hi.r,
+                    c.g <= 0.0031308 ? lo.g : hi.g,
+                    c.b <= 0.0031308 ? lo.b : hi.b
+                );
+            }
+            half4 main(float2 fragCoord) {
+                if (fragCoord.x < uPrimitiveRegion.x || fragCoord.x >= uPrimitiveRegion.z ||
+                    fragCoord.y < uPrimitiveRegion.y || fragCoord.y >= uPrimitiveRegion.w) {
+                    return half4(0.0);
+                }
+                float4 src = uInput.eval(fragCoord);
+                float4 dst = uIn2.eval(fragCoord);
+                float3 s = src.a > 0.0 ? src.rgb / src.a : float3(0.0);
+                float3 t = dst.a > 0.0 ? dst.rgb / dst.a : float3(0.0);
+                float3 sl = toLinear(s);
+                float3 tl = toLinear(t);
+                float3 res = uK.x * tl * sl + uK.y * sl + uK.z * tl + uK.w;
+                res = clamp(res, 0.0, 1.0);
+                float3 eotf = srgbEotf(floor(res * 255.0 + 0.5) / 255.0);
+                float a = clamp(uK.x * dst.a * src.a + uK.y * src.a + uK.z * dst.a + uK.w, 0.0, 1.0);
+                return half4(eotf * a, a);
+            }
+        """
+
+/**
+ * sRGB→linear transfer table as an opaque 256x1 gray texture (same
+ * premult-safe data-texture convention as the component-transfer LUTs).
+ * Fixed content ([ColorLuts.SRGB_TO_LINEAR]), built once and shared by all
+ * linear-arithmetic effects.
+ */
+private val linearTransferLut: Bitmap by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888).also { bitmap ->
+        val table = ColorLuts.SRGB_TO_LINEAR
+        val pixels = IntArray(256) { i ->
+            val v = table[i]
+            -0x1000000 or (v shl 16) or (v shl 8) or v
+        }
+        bitmap.setPixels(pixels, 0, 256, 0, 0, 256, 1)
+    }
+}
+
+/**
+ * Builds the linear-light arithmetic-composite step of an Impl33 chain
+ * (F9): like [createArithmeticCompositeShaderEffect] but the polynomial
+ * runs linearized with an sRGB EOTF on the output, mirroring the CPU
+ * `useLinear` path. Separate factory per mode (no caller-side flag).
+ *
+ * @param k1 k2 k3 k4 the arithmetic coefficients
+ * @param primitiveRegion the primitive subregion in buffer space (already
+ * remapped from user space by the caller); the CPU kernel writes the clip
+ * only
+ * @param in2Shader the already-configured chain shader feeding `uIn2`
+ * @param inputUniformName the shader-input uniform name (`uInput`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createLinearArithmeticCompositeShaderEffect(
+    k1: Float,
+    k2: Float,
+    k3: Float,
+    k4: Float,
+    primitiveRegion: RectF,
+    in2Shader: RuntimeShader,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect> {
+    val shader = RuntimeShader(LINEAR_COMPOSITE_SHADER)
+    shader.setInputShader("uIn2", in2Shader)
+    shader.setInputShader(
+        "uLutLin",
+        BitmapShader(linearTransferLut, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP),
+    )
     shader.setFloatUniform("uK", k1, k2, k3, k4)
     shader.setFloatUniform(
         "uPrimitiveRegion",

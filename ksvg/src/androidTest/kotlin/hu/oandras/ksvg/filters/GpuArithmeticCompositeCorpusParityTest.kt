@@ -21,7 +21,6 @@ import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.filtering.ArithmeticCompositeValidationCorpus
 import hu.oandras.ksvg.filtering.parity.ArithmeticCompositeParitySvg
-import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,20 +38,14 @@ import org.junit.runners.Parameterized
  * `arithmeticComposite` kernel is nondeterministic in `useLinear`
  * (identical calls flip between linear/sRGB math run-to-run —
  * `GPU_ROUNDB_ARITH_WORKLOG.md`), so no pixel assert may use it.
- * sRGB cases compare HW against host-generated goldens
- * (`parity/arithmetic/\*.png`, pure-Kotlin reference, turbulence
- * precedent) with `premultiplyReference` (arithmetic output is
+ * All cases compare HW against host-generated goldens
+ * (`parity/arithmetic/\*.png`, pure-Kotlin reference, sRGB + linear —
+ * F9 generated the linear set with the validated sRGB recipe).
+ * with `premultiplyReference` (arithmetic output is
  * premultiplied, like morphology). The SW render only feeds the
  * vacuous-pass guard (robust: any native behavior differs hugely from
  * unfiltered noise).
- *
- * Linear cases have no pixel asserts: the GPU chain declines them
- * (no useLinear support — raw taps vs. LUT-linearized CPU math), and the
- * fallback itself runs the flaky native kernel. Decline is proven by
- * construction plus measured evidence (HW-linear bias output differs
- * from the GPU-raw value it would emit without the guard — worklog).
- * Filed for the `:filtering` workstream with the native fix.
-*/
+ */
 @RunWith(Parameterized::class)
 class GpuArithmeticCompositeCorpusParityTest(
     private val caseName: String,
@@ -64,13 +57,6 @@ class GpuArithmeticCompositeCorpusParityTest(
         assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
-        )
-        // Linear cases are declined by the GPU chain (see class doc) and
-        // have no deterministic pixel reference, while the native
-        // useLinear handling is broken — skipped, not failed.
-        assumeFalse(
-            "linear-arithmetic: GPU declines, native reference nondeterministic (see worklog)",
-            case.useLinear,
         )
         val svg = ArithmeticCompositeParitySvg.toSvg(
             case,

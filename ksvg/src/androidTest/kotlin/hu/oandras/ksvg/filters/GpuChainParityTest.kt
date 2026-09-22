@@ -18,6 +18,7 @@ package hu.oandras.ksvg.filters
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import hu.oandras.ksvg.filtering.UnLinearizeValidationCorpus
 import org.junit.Assume
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,10 +48,13 @@ class GpuChainParityTest {
     fun distantIn2Arithmetic() {
         // C1: flood result feeds BOTH the displacement map (neighbor) and
         // the arithmetic in2 (2 hops back) — proves resultShaders lifetime
-        // across the chain, not just adjacent references. Premultiplied
-        // comparison (chain emits premult verbatim; verified offline
-        // maxAbs 1, 0/65536 outliers). Strict gates: the halo pixels that
-        // exposed the straight-tap bug keep them honest.
+        // across the chain, not just adjacent references. Host golden
+        // (F9: device-SW arithmetic is nondeterministic); premultiplied
+        // comparison like the corpus (chain emits premult verbatim).
+        // Measured 7/65536 at ≤45: displacement edge-straddle flips
+        // (map ±1 LSB at the rect boundary selects neighbor texels),
+        // amplified by linear+EOTF — same family as C2/C4, so the ratio
+        // stays strict and only the max gate budgets them.
         checkParity(
             name = "chainC1",
             svg = chainSvg(
@@ -60,7 +64,9 @@ class GpuChainParityTest {
                 <feComposite in="disp" in2="map" operator="arithmetic" k1="0" k2="0.5" k3="0.5" k4="0.1"/>
                 """.trimIndent(),
             ),
+            maxAbsTol = 64,
             premultiplyReference = true,
+            goldenAsset = "parity/chains/chainC1.png",
         )
     }
 
@@ -141,8 +147,8 @@ class GpuChainParityTest {
     fun subregionArithmetic() {
         // C5: flood subregion + composite clip (different rects,
         // userSpaceOnUse units) — region-guard mapping consistency across
-        // two primitives. Premultiplied comparison: outside the flood
-        // subregion the composite alpha drops below 1.
+        // two primitives. Host golden (F9: device-SW arithmetic is
+        // nondeterministic); premultiplied comparison like the corpus.
         checkParity(
             name = "chainC5",
             svg = chainSvg(
@@ -153,6 +159,7 @@ class GpuChainParityTest {
                 filterAttrs = """ primitiveUnits="userSpaceOnUse"""",
             ),
             premultiplyReference = true,
+            goldenAsset = "parity/chains/chainC5.png",
         )
     }
 
@@ -406,6 +413,24 @@ class GpuChainParityTest {
         )
     }
 
+    @Test
+    fun rasterImageComposite() {
+        // C20: raster feImage (data-URI PNG) composited over SourceGraphic
+        // (F8: decoded bitmap as chain input). Opaque pixels (premult ==
+        // straight, exact). Strict gates first, calibrated from measurement.
+        checkParity(
+            name = "chainC20",
+            svg = chainSvgWithImage(
+                width = 64,
+                height = 64,
+                primitives = """
+                <feImage href="%s" result="img"/>
+                <feComposite in="SourceGraphic" in2="img" operator="over"/>
+                """.trimIndent(),
+            ),
+        )
+    }
+
     private fun checkParity(
         name: String,
         svg: String,
@@ -413,6 +438,7 @@ class GpuChainParityTest {
         maxOutlierRatio: Double = GPU_PARITY_MAX_OUTLIER_RATIO,
         premultiplyReference: Boolean = false,
         skipVisibleEffectGuard: Boolean = false,
+        goldenAsset: String? = null,
     ) {
         Assume.assumeTrue(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
@@ -423,9 +449,20 @@ class GpuChainParityTest {
             assertVisibleFilterEffect(name, sw, renderSoftware(chainBaseline(svg)))
         }
         val hw = renderOnHardware(svg)
+        // Host-golden path (F9): device-SW is untrusted here (native
+        // nondeterminism), so parity is HW vs the committed golden
+        // (host render-path recipe, determinism-checked at generation).
+        val reference = if (goldenAsset != null) {
+            loadGoldenAsset(
+                goldenAsset,
+                android.graphics.Bitmap.createBitmap(256, 256, android.graphics.Bitmap.Config.ARGB_8888),
+            )
+        } else {
+            sw
+        }
         assertParity(
             "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-            sw,
+            reference,
             hw,
             maxAbsTol,
             maxOutlierRatio,
@@ -439,6 +476,21 @@ class GpuChainParityTest {
               <defs>
                 <filter id="f"$filterAttrs>
                   $primitives
+                </filter>
+              </defs>
+              <rect x="48" y="48" width="160" height="160" fill="#c83232" filter="url(#f)"/>
+            </svg>
+        """.trimIndent()
+    }
+
+    private fun chainSvgWithImage(width: Int, height: Int, primitives: String): String {
+        val pixels = UnLinearizeValidationCorpus.fixedSeedRandom(width * height)
+        val uri = imageSource(opaqueInput(pixels), width, height)
+        return """
+            <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+              <defs>
+                <filter id="f">
+                  ${primitives.format(uri)}
                 </filter>
               </defs>
               <rect x="48" y="48" width="160" height="160" fill="#c83232" filter="url(#f)"/>

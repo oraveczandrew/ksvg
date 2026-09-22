@@ -87,6 +87,8 @@ class GpuEndpointParityTest(
                 hw,
                 maxAbsTol = case.maxAbsTol,
                 maxOutlierRatio = case.maxOutlierRatio,
+                premultiplyReference = case.premultiplyReference,
+                matchRadius = case.matchRadius,
             )
             return
         }
@@ -131,7 +133,15 @@ class GpuEndpointParityTest(
             ),
             EndpointCase(
                 "filter_composite_arithmetic.svg", 256, 256,
-                goldenAsset = "endpoint-golden/filter_composite_arithmetic.png",
+                // Linear by default: HW computes linear (F9), so the sRGB
+                // rsvg golden can never match — host linear golden instead
+                // (render-path recipe, determinism-checked).
+                goldenAsset = "endpoint-golden/endpoint_composite_arithmetic_linear.png",
+                premultiplyReference = true,
+                // 1px region-rounding ring (host region slightly bigger):
+                // chamfer forgives the boundary shift, value errors still
+                // fail (F9 worklog).
+                matchRadius = 1,
             ),
             EndpointCase(
                 "filter_convolve.svg", 256, 256,
