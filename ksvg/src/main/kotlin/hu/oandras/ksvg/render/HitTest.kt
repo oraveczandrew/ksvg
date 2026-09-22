@@ -71,3 +71,23 @@ private fun collectHitRegionsRecursive(
         }
     }
 }
+
+/**
+ * Inverse of the root node's user→screen mapping: `transform` followed by
+ * `viewBoxTransform`, matching renderer concat order
+ * (`applyTransformTo` then `concat(viewBoxTransform)`). Without a `viewBox`
+ * the latter is a pure viewport translation, so this reduces exactly to the
+ * previous behavior (inverse root transform, else viewport translation).
+ *
+ * Returns null when the root carries neither matrix; callers then fall back
+ * to the viewport translation.
+ */
+internal fun inverseRootMapping(node: RenderNode<*>): Matrix? {
+    var mapped = false
+    val forward = Matrix()
+    node.transform?.let { forward.postConcat(it); mapped = true }
+    node.viewBoxTransform?.let { forward.postConcat(it); mapped = true }
+    if (!mapped) return null
+    val inverse = Matrix()
+    return if (forward.invert(inverse)) inverse else null
+}

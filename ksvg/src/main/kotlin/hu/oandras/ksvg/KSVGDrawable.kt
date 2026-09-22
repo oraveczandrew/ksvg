@@ -26,6 +26,7 @@ import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.render.RenderScene
 import hu.oandras.ksvg.render.Renderer
 import hu.oandras.ksvg.render.collectHitRegions
+import hu.oandras.ksvg.render.inverseRootMapping
 import hu.oandras.ksvg.render.pool.PoolOwner
 
 /**
@@ -239,18 +240,14 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         val regions = mutableListOf<HitRegion>()
         collectHitRegions(node, regions)
 
-        val rootTransform = node.transform
-        if (rootTransform != null) {
-            val inverse = Matrix()
-            screenToSvgTransform = if (rootTransform.invert(inverse)) inverse else null
-        } else {
+        screenToSvgTransform = inverseRootMapping(node) ?: run {
             val vp = scene?.viewport
             if (vp != null) {
                 val identity = Matrix()
                 identity.setTranslate(-vp.left.toFloat(), -vp.top.toFloat())
-                screenToSvgTransform = identity
+                identity
             } else {
-                screenToSvgTransform = null
+                null
             }
         }
 

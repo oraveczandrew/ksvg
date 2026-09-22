@@ -57,6 +57,7 @@ import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.render.RenderScene
 import hu.oandras.ksvg.render.Renderer
 import hu.oandras.ksvg.render.collectHitRegions
+import hu.oandras.ksvg.render.inverseRootMapping
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
 import java.io.ByteArrayInputStream
@@ -157,14 +158,10 @@ internal class SVGImpl internal constructor(
         val regions = mutableListOf<HitRegion>()
         collectHitRegions(node, regions)
 
-        val rootTransform = node.transform
-        if (rootTransform != null) {
-            val inverse = Matrix()
-            screenToSvgTransform = if (rootTransform.invert(inverse)) inverse else null
-        } else {
+        screenToSvgTransform = inverseRootMapping(node) ?: run {
             val identity = Matrix()
             identity.setTranslate(-viewport.left, -viewport.top)
-            screenToSvgTransform = identity
+            identity
         }
 
         hitRegions = regions

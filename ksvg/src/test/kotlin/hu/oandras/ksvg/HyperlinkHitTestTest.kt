@@ -261,4 +261,24 @@ class HyperlinkHitTestTest {
         assertTrue(bounds.width() > 0f)
         assertTrue(bounds.height() > 0f)
     }
+
+    @Test
+    fun hitTest_rootViewBox_pointMapsToUserSpace() {
+        val svg = renderSvg(
+            """
+                <svg width="200" height="200" viewBox="0 0 100 100">
+                  <a href="https://example.com">
+                    <rect x="50" y="50" width="20" height="10" fill="red"/>
+                  </a>
+                </svg>
+            """.trimIndent()
+        )
+        // Region stays in root-local (user) units...
+        val regions = svg.getHitRegions()
+        assertEquals(1, regions.size)
+        assertEquals(50f, regions[0].bounds.left, 0.5f)
+        // ...while the screen point (2x scale) maps back into them.
+        assertEquals("https://example.com", svg.hitTest(110f, 105f))
+        assertNull(svg.hitTest(10f, 10f))
+    }
 }
