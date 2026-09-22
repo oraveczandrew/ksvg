@@ -39,7 +39,14 @@ internal const val VISUAL_TARGET_SIZE = 256
 // (e.g. <solidColor> paint server), so its golden is empty/invalid and cannot
 // serve as a reference. The library renders these correctly (see
 // test-data/visual-library-golden); they are not compared against rsvg.
-private val EXCLUDED_FROM_VISUAL_VERIFICATION = setOf("solid_color.svg")
+private val EXCLUDED_FROM_VISUAL_VERIFICATION = setOf(
+    "solid_color.svg",
+    // rsvg (verified up to 2.63.2) ignores the `marker="url(#m)"` shorthand
+    // (explicit marker-start/mid/end render fine): the golden has no markers
+    // at all. Shorthand expansion is pinned by MarkerShorthandTest instead
+    // (shorthand vs explicit pixel-identical, markers proven to paint).
+    "marker_shorthand_strokeWidth.svg",
+)
 
 // Per-SVG similarity thresholds below the default 0.95, with a documented reason.
 // Two kinds of entries live here:
