@@ -59,6 +59,10 @@ private val ACCEPTED_SIMILARITY_EXCEPTIONS: Map<String, Double> = mapOf(
     "text_letter_spacing.svg" to 0.92,
     "text_variation_settings.svg" to 0.88,
     "text_advanced_features.svg" to 0.88,
+    // Font-feature advances the Robolectric Roboto lacks (condensed,
+    // small-caps, ligature/tabular/full-width): line widths diverge while
+    // all lines still render (measured 0.9256 on 2026-09-22).
+    "text_properties_extra.svg" to 0.90,
     "filters.svg" to 0.93,
 
     // Complex filter interactions and tiling edge cases
