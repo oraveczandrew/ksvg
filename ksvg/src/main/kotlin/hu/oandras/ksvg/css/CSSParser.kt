@@ -90,6 +90,10 @@ internal class CSSParser internal constructor(
                         append("+ ")
                     }
 
+                    Combinator.FOLLOWS_ALL -> {
+                        append("~ ")
+                    }
+
                     Combinator.DESCENDANT -> {}
                 }
 
@@ -102,6 +106,9 @@ internal class CSSParser internal constructor(
                         AttribOp.EQUALS -> append('=').append(attr.value)
                         AttribOp.INCLUDES -> append("~=").append(attr.value)
                         AttribOp.DASH_MATCH -> append("|=").append(attr.value)
+                        AttribOp.PREFIX -> append("^=").append(attr.value)
+                        AttribOp.SUFFIX -> append("$=").append(attr.value)
+                        AttribOp.SUBSTRING -> append("*=").append(attr.value)
                         else -> {}
                     }
                     append(']')
@@ -513,6 +520,17 @@ internal class CSSParser internal constructor(
                         obj = obj
                     )
                 }
+
+                Combinator.FOLLOWS_ALL -> {
+                    matchAnyPreviousSibling(
+                        ruleMatchContext = ruleMatchContext,
+                        selector = selector,
+                        selPartPos = selPartPos,
+                        ancestors = ancestors,
+                        ancestorsPos = ancestorsPos,
+                        obj = obj
+                    )
+                }
             }
         }
 
@@ -575,6 +593,17 @@ internal class CSSParser internal constructor(
                         obj = obj
                     )
                 }
+
+                Combinator.FOLLOWS_ALL -> {
+                    matchAnyPreviousSibling(
+                        ruleMatchContext = ruleMatchContext,
+                        selector = selector,
+                        selPartPos = selPartPos,
+                        ancestors = ancestors,
+                        ancestorsPos = ancestorsPos,
+                        obj = obj
+                    )
+                }
             }
         }
 
@@ -599,6 +628,34 @@ internal class CSSParser internal constructor(
             )
         }
 
+        private fun matchAnyPreviousSibling(
+            ruleMatchContext: RuleMatchContext?,
+            selector: Selector,
+            selPartPos: Int,
+            ancestors: MutableList<Container>,
+            ancestorsPos: Int,
+            obj: ElementBase
+        ): Boolean {
+            val childPos = getChildPosition(ancestors, ancestorsPos, obj)
+            if (childPos <= 0) return false
+            val siblings = obj.parent!!.getChildren()
+            for (i in childPos - 1 downTo 0) {
+                val sibling = siblings[i] as? ElementBase ?: continue
+                if (ruleMatch(
+                        ruleMatchContext = ruleMatchContext,
+                        selector = selector,
+                        selPartPos = selPartPos - 1,
+                        ancestors = ancestors,
+                        ancestorsPos = ancestorsPos,
+                        obj = sibling
+                    )
+                ) {
+                    return true
+                }
+            }
+            return false
+        }
+
         private fun getChildPosition(
             ancestors: MutableList<Container>,
             ancestorsPos: Int,
@@ -621,6 +678,22 @@ internal class CSSParser internal constructor(
             return -1
         }
 
+        /**
+         * Matches a single attribute value against an [AttribOp]. Substring operators
+         * (`^=`, `$=`, `*=`) never match the empty string, per CSS Selectors 3.
+         */
+        private fun matchAttribStringOp(value: String, op: AttribOp, pattern: String): Boolean {
+            return when (op) {
+                AttribOp.EXISTS -> true
+                AttribOp.EQUALS -> value == pattern
+                AttribOp.INCLUDES -> value.split(' ').contains(pattern)
+                AttribOp.DASH_MATCH -> value == pattern || value.startsWith("$pattern-")
+                AttribOp.PREFIX -> pattern.isNotEmpty() && value.startsWith(pattern)
+                AttribOp.SUFFIX -> pattern.isNotEmpty() && value.endsWith(pattern)
+                AttribOp.SUBSTRING -> pattern.isNotEmpty() && value.contains(pattern)
+            }
+        }
+
         private fun selectorMatch(
             ruleMatchContext: RuleMatchContext?,
             sel: SimpleSelector,
@@ -638,29 +711,37 @@ internal class CSSParser internal constructor(
             sel.attributes?.forEachElement { attr ->
                 when (attr.name) {
                     ID -> {
-                        if (attr.value != obj.id) {
-                            return false
+                        val id = obj.id
+                        if (attr.operation == AttribOp.EXISTS) {
+                            if (id == null) return false
+                        } else {
+                            if (id == null || !matchAttribStringOp(id, attr.operation, attr.value)) {
+                                return false
+                            }
                         }
                     }
 
                     CLASS -> {
                         val classNames = obj.classNames ?: return false
-                        if (!classNames.contains(attr.value)) {
-                            return false
+                        when (attr.operation) {
+                            AttribOp.EXISTS -> {}
+                            AttribOp.EQUALS, AttribOp.INCLUDES, AttribOp.DASH_MATCH -> {
+                                if (!classNames.contains(attr.value)) {
+                                    return false
+                                }
+                            }
+                            AttribOp.PREFIX, AttribOp.SUFFIX, AttribOp.SUBSTRING -> {
+                                if (classNames.none { matchAttribStringOp(it, attr.operation, attr.value) }) {
+                                    return false
+                                }
+                            }
                         }
                     }
 
                     else -> {
                         val value = obj.attributes?.get(attr.name) ?: return false
-                        when (attr.operation) {
-                            AttribOp.EXISTS -> {}
-                            AttribOp.EQUALS -> if (value != attr.value) return false
-                            AttribOp.INCLUDES -> {
-                                if (!value.split(' ').contains(attr.value)) return false
-                            }
-                            AttribOp.DASH_MATCH -> {
-                                if (value != attr.value && !value.startsWith("${attr.value}-")) return false
-                            }
+                        if (!matchAttribStringOp(value, attr.operation, attr.value)) {
+                            return false
                         }
                     }
                 }

@@ -20,5 +20,6 @@ package hu.oandras.ksvg.css
 internal enum class Combinator {
     DESCENDANT,  // E F
     CHILD,  // E > F
-    FOLLOWS // E + F
+    FOLLOWS,  // E + F
+    FOLLOWS_ALL,  // E ~ F
 }

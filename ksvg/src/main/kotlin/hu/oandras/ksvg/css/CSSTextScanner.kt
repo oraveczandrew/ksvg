@@ -136,6 +136,9 @@ internal class CSSTextScanner(input: String) : TextScanner(
             } else if (consume('+')) {
                 combinator = Combinator.FOLLOWS
                 skipWhitespace()
+            } else if (consume('~')) {
+                combinator = Combinator.FOLLOWS_ALL
+                skipWhitespace()
             }
         }
 
@@ -188,6 +191,12 @@ internal class CSSTextScanner(input: String) : TextScanner(
                     AttribOp.INCLUDES
                 } else if (consume("|=")) {
                     AttribOp.DASH_MATCH
+                } else if (consume("^=")) {
+                    AttribOp.PREFIX
+                } else if (consume("$=")) {
+                    AttribOp.SUFFIX
+                } else if (consume("*=")) {
+                    AttribOp.SUBSTRING
                 } else {
                     null
                 }

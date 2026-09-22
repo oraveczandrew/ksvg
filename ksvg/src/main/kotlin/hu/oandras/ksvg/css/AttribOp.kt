@@ -22,4 +22,7 @@ internal enum class AttribOp {
     EQUALS,  // *[foo=bar]
     INCLUDES,  // *[foo~=bar]
     DASH_MATCH,  // *[foo|=bar]
+    PREFIX,  // *[foo^=bar]
+    SUFFIX,  // *[foo$=bar]
+    SUBSTRING,  // *[foo*=bar]
 }
