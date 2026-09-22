@@ -1,30 +1,11 @@
 # KSVG Filter Kernel Benchmarks
 
-This document records the performance of native SIMD kernels and Kotlin reference implementations compared to their scalar C++ counterparts.
-
-Marker column: 🚀 very good speedup (>9x); 🟢 decent speedup; 🔴 regression (slower than the scalar baseline).
-
-Measurements come from the benchmark harness median timings. A run is marked
-`UNSTABLE` when all batches complete without thermal throttling but their batch
-averages have a coefficient of variation above 5%. Unstable runs remain
-displayed with their measured values. The Status icon still reflects the
-measured speedup; the `⚠️ UNSTABLE BENCH` marker in the Note column indicates that
-the run is not reliable.
-
-Kotlin rows use different status semantics: a slower Kotlin result has no
-regression icon, while a faster result uses `⬆️` to indicate the improvement.
-
-Within each kernel, backends are listed from the Kotlin reference and scalar
-baseline through progressively wider ISA implementations. On x86 the order is
-`kotlin → scalar → sse2 → ssse3 → avx2`; on ARM it is
-`kotlin → scalar → neon32 → neon64`. Omit backends that were not measured.
-Speedups are relative to `scalar` (`1.00x`).
-
-Kernel rows are ordered alphabetically by kernel name; within each kernel, sizes are ordered from 512x512 to 2048x2048.
+Speedups relative to `scalar` (`1.00x`). Status: 🚀 >9x, 🟢 faster, 🔴 regression; Kotlin faster = ⬆️. `⚠️ UNSTABLE BENCH` = CoV >5%.
+Row order per kernel: `kotlin → scalar → sse2 → ssse3 → avx2` (x86), `kotlin → scalar → neon32 → neon64` (ARM).
 
 ## Host Results (i7-7820X)
 
-Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
+macOS 15.8, i7-7820X, 64-bit host build.
 
 | Kernel | Backend | Size | Avg ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
@@ -219,13 +200,7 @@ Measured on macOS 15.8 (24H23) (i7-7820X, 64-bit host build).
 
 ## Host Results (x86-64, Android emulator)
 
-Measured on the x86_64 Android emulator (API 29), on the same hardware.
-Harness-reported median timings with the thermal gate disabled (`benchmark.thermalGating=false`).
-ConvolveMatrix measures the unified 5×5 kernel; ArithmeticComposite uses 3 buffers (12 B/px).
-Where a kernel row is missing a backend, that backend is not advertised on this ABI.
-Exception: the Lighting rows in this section were re-measured 2026-09-18 on an API-29 image
-where `scalar`/`ssse3`/`avx2` execute for lighting (no `sse2` lighting kernel exists on this
-ABI, hence no `sse2` Lighting rows). Non-lighting rows are unchanged from the previous session.
+x86_64 emulator (API 29), thermal gating off. Missing backend = not advertised on this ABI.
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
@@ -394,24 +369,11 @@ ABI, hence no `sse2` Lighting rows). Non-lighting rows are unchanged from the pr
 | UnLinearize | ssse3 | 512x512 | 0.32 | 817.12 | 6.54 | 2.84x | 🟢 | ⚠️ UNSTABLE BENCH |
 | UnLinearize | kotlin | 2048x2048 | 9.19 | 456.20 | 3.65 | 1.83x | ⬆️ |  |
 | UnLinearize | scalar | 2048x2048 | 16.79 | 249.75 | 2.00 | 1.00x |  |  |
-| UnLinearize | ssse3 | 2048x2048 | 5.37 | 780.57 | 6.24 | 3.13x | 🟢 |  |
-
-The emulator reports only `scalar`/`sse2`/`ssse3`: AVX2/AVX-512 are not matched by runtime detection
-(`detectSimdLevel()` stays below `SIMD_AVX2`) although the emulated CPU advertises `avx2`.
-
-Root cause (Android emulator 37.2.8.0 on macOS, HVF): the guest CPUID is served from a fixed mask
-regardless of `-qemu -cpu model` (`max`, `Skylake-Server`, forced `osxsave=on,avx512f=on,...` all give
-identical results) and `-cpu host` does not exist in this QEMU fork. The mask sets
-`CPUID.1:ECX.OSXSAVE=0` (with `AVX=1`) and clears every `CPUID.7:EBX` AVX-512 bit, so
-`__builtin_cpu_supports("avx"/"avx2"/"avx512*")` always returns 0 — 32-bit and 64-bit images alike.
-Under HVF the AVX/AVX2/AVX-512 backends can therefore never be advertised by runtime detection;
-only TCG software emulation would report them (slow). Use desktop/host native validation or forced
-backend dispatch instead.
+| UnLinearize | ssse3 | 2048x2048 | 5.37 | 780.57 | 6.24 | 3.13x | 🟢 |  
 
 ## Host Results (x86-32, Android emulator)
 
-Measured on the x86 (32-bit) Android emulator, API 30, on the same hardware. ConvolveMatrix measures
-the unified 5×5 kernel; ArithmeticComposite uses 3 buffers (12 B/px).
+x86 emulator (API 30). Missing backend = not advertised on this ABI.
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
@@ -578,20 +540,9 @@ the unified 5×5 kernel; ArithmeticComposite uses 3 buffers (12 B/px).
 | UnLinearize | scalar | 2048x2048 | 13.98 | 300.04 | 2.40 | 1.00x |  |  |
 | UnLinearize | ssse3 | 2048x2048 | 4.14 | 1012.00 | 8.10 | 3.37x | 🟢 |  |
 
-The emulator exposes only `scalar`/`sse2`/`ssse3`. This is not a 32-bit x86/Android gating quirk: the
-emulator's HVF layer hard-masks guest CPUID (`OSXSAVE=0`, all AVX-512 bits cleared) on 64-bit images
-too, so `__builtin_cpu_supports` never advertises AVX. See the note in the x86-64 emulator section.
-If a kernel row is missing a backend it is not advertised on this ABI.
-
-Exception: the Lighting rows above were re-measured 2026-09-18 on an API-30 image that advertises
-`scalar`/`ssse3`/`avx2` for lighting (AVX2 executes natively there; no `sse2` lighting kernel
-exists on this ABI, hence no `sse2` Lighting rows). Non-lighting rows are unchanged from the
-previous session.
-
 ## Device Results (OnePlus 11)
 
-Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `arm64-v8a`; non-quick harness run (512x512 and 2048x2048, median timings).
-Lighting rows re-measured 2026-09-18; non-lighting rows are unchanged from the previous session.
+OnePlus 11 (Snapdragon 8 Gen 2), `arm64-v8a`.
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
@@ -738,8 +689,7 @@ Lighting rows re-measured 2026-09-18; non-lighting rows are unchanged from the p
 
 ## Device Results (OnePlus 11, 32-bit ARM)
 
-Measured on OnePlus 11 (CPH2449, Snapdragon 8 Gen 2), `armeabi-v7a`; non-quick harness run (512x512 and 2048x2048, median timings).
-Lighting rows re-measured 2026-09-18; non-lighting rows are unchanged from the previous session.
+OnePlus 11 (Snapdragon 8 Gen 2), `armeabi-v7a`.
 
 | Kernel | Backend | Size | ms | MPix/s | GB/s | Speedup | Status | Note |
 | :--- | :--- | :---: | ---: | ---: | ---: | ---: | :---: | :--- |
