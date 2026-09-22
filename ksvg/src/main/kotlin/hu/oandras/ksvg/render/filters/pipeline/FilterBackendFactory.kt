@@ -25,7 +25,7 @@ import hu.oandras.ksvg.render.Renderer
  * still reject a graph while building the effect chain) and always falls back
  * to the software backend created here.
  */
-internal object FilterPipeline {
+internal object FilterBackendFactory {
 
     @JvmStatic
     internal fun createSoftware(renderer: Renderer): SoftwareFilterBackend =
@@ -34,8 +34,8 @@ internal object FilterPipeline {
     @JvmStatic
     internal fun createGpuOrNull(renderer: Renderer): FilterBackend? =
         when {
-            Build.VERSION.SDK_INT >= 33 -> FilterPipelineImpl33(renderer)
-            Build.VERSION.SDK_INT >= 31 -> FilterPipelineImpl31(renderer)
+            Build.VERSION.SDK_INT >= 33 -> GpuFilterBackendApi33(renderer)
+            Build.VERSION.SDK_INT >= 31 -> GpuFilterBackend(renderer)
             else -> null
         }
 }

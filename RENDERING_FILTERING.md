@@ -58,7 +58,7 @@ canvas type/API level:
 | Backend | Entry point | Runs on | Notes |
 |---|---|---|---|
 | Software (CPU) | `SoftwareFilterBackend` | software `Canvas` | The reference. Every primitive claims it. |
-| Hardware (GPU) | `FilterPipelineImpl31`/`FilterPipelineImpl33` | hardware canvas, API 31+/33+ | RenderEffect chain; shares region semantics with software via `RegionUtils`. |
+| Hardware (GPU) | `GpuFilterBackend`/`GpuFilterBackendApi33` | hardware canvas, API 31+/33+ | RenderEffect chain; shares region semantics with software via `RegionUtils`. |
 
 The two must agree **closely, not bit-exactly**. The software path and its
 native kernels are compared byte-for-byte by default (parity gate, see §6.3 —

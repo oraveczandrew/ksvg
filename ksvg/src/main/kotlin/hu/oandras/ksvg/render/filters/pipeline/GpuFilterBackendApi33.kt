@@ -87,7 +87,7 @@ import kotlin.math.abs
  * AGSL (RuntimeShader) GPU backend (API 33+, hardware canvas only).
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipelineImpl31(renderContext) {
+internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBackend(renderContext) {
 
     override val supportedMask: Int
         get() = FilterPrimitiveSet.FLAG_COLOR_MATRIX or

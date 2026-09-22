@@ -62,7 +62,7 @@ import android.graphics.RenderNode as AndroidRenderNode
  * (Blend/Composite/Merge/Flood/Image), displacement, lighting.
  */
 @RequiresApi(Build.VERSION_CODES.S)
-internal open class FilterPipelineImpl31 internal constructor(
+internal open class GpuFilterBackend internal constructor(
     @JvmField
     protected val renderContext: RenderContext,
 ) : FilterBackend {

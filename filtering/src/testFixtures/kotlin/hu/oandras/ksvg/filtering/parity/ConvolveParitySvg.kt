@@ -32,7 +32,7 @@ import hu.oandras.ksvg.filtering.ConvolveValidationCorpus
  * - `targetX`/`targetY`, `divisor`, `bias`, `preserveAlpha` -> verbatim.
  * - `edgeMode` (0=duplicate, 1=wrap, 2=none) -> `edgeMode` keyword. NOTE:
  *   the GPU chain only implements duplicate (clamp) sampling — wrap/none
- *   must fall back to software (guarded in `FilterPipelineImpl33`, covered
+ *   must fall back to software (guarded in `GpuFilterBackendApi33`, covered
  *   by fallback asserts in the runner, not parity asserts).
  * - No primitive subregion attributes: the corpus has no clip, so union
  *   inheritance (full filter region) applies on both backends.

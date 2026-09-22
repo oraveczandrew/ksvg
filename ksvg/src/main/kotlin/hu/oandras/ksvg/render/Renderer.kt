@@ -78,8 +78,8 @@ import hu.oandras.ksvg.render.animation.applyAnimatedStyle
 import hu.oandras.ksvg.render.animation.updateAnimations
 import hu.oandras.ksvg.render.filters.luminanceToAlphaFloatArray
 import hu.oandras.ksvg.render.filters.pipeline.FilterBackend
-import hu.oandras.ksvg.render.filters.pipeline.FilterPipeline
-import hu.oandras.ksvg.render.filters.pipeline.FilterPipelineImpl31
+import hu.oandras.ksvg.render.filters.pipeline.FilterBackendFactory
+import hu.oandras.ksvg.render.filters.pipeline.GpuFilterBackend
 import hu.oandras.ksvg.render.filters.pipeline.SoftwareFilterBackend
 import hu.oandras.ksvg.render.pool.Pool
 import hu.oandras.ksvg.render.pool.PoolOwner
@@ -1244,7 +1244,7 @@ internal class Renderer internal constructor(
         if (!forceSoftwareFiltering && canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31 &&
             state.style.opacity == 1f && state.style.mixBlendMode == CSSBlendMode.normal
         ) {
-            val gpu = gpuBackend ?: FilterPipeline.createGpuOrNull(this)?.also { gpuBackend = it }
+            val gpu = gpuBackend ?: FilterBackendFactory.createGpuOrNull(this)?.also { gpuBackend = it }
             if (gpu != null) {
                 val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
                 val pScaleX = if (primitiveUnitsAreUser) sx else boundingBox.width * sx
@@ -1255,7 +1255,7 @@ internal class Renderer internal constructor(
                 if (gpu.supports(primitives)) {
                     // Specific check for Impl31/33 linear chains + attributes.
                     val supported = when (gpu) {
-                        is FilterPipelineImpl31 -> gpu.tryBuildChain(
+                        is GpuFilterBackend -> gpu.tryBuildChain(
                             element = element,
                             filterNode = filterNode,
                             scaleX = pScaleX,
@@ -1275,7 +1275,7 @@ internal class Renderer internal constructor(
             }
         }
 
-        return softwareBackend ?: FilterPipeline.createSoftware(this).also { softwareBackend = it }
+        return softwareBackend ?: FilterBackendFactory.createSoftware(this).also { softwareBackend = it }
     }
 
     override fun resolveFloodColor(

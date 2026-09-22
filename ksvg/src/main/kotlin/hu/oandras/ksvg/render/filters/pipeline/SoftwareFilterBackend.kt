@@ -77,7 +77,7 @@ import hu.oandras.ksvg.utils.forEachElement
 /**
  * Software (CPU) filter backend driving the existing Kotlin/native kernel
  * path. It is both the software-canvas workhorse and the final fallback of
- * [FilterPipeline]: it claims every primitive set.
+ * [FilterBackendFactory]: it claims every primitive set.
  */
 internal class SoftwareFilterBackend internal constructor(
     private val renderContext: RenderContext,

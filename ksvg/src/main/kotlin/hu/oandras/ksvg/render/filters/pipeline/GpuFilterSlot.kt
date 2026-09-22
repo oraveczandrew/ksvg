@@ -53,7 +53,7 @@ internal class GpuFilterSlot internal constructor() {
 
     /** Built effect chain cache: depends on the filter's attributes
      * (version) and the primitive scales, not on the rendered content. */
-    @JvmField var gpuChain: FilterPipelineImpl31.Chain? = null
+    @JvmField var gpuChain: GpuFilterBackend.Chain? = null
     @JvmField var gpuChainVersion: Int = -1
     @JvmField var gpuChainScaleX: Float = 0f
     @JvmField var gpuChainScaleY: Float = 0f
