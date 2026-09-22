@@ -32,7 +32,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import kotlin.math.abs
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -273,9 +272,12 @@ class FiltersTest {
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
-        // Per spec feSpecularLighting produces alpha = max(R,G,B).
+        // Terminal feSpecularLighting emits the cairo form (91dc5961):
+        // full-strength light color in RGB (white here), intensity in alpha.
+        // The "alpha = max(R,G,B)" rule holds only for non-terminal output.
         val pixel = bm.getPixel(50, 50)
-        assertTrue(abs(maxOf(pixel.red, pixel.green, pixel.blue) - pixel.alpha) <= 1)
+        assertTrue(pixel.red == 255 && pixel.green == 255 && pixel.blue == 255)
+        assertTrue(pixel.alpha in 1..254)
     }
 
     @Test
@@ -300,9 +302,12 @@ class FiltersTest {
         val canvas = Canvas(bm)
         svg.renderToCanvas(canvas)
 
-        // Per spec feSpecularLighting produces alpha = max(R,G,B).
+        // Terminal feSpecularLighting emits the cairo form (91dc5961):
+        // full-strength light color in RGB (white here), intensity in alpha.
+        // The "alpha = max(R,G,B)" rule holds only for non-terminal output.
         val pixel = bm.getPixel(50, 50)
-        assertTrue(abs(maxOf(pixel.red, pixel.green, pixel.blue) - pixel.alpha) <= 1)
+        assertTrue(pixel.red == 255 && pixel.green == 255 && pixel.blue == 255)
+        assertTrue(pixel.alpha in 1..254)
     }
 
     @Test

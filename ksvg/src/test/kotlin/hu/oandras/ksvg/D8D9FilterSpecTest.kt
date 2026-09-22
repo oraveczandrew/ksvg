@@ -49,7 +49,14 @@ class D8D9FilterSpecTest {
     private fun alpha(bitmap: Bitmap, x: Int, y: Int): Int =
         (bitmap.getPixel(x, y) ushr 24) and 0xff
 
-    // --- D8: feSpecularLighting alpha must be max(R,G,B) ---
+    // --- D8: terminal feSpecularLighting emits the cairo form ---
+    //
+    // Since 91dc5961 the terminal kernel emits premultiplied (lightColor,
+    // intensity): full-strength light color in RGB, specular intensity in
+    // alpha — matching cairo/rsvg (rsvg renders this SVG as (255,255,255,116)
+    // at every interior point). The "alpha = max(R,G,B)" rule holds only for
+    // the straight intermediate form kept for non-terminal (consumer-fed)
+    // specular output, never for final rendered pixels.
 
     @Test
     fun specularAlphaIsMaxOfChannels() {
@@ -60,6 +67,8 @@ class D8D9FilterSpecTest {
         var sawOpaqueHighlight = false
         var sawTranslucentSlope = false
         // Check well inside the lit square to avoid edge anti-aliasing artifacts.
+        // The bump map is a flat rect, so the field is uniform: every pixel
+        // carries full-strength white with the rsvg intensity (116).
         for (y in 26 until 74) for (x in 26 until 74) {
             val p = bitmap.getPixel(x, y)
             val a = (p ushr 24) and 0xff
@@ -67,11 +76,11 @@ class D8D9FilterSpecTest {
             val g = (p shr 8) and 0xff
             val b = p and 0xff
             if (r > 0 || g > 0 || b > 0) {
-                // alpha == max(R,G,B) for every non-black output pixel
-                // (±1 tolerance for premultiplied-alpha round-trip)
+                // Terminal cairo form: full-strength light color; intensity in alpha.
+                assertTrue("lit pixel must carry full white at $x,$y, was ($r,$g,$b)", r == 255 && g == 255 && b == 255)
                 assertTrue(
-                    "alpha ($a) must equal max(R,G,B)=${maxOf(r, g, b)} at $x,$y",
-                    kotlin.math.abs(a - maxOf(r, g, b)) <= 1
+                    "alpha ($a) must be the rsvg intensity 116 at $x,$y",
+                    kotlin.math.abs(a - 116) <= 2
                 )
                 if (a >= 254) sawOpaqueHighlight = true else if (a in 16..239) sawTranslucentSlope = true
             } else {
