@@ -790,6 +790,13 @@ internal class FeConvolveMatrixRenderNode(
     @JvmField val bias: Float,
     @JvmField val preserveAlpha: Boolean,
     @JvmField val edgeMode: ConvolveMatrixEdgeMode,
+    /**
+     * `kernelUnitLength` in filter primitive units, or null for the default
+     * (one offscreen pixel). Applied as a device-pixel sampling step of
+     * `kernelUnitLength * primitiveScale`.
+     */
+    @JvmField val kernelUnitLengthX: Float?,
+    @JvmField val kernelUnitLengthY: Float?,
 ) : FilterPrimitiveRenderNode<FeConvolveMatrix>(sourceElement) {
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_CONVOLVE_MATRIX
     /**

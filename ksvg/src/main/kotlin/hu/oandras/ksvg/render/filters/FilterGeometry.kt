@@ -19,6 +19,7 @@ package hu.oandras.ksvg.render.filters
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import hu.oandras.ksvg.compat.XFerModes
 import hu.oandras.ksvg.css.CSSLength
@@ -32,6 +33,7 @@ import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withClip
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp
+import kotlin.math.roundToInt
 
 context(renderContext: RenderContext)
 internal fun doFeOffsetFilter(
@@ -64,6 +66,63 @@ internal fun doFeOffsetFilter(
 @SuppressLint("UseKtx")
 context(renderContext: RenderContext)
 internal fun doFeConvolveMatrixFilter(
+    primitiveNode: FeConvolveMatrixRenderNode,
+    inputBitmap: Bitmap,
+    primitiveScaleX: Float,
+    primitiveScaleY: Float,
+): Bitmap {
+    // kernelUnitLength (in filter primitive units) scales the kernel sampling
+    // step; the default is one offscreen pixel. Mirrors the reference model
+    // (rsvg): downscale the input by 1/step, convolve at 1px steps (native
+    // eligible), then upscale the result back.
+    val stepX = primitiveNode.kernelUnitLengthX
+        ?.let { it * primitiveScaleX }?.takeIf { it > 0f } ?: 1f
+    val stepY = primitiveNode.kernelUnitLengthY
+        ?.let { it * primitiveScaleY }?.takeIf { it > 0f } ?: 1f
+    if (stepX == 1f && stepY == 1f) {
+        return convolveBitmap(primitiveNode, inputBitmap)
+    }
+
+    val pool = renderContext.bitmapPool
+    val smallW = maxOf(1, (inputBitmap.width / stepX).roundToInt())
+    val smallH = maxOf(1, (inputBitmap.height / stepY).roundToInt())
+    val small = pool.acquire(smallW, smallH, inputBitmap.config!!)
+    try {
+        renderContext.canvasPool.withPooledObject { c ->
+            c.setBitmap(small)
+            c.drawBitmap(
+                inputBitmap,
+                Rect(0, 0, inputBitmap.width, inputBitmap.height),
+                RectF(0f, 0f, smallW.toFloat(), smallH.toFloat()),
+                bilinearPaint
+            )
+        }
+        val smallOut = convolveBitmap(primitiveNode, small)
+        try {
+            val res = pool.acquireSameAs(inputBitmap)
+            renderContext.canvasPool.withPooledObject { c ->
+                c.setBitmap(res)
+                c.drawBitmap(
+                    smallOut,
+                    Rect(0, 0, smallW, smallH),
+                    RectF(0f, 0f, inputBitmap.width.toFloat(), inputBitmap.height.toFloat()),
+                    bilinearPaint
+                )
+            }
+            return res
+        } finally {
+            pool.release(smallOut)
+        }
+    } finally {
+        pool.release(small)
+    }
+}
+
+/** Bilinear sampling paint for filter-region rescaling (read-only sharing). */
+private val bilinearPaint: Paint = Paint().apply { isFilterBitmap = true }
+
+context(renderContext: RenderContext)
+private fun convolveBitmap(
     primitiveNode: FeConvolveMatrixRenderNode,
     inputBitmap: Bitmap,
 ): Bitmap {

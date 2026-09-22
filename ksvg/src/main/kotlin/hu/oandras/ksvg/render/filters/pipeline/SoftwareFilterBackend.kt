@@ -537,6 +537,8 @@ internal class SoftwareFilterBackend internal constructor(
                 doFeConvolveMatrixFilter(
                     primitiveNode = primitiveNode,
                     inputBitmap = inputBitmap,
+                    primitiveScaleX = primitiveScaleX,
+                    primitiveScaleY = primitiveScaleY,
                 )
             }
 

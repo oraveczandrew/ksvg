@@ -122,6 +122,7 @@ internal enum class SVGAttr {
     numOctaves,
     order,
     kernelMatrix,
+    kernelUnitLength,
     divisor,
     bias,
     targetX,
@@ -303,6 +304,7 @@ internal enum class SVGAttr {
             "numOctaves" -> numOctaves
             "order" -> order
             "kernelMatrix" -> kernelMatrix
+            "kernelUnitLength" -> kernelUnitLength
             "divisor" -> divisor
             "bias" -> bias
             "targetX" -> targetX

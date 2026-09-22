@@ -50,6 +50,15 @@ internal class FeConvolveMatrix(
     val targetX: Int?,
     @JvmField
     val targetY: Int?,
+    /**
+     * `kernelUnitLength` in filter primitive units, or null when unspecified
+     * (default = one offscreen pixel). Non-positive values fall back to the
+     * default per spec and are stored as null.
+     */
+    @JvmField
+    val kernelUnitLengthX: Float?,
+    @JvmField
+    val kernelUnitLengthY: Float?,
     @JvmField
     val edgeMode: ConvolveMatrixEdgeMode,
     @JvmField
@@ -83,6 +92,8 @@ internal class FeConvolveMatrix(
         private var bias: Float = 0f
         private var targetX: Int? = null
         private var targetY: Int? = null
+        private var kernelUnitLengthX: Float? = null
+        private var kernelUnitLengthY: Float? = null
         private var edgeMode: ConvolveMatrixEdgeMode = ConvolveMatrixEdgeMode.duplicate
         private var preserveAlpha: Boolean = false
 
@@ -107,6 +118,13 @@ internal class FeConvolveMatrix(
                     ConvolveMatrixEdgeMode.valueOf(value.lowercase(Locale.US))
                 } catch (_: IllegalArgumentException) {
                     throw KSVGParseException("Invalid matrix edge mode: $value")
+                }
+                SVGAttr.kernelUnitLength -> {
+                    val values = parseFloatList(value)
+                    val x = values.getOrNull(0)
+                    val y = values.getOrNull(1) ?: x
+                    kernelUnitLengthX = if (x != null && x > 0f) x else null
+                    kernelUnitLengthY = if (y != null && y > 0f) y else null
                 }
                 SVGAttr.preserveAlpha -> preserveAlpha = value.equals("true", ignoreCase = true)
                 else -> return super.onAttribute(attributes, index, attr, value)
@@ -133,6 +151,8 @@ internal class FeConvolveMatrix(
                 bias = bias,
                 targetX = targetX,
                 targetY = targetY,
+                kernelUnitLengthX = kernelUnitLengthX,
+                kernelUnitLengthY = kernelUnitLengthY,
                 edgeMode = edgeMode,
                 preserveAlpha = preserveAlpha,
             )

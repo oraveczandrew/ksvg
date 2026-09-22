@@ -1705,6 +1705,8 @@ internal class RenderTreeBuilder(
                     bias = primitive.bias,
                     preserveAlpha = primitive.preserveAlpha,
                     edgeMode = primitive.edgeMode,
+                    kernelUnitLengthX = primitive.kernelUnitLengthX,
+                    kernelUnitLengthY = primitive.kernelUnitLengthY,
                 )
             }
             is FeMorphology -> FeMorphologyRenderNode(

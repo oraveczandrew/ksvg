@@ -446,6 +446,11 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeConvolveMatrixRenderNode -> {
+                            // kernelUnitLength needs downscale-convolve-upscale,
+                            // which the GPU chain cannot represent: decline to SW.
+                            if (primitive.kernelUnitLengthX != null || primitive.kernelUnitLengthY != null) {
+                                return null
+                            }
                             val (shader, convolveEffect) = when (primitive.sourceElement.edgeMode) {
                                 ConvolveMatrixEdgeMode.wrap -> createConvolveWrapShaderEffect(
                                     node = primitive,
