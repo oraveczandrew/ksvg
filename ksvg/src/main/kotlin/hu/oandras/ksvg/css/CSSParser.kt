@@ -298,7 +298,8 @@ internal class CSSParser internal constructor(
             var important = false
             if (scan.consume('!')) {
                 scan.skipWhitespace()
-                checkCssState(scan.consume("important")) { "Malformed rule set: found unexpected '!'" }
+                // CSS keywords are ASCII case-insensitive: accept !IMPORTANT etc.
+                checkCssState(scan.consumeIgnoreCase("important")) { "Malformed rule set: found unexpected '!'" }
                 important = true
                 scan.skipWhitespace()
             }

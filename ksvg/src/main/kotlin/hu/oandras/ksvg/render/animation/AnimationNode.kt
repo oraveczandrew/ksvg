@@ -152,10 +152,24 @@ internal class AnimateFloatNode(
     @JvmField
     val parsedKeySplines: List<CubicBezier>? = null,
     @JvmField
-    val pacedKeyTimes: FloatList? = null
+    val pacedKeyTimes: FloatList? = null,
+    /**
+     * True for SMIL `by`-only / `to`-only animations, where `effectiveValues`
+     * is a normalized 0→1 ramp and the endpoint is resolved against the base
+     * value at apply time (the base is unknown at tree-build time):
+     * - `by`-only: `base + byValue * p`
+     * - `to`-only + `additive="sum"`: `base + endValue * p`
+     * - `to`-only + replace: `base + (endValue - base) * p`
+     */
+    @JvmField
+    val baseRelative: Boolean = false,
+    @JvmField
+    val endValue: Float = 0f,
+    @JvmField
+    val byValue: Float? = null
 ) : AnimationNode(sourceElement) {
     override fun toString(): String {
-        return "AnimateFloatNode(effectiveValues=$effectiveValues, parsedKeySplines=$parsedKeySplines, pacedKeyTimes=$pacedKeyTimes) ${super.toString()}"
+        return "AnimateFloatNode(effectiveValues=$effectiveValues, parsedKeySplines=$parsedKeySplines, pacedKeyTimes=$pacedKeyTimes, baseRelative=$baseRelative) ${super.toString()}"
     }
 }
 

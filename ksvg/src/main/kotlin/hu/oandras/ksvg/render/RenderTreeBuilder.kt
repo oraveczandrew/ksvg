@@ -423,6 +423,22 @@ internal class RenderTreeBuilder(
         return result.optimizeReadOnlyList()
     }
 
+    /** Normalized 0→1 ramp for base-relative SMIL to-only / by-only animation. */
+    private fun rampFloatList(): MutableFloatList {
+        val list = MutableFloatList(2)
+        list.add(0f)
+        list.add(1f)
+        return list
+    }
+
+    /** Frozen single-value list for discrete to-only / by-only animation. */
+    private fun frozenFloatList(v: Float): MutableFloatList {
+        val list = MutableFloatList(2)
+        list.add(v)
+        list.add(v)
+        return list
+    }
+
     private fun buildAnimationNode(animation: Animation): AnimationNode? {
         if (!animation.isValid()) return null
 
@@ -524,10 +540,18 @@ internal class RenderTreeBuilder(
             }
 
             is AnimateFloat -> {
+                var baseRelative = false
+                var endValue = 0f
+                var byValue: Float? = null
                 val effectiveValues = animation.values ?: run {
                     val fromVal = animation.from
                     val toVal = animation.to
                     val byVal = animation.by
+                    // SMIL to-only / by-only resolve against the base value at apply
+                    // time (see AnimateFloatNode.baseRelative). Discrete to-only
+                    // stays frozen at `to` (this also keeps <set> semantics, which
+                    // forces discrete mode); discrete by-only freezes at base + by.
+                    val discrete = animation.calcMode == CalcMode.discrete
                     when {
                         fromVal != null && toVal != null -> {
                             val list = MutableFloatList(2)
@@ -543,11 +567,26 @@ internal class RenderTreeBuilder(
                             list
                         }
 
+                        byVal != null && !discrete -> {
+                            baseRelative = true
+                            byValue = byVal
+                            rampFloatList()
+                        }
+
+                        byVal != null -> {
+                            baseRelative = true
+                            byValue = byVal
+                            frozenFloatList(byVal)
+                        }
+
+                        toVal != null && !discrete -> {
+                            baseRelative = true
+                            endValue = toVal
+                            rampFloatList()
+                        }
+
                         toVal != null -> {
-                            val list = MutableFloatList(2)
-                            list.add(toVal)
-                            list.add(toVal)
-                            list
+                            frozenFloatList(toVal)
                         }
 
                         else -> null
@@ -560,7 +599,10 @@ internal class RenderTreeBuilder(
                     parsedKeySplines = if (animation.calcMode == CalcMode.spline) parseKeySplines(animation.keySplines) else null,
                     pacedKeyTimes = if (animation.calcMode == CalcMode.paced && animation.keyTimes == null) computePacedKeyTimesFloat(
                         effectiveValues
-                    ) else null
+                    ) else null,
+                    baseRelative = baseRelative,
+                    endValue = endValue,
+                    byValue = byValue
                 )
             }
 

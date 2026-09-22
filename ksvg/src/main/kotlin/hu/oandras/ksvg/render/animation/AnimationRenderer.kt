@@ -319,7 +319,7 @@ internal fun applyAnimatedStyle(
         when (animation) {
             is AnimateFloatNode -> {
                 animation.withValueAt(renderContext.animationTimeMs) { valAt ->
-                    if (applyFloatAnimation(state, builder, animation.attributeName, valAt, animation.additiveSum)) {
+                    if (applyFloatAnimation(state, builder, animation.attributeName, valAt, animation)) {
                         changed = true
                     }
                 }
@@ -376,18 +376,41 @@ internal fun applyAnimatedStyle(
     return changed
 }
 
+/**
+ * Resolves an interpolated float animation value against the base value.
+ *
+ * Plain from-to/values animation replaces the base (or adds to it with
+ * `additive="sum"`). SMIL `by`-only / `to`-only animations
+ * ([AnimateFloatNode.baseRelative]) interpolate a normalized 0→1 ramp that is
+ * resolved here: `by`-only adds `by * p`; `to`-only with `additive="sum"` adds
+ * `to * p`; plain `to`-only interpolates `base → to`.
+ */
+context(renderContext: AnimationContext)
+private fun resolveAnimatedFloat(base: Float, valAt: Float, animation: AnimateFloatNode): Float {
+    if (!animation.baseRelative) {
+        return if (animation.additiveSum) base + valAt else valAt
+    }
+    val by = animation.byValue
+    if (by != null) return base + by * valAt
+    return if (animation.additiveSum) {
+        base + animation.endValue * valAt
+    } else {
+        base + (animation.endValue - base) * valAt
+    }
+}
+
 context(renderContext: AnimationContext)
 private fun applyFloatAnimation(
     state: RendererState,
     builder: Style.Builder,
     attributeName: SVGAttr,
     valAt: Float,
-    additiveSum: Boolean
+    animation: AnimateFloatNode
 ): Boolean {
     var changed = false
     when (attributeName) {
         SVGAttr.opacity -> {
-            val newVal = if (additiveSum) builder.opacity + valAt else valAt
+            val newVal = resolveAnimatedFloat(builder.opacity, valAt, animation)
             if (builder.opacity != newVal) {
                 builder.opacity = newVal
                 changed = true
@@ -396,7 +419,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.fill_opacity -> {
             val base = if (builder.fillOpacity.isNaN()) 1f else builder.fillOpacity
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (builder.fillOpacity != newVal) {
                 builder.fillOpacity = newVal
                 changed = true
@@ -405,7 +428,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.stroke_opacity -> {
             val base = if (builder.strokeOpacity.isNaN()) 1f else builder.strokeOpacity
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (builder.strokeOpacity != newVal) {
                 builder.strokeOpacity = newVal
                 changed = true
@@ -414,7 +437,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.stroke_width -> {
             val base = builder.strokeWidth?.floatValueInContext() ?: 1f
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (base != newVal) {
                 val newStrokeWidth = CSSLength(newVal)
                 builder.strokeWidth = newStrokeWidth
@@ -429,7 +452,7 @@ private fun applyFloatAnimation(
             } else {
                 builder.strokeDashOffset?.floatValueInContext() ?: 0f
             }
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (base != newVal) {
                 builder.strokeDashOffsetResolved = newVal
                 state.updateStrokeDash(
@@ -442,7 +465,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.stroke_miterlimit -> {
             val base = builder.strokeMiterLimit
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (base != newVal) {
                 builder.strokeMiterLimit = newVal
                 state.strokeConfig.setStrokeMiter(newVal)
@@ -452,7 +475,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.stop_opacity -> {
             val base = if (builder.stopOpacity.isNaN()) 1f else builder.stopOpacity
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (builder.stopOpacity != newVal) {
                 builder.stopOpacity = newVal
                 changed = true
@@ -461,7 +484,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.flood_opacity -> {
             val base = if (builder.floodOpacity.isNaN()) 1f else builder.floodOpacity
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (builder.floodOpacity != newVal) {
                 builder.floodOpacity = newVal
                 changed = true
@@ -470,7 +493,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.solid_opacity -> {
             val base = if (builder.solidOpacity.isNaN()) 1f else builder.solidOpacity
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (builder.solidOpacity != newVal) {
                 builder.solidOpacity = newVal
                 changed = true
@@ -479,7 +502,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.viewport_fill_opacity -> {
             val base = if (builder.viewportFillOpacity.isNaN()) 1f else builder.viewportFillOpacity
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (builder.viewportFillOpacity != newVal) {
                 builder.viewportFillOpacity = newVal
                 changed = true
@@ -488,7 +511,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.font_size -> {
             val base = builder.fontSize?.floatValue() ?: 12f
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (base != newVal) {
                 val newFontSize = CSSLength(newVal)
                 builder.fontSize = newFontSize
@@ -501,7 +524,7 @@ private fun applyFloatAnimation(
 
         SVGAttr.letter_spacing -> {
             val base = builder.letterSpacing?.floatValueInContext() ?: 0f
-            val newVal = if (additiveSum) base + valAt else valAt
+            val newVal = resolveAnimatedFloat(base, valAt, animation)
             if (base != newVal) {
                 val newSpacing = CSSLength(newVal)
                 builder.letterSpacing = newSpacing
@@ -521,7 +544,7 @@ private fun applyFloatAnimation(
         SVGAttr.word_spacing -> {
             if (supportsWordSpacing()) {
                 val base = builder.wordSpacing?.floatValueInContext() ?: 0f
-                val newVal = if (additiveSum) base + valAt else valAt
+                val newVal = resolveAnimatedFloat(base, valAt, animation)
                 if (base != newVal) {
                     val newSpacing = CSSLength(newVal)
                     builder.wordSpacing = newSpacing
@@ -640,7 +663,7 @@ internal fun animatedFloat(
     node.animationNodes?.forEachElement { anim ->
         if (anim is AnimateFloatNode && anim.attributeName == attributeName) {
             anim.withValueAt(animationTimeMs) { valAt ->
-                value = if (anim.additiveSum) value + valAt else valAt
+                value = resolveAnimatedFloat(value, valAt, anim)
             }
         }
     }

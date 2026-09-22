@@ -117,13 +117,13 @@ class AnimationUtilsTest {
     fun testSelectAnimationSegmentDiscrete_floatList() {
         val values = mutableFloatListOf(0f, 50f, 100f)
 
-        // At progress 0, should be at first segment (returns second value for discrete)
+        // SMIL discrete: values[0] holds at t=0
         val r0 = selectAnimationSegmentDiscrete(values, null, 0.0f)
-        assertEquals(50f, r0, 0.001f)
+        assertEquals(0f, r0, 0.001f)
 
-        // At progress 0.5, should be at second segment
+        // At progress 0.5 (default keyTime of the middle value) -> second value
         val r1 = selectAnimationSegmentDiscrete(values, null, 0.5f)
-        assertEquals(100f, r1, 0.001f)
+        assertEquals(50f, r1, 0.001f)
 
         // At progress 1, should be at last value
         val r2 = selectAnimationSegmentDiscrete(values, null, 1.0f)
@@ -135,13 +135,13 @@ class AnimationUtilsTest {
         val values = mutableFloatListOf(0f, 50f, 100f)
         val keyTimes = mutableFloatListOf(0f, 0.3f, 1.0f)
 
-        // Before first keyTime boundary -> second value
+        // Before first keyTime boundary -> first value (SMIL discrete)
         val r0 = selectAnimationSegmentDiscrete(values, keyTimes, 0.1f)
-        assertEquals(50f, r0, 0.001f)
+        assertEquals(0f, r0, 0.001f)
 
-        // After first boundary -> third value
+        // Inside second interval [0.3, 1.0) -> second value (SMIL discrete)
         val r1 = selectAnimationSegmentDiscrete(values, keyTimes, 0.5f)
-        assertEquals(100f, r1, 0.001f)
+        assertEquals(50f, r1, 0.001f)
 
         // At end
         val r2 = selectAnimationSegmentDiscrete(values, keyTimes, 1.0f)
@@ -153,10 +153,10 @@ class AnimationUtilsTest {
         val values = mutableIntListOf(0xFF0000.toInt(), 0x00FF00.toInt(), 0x0000FF.toInt())
 
         val r0 = selectAnimationSegmentDiscrete(values, null, 0.0f)
-        assertEquals(0x00FF00.toInt(), r0)
+        assertEquals(0xFF0000.toInt(), r0)
 
         val r1 = selectAnimationSegmentDiscrete(values, null, 0.5f)
-        assertEquals(0x0000FF.toInt(), r1)
+        assertEquals(0x00FF00.toInt(), r1)
 
         val r2 = selectAnimationSegmentDiscrete(values, null, 1.0f)
         assertEquals(0x0000FF.toInt(), r2)

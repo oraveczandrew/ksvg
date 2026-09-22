@@ -134,16 +134,18 @@ internal fun selectAnimationSegmentDiscrete(
 
     if (keyTimes != null && keyTimes.size == elementCount) {
         for (i in 0 until segmentCount) {
-            val end = keyTimes[i + 1]
-            if (progress < end || i == segmentCount - 1) {
-                return values[i + 1]
+            // SMIL discrete: values[i] holds for keyTime[i] <= t < keyTime[i + 1].
+            if (progress < keyTimes[i + 1]) {
+                return values[i]
             }
         }
+        return values[elementCount - 1]
     }
 
+    if (progress >= 1f) return values[elementCount - 1]
     val scaled = progress * segmentCount
     val index = clamp(scaled.toInt(), 0, segmentCount - 1)
-    return values[index + 1]
+    return values[index]
 }
 
 internal inline fun selectAnimationSegment(
@@ -247,16 +249,18 @@ internal fun selectAnimationSegmentDiscrete(
 
     if (keyTimes != null && keyTimes.size == elementCount) {
         for (i in 0 until segmentCount) {
-            val end = keyTimes[i + 1]
-            if (progress < end || i == segmentCount - 1) {
-                return values[i + 1]
+            // SMIL discrete: values[i] holds for keyTime[i] <= t < keyTime[i + 1].
+            if (progress < keyTimes[i + 1]) {
+                return values[i]
             }
         }
+        return values[elementCount - 1]
     }
 
+    if (progress >= 1f) return values[elementCount - 1]
     val scaled = progress * segmentCount
     val index = clamp(scaled.toInt(), 0, segmentCount - 1)
-    return values[index + 1]
+    return values[index]
 }
 
 internal fun selectAnimationSegmentDiscrete(
@@ -280,22 +284,30 @@ internal fun selectAnimationSegmentDiscrete(
 
     if (keyTimes != null && keyTimes.size == elementCount) {
         for (i in 0 until segmentCount) {
-            val end = keyTimes[i + 1]
-            if (progress < end || i == segmentCount - 1) {
-                val toIdx = (i + 1) * stride
+            // SMIL discrete: values[i] holds for keyTime[i] <= t < keyTime[i + 1].
+            if (progress < keyTimes[i + 1]) {
+                val fromIdx = i * stride
                 for (j in 0 until stride) {
-                    out[j] = values[toIdx + j]
+                    out[j] = values[fromIdx + j]
                 }
                 return
             }
         }
+        val lastIdx = (elementCount - 1) * stride
+        for (j in 0 until stride) {
+            out[j] = values[lastIdx + j]
+        }
+        return
     }
 
-    val scaled = progress * segmentCount
-    val index = clamp(scaled.toInt(), 0, segmentCount - 1)
-    val toIdx = (index + 1) * stride
+    val index = if (progress >= 1f) {
+        segmentCount - 1
+    } else {
+        clamp((progress * segmentCount).toInt(), 0, segmentCount - 1)
+    }
+    val fromIdx = index * stride
     for (j in 0 until stride) {
-        out[j] = values[toIdx + j]
+        out[j] = values[fromIdx + j]
     }
 }
 
@@ -459,7 +471,8 @@ internal fun calculateProgress(
 ): Float {
     if (durMs <= 0) return 1f
 
-    val totalDurMs = if (repeatCount == Animation.REPEAT_INDEFINITE) {
+    // dur="indefinite" maps to Long.MAX_VALUE; saturate instead of overflowing.
+    val totalDurMs = if (durMs == Long.MAX_VALUE || repeatCount == Animation.REPEAT_INDEFINITE) {
         Long.MAX_VALUE
     } else {
         durMs * repeatCount
@@ -492,7 +505,8 @@ internal fun isFinished(
 ): Boolean {
     if (animationTimeMs >= endMs) return true
 
-    val totalDurMs = if (repeatCount == Animation.REPEAT_INDEFINITE) {
+    // dur="indefinite" maps to Long.MAX_VALUE; saturate instead of overflowing.
+    val totalDurMs = if (durMs == Long.MAX_VALUE || repeatCount == Animation.REPEAT_INDEFINITE) {
         Long.MAX_VALUE
     } else {
         durMs * repeatCount

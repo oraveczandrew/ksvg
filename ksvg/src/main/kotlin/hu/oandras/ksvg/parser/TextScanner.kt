@@ -187,6 +187,16 @@ internal open class TextScanner(input: String) {
         return found
     }
 
+    /**
+     * Case-insensitive [consume] for ASCII CSS keywords (e.g. `!IMPORTANT`).
+     * Zero-allocation: uses region matching instead of lowercasing.
+     */
+    fun consumeIgnoreCase(str: String): Boolean {
+        val found = input.regionMatches(position, str, 0, str.length, ignoreCase = true)
+        if (found) position += str.length
+        return found
+    }
+
     /*
     * Skip the current char and peek at the char in the following position.
     */

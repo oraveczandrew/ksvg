@@ -108,7 +108,14 @@ internal sealed class Animation(
             when (attr) {
                 SVGAttr.attributeName -> attributeName = SVGAttr.fromString(value)
                 SVGAttr.dur -> {
-                    durMs = parseClockValueMillis(value)
+                    // SMIL: dur="indefinite" means an indefinite simple duration.
+                    // Map it to Long.MAX_VALUE so isValid() keeps the animation;
+                    // <set> without dur is handled separately (useIndefiniteDurationForSet).
+                    durMs = if (value.trim().equals("indefinite", ignoreCase = true)) {
+                        Long.MAX_VALUE
+                    } else {
+                        parseClockValueMillis(value)
+                    }
                     durSpecified = true
                 }
                 SVGAttr.begin -> beginMs = parseClockValueMillis(value)
@@ -127,7 +134,10 @@ internal sealed class Animation(
                 SVGAttr.additive -> additiveSum = (value == "sum")
                 SVGAttr.accumulate -> accumulateSum = (value == "sum")
                 SVGAttr.keyTimes -> keyTimes = parseSemicolonFloatList(value)
-                SVGAttr.calcMode -> calcMode = CalcMode.valueOf(value.lowercase())
+                // Unknown calcMode values must not abort the whole parse (would
+                // propagate out of the SAX handler); fall back to linear per SMIL.
+                SVGAttr.calcMode -> calcMode =
+                    runCatching { CalcMode.valueOf(value.lowercase()) }.getOrDefault(CalcMode.linear)
                 SVGAttr.keySplines -> keySplines = value
                 SVGAttr.values -> valuesStr = value
                 SVGAttr.from -> fromStr = value
