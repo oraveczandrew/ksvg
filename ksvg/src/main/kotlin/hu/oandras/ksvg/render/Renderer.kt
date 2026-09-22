@@ -2558,5 +2558,8 @@ internal fun textLayoutStyleCacheVersion(style: Style): Long {
     k = k * 31 + (style.baselineShift?.type?.ordinal ?: -1)
     k = k * 31 + (style.dominantBaseline?.ordinal ?: -1)
     k = k * 31 + (style.alignmentBaseline?.ordinal ?: -1)
+    // getAnchorPosition() drives layout from these two (including the RTL swap).
+    k = k * 31 + (style.textAnchor?.ordinal ?: -1)
+    k = k * 31 + (style.direction?.ordinal ?: -1)
     return k
 }
