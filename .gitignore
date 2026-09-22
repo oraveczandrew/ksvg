@@ -1,4 +1,13 @@
 local.properties
+# Signing / publishing secrets - never commit these
+*.jks
+*.p12
+*.pfx
+*.asc
+*.gpg
+keystore*
+secring*
+signing.properties
 build
 .cxx
 .gradle
