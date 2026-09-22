@@ -27,6 +27,7 @@ import hu.oandras.ksvg.dom.filter.FeSpotLight
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
 import hu.oandras.ksvg.dom.filter.Lighting
 import hu.oandras.ksvg.dom.style.ColorValue
+import hu.oandras.ksvg.filtering.ColorLuts
 import hu.oandras.ksvg.filtering.LightType
 import hu.oandras.ksvg.filtering.SoftwareKernels
 import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
@@ -63,8 +64,156 @@ private fun doLightingFilter(
     exponent: Float,
     premultipliedOutput: Boolean = false,
     useLinear: Boolean = false,
+    kernelUnitLengthX: Float?,
+    kernelUnitLengthY: Float?,
 ): Bitmap {
     val lightSource = light ?: return inputBitmap
+
+    val primitiveUnitSizeX = primitiveScaleX.toDouble() / canvasScaleX.toDouble()
+    val primitiveUnitSizeY = primitiveScaleY.toDouble() / canvasScaleY.toDouble()
+    val invCanvasScaleX = 1.0 / canvasScaleX.toDouble()
+    val invCanvasScaleY = 1.0 / canvasScaleY.toDouble()
+
+    // kernelUnitLength (in filter primitive units) scales the normal-tap
+    // distances; the default is one offscreen pixel. Mirrors the reference
+    // model (rsvg): downscale the input, light at 1px taps, upscale back.
+    val stepX = kernelUnitLengthX?.let { it * primitiveScaleX }?.takeIf { it > 0f } ?: 1f
+    val stepY = kernelUnitLengthY?.let { it * primitiveScaleY }?.takeIf { it > 0f } ?: 1f
+    if (stepX == 1f && stepY == 1f) {
+        return lightBitmap(
+            primitive = primitive,
+            lightSource = lightSource,
+            surfaceScale = surfaceScale,
+            pixels = pixels,
+            outPixels = outPixels,
+            inputBitmap = inputBitmap,
+            primitiveOriginX = primitiveOriginX,
+            primitiveOriginY = primitiveOriginY,
+            regionLeft = regionLeft,
+            regionTop = regionTop,
+            unitSizeX = primitiveUnitSizeX,
+            unitSizeY = primitiveUnitSizeY,
+            invCanvasScaleX = invCanvasScaleX,
+            invCanvasScaleY = invCanvasScaleY,
+            canvasScaleX = canvasScaleX,
+            canvasScaleY = canvasScaleY,
+            primitiveRegion = primitiveRegion,
+            filterRegion = filterRegion,
+            alphaIsMaxOfChannels = alphaIsMaxOfChannels,
+            k = k,
+            exponent = exponent,
+            premultipliedOutput = premultipliedOutput,
+            useLinear = useLinear,
+        )
+    }
+
+    val pool = renderContext.bitmapPool
+    val small = downscaleBitmap(inputBitmap, stepX, stepY)
+    try {
+        val smallOut = lightBitmap(
+            primitive = primitive,
+            lightSource = lightSource,
+            surfaceScale = surfaceScale,
+            pixels = pixels,
+            outPixels = outPixels,
+            inputBitmap = small,
+            primitiveOriginX = primitiveOriginX,
+            primitiveOriginY = primitiveOriginY,
+            regionLeft = regionLeft,
+            regionTop = regionTop,
+            unitSizeX = primitiveUnitSizeX,
+            unitSizeY = primitiveUnitSizeY,
+            // Light-vector positions map back to full resolution (rsvg:
+            // scaled_x = x * ox); the normal-tap math (dzdxScale) intentionally
+            // keeps full-res canvasScale, matching the reference which runs
+            // identical math in the downscaled space.
+            invCanvasScaleX = invCanvasScaleX * stepX,
+            invCanvasScaleY = invCanvasScaleY * stepY,
+            canvasScaleX = canvasScaleX,
+            canvasScaleY = canvasScaleY,
+            primitiveRegion = RectF(
+                primitiveRegion.left / stepX,
+                primitiveRegion.top / stepY,
+                primitiveRegion.right / stepX,
+                primitiveRegion.bottom / stepY
+            ),
+            filterRegion = RectF(
+                filterRegion.left / stepX,
+                filterRegion.top / stepY,
+                filterRegion.right / stepX,
+                filterRegion.bottom / stepY
+            ),
+            alphaIsMaxOfChannels = alphaIsMaxOfChannels,
+            k = k,
+            exponent = exponent,
+            premultipliedOutput = premultipliedOutput,
+            // The reference resamples in linear space: keep the intermediate
+            // linear and gamma-correct after upscaling (below).
+            useLinear = false,
+        )
+        try {
+            val res = upscaleBitmap(smallOut, inputBitmap.width, inputBitmap.height)
+            if (useLinear && !premultipliedOutput) {
+                linearToSrgbInPlace(res)
+            }
+            return res
+        } finally {
+            pool.release(smallOut)
+        }
+    } finally {
+        pool.release(small)
+    }
+}
+
+/**
+ * In-place linear→sRGB conversion of RGB channels (alpha untouched) for a
+ * `kernelUnitLength` lighting result that was resampled in linear space.
+ * Uses the same LUT as the kernel gamma path for bit-consistency.
+ */
+context(renderContext: RenderContext)
+private fun linearToSrgbInPlace(bitmap: Bitmap) {
+    val size = bitmap.width * bitmap.height
+    if (size <= 0) return
+    val table = ColorLuts.LINEAR_TO_SRGB.table
+    val pixels = IntArray(size)
+    bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+    for (i in pixels.indices) {
+        val p = pixels[i]
+        pixels[i] = (p and -0x1000000) or
+            (table[(p shr 16) and 0xff] shl 16) or
+            (table[(p shr 8) and 0xff] shl 8) or
+            table[p and 0xff]
+    }
+    bitmap.setPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+}
+
+context(renderContext: RenderContext)
+private fun lightBitmap(
+    primitive: FilterPrimitive,
+    lightSource: Lighting,
+    surfaceScale: Float,
+    pixels: IntArrayBucket,
+    outPixels: IntArrayBucket,
+    inputBitmap: Bitmap,
+    primitiveOriginX: Float,
+    primitiveOriginY: Float,
+    regionLeft: Float,
+    regionTop: Float,
+    unitSizeX: Double,
+    unitSizeY: Double,
+    invCanvasScaleX: Double,
+    invCanvasScaleY: Double,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    // feSpecularLighting produces a transparency map (alpha = max(R,G,B)); feDiffuseLighting is opaque.
+    alphaIsMaxOfChannels: Boolean,
+    k: Float,
+    exponent: Float,
+    premultipliedOutput: Boolean = false,
+    useLinear: Boolean = false,
+): Bitmap {
 
     val width = inputBitmap.width
     val height = inputBitmap.height
@@ -85,15 +234,10 @@ private fun doLightingFilter(
 
     val surfaceScaleNormalized = surfaceScale / 255f
 
-    val invCanvasScaleX = 1.0 / canvasScaleX.toDouble()
-    val invCanvasScaleY = 1.0 / canvasScaleY.toDouble()
     val userLeft = regionLeft.toDouble()
     val userTop = regionTop.toDouble()
     val originX = primitiveOriginX.toDouble()
     val originY = primitiveOriginY.toDouble()
-
-    val primitiveUnitSizeX = primitiveScaleX.toDouble() / canvasScaleX.toDouble()
-    val primitiveUnitSizeY = primitiveScaleY.toDouble() / canvasScaleY.toDouble()
 
     val clipLeft = clamp(((primitiveRegion.left - filterRegion.left)).toInt(), 0, width)
     val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
@@ -142,8 +286,8 @@ private fun doLightingFilter(
         userTop = userTop,
         originX = originX,
         originY = originY,
-        unitSizeX = primitiveUnitSizeX,
-        unitSizeY = primitiveUnitSizeY,
+        unitSizeX = unitSizeX,
+        unitSizeY = unitSizeY,
         canvasScaleX = canvasScaleX,
         canvasScaleY = canvasScaleY,
         lightType = lightType,
@@ -199,6 +343,8 @@ internal fun doFeDiffuseLightingFilter(
         k = diffuseConstant,
         exponent = 0f,
         useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
+        kernelUnitLengthX = primitive.kernelUnitLengthX,
+        kernelUnitLengthY = primitive.kernelUnitLengthY,
     )
 }
 
@@ -243,6 +389,8 @@ internal fun doFeSpecularLightingFilter(
         exponent = specularExponent,
         premultipliedOutput = premultipliedOutput,
         useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
+        kernelUnitLengthX = primitive.kernelUnitLengthX,
+        kernelUnitLengthY = primitive.kernelUnitLengthY,
     )
 }
 

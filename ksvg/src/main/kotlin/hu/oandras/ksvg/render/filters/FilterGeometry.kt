@@ -84,32 +84,11 @@ internal fun doFeConvolveMatrixFilter(
     }
 
     val pool = renderContext.bitmapPool
-    val smallW = maxOf(1, (inputBitmap.width / stepX).roundToInt())
-    val smallH = maxOf(1, (inputBitmap.height / stepY).roundToInt())
-    val small = pool.acquire(smallW, smallH, inputBitmap.config!!)
+    val small = downscaleBitmap(inputBitmap, stepX, stepY)
     try {
-        renderContext.canvasPool.withPooledObject { c ->
-            c.setBitmap(small)
-            c.drawBitmap(
-                inputBitmap,
-                Rect(0, 0, inputBitmap.width, inputBitmap.height),
-                RectF(0f, 0f, smallW.toFloat(), smallH.toFloat()),
-                bilinearPaint
-            )
-        }
         val smallOut = convolveBitmap(primitiveNode, small)
         try {
-            val res = pool.acquireSameAs(inputBitmap)
-            renderContext.canvasPool.withPooledObject { c ->
-                c.setBitmap(res)
-                c.drawBitmap(
-                    smallOut,
-                    Rect(0, 0, smallW, smallH),
-                    RectF(0f, 0f, inputBitmap.width.toFloat(), inputBitmap.height.toFloat()),
-                    bilinearPaint
-                )
-            }
-            return res
+            return upscaleBitmap(smallOut, inputBitmap.width, inputBitmap.height)
         } finally {
             pool.release(smallOut)
         }
@@ -119,7 +98,48 @@ internal fun doFeConvolveMatrixFilter(
 }
 
 /** Bilinear sampling paint for filter-region rescaling (read-only sharing). */
-private val bilinearPaint: Paint = Paint().apply { isFilterBitmap = true }
+internal val bilinearPaint: Paint = Paint().apply { isFilterBitmap = true }
+
+/**
+ * Downscales [src] by 1/[stepX], 1/[stepY] (bilinear) into a pooled bitmap.
+ * The caller owns the result and must release it. Mirrors the reference
+ * downscale step for `kernelUnitLength` (rsvg).
+ */
+context(renderContext: RenderContext)
+internal fun downscaleBitmap(src: Bitmap, stepX: Float, stepY: Float): Bitmap {
+    val w = maxOf(1, (src.width / stepX).roundToInt())
+    val h = maxOf(1, (src.height / stepY).roundToInt())
+    val dst = renderContext.bitmapPool.acquire(w, h, src.config!!)
+    renderContext.canvasPool.withPooledObject { c ->
+        c.setBitmap(dst)
+        c.drawBitmap(
+            src,
+            Rect(0, 0, src.width, src.height),
+            RectF(0f, 0f, w.toFloat(), h.toFloat()),
+            bilinearPaint
+        )
+    }
+    return dst
+}
+
+/**
+ * Upscales [src] to [dstWidth]×[dstHeight] (bilinear) into a pooled bitmap.
+ * The caller owns the result and must release it.
+ */
+context(renderContext: RenderContext)
+internal fun upscaleBitmap(src: Bitmap, dstWidth: Int, dstHeight: Int): Bitmap {
+    val dst = renderContext.bitmapPool.acquire(dstWidth, dstHeight, src.config!!)
+    renderContext.canvasPool.withPooledObject { c ->
+        c.setBitmap(dst)
+        c.drawBitmap(
+            src,
+            Rect(0, 0, src.width, src.height),
+            RectF(0f, 0f, dstWidth.toFloat(), dstHeight.toFloat()),
+            bilinearPaint
+        )
+    }
+    return dst
+}
 
 context(renderContext: RenderContext)
 private fun convolveBitmap(

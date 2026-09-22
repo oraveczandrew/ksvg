@@ -86,4 +86,51 @@ class KernelUnitLengthTest {
             assertTrue("kul=$kul: expected white at x=31, got ${row[31]}", row[31] > 239)
         }
     }
+
+    private fun renderLit(kulAttr: String): IntArray {
+        // Alpha step as the bump map: flat field with a degenerate-normal
+        // edge (black), matching rsvg pixel-for-pixel without kernelUnitLength.
+        val svg = """
+            <svg width="60" height="20" xmlns="http://www.w3.org/2000/svg">
+              <filter id="f" x="0" y="0" width="60" height="20"
+                      filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse">
+                <feDiffuseLighting surfaceScale="2" diffuseConstant="1" lighting-color="white"$kulAttr>
+                  <feDistantLight azimuth="0" elevation="60"/>
+                </feDiffuseLighting>
+              </filter>
+              <g filter="url(#f)">
+                <rect x="0" y="0" width="30" height="20" fill="white" opacity="0"/>
+                <rect x="30" y="0" width="30" height="20" fill="white" opacity="1"/>
+              </g>
+            </svg>
+        """.trimIndent()
+        val bitmap = renderWithLibrary(svg, createBitmap(60, 20), softwareFiltering = true)
+        return IntArray(60) { x -> (bitmap.getPixel(x, 10) shr 16) and 0xff }
+    }
+
+    @Test
+    fun lightingKernelUnitLengthWidensEdgeResponse() {
+        val flat = renderLit("")
+        // Baseline without kernelUnitLength: uniform field, black edge pair.
+        assertTrue("expected flat field at x=24, got ${flat[24]}", flat[24] in 230..255)
+        assertEquals(0, flat[29])
+        assertEquals(0, flat[30])
+        assertTrue("expected flat field at x=26, got ${flat[26]}", flat[26] in 230..255)
+
+        // kernelUnitLength=3: same flat field and black core, but the
+        // shoulders spread (validated against rsvg-convert; tmp/kul/).
+        val row = renderLit(" kernelUnitLength=\"3\"")
+        assertTrue("expected flat field at x=24, got ${row[24]}", row[24] in 230..255)
+        assertEquals(0, row[29])
+        assertTrue("expected spread shoulder at x=26, got ${row[26]}", row[26] in 150..220)
+        assertTrue("expected spread shoulder at x=27, got ${row[27]}", row[27] in 100..200)
+        assertTrue("expected flat field at x=34, got ${row[34]}", row[34] in 230..255)
+    }
+
+    @Test
+    fun lightingInvalidKernelUnitLengthFallsBackToDefault() {
+        val row = renderLit(" kernelUnitLength=\"0\"")
+        assertTrue("expected flat field at x=26, got ${row[26]}", row[26] in 230..255)
+        assertEquals(0, row[29])
+    }
 }

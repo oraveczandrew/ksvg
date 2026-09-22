@@ -22,6 +22,7 @@ import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseFloat
+import hu.oandras.ksvg.parser.parseFloatList
 import org.xml.sax.Attributes
 
 internal class FeDiffuseLighting(
@@ -37,6 +38,15 @@ internal class FeDiffuseLighting(
     val surfaceScale: Float,
     @JvmField
     val diffuseConstant: Float,
+    /**
+     * `kernelUnitLength` in filter primitive units, or null when unspecified
+     * (default = one offscreen pixel). Non-positive values fall back to the
+     * default per spec and are stored as null.
+     */
+    @JvmField
+    val kernelUnitLengthX: Float?,
+    @JvmField
+    val kernelUnitLengthY: Float?,
 ) : FilterPrimitive(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -63,6 +73,8 @@ internal class FeDiffuseLighting(
     ) {
         private var surfaceScale: Float = 1f
         private var diffuseConstant: Float = 1f
+        private var kernelUnitLengthX: Float? = null
+        private var kernelUnitLengthY: Float? = null
 
         override fun onAttribute(
             attributes: Attributes,
@@ -73,6 +85,13 @@ internal class FeDiffuseLighting(
             when (attr) {
                 SVGAttr.surfaceScale -> surfaceScale = parseFloat(value)
                 SVGAttr.diffuseConstant -> diffuseConstant = parseFloat(value)
+                SVGAttr.kernelUnitLength -> {
+                    val values = parseFloatList(value)
+                    val x = values.getOrNull(0)
+                    val y = values.getOrNull(1) ?: x
+                    kernelUnitLengthX = if (x != null && x > 0f) x else null
+                    kernelUnitLengthY = if (y != null && y > 0f) y else null
+                }
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
 
@@ -92,6 +111,8 @@ internal class FeDiffuseLighting(
                 `in` = getIn(),
                 surfaceScale = surfaceScale,
                 diffuseConstant = diffuseConstant,
+                kernelUnitLengthX = kernelUnitLengthX,
+                kernelUnitLengthY = kernelUnitLengthY,
             )
         }
     }

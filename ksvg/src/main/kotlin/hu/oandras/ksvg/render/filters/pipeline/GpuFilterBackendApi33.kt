@@ -357,6 +357,13 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeDiffuseLightingRenderNode -> {
+                            // kernelUnitLength needs downscale-light-upscale,
+                            // which the GPU chain cannot represent: decline to SW.
+                            if (primitive.sourceElement.kernelUnitLengthX != null ||
+                                primitive.sourceElement.kernelUnitLengthY != null
+                            ) {
+                                return null
+                            }
                             primitiveRegion.set(
                                 (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
                                 (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
@@ -392,6 +399,13 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeSpecularLightingRenderNode -> {
+                            // kernelUnitLength needs downscale-light-upscale,
+                            // which the GPU chain cannot represent: decline to SW.
+                            if (primitive.sourceElement.kernelUnitLengthX != null ||
+                                primitive.sourceElement.kernelUnitLengthY != null
+                            ) {
+                                return null
+                            }
                             primitiveRegion.set(
                                 (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
                                 (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
