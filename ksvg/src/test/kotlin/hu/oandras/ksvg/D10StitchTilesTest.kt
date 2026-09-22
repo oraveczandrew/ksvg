@@ -41,11 +41,32 @@ class D10StitchTilesTest {
         SvgPathNoise.buildPermutation(lcg, permutation)
         val noise = SvgPathNoise(lcg, permutation)
         val p = 10
-        for (t in listOf(0.3, 3.7, 9.9999)) {
-            val v = noise.noise2(t, 2.4, p, p)
-            assertTrue("noise(x+$p) must equal noise(x)", abs(v - noise.noise2(t + p, 2.4, p, p)) < 1e-9)
-            assertTrue("noise(y+$p) must equal noise(y)", abs(v - noise.noise2(t, 2.4 + p, p, p)) < 1e-9)
+        // Production wrap convention (cf. KotlinKernels turbulence loop):
+        // tile origin 0 + PERLIN_N offset + period. Since e8e52097 noise2
+        // uses the SVG 1.1 / librsvg edge-wrap form (conditional subtraction
+        // past the wrap line, NOT modular folding), so the wrap origin must
+        // be explicit — the (0, 0) defaults fold every sample and cannot tile.
+        val w = 4096 + p
+        for (t in listOf(0.3, 3.7)) {
+            val v = noise.noise2(t, 2.4, p, p, w, w)
+            assertTrue("noise(x+$p) must equal noise(x)", abs(v - noise.noise2(t + p, 2.4, p, p, w, w)) < 1e-9)
+            assertTrue("noise(y+$p) must equal noise(y)", abs(v - noise.noise2(t, 2.4 + p, p, p, w, w)) < 1e-9)
         }
+        // Seam continuity: the cell straddling the wrap line folds only its
+        // far corner (e.g. t=9.9999 folds bx1 but not bx0), so exact
+        // t/t+p equality does NOT hold there by design — but the folded far
+        // corner meets the folded near corner, i.e. the tile edge is
+        // seamless: the difference scales with eps (measured ~1e-7 at 1e-7).
+        // A broken fold would diverge O(0.1).
+        val eps = 1e-7
+        assertTrue(
+            "stitch seam must be continuous in x",
+            abs(noise.noise2(p - eps, 2.4, p, p, w, w) - noise.noise2(p + eps, 2.4, p, p, w, w)) < 1e-5
+        )
+        assertTrue(
+            "stitch seam must be continuous in y",
+            abs(noise.noise2(3.7, p - eps, p, p, w, w) - noise.noise2(3.7, p + eps, p, p, w, w)) < 1e-5
+        )
         // Sanity: without a period the values differ.
         val a = noise.noise2(1.234, 2.4)
         assertTrue(abs(a - noise.noise2(1.234 + p, 2.4)) > 1e-6)
