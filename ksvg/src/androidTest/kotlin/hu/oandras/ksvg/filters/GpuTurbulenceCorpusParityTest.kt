@@ -86,6 +86,8 @@ class GpuTurbulenceCorpusParityTest(
             unfiltered = renderSoftware(corpusBaseline(svg), case.width, case.height)
         )
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E chain-taken proof (stitch takes the GPU chain since F6).
+        assertChainBackend(name, minGpuApi = 33)
         // Host golden for every case (straight bytes, no roundtrip):
         // non-stitch goldens use corpus params (== device params, no
         // adjustment); stitch goldens use device-derived params (adjusted

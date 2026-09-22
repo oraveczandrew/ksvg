@@ -63,6 +63,9 @@ class GpuLightingCorpusParityTest(
             unfiltered = renderSoftware(corpusBaseline(svg), case.width, case.height)
         )
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E chain-taken proof (lightless cases pass through on GPU
+        // since F3 — still a taken chain, not a decline).
+        assertChainBackend(name, minGpuApi = 33)
         // Per-case gates (all Adreno-measured, see GPU_ROUNDB_LIGHT_WORKLOG):
         // - point specular (sRGB + linear): fp intensity noise amplified by
         //   exponent 20 (10 scattered ±4 alpha pixels, RGB exact).

@@ -60,6 +60,8 @@ class GpuMorphologyCorpusParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E chain-taken proof.
+        assertChainBackend(name, minGpuApi = 33)
         assertParity(
             name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
             sw = sw,

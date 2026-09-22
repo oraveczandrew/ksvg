@@ -83,6 +83,8 @@ class GpuDisplacementCorpusParityTest(
             )
         }
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E chain-taken proof.
+        assertChainBackend(name, minGpuApi = 33)
         // Per-case gates (Adreno CPH2449 measured 2026-09-21; flip rate
         // grows with |scale| as modeled: ±1 LSB map quantization flips
         // trunc(scale*(ch-0.5)) with P ≈ 2*scale/255):

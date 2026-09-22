@@ -466,6 +466,7 @@ internal open class FilterPipelineImpl31 internal constructor(
         val slot = filterNode.gpuSlotFor(node)
         val chain = slot.gpuChain ?: return
         val gpuNode = slot.gpuNode ?: return
+        GpuChainEvents.record(filterNode, GpuChainEvents.GPU)
         gpuNode.setRenderEffect(chain.effect)
         canvas.withSave {
             @Suppress("DEPRECATION")

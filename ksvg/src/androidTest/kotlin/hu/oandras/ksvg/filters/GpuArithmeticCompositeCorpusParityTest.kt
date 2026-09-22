@@ -66,6 +66,10 @@ class GpuArithmeticCompositeCorpusParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E chain-taken proof (linear arithmetic takes the GPU chain
+        // since F9; the golden exists because device-SW is nondeterministic,
+        // not because HW declines).
+        assertChainBackend(name, minGpuApi = 33)
         val golden = loadGoldenAsset(
             "parity/arithmetic/" + caseName.replace(Regex("[^A-Za-z0-9]+"), "_") + ".png",
             Bitmap.createBitmap(case.width, case.height, Bitmap.Config.ARGB_8888),

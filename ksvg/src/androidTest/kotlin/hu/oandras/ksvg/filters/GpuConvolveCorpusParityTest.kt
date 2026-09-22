@@ -73,6 +73,8 @@ class GpuConvolveCorpusParityTest(
             )
         )
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E chain-taken proof (wrap/none take the GPU chain since F4).
+        assertChainBackend(name, minGpuApi = 33)
         // NOTE (F4): wrap/none take the GPU chain now; strict placeholder
         // gates for all modes, calibrated from measured stats (worklog).
         assertParity(

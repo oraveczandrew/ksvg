@@ -57,6 +57,8 @@ class GpuGaussianBlurCorpusParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E chain-taken proof.
+        assertChainBackend(name, minGpuApi = 31)
         // The GPU path (Skia blur) approximates the CPU kernel (report §7:
         // non-separable kernel, corner zones): per-case tolerances below are
         // Adreno-measured (see GPU_ROUNDB_BLUR_WORKLOG.md), never global.

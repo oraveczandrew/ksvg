@@ -25,11 +25,13 @@ import android.graphics.RenderNode
 import android.media.ImageReader
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.render.filters.pipeline.GpuChainEvents
 import hu.oandras.ksvg.test.decodePng
 import hu.oandras.ksvg.test.renderWithLibrary
 import hu.oandras.ksvg.utils.alpha
@@ -54,10 +56,100 @@ internal const val GPU_PARITY_MAX_OUTLIER_RATIO = 0.001
 internal const val GPU_PARITY_MIN_VISIBLE_EFFECT_RATIO = 0.005
 
 /**
+ * Round-E chain-taken proof (`tmp/GPU_PARITY_PLAN_E.md` §1.1): per-filter
+ * record of which backend drew each filter use. Both renders clear on
+ * entry (one-render-per-test convention), so the snapshot after
+ * [renderOnHardware] holds exactly that render's HW-side events.
+ *
+ * Emission runs on the test thread during `RenderNode` recording
+ * (`drawFiltered` records the chain into the display list; `syncAndDraw`
+ * only replays it), so no cross-thread race: reading after the render
+ * returns is safe. The list is still synchronized — cheap insurance if
+ * the framework ever replays on another thread.
+ */
+private val chainEventLog: MutableList<Pair<String, String>> =
+    java.util.Collections.synchronizedList(mutableListOf())
+
+/** Registers the [GpuChainEvents] sink (idempotent, test-only). */
+internal fun installChainEventLog() {
+    if (GpuChainEvents.listener == null) {
+        GpuChainEvents.listener = { filterId, backend ->
+            chainEventLog.add(filterId to backend)
+        }
+    }
+}
+
+/** Drops events from a previous render; called on entry by both renders. */
+internal fun clearChainEvents() {
+    chainEventLog.clear()
+}
+
+/** Copy of the current render's `(filterId, backend)` events. */
+internal fun snapshotChainEvents(): List<Pair<String, String>> =
+    synchronized(chainEventLog) { chainEventLog.toList() }
+
+/**
+ * Asserts which backend drew each expected filter in the last
+ * [renderOnHardware] render. Pixel asserts cannot distinguish "GPU rendered
+ * correctly" from "GPU silently declined and software rendered instead"
+ * (vacuous pass); this pins the mechanism.
+ *
+ * @param minGpuApi API level from which the chain is taken (Round-A
+ * convention): below it the HW side legitimately falls back, so `sw` is
+ * expected there.
+ * @param expectFallback the chain must decline (fallback tests: C15,
+ * geometry endpoint) — `sw` expected regardless of API.
+ * @param expectedFilterIds filter element ids that must have drawn (test
+ * SVGs carry ids by convention; anonymous filters record as
+ * `"(anonymous)"`).
+ * @param expectedMinUses per-filter minimum draw counts (E6: the
+ * `filters.svg` `#shadow` shared by circle+text must draw twice — guards
+ * the per-element slot fix against cache regressions).
+ */
+internal fun assertChainBackend(
+    name: String,
+    minGpuApi: Int,
+    expectFallback: Boolean = false,
+    expectedFilterIds: List<String> = listOf("f"),
+    expectedMinUses: Map<String, Int> = emptyMap(),
+) {
+    val expected = if (!expectFallback && Build.VERSION.SDK_INT >= minGpuApi) {
+        GpuChainEvents.GPU
+    } else {
+        GpuChainEvents.SW
+    }
+    val events = snapshotChainEvents()
+    for (id in expectedFilterIds) {
+        val hits = events.filter { it.first == id }
+        assertTrue(
+            "$name: no chain event for filter '$id' " +
+                "(expected $expected, minGpuApi=$minGpuApi, " +
+                "deviceApi=${Build.VERSION.SDK_INT}, events=$events)",
+            hits.isNotEmpty(),
+        )
+        assertTrue(
+            "$name: filter '$id' drew on ${hits.map { it.second }.distinct()} " +
+                "(expected all $expected, events=$events)",
+            hits.all { it.second == expected },
+        )
+    }
+    for ((id, minUses) in expectedMinUses) {
+        val uses = events.count { it.first == id && it.second == expected }
+        assertTrue(
+            "$name: filter '$id' drew $uses time(s), expected at least $minUses " +
+                "on $expected (events=$events)",
+            uses >= minUses,
+        )
+    }
+}
+
+/**
  * Software reference render (CPU kernels, software [android.graphics.Canvas]).
  * Mirrors the unit-test path via [renderWithLibrary] with forced software filtering.
  */
 internal fun renderSoftware(svgString: String, width: Int = GPU_PARITY_SIZE, height: Int = GPU_PARITY_SIZE): Bitmap {
+    installChainEventLog()
+    clearChainEvents()
     val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     return renderWithLibrary(svgString, out, true)
 }
@@ -76,6 +168,8 @@ internal fun renderOnHardware(
     width: Int = GPU_PARITY_SIZE,
     height: Int = GPU_PARITY_SIZE,
 ): Bitmap {
+    installChainEventLog()
+    clearChainEvents()
     val svg = SVG.getFromString(svgString)
     val renderer = HardwareRenderer()
     val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 1)
@@ -494,8 +588,8 @@ internal fun dumpParityBitmaps(name: String, sw: Bitmap, hw: Bitmap, stats: Pari
         sw.compress(Bitmap.CompressFormat.PNG, 100, File(dir, "$safe.sw.png").outputStream())
         hw.compress(Bitmap.CompressFormat.PNG, 100, File(dir, "$safe.hw.png").outputStream())
         diff.compress(Bitmap.CompressFormat.PNG, 100, File(dir, "$safe.diff.png").outputStream())
-        android.util.Log.w("GpuParity", "$name parity dump in ${dir.absolutePath} stats=$stats")
-        android.util.Log.w(
+        Log.w("GpuParity", "$name parity dump in ${dir.absolutePath} stats=$stats")
+        Log.w(
             "GpuParity",
             "$name worst non-fringe d=${stats.maxAbs} at (${stats.worstX},${stats.worstY}) " +
                 "ref=${stats.worstA.toUInt().toString(16)} hw=${stats.worstB.toUInt().toString(16)}",

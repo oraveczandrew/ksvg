@@ -191,6 +191,7 @@ internal class SoftwareFilterBackend internal constructor(
             cachedFilterOutput.width == width &&
             cachedFilterOutput.height == height
         ) {
+            GpuChainEvents.record(filterNode, GpuChainEvents.SW)
             drawResult(canvas, deviceRegion, cachedFilterOutput, state)
             return
         }
@@ -222,6 +223,7 @@ internal class SoftwareFilterBackend internal constructor(
         node.lastScaleY = sy
 
         if (filteredBitmap != null) {
+            GpuChainEvents.record(filterNode, GpuChainEvents.SW)
             drawResult(canvas, deviceRegion, filteredBitmap, state)
         }
     }

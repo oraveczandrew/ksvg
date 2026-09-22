@@ -55,6 +55,8 @@ class GpuComponentTransferCorpusParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E chain-taken proof.
+        assertChainBackend(name, minGpuApi = 33)
         // Single-row images are bilinear-sensitive: the content row has
         // transparent padding on both vertical sides, so any sub-texel
         // pipeline offset (or Adreno dither) blends the corner pixels.
@@ -169,6 +171,8 @@ class GpuComponentTransferFuncParityTest {
         val sw = renderSoftware(svg, 16, 16)
         assertVisibleFilterEffect(fullName, sw, renderSoftware(corpusBaseline(svg), 16, 16))
         val hw = renderOnHardware(svg, 16, 16)
+        // Round-E chain-taken proof.
+        assertChainBackend(fullName, minGpuApi = 33)
         assertParity(
             name = "$fullName (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
             sw = sw,

@@ -334,6 +334,9 @@ class GpuPrimitiveParityTest {
         val sw = renderSoftware(svg)
         assertVisibleFilterEffect(name, sw, renderSoftware(unfilteredBaseline(svg)))
         val hw = renderOnHardware(svg)
+        // Round-E chain-taken proof: below minGpuApi the HW side
+        // legitimately falls back (assert expects sw there).
+        assertChainBackend(name, minGpuApi)
         val reference = if (goldenAsset != null) {
             loadGoldenAsset(
                 goldenAsset,

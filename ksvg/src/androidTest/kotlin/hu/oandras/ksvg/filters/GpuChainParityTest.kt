@@ -449,6 +449,11 @@ class GpuChainParityTest {
             assertVisibleFilterEffect(name, sw, renderSoftware(chainBaseline(svg)))
         }
         val hw = renderOnHardware(svg)
+        // Round-E chain-taken proof (all parity chains run Impl33, min 33 —
+        // including C16 lightless passthrough, which the GPU serves, and
+        // C1/C5 golden paths, whose goldens exist for determinism, not
+        // decline, reasons).
+        assertChainBackend(name, minGpuApi = 33)
         // Host-golden path (F9): device-SW is untrusted here (native
         // nondeterminism), so parity is HW vs the committed golden
         // (host render-path recipe, determinism-checked at generation).
@@ -518,6 +523,8 @@ class GpuChainParityTest {
         val sw = renderSoftware(svg)
         assertVisibleFilterEffect(name, sw, renderSoftware(chainBaseline(svg)))
         val hw = renderOnHardware(svg)
+        // Round-E decline proof: C15 must NOT take the chain.
+        assertChainBackend(name, minGpuApi = 33, expectFallback = true)
         assertParity(
             "$name (fallback, minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
             sw,

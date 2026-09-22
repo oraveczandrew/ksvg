@@ -957,6 +957,7 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
         }
 
         val gpuNode = slot.gpuNode ?: return
+        GpuChainEvents.record(filterNode, GpuChainEvents.GPU)
         gpuNode.setRenderEffect(chain.effect)
         canvas.withSave {
             @Suppress("DEPRECATION")

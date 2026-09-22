@@ -77,6 +77,14 @@ class GpuEndpointParityTest(
             val sw = renderSoftware(svg, case.width, case.height)
             assertVisibleFilterEffect(name, sw, renderSoftware(unfilteredEndpoint(svg), case.width, case.height))
             val hw = renderOnHardware(svg, case.width, case.height)
+            // Round-E: per-filter chain-taken proof (E5/E6); the geometry
+            // case declines (fallback = true).
+            assertChainBackend(
+                name, minGpuApi = 33,
+                expectFallback = case.fallback,
+                expectedFilterIds = case.chainFilters,
+                expectedMinUses = case.chainMinUses,
+            )
             val golden = loadGoldenAsset(
                 case.goldenAsset,
                 Bitmap.createBitmap(case.width, case.height, Bitmap.Config.ARGB_8888),
@@ -95,6 +103,14 @@ class GpuEndpointParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(unfilteredEndpoint(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
+        // Round-E: per-filter chain-taken proof (E5/E6); the geometry
+        // case declines (fallback = true).
+        assertChainBackend(
+            name, minGpuApi = 33,
+            expectFallback = case.fallback,
+            expectedFilterIds = case.chainFilters,
+            expectedMinUses = case.chainMinUses,
+        )
         assertParity(
             "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
             sw,
@@ -119,6 +135,18 @@ class GpuEndpointParityTest(
             val fallback: Boolean = false,
             val goldenAsset: String? = null,
             val matchRadius: Int = 0,
+            /**
+             * Round-E: filter element ids expected to draw in this file
+             * (E5 per-filter map). Must match the `<filter id="...">`s
+             * referenced by rendered elements in `assets/endpoint/$file`.
+             */
+            val chainFilters: List<String> = emptyList(),
+            /**
+             * Round-E: per-filter minimum draw counts (E6: shared filter
+             * nodes must draw once per use — guards the per-element slot
+             * fix against cache regressions).
+             */
+            val chainMinUses: Map<String, Int> = emptyMap(),
         )
 
         // NOTE: gates are first-run placeholders (strict); calibrated
@@ -130,6 +158,7 @@ class GpuEndpointParityTest(
                 "filter_component_transfer_complex.svg", 300, 300,
                 maxAbsTol = 8,
                 maxOutlierRatio = 0.005,
+                chainFilters = listOf("table", "discrete", "gamma"),
             ),
             EndpointCase(
                 "filter_composite_arithmetic.svg", 256, 256,
@@ -142,6 +171,7 @@ class GpuEndpointParityTest(
                 // chamfer forgives the boundary shift, value errors still
                 // fail (F9 worklog).
                 matchRadius = 1,
+                chainFilters = listOf("arithmetic"),
             ),
             EndpointCase(
                 "filter_convolve.svg", 256, 256,
@@ -153,15 +183,26 @@ class GpuEndpointParityTest(
                 // outside it). Round-B covers values/targets precisely.
                 maxAbsTol = 255,
                 maxOutlierRatio = 0.03,
+                // `#conv` is shared by two elements (E6 class) — both uses
+                // must draw.
+                chainFilters = listOf("conv"),
+                chainMinUses = mapOf("conv" to 2),
             ),
             EndpointCase(
                 "filter_convolve_advanced.svg", 240, 220,
                 matchRadius = 1,
                 maxAbsTol = 255,
                 maxOutlierRatio = 0.01,
+                chainFilters = listOf("edge"),
             ),
-            EndpointCase("filter_feImage.svg", 240, 220),
-            EndpointCase("filter_flood.svg", 256, 256),
+            // Round-E: fragment-reference feImage (`href="#source"`) still
+            // declines — F8 covers raster (data-URI) feImage only. Legit
+            // fallback: expect sw.
+            EndpointCase(
+                "filter_feImage.svg", 240, 220, fallback = true,
+                chainFilters = listOf("mix"),
+            ),
+            EndpointCase("filter_flood.svg", 256, 256, chainFilters = listOf("flood")),
             EndpointCase(
                 "filter_geometry_units.svg", 240, 220, fallback = true,
                 // Fallback-blit fringe (deterministic 902 px, max 78 — the
@@ -170,14 +211,19 @@ class GpuEndpointParityTest(
                 // by log). Still catches a broken decline (8000+ px).
                 maxAbsTol = 80,
                 maxOutlierRatio = 0.03,
+                chainFilters = listOf("f"),
             ),
-            EndpointCase("filter_merge.svg", 256, 256),
-            EndpointCase("filter_morphology_erode.svg", 200, 200, matchRadius = 1),
+            EndpointCase("filter_merge.svg", 256, 256, chainFilters = listOf("merge")),
+            EndpointCase(
+                "filter_morphology_erode.svg", 200, 200, matchRadius = 1,
+                chainFilters = listOf("erode", "dilate"),
+            ),
             EndpointCase(
                 "filter_object_bbox_linear_rgb.svg", 320, 140,
                 matchRadius = 1,
                 maxAbsTol = 24,
                 maxOutlierRatio = 0.10,
+                chainFilters = listOf("a", "b"),
             ),
             EndpointCase(
                 "filter_primitives.svg", 256, 256,
@@ -191,11 +237,17 @@ class GpuEndpointParityTest(
                 // and region bugs hit opaque areas far outside it.
                 maxAbsTol = 64,
                 maxOutlierRatio = 0.06,
+                // E5: all 9 filters must take the chain, one draw each.
+                chainFilters = listOf(
+                    "blur", "gray", "cm", "morph", "offset",
+                    "blend", "ct", "disp", "light",
+                ),
             ),
             EndpointCase(
                 "filter_tile.svg", 256, 256,
                 maxAbsTol = 20,
                 maxOutlierRatio = 0.005,
+                chainFilters = listOf("tile"),
             ),
             EndpointCase(
                 "filters.svg", 200, 200,
@@ -206,6 +258,10 @@ class GpuEndpointParityTest(
                 // thousands of blue/shape px) fails loudly.
                 maxAbsTol = 255,
                 maxOutlierRatio = 0.05,
+                chainFilters = listOf("blur", "shadow"),
+                // E6: `#shadow` is shared by the circle AND the text — both
+                // uses must draw on GPU (guards the per-element slot fix).
+                chainMinUses = mapOf("shadow" to 2),
             ),
         ).associateBy { it.file }
 
