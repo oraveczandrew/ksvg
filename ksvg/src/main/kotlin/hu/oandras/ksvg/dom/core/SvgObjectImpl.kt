@@ -22,6 +22,7 @@ import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.style.Style
+import java.util.Locale
 import org.xml.sax.Attributes
 
 //===============================================================================
@@ -75,7 +76,7 @@ internal open class SvgObjectImpl(
         }
 
         private fun spaceReserveValueFrom(value: String): Boolean {
-            return when (val value = value.lowercase()) {
+            return when (val value = value.lowercase(Locale.US)) {
                 "default" -> false
                 "preserve" -> true
                 else -> throw KSVGParseException("Invalid value for \"xml:space\" attribute: $value")

@@ -24,6 +24,7 @@ import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseFloat
 import hu.oandras.ksvg.parser.parseFloatList
+import java.util.Locale
 import org.xml.sax.Attributes
 
 internal class FeConvolveMatrix(
@@ -103,7 +104,7 @@ internal class FeConvolveMatrix(
                 SVGAttr.targetX -> targetX = parseFloat(value).toInt()
                 SVGAttr.targetY -> targetY = parseFloat(value).toInt()
                 SVGAttr.edgeMode -> edgeMode = if (value.isEmpty()) ConvolveMatrixEdgeMode.duplicate else try {
-                    ConvolveMatrixEdgeMode.valueOf(value.lowercase())
+                    ConvolveMatrixEdgeMode.valueOf(value.lowercase(Locale.US))
                 } catch (_: IllegalArgumentException) {
                     throw KSVGParseException("Invalid matrix edge mode: $value")
                 }

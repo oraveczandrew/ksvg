@@ -22,6 +22,7 @@ import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
+import java.util.Locale
 import org.xml.sax.Attributes
 
 internal class FeBlend(
@@ -71,7 +72,7 @@ internal class FeBlend(
             when (attr) {
                 SVGAttr.in2 -> in2 = value
                 SVGAttr.mode -> mode = if (value.isEmpty()) FeBlendMode.normal else try {
-                    FeBlendMode.valueOf(value.lowercase())
+                    FeBlendMode.valueOf(value.lowercase(Locale.US))
                 } catch (_: IllegalArgumentException) {
                     throw KSVGParseException("Invalid blend mode: $value")
                 }

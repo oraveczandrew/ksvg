@@ -20,6 +20,8 @@ import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -130,6 +132,35 @@ class P1AuditReproTest {
         // Animation active from the start: alpha ~0.
         // (Before the fix dur parsed as 0 -> animation dropped -> alpha 255.)
         assertEquals(0, drawAt(svg, 500L).alpha)
+    }
+
+    @Test
+    fun colorToOnlyAnimatesBaseToTarget() {
+        val svg = SVG.getFromString(
+            svg = """
+                <svg width="100" height="100" viewBox="0 0 100 100">
+                  <rect width="100" height="100" fill="red">
+                    <animate attributeName="fill" to="blue" dur="1s" fill="freeze"/>
+                  </rect>
+                </svg>
+            """.trimIndent(),
+            parseAnimations = true
+        ) as SVGImpl
+
+        // SMIL to-animation on colors: interpolate base -> target.
+        // t=0: base red.
+        val start = drawAt(svg, 0L)
+        assertEquals(255, start.red)
+        assertEquals(0, start.blue)
+        // t=500ms: midpoint purple (red ~128, blue ~127).
+        val mid = drawAt(svg, 500L)
+        assertTrue("expected mid red near 128, got ${mid.red}", mid.red in 115..140)
+        assertTrue("expected mid blue near 127, got ${mid.blue}", mid.blue in 115..140)
+        // t=dur (frozen): exactly blue.
+        // (Before the fix the fill froze at `to` for the whole duration.)
+        val end = drawAt(svg, 1000L)
+        assertEquals(0, end.red)
+        assertEquals(255, end.blue)
     }
 
     @Test

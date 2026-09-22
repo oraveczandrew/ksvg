@@ -191,7 +191,18 @@ internal class AnimateColorNode(
     @JvmField
     val parsedKeySplines: List<CubicBezier>? = null,
     @JvmField
-    val pacedKeyTimes: FloatList? = null
+    val pacedKeyTimes: FloatList? = null,
+    /**
+     * True for SMIL `by`-only / `to`-only animations, resolved against the base
+     * color at apply time (see `withColorAt`): `by`-only adds `by * p` per
+     * channel, plain `to`-only interpolates `base → endValue`.
+     */
+    @JvmField
+    val baseRelative: Boolean = false,
+    @JvmField
+    val endValue: Int = 0,
+    @JvmField
+    val byValue: Int? = null
 ) : AnimationNode(sourceElement)
 
 internal class AnimateDashArrayNode(

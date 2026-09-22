@@ -23,6 +23,7 @@ import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseFloat
+import java.util.Locale
 import org.xml.sax.Attributes
 
 internal class FeComposite(
@@ -84,7 +85,7 @@ internal class FeComposite(
             when (attr) {
                 SVGAttr.in2 -> in2 = value
                 SVGAttr.operator -> operator = if (value.isEmpty()) FeCompositeOperator.over else try {
-                    FeCompositeOperator.valueOf(value.lowercase())
+                    FeCompositeOperator.valueOf(value.lowercase(Locale.US))
                 } catch (_: IllegalArgumentException) {
                     throw KSVGParseException("Invalid FeComposite operator: $value")
                 }

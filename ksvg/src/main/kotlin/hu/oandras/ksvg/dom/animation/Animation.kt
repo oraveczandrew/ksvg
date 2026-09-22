@@ -23,6 +23,7 @@ import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.render.animation.parseClockValueMillis
 import hu.oandras.ksvg.render.animation.parseSemicolonFloatList
+import java.util.Locale
 import org.xml.sax.Attributes
 
 internal sealed class Animation(
@@ -137,7 +138,7 @@ internal sealed class Animation(
                 // Unknown calcMode values must not abort the whole parse (would
                 // propagate out of the SAX handler); fall back to linear per SMIL.
                 SVGAttr.calcMode -> calcMode =
-                    runCatching { CalcMode.valueOf(value.lowercase()) }.getOrDefault(CalcMode.linear)
+                    runCatching { CalcMode.valueOf(value.lowercase(Locale.US)) }.getOrDefault(CalcMode.linear)
                 SVGAttr.keySplines -> keySplines = value
                 SVGAttr.values -> valuesStr = value
                 SVGAttr.from -> fromStr = value

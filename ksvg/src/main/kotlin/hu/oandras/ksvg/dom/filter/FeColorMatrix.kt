@@ -23,6 +23,7 @@ import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseFloatList
+import java.util.Locale
 import org.xml.sax.Attributes
 
 internal class FeColorMatrix(
@@ -73,7 +74,7 @@ internal class FeColorMatrix(
                 SVGAttr.type -> type = if (value.isEmpty()) {
                     FeColorMatrixType.matrix
                 } else try {
-                    FeColorMatrixType.valueOf(value.lowercase())
+                    FeColorMatrixType.valueOf(value.lowercase(Locale.US))
                 } catch (_: IllegalArgumentException) {
                     throw KSVGParseException("Invalid matrix type: $value")
                 }

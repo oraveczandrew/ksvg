@@ -25,6 +25,7 @@ import hu.oandras.ksvg.utils.pack4Hex
 import hu.oandras.ksvg.utils.pack8Hex
 import hu.oandras.ksvg.utils.packHsla
 import hu.oandras.ksvg.utils.packRgba
+import java.util.Locale
 
 internal object ColorParser {
     /*
@@ -51,7 +52,7 @@ internal object ColorParser {
 
         // Parse a rgb() or rgba() color.
         // In CSS Color 4, these are synonyms, and the alpha parameter is optional in both cases.
-        val valueLowerCase = value.lowercase()
+        val valueLowerCase = value.lowercase(Locale.US)
         val isRGBA = valueLowerCase.startsWith("rgba(")
         if (isRGBA || valueLowerCase.startsWith("rgb(")) {
             val scan = TextScanner(value.substring(if (isRGBA) 5 else 4))

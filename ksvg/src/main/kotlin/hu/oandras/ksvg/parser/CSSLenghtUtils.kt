@@ -20,6 +20,7 @@ package hu.oandras.ksvg.parser
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
+import java.util.Locale
 
 
 //=========================================================================
@@ -44,7 +45,7 @@ internal fun parseLength(value: String): CSSLength {
         end -= 2
         val unitStr = value.substring(end)
         try {
-            unit = CssUnit.valueOf(unitStr.lowercase())
+            unit = CssUnit.valueOf(unitStr.lowercase(Locale.US))
         } catch (_: IllegalArgumentException) {
             throw KSVGParseException("Invalid length unit specifier: $value")
         }

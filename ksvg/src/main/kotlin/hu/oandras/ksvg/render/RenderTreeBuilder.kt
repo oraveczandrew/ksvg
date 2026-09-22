@@ -625,10 +625,17 @@ internal class RenderTreeBuilder(
             }
 
             is AnimateColor -> {
+                var baseRelative = false
+                var endValue = 0
+                var byValue: Int? = null
                 val effectiveValues = animation.values ?: run {
                     val fromVal = animation.from
                     val toVal = animation.to
                     val byVal = animation.by
+                    // SMIL to-only / by-only resolve against the base color at apply
+                    // time (see AnimateColorNode.baseRelative). Discrete to-only
+                    // stays frozen at `to` (this also keeps <set> semantics).
+                    val discrete = animation.calcMode == CalcMode.discrete
                     when {
                         fromVal != null && toVal != null -> {
                             val list = MutableIntList(2)
@@ -651,6 +658,24 @@ internal class RenderTreeBuilder(
                             list
                         }
 
+                        byVal != null && !discrete -> {
+                            baseRelative = true
+                            byValue = byVal
+                            val list = MutableIntList(2)
+                            list.add(byVal)
+                            list.add(byVal)
+                            list
+                        }
+
+                        toVal != null && !discrete -> {
+                            baseRelative = true
+                            endValue = toVal
+                            val list = MutableIntList(2)
+                            list.add(toVal)
+                            list.add(toVal)
+                            list
+                        }
+
                         toVal != null -> {
                             val list = MutableIntList(2)
                             list.add(toVal)
@@ -666,9 +691,12 @@ internal class RenderTreeBuilder(
                     sourceElement = animation,
                     effectiveValues = effectiveValues,
                     parsedKeySplines = if (animation.calcMode == CalcMode.spline) parseKeySplines(animation.keySplines) else null,
-                    pacedKeyTimes = if (animation.calcMode == CalcMode.paced && animation.keyTimes == null) computePacedKeyTimesColor(
+                    pacedKeyTimes = if (animation.calcMode == CalcMode.paced && animation.keyTimes == null && !baseRelative) computePacedKeyTimesColor(
                         effectiveValues
-                    ) else null
+                    ) else null,
+                    baseRelative = baseRelative,
+                    endValue = endValue,
+                    byValue = byValue
                 )
             }
 

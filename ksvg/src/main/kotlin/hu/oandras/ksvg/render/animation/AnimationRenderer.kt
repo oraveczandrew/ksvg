@@ -48,9 +48,15 @@ import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.calculatePathBounds
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.updatePathAndBoundingBox
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.argb
+import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.clamp
+import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.forEachElement
+import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.interpolateColor
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.toRadians
 import kotlin.math.atan2
@@ -326,7 +332,8 @@ internal fun applyAnimatedStyle(
             }
 
             is AnimateColorNode -> {
-                animation.withColorAt(renderContext.animationTimeMs) { color ->
+                val baseColor = baseColorFor(state, builder, animation.attributeName)
+                animation.withColorAt(renderContext.animationTimeMs, baseColor) { color ->
                     if (applyColorAnimation(state, builder, animation.attributeName, color)) {
                         changed = true
                     }
@@ -696,20 +703,57 @@ internal inline fun AnimateFloatNode.withValueAt(animationTimeMs: Long, handler:
     handler.invoke(result)
 }
 
-internal inline fun AnimateColorNode.withColorAt(animationTimeMs: Long, handler: (Int) -> Unit) {
+internal inline fun AnimateColorNode.withColorAt(animationTimeMs: Long, baseColor: Int, handler: (Int) -> Unit) {
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return
 
     if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return
 
     val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
-    val effectiveKeyTimes = if (calcMode == CalcMode.paced) pacedKeyTimes ?: keyTimes else keyTimes
 
-    val color = when (calcMode) {
-        CalcMode.discrete -> selectAnimationSegmentDiscrete(effectiveValues, effectiveKeyTimes, progress)
-        else -> selectAnimationSegment(effectiveValues, effectiveKeyTimes, progress, ::interpolateColor, parsedKeySplines)
+    val color = if (baseRelative) {
+        // SMIL by-only / to-only: resolve against the base color. Discrete
+        // freezes at the full delta (keyTimes/spline are meaningless without
+        // `values` and are ignored).
+        val p = if (calcMode == CalcMode.discrete) 1f else progress
+        val by = byValue
+        if (by != null) addColors(baseColor, by, p) else interpolateColor(baseColor, endValue, p)
+    } else {
+        val effectiveKeyTimes = if (calcMode == CalcMode.paced) pacedKeyTimes ?: keyTimes else keyTimes
+        when (calcMode) {
+            CalcMode.discrete -> selectAnimationSegmentDiscrete(effectiveValues, effectiveKeyTimes, progress)
+            else -> selectAnimationSegment(effectiveValues, effectiveKeyTimes, progress, ::interpolateColor, parsedKeySplines)
+        }
     }
     handler.invoke(color)
+}
+
+/** Per-channel `base + by * p` for SMIL `by`-only color animation. */
+private fun addColors(baseColor: Int, byColor: Int, progress: Float): Int {
+    return argb(
+        clamp255(baseColor.alpha + byColor.alpha * progress),
+        clamp255(baseColor.red + byColor.red * progress),
+        clamp255(baseColor.green + byColor.green * progress),
+        clamp255(baseColor.blue + byColor.blue * progress)
+    )
+}
+
+/**
+ * Base color of a color-animated attribute. Must be read after the per-frame
+ * base reset in `updateAnimations`, so `by`-only / `to`-only animations
+ * resolve against the underlying value instead of compounding.
+ */
+private fun baseColorFor(state: RendererState, builder: Style.Builder, attributeName: SVGAttr): Int {
+    return when (attributeName) {
+        SVGAttr.fill -> state.fillConfig.color
+        SVGAttr.stroke -> state.strokeConfig.color
+        SVGAttr.stop_color -> (builder.stopColor as? ColorValue)?.value ?: 0xFF000000.toInt()
+        SVGAttr.flood_color -> (builder.floodColor as? ColorValue)?.value ?: 0xFF000000.toInt()
+        SVGAttr.color -> builder.color?.value ?: 0xFF000000.toInt()
+        SVGAttr.solid_color -> (builder.solidColor as? ColorValue)?.value ?: 0xFF000000.toInt()
+        SVGAttr.lighting_color -> (builder.lightingColor as? ColorValue)?.value ?: 0xFFFFFFFF.toInt()
+        else -> 0xFF000000.toInt()
+    }
 }
 
 internal fun AnimateTransformNode.applyValueAt(animationTimeMs: Long, out: FloatArray): Boolean {
