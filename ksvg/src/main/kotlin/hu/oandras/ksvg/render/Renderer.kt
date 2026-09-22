@@ -1373,7 +1373,10 @@ internal class Renderer internal constructor(
         var bottom = minY + height
 
         val clip = state.style.clip
-        if (clip != null) {
+        // CSS `clip` is ignored when `overflow` is not `visible` (used value
+        // `auto` — F3: Chrome and rsvg agree; applying both over-clips
+        // nested viewports, e.g. clip_overflow.svg's circle → sliver).
+        if (clip != null && state.style.overflow != false) {
             val clipL = clip.left.floatValueXInContext()
             val clipT = clip.top.floatValueYInContext()
             val clipR = clip.right.floatValueXInContext()
