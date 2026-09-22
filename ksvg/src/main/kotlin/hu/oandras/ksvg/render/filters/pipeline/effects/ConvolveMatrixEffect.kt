@@ -38,7 +38,7 @@ import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
  */
 private const val CONVOLVE_MATRIX_SHADER: String = """
             uniform shader uInput;
-            uniform float uKernel[25];
+            uniform float uKernel[49];
             uniform int uOrderX;
             uniform int uOrderY;
             uniform int uTargetX;
@@ -53,7 +53,7 @@ private const val CONVOLVE_MATRIX_SHADER: String = """
                 int kx = 0;
                 int ky = 0;
                 float2 size = float2(uBounds.z - uBounds.x + 1.0, uBounds.w - uBounds.y + 1.0);
-                for (int i = 0; i < 25; ++i) {
+                for (int i = 0; i < 49; ++i) {
                     if (i >= uOrderX * uOrderY) break;
                     float2 raw = fragCoord + float2(float(kx - uTargetX), float(ky - uTargetY));
                     float4 tap;
@@ -164,9 +164,9 @@ private fun createConvolveShaderEffect(
 ): Pair<RuntimeShader, RenderEffect>? {
     val size = node.orderX * node.orderY
     val kernel = node.kernel ?: FloatArray(size)
-    if (size > 25 || kernel.size > 25) return null
+    if (size > 49 || kernel.size > 49) return null
     val shader = RuntimeShader(CONVOLVE_MATRIX_SHADER)
-    val paddedKernel = FloatArray(25)
+    val paddedKernel = FloatArray(49)
     kernel.copyInto(paddedKernel)
     shader.setFloatUniform("uKernel", paddedKernel)
     shader.setIntUniform("uOrderX", node.orderX)

@@ -30,7 +30,6 @@ import androidx.collection.ArrayMap
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.FeBlendMode
 import hu.oandras.ksvg.dom.filter.FeCompositeOperator
-import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
 import hu.oandras.ksvg.render.ALPHA_MATRIX_COLOR_FILTER
 import hu.oandras.ksvg.render.FeBlendRenderNode
@@ -570,6 +569,13 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                         }
 
                         is FeTurbulenceRenderNode -> {
+                            // Stitch wrap origin (F6): CPU `clipLeft`/`clipTop`
+                            // mirrored from user space BEFORE the buffer-space
+                            // mapping below (same formula as the CPU remap).
+                            val clipLeft = ((primitiveRegion.left - filterRegion.left) * sx).toInt()
+                                .coerceIn(0, (filterRegion.width() * sx).toInt())
+                            val clipTop = ((primitiveRegion.top - filterRegion.top) * sy).toInt()
+                                .coerceIn(0, (filterRegion.height() * sy).toInt())
                             // Map to buffer space: (user - filterRegion.left) * sx + padX
                             primitiveRegion.set(
                                 (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
@@ -578,15 +584,9 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                             )
 
-                            // stitchTiles="stitch" has no GPU support (the
-                            // shader hardcodes uTilePeriod=0 = no stitching and
-                            // would silently compute the wrong tile field):
-                            // decline the chain so the software reference
-                            // renders instead (round-B fallback coverage in
-                            // GpuTurbulenceCorpusParityTest).
-                            if (primitive.sourceElement.stitchTiles != FeStitchTiles.noStitch) {
-                                return null
-                            }
+                            // stitchTiles="stitch" is served by the shader itself
+                            // (uTilePeriod, F6 — same adjusted-frequency math
+                            // as FilterGeneration).
 
                             // Terminal turbulence under linearRGB gets the linear->sRGB transfer
                             // (CPU unLinearizeBitmap equivalent); anything else stays linear.
@@ -606,6 +606,8 @@ internal class FilterPipelineImpl33(renderContext: RenderContext) : FilterPipeli
                                 primitiveUnitsAreUser = primitiveUnitsAreUser,
                                 boundingBox = boundingBox,
                                 primitiveRegion = primitiveRegion,
+                                clipLeft = clipLeft,
+                                clipTop = clipTop,
                                 inputUniformName = "in_source",
                             )
 

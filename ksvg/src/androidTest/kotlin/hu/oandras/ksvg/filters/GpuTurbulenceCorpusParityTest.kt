@@ -51,12 +51,12 @@ import org.junit.runners.Parameterized
  * The bound stays tight at opaque pixels, so real kernel regressions (wrong
  * lattice/accumulation/EOTF) still fail there.
  *
- * Stitch cases (`periodX/Y != 0`): the GPU chain declines (no stitch
- * support — `uTilePeriod` hardcodes no-stitch), so the hardware side
- * falls back to software. These assert HW==SW under the same bound: both
- * sides run the same deterministic native kernel, so agreement proves the
- * fallback instead of passing vacuously (a taken GPU path would compute a
- * non-stitched field and diverge hugely, far outside the bound).
+ * Stitch cases (`periodX/Y != 0`, F6): the GPU chain serves stitch
+ * itself (`uTilePeriod` + adjusted frequencies + rsvg-form wrap offsets,
+ * same math as FilterGeneration). Their goldens use device-derived params
+ * (NOT corpus kernel params — see F6 worklog); comparison is straight
+ * space like the rest (the chain emits straight, and a premultiplied
+ * reference would crush low-alpha signal vacuously).
  */
 @RunWith(Parameterized::class)
 class GpuTurbulenceCorpusParityTest(
@@ -86,50 +86,40 @@ class GpuTurbulenceCorpusParityTest(
             unfiltered = renderSoftware(corpusBaseline(svg), case.width, case.height)
         )
         val hw = renderOnHardware(svg, case.width, case.height)
-        if (case.periodX == 0 && case.periodY == 0) {
-            val golden = loadGoldenAsset(
-                assetPath = "parity/turbulence/" + caseName.replace(Regex("[^A-Za-z0-9]+"), "_") + ".png",
-                outBitmap = Bitmap.createBitmap(case.width, case.height, Bitmap.Config.ARGB_8888),
-            )
-            assertParity(
-                name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-                sw = golden,
-                hw = hw,
-                // Round-A turbulence gates (fp32 + 8-bit gradient packing).
-                maxAbsTol = 4,
-                maxOutlierRatio = 0.005,
-                ignoreBoundaryFringe = true,
-                // Straight-space comparison with the alpha-scaled
-                // quantization bound (see class kdoc): premultiplying the
-                // reference would crush all low-alpha signal to ~0 and pass
-                // vacuously there, while straight comparison keeps the
-                // observable pixels tight.
-                translucentQuantK = 510,
-            )
-        } else {
-            // Stitch fallback: both sides run the same deterministic
-            // native kernel, so agreement proves the fallback (a taken GPU
-            // path would compute a non-stitched field and diverge hugely,
-            // far outside the quantization bound).
-            assertParity(
-                name = "$name (fallback, minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
-                sw = sw,
-                hw = hw,
-                maxAbsTol = 4,
-                translucentQuantK = 510,
-                // Premultiplied-space comparison: HW fallback output is
-                // premultiplied SW bytes (straight RGB unrepresentable at
-                // low alpha); validated 0 bad / 0 outliers offline.
-                premultiplyReference = true,
-            )
-        }
+        // Host golden for every case (straight bytes, no roundtrip):
+        // non-stitch goldens use corpus params (== device params, no
+        // adjustment); stitch goldens use device-derived params (adjusted
+        // frequencies + derived periods, F6 — the corpus pins kernel params
+        // instead, which the device never computes). The SW render only
+        // feeds the vacuous-pass guard (its Bitmap roundtrip corrupts
+        // low-alpha straight values one-sidedly, which no symmetric bound
+        // can absorb — hence goldens, not SW, for all cases).
+        val golden = loadGoldenAsset(
+            assetPath = "parity/turbulence/" + caseName.replace(Regex("[^A-Za-z0-9]+"), "_") + ".png",
+            outBitmap = Bitmap.createBitmap(case.width, case.height, Bitmap.Config.ARGB_8888),
+        )
+        assertParity(
+            name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
+            sw = golden,
+            hw = hw,
+            // Round-A turbulence gates (fp32 + 8-bit gradient packing).
+            maxAbsTol = 4,
+            maxOutlierRatio = 0.005,
+            ignoreBoundaryFringe = true,
+            // Straight-space comparison with the alpha-scaled
+            // quantization bound (see class kdoc): premultiplying the
+            // reference would crush all low-alpha signal to ~0 and pass
+            // vacuously there, while straight comparison keeps the
+            // observable pixels tight.
+            translucentQuantK = 510,
+        )
     }
 
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun data(): List<Array<Any?>> {
-            // Full corpus (11 cases): stitch takes the fallback branch.
+            // Full corpus (11 cases, all golden-backed).
             val nameFilter: String? = InstrumentationRegistry.getArguments()
                 .getString("gpu_parity_filter")
             val cases = if (nameFilter.isNullOrBlank()) {

@@ -27,9 +27,12 @@ import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.createBitmap
+import kotlin.math.ceil
+import kotlin.math.floor
 
 private const val TURBULENCE_SHADER: String = """
             uniform shader uLattice;
@@ -42,6 +45,9 @@ private const val TURBULENCE_SHADER: String = """
             uniform int uNumOctaves;
             uniform int uIsFractal;
             uniform float2 uTilePeriod;
+            // Stitch wrap origin: the primitive clip left/top in device px
+            // from the filter-region left/top (CPU `clipLeft`/`clipTop`).
+            uniform float2 uClip;
             uniform float2 uOrigin;
             uniform float2 uPrimitiveUnitSize;
             uniform float2 uUserLeftTop;
@@ -87,37 +93,32 @@ private const val TURBULENCE_SHADER: String = """
                 );
             }
 
-            float4 noise2(float2 p, float2 period) {
+            float4 noise2(float2 p, float2 period, int2 wrap) {
                 float2 pf = floor(p);
                 float2 r0 = p - pf;
                 float2 r1 = r0 - 1.0;
                 int2 b0 = int2(pf);
 
+                int bx1 = b0.x + 1;
+                int by1 = b0.y + 1;
+
+                // Stitch wrap-lattice offset (rsvg form, mirroring
+                // SvgPathNoise.noise2 exactly): conditional subtraction past
+                // the wrap line, NOT modular wrapping. The 256-mask below
+                // applies to both paths (CPU `and BM`).
                 if (period.x > 0.0) {
-                    b0.x = customMod(b0.x, int(period.x));
-                } else {
-                    b0.x = customMod(b0.x, 256);
+                    if (b0.x >= wrap.x) b0.x -= int(period.x);
+                    if (bx1 >= wrap.x) bx1 -= int(period.x);
                 }
-
-                int bx1;
-                if (period.x > 0.0) {
-                    bx1 = customMod(b0.x + 1, int(period.x));
-                } else {
-                    bx1 = customMod(b0.x + 1, 256);
-                }
-
                 if (period.y > 0.0) {
-                    b0.y = customMod(b0.y, int(period.y));
-                } else {
-                    b0.y = customMod(b0.y, 256);
+                    if (b0.y >= wrap.y) b0.y -= int(period.y);
+                    if (by1 >= wrap.y) by1 -= int(period.y);
                 }
 
-                int by1;
-                if (period.y > 0.0) {
-                    by1 = customMod(b0.y + 1, int(period.y));
-                } else {
-                    by1 = customMod(b0.y + 1, 256);
-                }
+                b0.x = customMod(b0.x, 256);
+                bx1 = customMod(bx1, 256);
+                b0.y = customMod(b0.y, 256);
+                by1 = customMod(by1, 256);
 
                 float4 i = float4(getLattice(b0.x, 0).r, getLattice(b0.x, 1).r, getLattice(b0.x, 2).r, getLattice(b0.x, 3).r) * 255.0;
                 float4 j = float4(getLattice(bx1, 0).r, getLattice(bx1, 1).r, getLattice(bx1, 2).r, getLattice(bx1, 3).r) * 255.0;
@@ -181,11 +182,19 @@ private const val TURBULENCE_SHADER: String = """
                 float4 sums = float4(0.0);
                 float ratio = 1.0;
                 float2 period = uTilePeriod;
+                // Stitch wrap origin, mirroring the CPU kernel: tile-relative
+                // pixel index times the (adjusted) base frequency, doubled
+                // per octave like the lattice position. uClip carries the
+                // primitive clip left/top in the same device-px space as
+                // `local - 0.5` (the kernel bitmap pixel index).
+                float2 curt = ((local - 0.5) - uClip) * uBaseFrequency;
                 for (int i = 0; i < 8; ++i) {
                     if (i >= uNumOctaves) break;
-                    float4 n = noise2(p, period);
+                    int2 wrap = int2(int(floor(curt.x)), int(floor(curt.y))) + int2(int(period.x), int(period.y));
+                    float4 n = noise2(p, period, wrap);
                     if (uIsFractal != 0) sums += n / ratio; else sums += abs(n) / ratio;
-                    p *= 2.0; ratio *= 2.0; if (period.x > 0.0) period *= 2.0;
+                    p *= 2.0; ratio *= 2.0; curt *= 2.0;
+                    if (period.x > 0.0 || period.y > 0.0) period *= 2.0;
                 }
                 float4 finalVal = (uIsFractal != 0) ? (sums + 1.0) * 0.5 : sums;
                 finalVal = clamp(finalVal, 0.0, 1.0);
@@ -225,6 +234,9 @@ private const val TURBULENCE_SHADER: String = """
  * primitive units are objectBoundingBox)
  * @param primitiveRegion the primitive subregion in buffer space (already
  * remapped from user space by the caller)
+ * @param clipLeft clipTop the primitive clip left/top in device px from the
+ * filter-region left/top (CPU `clipLeft`/`clipTop`: the stitch wrap origin;
+ * exact for full-region clips, best-effort mirrored formula otherwise)
  * @param inputUniformName the shader-input uniform name (`in_source`)
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -241,6 +253,8 @@ internal fun createTurbulenceShaderEffect(
     primitiveUnitsAreUser: Boolean,
     boundingBox: Box,
     primitiveRegion: RectF,
+    clipLeft: Int,
+    clipTop: Int,
     inputUniformName: String,
 ): Pair<RuntimeShader, RenderEffect> {
     val shader = RuntimeShader(TURBULENCE_SHADER)
@@ -251,14 +265,44 @@ internal fun createTurbulenceShaderEffect(
     val unitSizeX = primitiveScaleX / canvasScaleX
     val unitSizeY = primitiveScaleY / canvasScaleY
 
+    // Stitch adjustment (F6): mirror FilterGeneration exactly — the tile is
+    // the filter-region device size (int-truncated, like the CPU bitmap),
+    // the adjusted frequency is the nearest integral-period one, and the
+    // period is the tile in those periods. Non-stitch keeps raw values.
+    var baseFrequencyX = element.baseFrequencyX
+    var baseFrequencyY = element.baseFrequencyY
+    var tilePeriodX = 0f
+    var tilePeriodY = 0f
+    if (element.stitchTiles == FeStitchTiles.stitch) {
+        val tileWidthPx = (filterRegion.width() * canvasScaleX).toInt().toDouble()
+        val tileHeightPx = (filterRegion.height() * canvasScaleY).toInt().toDouble()
+        val baseX = maxOf(0.0, element.baseFrequencyX.toDouble())
+        val baseY = maxOf(0.0, element.baseFrequencyY.toDouble())
+        if (tileWidthPx > 0.0 && baseX != 0.0) {
+            val fLo = floor(tileWidthPx * baseX) / tileWidthPx
+            val fHi = ceil(tileWidthPx * baseX) / tileWidthPx
+            val adjusted = if (baseX / fLo < fHi / baseX) fLo else fHi
+            baseFrequencyX = adjusted.toFloat()
+            tilePeriodX = (tileWidthPx * adjusted + 0.5).toInt().toFloat()
+        }
+        if (tileHeightPx > 0.0 && baseY != 0.0) {
+            val fLo = floor(tileHeightPx * baseY) / tileHeightPx
+            val fHi = ceil(tileHeightPx * baseY) / tileHeightPx
+            val adjusted = if (baseY / fLo < fHi / baseY) fLo else fHi
+            baseFrequencyY = adjusted.toFloat()
+            tilePeriodY = (tileHeightPx * adjusted + 0.5).toInt().toFloat()
+        }
+    }
+
     shader.setFloatUniform(
         /* uniformName = */ "uBaseFrequency",
-        /* value1 = */ element.baseFrequencyX,
-        /* value2 = */ element.baseFrequencyY
+        /* value1 = */ baseFrequencyX,
+        /* value2 = */ baseFrequencyY
     )
     shader.setIntUniform("uNumOctaves", element.numOctaves)
     shader.setIntUniform("uIsFractal", if (element.type == FeTurbulenceType.fractalNoise) 1 else 0)
-    shader.setFloatUniform("uTilePeriod", 0f, 0f) // stitchTiles="stitch" not yet GPU-supported
+    shader.setFloatUniform("uTilePeriod", tilePeriodX, tilePeriodY)
+    shader.setFloatUniform("uClip", clipLeft.toFloat(), clipTop.toFloat())
     shader.setFloatUniform("uOrigin", originX, originY)
     shader.setFloatUniform("uUserLeftTop", filterRegion.left, filterRegion.top)
     shader.setFloatUniform("uInvCanvasScale", 1f / canvasScaleX, 1f / canvasScaleY)

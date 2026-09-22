@@ -208,11 +208,13 @@ class GpuChainParityTest {
     }
 
     @Test
-    fun stitchTurbulenceFallback() {
-        // C8: stitch-turbulence declines at the FIRST primitive → whole
-        // chain falls back. HW==SW assert (a taken path would compute the
-        // wrong non-stitched field).
-        checkFallback(
+    fun stitchTurbulenceChain() {
+        // C8: stitch-turbulence map feeding displacement (F6: real stitch
+        // on GPU, no more fallback). Gates like C2: map quantization flips
+        // the truncated shift at scattered edge pixels over the flat rect
+        // (measured 45/65536, max 255 where the straddle crosses
+        // transparent↔opaque); the ratio budgets them.
+        checkParity(
             name = "chainC8",
             svg = chainSvg(
                 """
@@ -220,6 +222,8 @@ class GpuChainParityTest {
                 <feDisplacementMap in="SourceGraphic" in2="map" scale="30" xChannelSelector="R" yChannelSelector="G"/>
                 """.trimIndent(),
             ),
+            maxAbsTol = 255,
+            maxOutlierRatio = 0.002,
         )
     }
 
@@ -368,6 +372,23 @@ class GpuChainParityTest {
                 """<feDiffuseLighting in="SourceGraphic" surfaceScale="2" diffuseConstant="1" lighting-color="#ffffff"/>""",
             ),
             skipVisibleEffectGuard = true,
+        )
+    }
+
+    @Test
+    fun largeKernelConvolve() {
+        // C18: 7x7 box blur (F5: uKernel[49]). Exercises taps beyond the
+        // old 5x5 limit. Strict gates first, calibrated from measurement.
+        checkParity(
+            name = "chainC18",
+            svg = chainSvg(
+                """
+                <feFlood flood-color="#2020c0" result="b"/>
+                <feConvolveMatrix in="b" order="7" kernelMatrix="1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1" divisor="49" result="c"/>
+                <feComposite in="c" in2="SourceGraphic" operator="over"/>
+                """.trimIndent(),
+            ),
+            premultiplyReference = true,
         )
     }
 
