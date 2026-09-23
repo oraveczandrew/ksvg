@@ -72,7 +72,10 @@
     //       r0 = first x NOT processed on an interior row (constant per row).
 
 ksvgConvolveGenericNeonAsm32:
-    push    {r4-r11, lr}
+    push    {r4-r11, r12, lr} // 10 words -> sp stays 8-byte aligned for vpush
+    // Save callee-saved d8-d15 (q4-q7 accumulators/mask).
+    // (Audit R7: used to leak.)
+    vpush   {d8-d15}
     sub     sp, sp, #32
 
     //       Save callee-saved GPRs.
@@ -324,6 +327,7 @@ ksvgConvolveGenericNeonAsm32:
 .Ldone:
     ldr     r0, [sp, #24] // r0 = first unprocessed x
     add     sp, sp, #32
-    pop     {r4-r11, pc}
+    vpop    {d8-d15}
+    pop     {r4-r11, r12, pc}
 
 .size ksvgConvolveGenericNeonAsm32, .-ksvgConvolveGenericNeonAsm32
