@@ -45,6 +45,19 @@ object KernelBenchmarkRunner {
 
     private val LOCALE: Locale = Locale.US
 
+    /**
+     * Backend order for emitted rows. Mirrors the ISA superset convention
+     * (`BENCHMARKS.md` header + `BenchmarkTableWriter.isaOrder` in buildSrc):
+     * reference first, then native backends from oldest to newest ISA.
+     */
+    private val isaOrder = listOf("kotlin", "scalar", "sse2", "ssse3", "avx2", "avx512", "neon32", "neon64")
+
+    internal fun backendRank(backend: String): Int {
+        val lower = backend.lowercase(LOCALE)
+        val idx = isaOrder.indexOfFirst { lower.contains(it) }
+        return if (idx >= 0) idx else 999
+    }
+
     fun runBenchmark(
         kernel: String,
         backendName: String,
@@ -129,7 +142,17 @@ object KernelBenchmarkRunner {
         val mdSep = "| :--- | :--- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |"
         val md = StringBuilder("$mdHeader\n$mdSep\n")
 
-        for (r in results) {
+        // Execution order is arbitrary (matrix/filter driven); emitted rows follow
+        // the ISA superset convention: kernels alphabetical, sizes ascending,
+        // backends kotlin -> scalar -> sse2 -> ... -> neon64.
+        val ordered = results.sortedWith(
+            compareBy<Result>(
+                { it.kernel },
+                { it.width * it.height },
+                { backendRank(it.backend) },
+            )
+        )
+        for (r in ordered) {
             val scalarMs = results.find {
                 it.kernel == r.kernel && it.backend == "scalar" && it.width == r.width && it.height == r.height
             }?.avgMs
@@ -167,9 +190,14 @@ object KernelBenchmarkRunner {
         println(summarySep)
         for (k in kernels) {
             for (size in results.filter { it.kernel == k }.map { "${it.width}x${it.height}" }.distinct()) {
-                val best = results.filter { it.kernel == k && "${it.width}x${it.height}" == size }.minByOrNull { it.avgMs }
+                val group = results.filter { it.kernel == k && "${it.width}x${it.height}" == size }
+                val best = group.minByOrNull { it.avgMs }
                 if (best != null) {
-                    println(String.format(Locale.US, "| %s | %s | %s | %.2fx |", k, size, best.backend, best.speedup))
+                    // Recomputed here: the stored speedup was captured at insertion
+                    // time and is stale when scalar runs after faster backends.
+                    val scalarMs = group.find { it.backend == "scalar" }?.avgMs
+                    val bestSpeedup = if (scalarMs != null && best.avgMs > 0.0) scalarMs / best.avgMs else 1.0
+                    println(String.format(Locale.US, "| %s | %s | %s | %.2fx |", k, size, best.backend, bestSpeedup))
                 }
             }
         }

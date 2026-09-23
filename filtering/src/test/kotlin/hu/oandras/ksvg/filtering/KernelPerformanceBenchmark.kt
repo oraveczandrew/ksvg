@@ -59,6 +59,11 @@ class KernelPerformanceBenchmark {
             sizes = sizes.toTypedArray()
         )
 
+        // Hardware-counter profiling (cycles/instructions -> IPC column) is opt-in:
+        // run with `-Dbenchmark.host.profile=true`. Without it the profiler stays
+        // NoOp and the IPC / CyclesPerIter columns read 0 — that is expected, not
+        // a measurement failure. Supported collectors: Intel macOS (IntelMacOSProfiler),
+        // ARM64 macOS (Arm64MacOSProfiler), Linux perf (LinuxHardwareProfiler).
         val profileEnabled = System.getProperty("benchmark.host.profile") == "true"
         val profiler = when {
             profileEnabled && IntelMacOSProfiler.isSupported -> IntelMacOSProfiler()
