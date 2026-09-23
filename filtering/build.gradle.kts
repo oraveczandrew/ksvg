@@ -264,20 +264,30 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
         // target the resolved serial explicitly with -s for both find and pull.
 
         // Locate every benchmark CSV the run left behind and pull it into tmp/device-bench-<abi>/.
-        // The benchmark writes to Context.externalCacheDir, i.e. the canonical
-        // /storage/emulated/0/Android/data/<pkg>/cache/ path. adb pull needs that
-        // exact path, not the /sdcard symlink. `find` also prints "find: <path>:
+        // The benchmark writes to Context.externalCacheDir/benchmarks/<suite>/, i.e. the canonical
+        // /storage/emulated/0/Android/data/<pkg>/cache/benchmarks/ path. adb pull needs that
+        // exact path, not the /sdcard symlink. `find` recurses into the per-suite
+        // subdirectories on its own; scoping the search to benchmarks/ also keeps
+        // pre-subdirectory legacy flat files (which setups no longer manage) out of
+        // the pull. `find` also prints "find: <path>:
         // Permission denied" noise to stderr, which adb merges into stdout; only
         // accept lines that are real absolute paths to a benchmarks_device CSV.
         val remote = Adb.run(
-            adb, "-s", serial, "shell", "find", "/storage/emulated/0/Android/data",
+            adb, "-s", serial, "shell", "find", "/storage/emulated/0/Android/data/hu.oandras.filtering.test/cache/benchmarks",
             "-name", "benchmarks_device*.csv", "-type", "f",
         )
+        // Suite-qualify the host-side name so same-named cells from
+        // different suites never overwrite each other on pull. The table
+        // writer reads row contents, not file names.
+        fun suiteOf(path: String): String {
+            val after = path.substringAfter("/cache/benchmarks/", "")
+            return if ('/' in after) after.substringBefore('/') else "default"
+        }
         val pulled = mutableListOf<File>()
         remote.outputLineSequence()
             .filter { it.startsWith("/storage/emulated/0/Android/data/") && it.endsWith(".csv") }
             .forEach { path ->
-                val dest = abiDir.resolve(path.substringAfterLast('/'))
+                val dest = abiDir.resolve(suiteOf(path) + "_" + path.substringAfterLast('/'))
                 val pull = Adb.run(adb, "-s", serial, "pull", path, dest.absolutePath).output
                 if ("1 file pulled" in pull || dest.exists()) {
                     pulled.add(dest)
@@ -293,19 +303,23 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
 
         // Pull + print the per-cell simpleperf profiles when the run used profiling.
         // Cell names are simpleperf_benchmark_<Kernel>_<Backend>_<W>x<H>; both the raw
-        // simpleperf text dump (.txt) and the parsed CSV are fetched.
+        // simpleperf text dump (.txt) and the parsed CSV are fetched. Profiles live in
+        // the per-suite benchmarks/<suite>/ subdirectories; distinctness keys on the
+        // suite-qualified path so same-named cells from different suites both survive.
         val profileRemote = Adb.run(
-            adb, "-s", serial, "shell", "find", "/storage/emulated/0/Android/data",
+            adb, "-s", serial, "shell", "find", "/storage/emulated/0/Android/data/hu.oandras.filtering.test/cache/benchmarks",
             "-name", "simpleperf_benchmark_*.csv", "-type", "f",
         )
         val pulledProfiles = mutableListOf<File>()
         profileRemote.outputLineSequence()
             .filter { it.startsWith("/storage/emulated/0/Android/data/") && it.endsWith(".csv") }
-            .distinctBy { it.substringAfterLast('/') }
+            .distinctBy { it.substringAfter("/cache/benchmarks/") }
             .forEach { path ->
                 val csvPath = path.trim()
                 val txtPath = csvPath.removeSuffix(".csv") + ".txt"
-                val base = csvPath.substringAfterLast('/').removeSuffix(".csv")
+                // Suite-qualify the host-side name: same-named cells from different
+                // suites must not overwrite each other on pull.
+                val base = suiteOf(csvPath) + "_" + csvPath.substringAfterLast('/').removeSuffix(".csv")
                 val destTxt = abiDir.resolve("$base.txt")
                 Adb.run(adb, "-s", serial, "pull", txtPath, destTxt.absolutePath)
                 Adb.run(adb, "-s", serial, "pull", csvPath, abiDir.resolve("$base.csv").absolutePath)

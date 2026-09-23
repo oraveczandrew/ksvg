@@ -19,7 +19,7 @@ package hu.oandras.ksvg.filtering
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hu.oandras.ksvg.filtering.benchmark.BenchmarkViewModel
 import hu.oandras.ksvg.filtering.benchmark.DeviceBenchmarkSink
-import hu.oandras.ksvg.filtering.benchmark.clearPreviousResults
+import hu.oandras.ksvg.filtering.benchmark.clearSuiteResults
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,25 +48,32 @@ import org.junit.runner.RunWith
 class KernelPerformanceDeviceBenchmark {
 
     private companion object {
+        /** Result suite: `benchmarks/<SUITE>/` on the device; see [clearSuiteResults]. */
+        const val SUITE = "kernelBenchmark"
 
         @BeforeClass
         @JvmStatic
         fun setup() {
             assertNativeBackendAvailable()
-            clearPreviousResults()
+            clearSuiteResults(SUITE)
+        }
+
+        private fun benchmarkMatrix(args: BenchmarkArguments): List<BenchmarkCase> {
+            val benchmarkSizes =
+                if (args.isQuick) arrayOf(512 to 512) else arrayOf(512 to 512, 2048 to 2048)
+            return KernelBenchmarkMatrix.cases(
+                kernels = args.kernels,
+                configs = args.configs,
+                sizes = benchmarkSizes
+            )
         }
     }
 
     @Test
     fun benchmarkAll() {
         val benchmarkArguments = BenchmarkArguments.fromInstrumentationRegistry()
-        val sink = DeviceBenchmarkSink(benchmarkArguments)
-        val benchmarkSizes = if (benchmarkArguments.isQuick) arrayOf(512 to 512) else arrayOf(512 to 512, 2048 to 2048)
-        val matrix = KernelBenchmarkMatrix.cases(
-            kernels = benchmarkArguments.kernels,
-            configs = benchmarkArguments.configs,
-            sizes = benchmarkSizes
-        )
+        val sink = DeviceBenchmarkSink(benchmarkArguments, SUITE)
+        val matrix = benchmarkMatrix(benchmarkArguments)
         BenchmarkViewModel.beginSuite(sink.estimatedTotalRuns(matrix))
         for (case in matrix) {
             runBenchmarkCase(case, sink)

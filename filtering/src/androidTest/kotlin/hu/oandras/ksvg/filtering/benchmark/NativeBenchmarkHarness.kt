@@ -29,23 +29,25 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
-/**
- * Clears every benchmark CSV and simpleperf profile dump from the device's external cache
- * directory (spec §24), so a fresh run is not mixed with stale files on pull.
- */
-fun clearPreviousResults() {
-    val dir = getTestTargetContext().externalCacheDir ?: return
-    if (!dir.exists()) return
-    val summaryFiles = dir.listFiles { _, name -> name.startsWith("benchmarks_device") && name.endsWith(".csv") }
-    val detailFiles = dir.listFiles { _, name -> name.startsWith("benchmarks_harness_detail") && name.endsWith(".csv") }
-    val simpleperfFiles = dir.listFiles { _, name -> name.startsWith("simpleperf_") }
+/** Device cache subdirectory holding every benchmark result file. */
+internal const val BENCHMARKS_DIR_NAME = "benchmarks"
 
-    val totalDeleted =
-        (summaryFiles?.size ?: 0) + (detailFiles?.size ?: 0) + (simpleperfFiles?.size ?: 0)
+/**
+ * Clears one benchmark suite's previous result files (`benchmarks/<suite>/` in the
+ * device's external cache directory, spec §24), so a fresh run is not mixed with
+ * stale files on pull. Each benchmark class calls this in its setup with its own
+ * [SUITE]-style name: per-suite subdirectories make cross-class deletion
+ * structurally impossible within a shared instrumentation run.
+ */
+fun clearSuiteResults(suite: String) {
+    val cacheDir = getTestTargetContext().externalCacheDir ?: return
+    if (!cacheDir.exists()) return
+    val dir = File(cacheDir, "$BENCHMARKS_DIR_NAME/$suite")
+    if (!dir.exists()) return
+    val files = dir.listFiles()
+    val totalDeleted = files?.size ?: 0
+    files?.forEach { it.delete() }
     if (totalDeleted > 0) {
-        summaryFiles?.forEach { it.delete() }
-        detailFiles?.forEach { it.delete() }
-        simpleperfFiles?.forEach { it.delete() }
         println("Benchmark harness: cleared $totalDeleted previous result files from ${dir.absolutePath}")
     }
 }
@@ -59,6 +61,7 @@ fun clearPreviousResults() {
  * ```
  * nativeBenchmark {
  *     name = "Turbulence"
+ *     suite = "kernelBenchmark"
  *     backend = "neon64"
  *     width = 512
  *     height = 512
@@ -97,6 +100,14 @@ class NativeBenchmarkBuilder {
 
     @JvmField
     var name: String = "benchmark"
+
+    /**
+     * Result suite (owning benchmark class, e.g. `"kernelBenchmark"`). Results land in
+     * `benchmarks/<suite>/`, so classes sharing one instrumentation run can never
+     * delete or overwrite each other's files.
+     */
+    @JvmField
+    var suite: String = "default"
 
     @JvmField
     var backend: String = ""
@@ -402,6 +413,7 @@ class NativeBenchmarkBuilder {
             NativeBenchmarkReport(
                 name = name,
                 backend = backend,
+                suite = suite,
                 width = width,
                 height = height,
                 samples = validBatches.toTypedArray(),
@@ -513,6 +525,9 @@ class NativeBenchmarkReport(
     val name: String,
     @JvmField
     val backend: String,
+    /** Owning benchmark suite; selects the `benchmarks/<suite>/` result subdirectory. */
+    @JvmField
+    val suite: String,
     @JvmField
     val width: Int,
     @JvmField
@@ -633,13 +648,15 @@ class NativeBenchmarkReport(
     }
 
     /**
-     * Writes two CSVs:
+     * Writes two CSVs into `benchmarks/<suite>/`:
      *  - `benchmarks_device_harness_<name>.csv` — one summary row, glob-compatible with the
      *    existing `runDeviceBenchmark` pull task (spec §24 deliverable 4);
      *  - `benchmarks_harness_detail_<name>.csv` — environment block and per-sample rows.
      */
     fun writeCsv(context: Context) {
-        val dir = context.externalCacheDir
+        val cacheDir = context.externalCacheDir
+        val dir = File(cacheDir, "$BENCHMARKS_DIR_NAME/$suite")
+        dir.mkdirs()
         // Backend + size in the name: a kernel run makes one file per backend.
         val fileBase =
             cleanName(name) + "_" + cleanName(backend.ifBlank { "all" }) + "_" + sizeLabel()

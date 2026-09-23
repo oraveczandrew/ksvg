@@ -84,6 +84,7 @@ class SimpleperfProfiler(private val appContext: Context) {
      */
     fun profile(
         name: String,
+        suite: String = "default",
         events: List<String>,
         durationMs: Long,
         cpuCore: Int?,
@@ -200,9 +201,13 @@ class SimpleperfProfiler(private val appContext: Context) {
         }
 
         val windowMs = windowMsOf(rawInternal) ?: durationMs
-        val rawExternal = File(externalDir, "simpleperf_$name.txt")
+        // Suite subdirectory (mirrors the timing-harness layout): classes sharing
+        // one instrumentation run never touch each other's profiles.
+        val suiteDir = File(externalDir, "$BENCHMARKS_DIR_NAME/$suite")
+        suiteDir.mkdirs()
+        val rawExternal = File(suiteDir, "simpleperf_$name.txt")
         rawInternal.copyTo(rawExternal, overwrite = true)
-        val csv = File(externalDir, "simpleperf_$name.csv")
+        val csv = File(suiteDir, "simpleperf_$name.csv")
         writeCsv(csv, name, counts, windowMs, iterations)
 
         val profile = SimpleperfProfile(

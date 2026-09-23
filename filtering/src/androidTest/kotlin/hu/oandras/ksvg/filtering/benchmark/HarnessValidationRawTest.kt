@@ -87,6 +87,7 @@ class HarnessValidationRawTest {
         val harnessReport =
             nativeBenchmark {
                 name = "ValidationHarness"
+                suite = SUITE
                 backend = "neon64"
                 width = w
                 height = h
@@ -149,10 +150,13 @@ class HarnessValidationRawTest {
     )
 
     private companion object {
+        /** Result suite: `benchmarks/<SUITE>/` on the device; see [clearSuiteResults]. */
+        const val SUITE = "harnessValidation"
+
         @BeforeClass
         @JvmStatic
         fun setup() {
-            clearPreviousResults()
+            clearSuiteResults(SUITE)
         }
         
         const val RAW_RUNS = 50

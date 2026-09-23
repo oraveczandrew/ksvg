@@ -48,11 +48,17 @@ import hu.oandras.ksvg.filtering.getTestTargetContext
  *  - `benchmark.simpleperf.durationMs` = profile window in ms (default 2000).
  *  - `benchmark.simpleperf.pinCore` = optional CPU index for the profile window
  *    (default: unpinned, like the timing harness).
- * Profiles land in the external cache as `simpleperf_benchmark_<Kernel>_<Backend>_<W>x<H>`
+ * Profiles land in the suite's result subdirectory as
+ * `benchmarks/<suite>/simpleperf_benchmark_<Kernel>_<Backend>_<W>x<H>`
  * `.txt`/`.csv` and are pulled+printed by `runDeviceBenchmark`.
+ *
+ * @param suite owning benchmark suite; selects the `benchmarks/<suite>/` result
+ * subdirectory so classes sharing one instrumentation run never touch each
+ * other's files.
  */
 class DeviceBenchmarkSink(
-    private val arguments: BenchmarkArguments
+    private val arguments: BenchmarkArguments,
+    private val suite: String,
 ) : KernelBenchmarkSink {
 
     private val simpleperfProfiler: SimpleperfProfiler? =
@@ -81,6 +87,7 @@ class DeviceBenchmarkSink(
         val bytesPerPixel = case.numBuffers * 4
         nativeBenchmark {
             this.name = case.config.name
+            this.suite = this@DeviceBenchmarkSink.suite
             backend = "kotlin"
             this.width = case.width
             this.height = case.height
@@ -101,6 +108,7 @@ class DeviceBenchmarkSink(
         for (b in getBackendsFor(case.backendFlags)) {
             nativeBenchmark {
                 this.name = case.config.name
+                this.suite = this@DeviceBenchmarkSink.suite
                 backend = backendName(b)
                 width = case.width
                 height = case.height
@@ -150,6 +158,7 @@ class DeviceBenchmarkSink(
         if (events.isEmpty()) return
         profiler.profile(
             name = "benchmark_${sanitizeName(case.config.name)}_${sanitizeName(backend)}_${case.width}x${case.height}",
+            suite = suite,
             events = events,
             durationMs = arguments.simpleperfDurationMs,
             cpuCore = arguments.simplePerfPinCore,
