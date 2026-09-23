@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.filtering
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import hu.oandras.ksvg.filtering.benchmark.BenchmarkActivity
 import hu.oandras.ksvg.filtering.benchmark.BenchmarkViewModel
 import hu.oandras.ksvg.filtering.benchmark.DeviceBenchmarkSink
 import hu.oandras.ksvg.filtering.benchmark.clearSuiteResults
@@ -75,8 +76,15 @@ class KernelPerformanceDeviceBenchmark {
         val sink = DeviceBenchmarkSink(benchmarkArguments, SUITE)
         val matrix = benchmarkMatrix(benchmarkArguments)
         BenchmarkViewModel.beginSuite(sink.estimatedTotalRuns(matrix))
-        for (case in matrix) {
-            runBenchmarkCase(case, sink)
+        try {
+            for (case in matrix) {
+                runBenchmarkCase(case, sink)
+            }
+        } finally {
+            // Tear down the benchmark window (spinner, sustained mode, screen-on):
+            // later suites in this process (parity!) must not inherit capped
+            // clocks and a spinning core. Relaunch is on demand (ensureAlive).
+            BenchmarkActivity.finishSingleton()
         }
     }
 }

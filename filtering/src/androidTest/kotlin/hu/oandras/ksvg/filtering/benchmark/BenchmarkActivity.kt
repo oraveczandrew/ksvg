@@ -177,6 +177,14 @@ internal class BenchmarkActivity : ComponentActivity() {
 
     internal fun actuallyFinish() {
         cpuSpinner.stop()
+        // Leave sustained mode explicitly: the window going away ends it anyway,
+        // but a stuck flag would keep later suites (parity!) on capped clocks.
+        try {
+            window.setSustainedPerformanceMode(false)
+        } catch (t: Throwable) {
+            Log.w(TAG, "setSustainedPerformanceMode(false) threw", t)
+        }
+        sustainedPerformanceModeInUse = false
         // Disable close animation.
         @Suppress("Deprecation") overridePendingTransition(0, 0)
         super.finish()

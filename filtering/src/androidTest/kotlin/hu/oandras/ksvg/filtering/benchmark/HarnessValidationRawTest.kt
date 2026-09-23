@@ -81,33 +81,39 @@ class HarnessValidationRawTest {
         }
 
         // Raw: N back-to-back calls, no harness at all.
-        val rawSamples = DoubleArray(RAW_RUNS) { timedMs(kernel) }
+        try {
+            val rawSamples = DoubleArray(RAW_RUNS) { timedMs(kernel) }
 
-        // Harness: the same work through nativeBenchmark { }.
-        val harnessReport =
-            nativeBenchmark {
-                name = "ValidationHarness"
-                suite = SUITE
-                backend = "neon64"
-                width = w
-                height = h
-                warmupIterations = 10
-                measurementBatches = 5
-                iterationsPerBatch = 10
-                run { kernel() }
-            }
+            // Harness: the same work through nativeBenchmark { }.
+            val harnessReport =
+                nativeBenchmark {
+                    name = "ValidationHarness"
+                    suite = SUITE
+                    backend = "neon64"
+                    width = w
+                    height = h
+                    warmupIterations = 10
+                    measurementBatches = 5
+                    iterationsPerBatch = 10
+                    run { kernel() }
+                }
 
-        val raw = describe(rawSamples)
-        val harnessStats = harnessReport.stats
-        val harnessSamples = harnessReport.samples.sumOf { it.size }
+            val raw = describe(rawSamples)
+            val harnessStats = harnessReport.stats
+            val harnessSamples = harnessReport.samples.sumOf { it.size }
 
-        println(
-            "Validation raw-vs-harness (Turbulence neon64 512x512):\n" +
-                "  raw      : n=$RAW_RUNS median=${raw.medianMs}p p95=${raw.p95Ms} max=${raw.maxMs} cv=${raw.cv}\n" +
-                "  harness  : n=$harnessSamples median=${harnessStats.medianMs} " +
-                "p95=${harnessStats.p95Ms} max=${harnessStats.maxMs} " +
-                "cv=${harnessCv(harnessReport)} classification=${harnessReport.classification}"
-        )
+            println(
+                "Validation raw-vs-harness (Turbulence neon64 512x512):\n" +
+                        "  raw      : n=$RAW_RUNS median=${raw.medianMs}p p95=${raw.p95Ms} max=${raw.maxMs} cv=${raw.cv}\n" +
+                        "  harness  : n=$harnessSamples median=${harnessStats.medianMs} " +
+                        "p95=${harnessStats.p95Ms} max=${harnessStats.maxMs} " +
+                        "cv=${harnessCv(harnessReport)} classification=${harnessReport.classification}"
+            )
+        } finally {
+            // Same teardown contract as the benchmark suites: no spinner,
+            // sustained mode or foreground window leaks into later suites.
+            BenchmarkActivity.finishSingleton()
+        }
     }
 
     private fun timedMs(kernel: () -> Unit): Double {
@@ -158,7 +164,7 @@ class HarnessValidationRawTest {
         fun setup() {
             clearSuiteResults(SUITE)
         }
-        
+
         const val RAW_RUNS = 50
     }
 }
