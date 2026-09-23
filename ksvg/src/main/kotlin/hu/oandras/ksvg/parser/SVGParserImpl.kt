@@ -317,7 +317,11 @@ internal class SVGParserImpl(
                         if (prefix != null) {
                             qName = "$prefix:$qName"
                         }
-                        startElement(parser.namespace, localName, qName, attributes)
+                        try {
+                            startElement(parser.namespace, localName, qName, attributes)
+                        } catch (e: KSVGParseException) {
+                            skipBrokenElement(localName.ifEmpty { qName }, e)
+                        }
                     }
 
                     XmlPullParser.END_TAG -> {
@@ -399,7 +403,11 @@ internal class SVGParserImpl(
             qName: String?,
             attributes: Attributes
         ) {
-            this@SVGParserImpl.startElement(uri, localName, qName, attributes)
+            try {
+                this@SVGParserImpl.startElement(uri, localName, qName, attributes)
+            } catch (e: KSVGParseException) {
+                skipBrokenElement(localName.ifEmpty { qName ?: localName }, e)
+            }
         }
 
         @Throws(SAXException::class)
@@ -443,6 +451,20 @@ internal class SVGParserImpl(
         ).apply {
             animationsEnabled = this@SVGParserImpl.animationsEnabled
         }
+    }
+
+    /**
+     * Browser parity (audit D2): a broken element (bad attribute values, misplaced
+     * structural tags) is skipped with a warning instead of aborting the whole
+     * document. Nothing was pushed for it, so enter the ignoring state (same as
+     * unknown elements): the matching end tag then unwinds without popping the
+     * parent container. Malformed XML itself still aborts at the parser level.
+     * Called from both parser frontends (XPP fast path + SAX entity path).
+     */
+    private fun skipBrokenElement(tag: String, e: KSVGParseException) {
+        logger.logE(TAG) { "Skipping <$tag>: ${e.message}" }
+        ignoring = true
+        ignoreDepth = 1
     }
 
     @Throws(KSVGParseException::class)

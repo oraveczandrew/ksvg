@@ -712,4 +712,33 @@ class P1AuditReproTest {
         assertTrue(countPixels(focused) { it.alpha != 0 } > 1000)
         assertFalse(soft.sameAs(focused))
     }
+
+    // Audit D2 (browser parity): an element with invalid attribute values is
+    // skipped with a warning; siblings still render. No exception escapes.
+    @Test
+    fun invalidGeometrySkipsElementOnly() {
+        val out = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<rect x="10" y="10" width="bogus" height="40" fill="#FF0000"/>""" +
+                """<circle cx="70" cy="70" r="15" fill="#00FF00"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertEquals(0, countPixels(out) { it.red == 255 })
+        assertTrue(countPixels(out) { it.green == 255 } > 500)
+    }
+
+    // Audit D2: the skip keeps the element stack balanced even nested.
+    @Test
+    fun invalidNestedGeometryKeepsStackBalanced() {
+        val out = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<g><rect x="10" y="10" width="bogus" height="40" fill="#FF0000"/>""" +
+                """<rect x="10" y="10" width="20" height="20" fill="#0000FF"/></g>""" +
+                """<rect x="60" y="60" width="30" height="30" fill="#00FF00"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertEquals(0, countPixels(out) { it.red == 255 })
+        assertTrue(countPixels(out) { it.blue == 255 } > 300)
+        assertTrue(countPixels(out) { it.green == 255 } > 500)
+    }
 }
