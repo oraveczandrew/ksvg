@@ -18,6 +18,8 @@ package hu.oandras.ksvg.glide
 
 import com.bumptech.glide.load.Options
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPoolAdapter
+import com.bumptech.glide.request.target.Target
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -26,6 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
+import java.io.ByteArrayInputStream
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -66,5 +69,26 @@ class SvgDecoderTest {
         resourceAsInputStream("example.svg").use {
             assertNotNull(decoder.decode(it, 192, 192, Options()))
         }
+    }
+
+    // Audit #26: Glide hands the same stream to decode() after handles().
+    @Test
+    fun testHandlesDoesNotConsumeStream() {
+        val bytes = resourceAsInputStream("example.svg").use { it.readBytes() }
+        val shared = ByteArrayInputStream(bytes)
+        assertTrue(decoder.handles(shared, Options()))
+        assertNotNull(decoder.decode(shared, 192, 192, Options()))
+    }
+
+    // Audit R2/D5: absurd document dimensions clamp aspect-preserving
+    // instead of exploding the bitmap allocation.
+    @Test
+    fun testHugeDocumentClamps() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20000" height="100">""" +
+            """<rect width="20000" height="100" fill="#FF0000"/></svg>"""
+        val stream = ByteArrayInputStream(svg.toByteArray())
+        val bitmap = decoder.decode(stream, Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL, Options()).get()
+        assertEquals(SvgDecoder.MAX_DECODE_DIMENSION, bitmap.width)
+        assertEquals(41, bitmap.height)
     }
 }

@@ -18,6 +18,7 @@ package hu.oandras.ksvg.glide
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.util.Log
 import com.bumptech.glide.load.Options
 import com.bumptech.glide.load.ResourceDecoder
 import com.bumptech.glide.load.engine.Resource
@@ -32,10 +33,20 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /** Decodes an SVG internal representation from an [java.io.InputStream].  */
-@Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
 public class SvgDecoder(
     private val pool: BitmapPool
 ) : ResourceDecoder<InputStream, Bitmap> {
+
+    internal companion object {
+        private const val TAG = "SvgDecoder"
+
+        /**
+         * Decode-time dimension budget: texture-safe ceiling browsers likewise
+         * enforce before allocating (audit R2/D5). Larger requests clamp
+         * aspect-preserving instead of throwing OOM.
+         */
+        internal const val MAX_DECODE_DIMENSION: Int = 8192
+    }
 
     override fun handles(source: InputStream, options: Options): Boolean {
         return isSvg(source)
@@ -88,13 +99,30 @@ public class SvgDecoder(
             }
 
             val scale = max(scaleX, scaleY)
-            val finalWidth: Int = (scale * documentWidth).roundToInt()
-            val finalHeight: Int = (scale * documentHeight).roundToInt()
+            var finalWidth: Int = (scale * documentWidth).roundToInt()
+            var finalHeight: Int = (scale * documentHeight).roundToInt()
 
-            val bitmap = pool.get(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)!!
+            // Decode-time budget (audit R2, browser parity): attacker-controlled
+            // dimensions must never drive an unbounded allocation. Clamp
+            // aspect-preserving to the texture-safe ceiling instead of OOMing.
+            if (finalWidth > MAX_DECODE_DIMENSION || finalHeight > MAX_DECODE_DIMENSION) {
+                val down = minOf(
+                    MAX_DECODE_DIMENSION / finalWidth.toFloat(),
+                    MAX_DECODE_DIMENSION / finalHeight.toFloat()
+                )
+                Log.w(TAG, "Clamping SVG decode size ${finalWidth}x$finalHeight")
+                finalWidth = (finalWidth * down).roundToInt().coerceAtLeast(1)
+                finalHeight = (finalHeight * down).roundToInt().coerceAtLeast(1)
+            }
+
+            val bitmap = try {
+                pool.get(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
+            } catch (e: OutOfMemoryError) {
+                throw IOException("SVG decode bitmap too large: ${finalWidth}x$finalHeight", e)
+            }
             val canvas = Canvas(bitmap)
             canvas.scale(scale, scale)
-           svg.renderToCanvas(canvas)
+            svg.renderToCanvas(canvas)
             return BitmapResource(bitmap, pool)
         } catch (ex: KSVGParseException) {
             throw IOException("Cannot load SVG from stream", ex)

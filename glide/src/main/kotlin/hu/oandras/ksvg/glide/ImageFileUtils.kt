@@ -18,15 +18,36 @@
 
 package hu.oandras.ksvg.glide
 
+import java.io.IOException
 import java.io.InputStream
 
+/**
+ * Detection lookahead budget: the `<svg` marker must appear within this many
+ * leading bytes (existing fixtures use <1KB). Bounded so the mark stays valid
+ * and [isSvg] can rewind for the subsequent decode (audit #26).
+ */
+private const val SVG_DETECT_LOOKAHEAD = 65536
+
 internal fun isSvg(inputStream: InputStream): Boolean {
-    val source = inputStream.buffered()
-    source.mark(20)
+    // Operate on the CALLER's stream with its own mark/reset: wrapping it in a
+    // local buffered() would leave the caller's position consumed after we return,
+    // breaking decode() on the same stream (audit #26). Streams without mark
+    // support are declined (we must not consume what we cannot rewind).
+    if (!inputStream.markSupported()) return false
+    inputStream.mark(SVG_DETECT_LOOKAHEAD)
     val byteArray = ByteArray(15)
-    source.read(byteArray)
-    source.reset()
-    return !isAndroidBinaryXmlFile(byteArray) && guessImageTypeFromBytes(byteArray) == null && hasSvgOpenTag(source)
+    inputStream.read(byteArray)
+    inputStream.reset()
+    val claimed = !isAndroidBinaryXmlFile(byteArray) &&
+        guessImageTypeFromBytes(byteArray) == null &&
+        hasSvgOpenTag(inputStream, SVG_DETECT_LOOKAHEAD - byteArray.size)
+    return try {
+        inputStream.reset()
+        claimed
+    } catch (_: IOException) {
+        // Lookahead overran (should not happen within budget): do not claim it.
+        false
+    }
 }
 
 @ImageMime
@@ -108,13 +129,19 @@ private fun guessImageTypeFromBytes(bytes: ByteArray?): String? {
     return null
 }
 
-private fun hasSvgOpenTag(inputStream: InputStream): Boolean {
+private fun hasSvgOpenTag(inputStream: InputStream, maxBytes: Int): Boolean {
     val buffer = ByteArray(8192)
     var match = 0
+    var remaining = maxBytes
 
-    while (true) {
-        val read = inputStream.read(buffer)
+    while (remaining > 0) {
+        val read = if (remaining < buffer.size) {
+            inputStream.read(buffer, 0, remaining)
+        } else {
+            inputStream.read(buffer)
+        }
         if (read == -1) return false
+        remaining -= read
 
         for (i in 0 until read) {
             match = when (buffer[i].toInt().toChar()) {
@@ -126,6 +153,7 @@ private fun hasSvgOpenTag(inputStream: InputStream): Boolean {
             }
         }
     }
+    return false
 }
 
 private inline fun ByteArray.isSameByte(index: Int, byte: Int): Boolean {
