@@ -77,8 +77,13 @@ class ParseTest {
                     "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                     "</svg>"
         SVG.setInternalEntitiesEnabled(false)
-        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
-        assertNotNull(svg.rootElement)
+        try {
+            val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
+            assertNotNull(svg.rootElement)
+        } finally {
+            // Global singleton: never leak a disabled state into other tests.
+            SVG.setInternalEntitiesEnabled(true)
+        }
     }
 
     @Test(expected = KSVGParseException::class)
@@ -284,6 +289,79 @@ class ParseTest {
         // Ensure settings for "svg" haven't changed
         assertTrue(svg.isInternalEntitiesEnabled)
         assertNull(svg.externalFileResolver)
+    }
+
+    @Test
+    @Throws(KSVGParseException::class)
+    fun internalEntitiesNestedWithinLimit() {
+        SVG.setInternalEntitiesEnabled(true)
+        try {
+            val test =
+                "<!DOCTYPE svg [" +
+                    "  <!ENTITY a \"abc\">" +
+                    "  <!ENTITY b \"&a;-&a;\">" +
+                    "]>" +
+                    "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
+                    "<text>&b;</text>" +
+                    "</svg>"
+            val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
+            assertNotNull(svg.rootElement)
+        } finally {
+            SVG.setInternalEntitiesEnabled(true)
+        }
+    }
+
+    @Test
+    fun billionLaughsTripsExpansionLimit() {        SVG.setInternalEntitiesEnabled(true)
+        try {
+        // Few expansions (21 << JDK's 64000), many chars (2M > our 1M cap): the JDK
+        // stays silent, so only OUR guard can fire. Also proves the Expat/SAX layer
+        // reports internal-entity boundaries (else the counter stays blind).
+        val big = "x".repeat(100_000)
+        val refs = StringBuilder()
+        repeat(20) { refs.append("&a0;") }
+        val test =
+            "<!DOCTYPE svg [<!ENTITY a0 \"$big\"><!ENTITY a1 \"$refs\">]>" +
+            "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
+            "<text>&a1;</text>" +
+            "</svg>"
+        try {
+            SVGImpl.getFromString(test, logger = NoopLoggerContext)
+            throw AssertionError("expected KSVGParseException for billion laughs")
+        } catch (e: KSVGParseException) {
+            var cursor: Throwable? = e
+            var seen = false
+            val chain = StringBuilder()
+            while (cursor != null && !seen) {
+                chain.append("[").append(cursor::class.simpleName).append(": ")
+                    .append(cursor.message).append("] <- ")
+                if ((cursor.message ?: "").contains("expansion limit")) seen = true
+                cursor = cursor.cause
+            }
+            println("AUDITDBG laugh chain: $chain")
+            assertTrue("expected our expansion guard in the chain", seen)
+        }
+        } finally {
+            SVG.setInternalEntitiesEnabled(true)
+        }
+    }
+
+    @Test
+    fun undefinedEntityRefsDroppedWhenDisabled() {
+        // Entities off + references present: the XPP path cannot expand them;
+        // the references are dropped instead of crashing on the platform null.
+        SVG.setInternalEntitiesEnabled(false)
+        try {
+            val test =
+                "<!DOCTYPE svg [<!ENTITY a \"abc\">]>" +
+                    "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
+                    "<text>&a;&a;</text>" +
+                    "</svg>"
+            val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
+            assertNotNull(svg.rootElement)
+        } finally {
+            SVG.setInternalEntitiesEnabled(true)
+        }
     }
 
     private class TestAssetResolver: ExternalFileResolver()

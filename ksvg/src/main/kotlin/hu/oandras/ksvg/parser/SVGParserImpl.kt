@@ -340,8 +340,11 @@ internal class SVGParserImpl(
                         text(text, tempStartAndLength[0], tempStartAndLength[1])
                     }
 
-                    XmlPullParser.ENTITY_REF -> text(parser.text)
-                    XmlPullParser.CDSECT -> text(parser.text)
+                    // Undefined entity references (entities disabled, or bypassed
+                    // sniffing) have no text: drop them instead of crashing on the
+                    // platform null (audit R2).
+                    XmlPullParser.ENTITY_REF -> parser.text?.let { text(it) }
+                    XmlPullParser.CDSECT -> parser.text?.let { text(it) }
                     XmlPullParser.PROCESSING_INSTRUCTION -> {
                         val scan = TextScanner(parser.text)
                         val instr = scan.requireNextToken()
@@ -391,6 +394,14 @@ internal class SVGParserImpl(
     }
 
     private inner class SAXHandler : DefaultHandler2() {
+        // Billion-laughs accounting: characters() fires for literal document text
+        // too, so only the slices arriving inside entity expansions count toward
+        // ENTITY_EXPANSION_LIMIT. saxChars is the backstop for stacks that never
+        // report boundaries (see SAX_CHAR_LIMIT).
+        private var entityDepth: Int = 0
+        private var expandedChars: Long = 0L
+        private var saxChars: Long = 0L
+
         override fun startDocument() {
             this@SVGParserImpl.startDocument()
         }
@@ -412,7 +423,33 @@ internal class SVGParserImpl(
 
         @Throws(SAXException::class)
         override fun characters(ch: CharArray, start: Int, length: Int) {
+            if (entityDepth > 0) {
+                expandedChars += length
+                if (expandedChars > ENTITY_EXPANSION_LIMIT) {
+                    throw KSVGParseException(
+                        "Entity expansion limit exceeded " +
+                            "($ENTITY_EXPANSION_LIMIT chars); possible Billion Laughs attack"
+                    )
+                }
+            }
+            saxChars += length
+            if (saxChars > SAX_CHAR_LIMIT) {
+                throw KSVGParseException(
+                    "SAX character limit exceeded " +
+                        "($SAX_CHAR_LIMIT chars); possible Billion Laughs attack"
+                )
+            }
             this@SVGParserImpl.text(ch = ch, start = start, length = length)
+        }
+
+        @Throws(SAXException::class)
+        override fun startEntity(name: String) {
+            entityDepth++
+        }
+
+        @Throws(SAXException::class)
+        override fun endEntity(name: String) {
+            if (entityDepth > 0) entityDepth--
         }
 
         /*
@@ -1770,6 +1807,20 @@ internal class SVGParserImpl(
         // This value defines how much of the SVG file preamble will we keep in order to check for
         // a doctype definition that has internal entities defined.
         const val ENTITY_WATCH_BUFFER_SIZE: Int = 4096
+
+        // Billion-laughs guard (audit D1/R2): total characters accepted from inside
+        // entity expansions on the SAX path (the XPP fast path never expands custom
+        // entities, so it needs no cap). Exponential nesting exceeds any fixed cap
+        // within a few levels, while legitimate entity use stays orders of magnitude
+        // below it.
+        internal const val ENTITY_EXPANSION_LIMIT: Int = 1_000_000
+
+        // Backstop for SAX stacks that do not report entity boundaries (notably
+        // Android's Expat: device-measured 2M expanded chars with zero boundary
+        // events and no platform amplification limit). Counts every character on
+        // the SAX path — entity docs with megabytes of literal text are
+        // essentially nonexistent, and the transient is bounded and survivable.
+        internal const val SAX_CHAR_LIMIT: Long = 8_000_000L
 
         private const val DEBUG_MODE: Boolean = false
     }
