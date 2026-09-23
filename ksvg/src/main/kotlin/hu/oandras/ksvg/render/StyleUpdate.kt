@@ -30,6 +30,38 @@ import hu.oandras.ksvg.dom.style.SvgPaint
 import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
 
+/**
+ * Resolves CSS relative font weights (`lighter`/`bolder`, sentinels
+ * [Style.FONT_WEIGHT_LIGHTER]/[Style.FONT_WEIGHT_BOLDER]) against the inherited
+ * base weight. Relative weight rules from CSS-Fonts-4:
+ * https://www.w3.org/TR/css-fonts-4/#relative-weights
+ * Shared by the builder and renderer style paths so variable-font axes and
+ * external resolvers never see the raw sentinels (audit #34).
+ */
+internal fun resolveRelativeFontWeight(specified: Float, baseWeight: Float): Float {
+    return when (specified) {
+        Style.FONT_WEIGHT_LIGHTER -> {
+            when {
+                baseWeight in 100f..<550f -> 100f
+                baseWeight in 550f..<750f -> 400f
+                baseWeight >= 750f -> 700f
+                else -> baseWeight
+            }
+        }
+
+        Style.FONT_WEIGHT_BOLDER -> {
+            when {
+                baseWeight < 350f -> 400f
+                baseWeight in 350f..<550f -> 700f
+                baseWeight in 550f..<900f -> 900f
+                else -> baseWeight
+            }
+        }
+
+        else -> specified
+    }
+}
+
 context(renderContext: DisplayContext)
 internal fun updateStyle(
     state: RendererState,

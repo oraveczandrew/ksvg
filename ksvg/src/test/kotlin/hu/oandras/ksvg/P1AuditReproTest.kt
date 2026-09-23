@@ -25,6 +25,8 @@ import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.parseFontFamily
 import hu.oandras.ksvg.parser.parsePath
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.render.MarkerVector
+import hu.oandras.ksvg.render.resolveRelativeFontWeight
 import hu.oandras.ksvg.render.text.checkGenericFont
 import hu.oandras.ksvg.test.countPixels
 import hu.oandras.ksvg.test.renderWithLibrary
@@ -33,6 +35,9 @@ import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.red
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -450,6 +455,73 @@ class P1AuditReproTest {
         assertTrue(render("SCREEN").sameAs(ref))
     }
 
+    // Audit #15: word-spacing must reach Paint (previously dropped between the
+    // detached apply and the lazy diff, which seeded equality).
+    @Test
+    fun wordSpacingWidensText() {
+        fun render(spacing: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60">""" +
+                """<text x="10" y="40" font-size="40" fill="#000000" word-spacing="$spacing">A B</text></svg>""",
+            Bitmap.createBitmap(200, 60, Bitmap.Config.ARGB_8888)
+        )
+        assertFalse(render("0").sameAs(render("20")))
+    }
+
+    // Audit #34: relative weights resolve against the base (table unit test) and
+    // never reach external resolvers as sentinels (end-to-end with a capturing
+    // resolver; font-family is non-generic so the resolver is actually called).
+    @Test
+    fun relativeFontWeightResolves() {
+        assertEquals(100f, resolveRelativeFontWeight(Style.FONT_WEIGHT_LIGHTER, 400f))
+        assertEquals(700f, resolveRelativeFontWeight(Style.FONT_WEIGHT_BOLDER, 400f))
+        assertEquals(400f, resolveRelativeFontWeight(Style.FONT_WEIGHT_BOLDER, 300f))
+        assertEquals(500f, resolveRelativeFontWeight(500f, 400f))
+    }
+
+    @Test
+    fun bolderNeverReachesResolverAsSentinel() {
+        var seenWeight = Float.NaN
+        val resolver = object : ExternalFileResolver() {
+            override fun resolveFont(
+                fontFamily: String,
+                fontWeight: Float,
+                fontStyle: String,
+                fontStretch: Float
+            ): Typeface? {
+                seenWeight = fontWeight
+                return null
+            }
+        }
+        SVG.registerExternalFileResolver(resolver)
+        try {
+            renderWithLibrary(
+                """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60">""" +
+                    """<text x="10" y="40" font-size="40" font-family="NoSuchFont" font-weight="bolder">A</text></svg>""",
+                Bitmap.createBitmap(100, 60, Bitmap.Config.ARGB_8888)
+            )
+        } finally {
+            SVG.deregisterExternalFileResolver()
+        }
+        assertEquals(700f, seenWeight)
+    }
+
+    // Audit plen: SVG2 pathLength applies to shapes, not just <path>.
+    // Same rect geometry, different pathLength -> different dash density.
+    @Test
+    fun rectPathLengthScalesDash() {
+        fun render(pathLength: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<rect x="10" y="10" width="80" height="20" fill="none" stroke="#FF0000" """ +
+                """stroke-width="4" stroke-dasharray="10" pathLength="$pathLength"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        val sparse = render("100")
+        val dense = render("200")
+        assertTrue(countPixels(sparse) { it.red == 255 } > 100)
+        assertTrue(countPixels(dense) { it.red == 255 } > 100)
+        assertFalse(sparse.sameAs(dense))
+    }
+
     // Audit #17: pattern tile overflow is clipped with and without viewBox
     // (hasOverflow gate verified empirically in both spaces; fully-outside
     // content paints nothing, so the gate cannot be vacuous here).
@@ -468,5 +540,91 @@ class P1AuditReproTest {
         val outside = """<rect x="-15" y="-15" width="10" height="10" fill="#FF0000"/>"""
         assertEquals(0, render(outside, """width="20" height="20" viewBox="0 0 20 20""""))
         assertEquals(0, render(outside, """width="20" height="20""""))
+    }
+
+    // Audit tcache: generic typefaces are deduplicated (same instance back).
+    @Test
+    fun genericTypefaceCached() {
+        val first = checkGenericFont("sans-serif", 400f, FontStyle.normal)
+        val second = checkGenericFont("sans-serif", 400f, FontStyle.normal)
+        assertSame(first, second)
+        assertNotSame(
+            first,
+            checkGenericFont("sans-serif", 700f, FontStyle.normal)
+        )
+    }
+
+    // Audit poly1: a single-point polyline renders nothing, so it takes no markers.
+    @Test
+    fun singlePointPolylineTakesNoMarker() {
+        val defs = """<defs><marker id="m" markerWidth="10" markerHeight="10" refX="5" refY="5">""" +
+            """<rect width="10" height="10" fill="#FF0000"/></marker></defs>"""
+        fun render(points: String, marker: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">$defs""" +
+                """<polyline points="$points" stroke="#000000" $marker/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertTrue(render("50,50", """marker-start="url(#m)"""").sameAs(render("50,50", "")))
+        assertTrue(countPixels(render("10,10 90,90", """marker-start="url(#m)"""")) { it.red == 255 } > 0)
+    }
+
+    // Audit marker180: near-reversal sums flag ambiguous instead of jittering.
+    @Test
+    fun nearReversalIsAmbiguous() {
+        val direct = MarkerVector(0f, 0f, 1f, 0f)
+        direct.add(-1f, 0.0000001f)
+        assertTrue(direct.isAmbiguous)
+        val viaVector = MarkerVector(0f, 0f, 1f, 0f)
+        viaVector.add(MarkerVector(0f, 0f, -1f, 0.0000001f))
+        assertTrue(viaVector.isAmbiguous)
+    }
+
+    // Audit view-blank: a <view> without viewBox must not blank the scene.
+    @Test
+    fun viewWithoutViewBoxDoesNotBlank() {
+        val svg = SVG.getFromString(
+            svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<view id="v"/>""" +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000"/></svg>"""
+        ) as SVGImpl
+        val drawable = KSVGDrawable(svg, RenderOptions.create().view("v"))
+        val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, 100, 100)
+        drawable.draw(Canvas(bitmap))
+        assertTrue(countPixels(bitmap) { it.red == 255 } > 1000)
+    }
+
+    // Audit xlink: plain href wins over xlink:href regardless of order (SVG2).
+    @Test
+    fun plainHrefBeatsXlinkHref() {
+        fun render(first: String, second: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="100">""" +
+                """<defs><rect id="a" width="40" height="40" fill="#FF0000"/>""" +
+                """<rect id="b" width="40" height="40" fill="#0000FF"/></defs>""" +
+                """<use $first $second width="40" height="40"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        for ((first, second) in listOf(
+            """href="#a"""" to """xlink:href="#b"""",
+            """xlink:href="#b"""" to """href="#a""""
+        )) {
+            val out = render(first, second)
+            assertTrue(countPixels(out) { it.red == 255 } > 1000)
+            assertEquals(0, countPixels(out) { it.blue == 255 })
+        }
+    }
+
+    // Audit empty-conditional: systemLanguage="" matches nothing (existential),
+    // requiredFeatures="" constrains nothing (universal). Both per-spec; locked here.
+    @Test
+    fun emptyConditionalsBehavePerSpec() {
+        val out = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000" systemLanguage=""/>""" +
+                """<rect x="50" y="50" width="40" height="40" fill="#00FF00" requiredFeatures=""/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertEquals(0, countPixels(out) { it.red == 255 })
+        assertTrue(countPixels(out) { it.green == 255 } > 1000)
     }
 }

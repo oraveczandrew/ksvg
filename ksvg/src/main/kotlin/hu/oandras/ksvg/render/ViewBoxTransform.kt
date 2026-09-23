@@ -38,15 +38,15 @@ internal class RootViewOverrides(
 
 /**
  * Resolves the effective root view overrides from render options.
- * Returns null when `options.view()` names an invalid <view> element
- * (the build must fail in that case).
+ * Returns null when `options.view()` names a missing or non-`<view>` element
+ * (the build must fail in that case). A `<view>` without `viewBox` simply
+ * contributes no viewBox override instead of blanking the scene.
  */
 internal fun resolveRootViewOverrides(document: SVGImpl, options: RenderOptionsImpl): RootViewOverrides? {
     val rootObj = document.rootElement ?: return RootViewOverrides(null, null)
     if (options.hasView()) {
         val obj = document.getElementById(options.viewId)
         if (obj !is View) return null
-        if (obj.viewBox == null) return null
         return RootViewOverrides(obj.viewBox, obj.preserveAspectRatio)
     }
     val viewBoxOverride = if (options.hasViewBox()) options.viewBox else rootObj.viewBox

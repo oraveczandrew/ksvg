@@ -41,7 +41,8 @@ internal fun calculateMarkerPositions(obj: PolyLineShape): List<MarkerVector>? {
     val points = obj.points ?: return null
 
     val numPoints = points.size
-    if (numPoints < 2) {
+    // A single point (2 floats) renders nothing, so it takes no markers.
+    if (numPoints < 4) {
         return null
     }
 

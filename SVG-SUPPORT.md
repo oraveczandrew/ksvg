@@ -203,14 +203,14 @@
 | [`alignment-baseline`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/alignment-baseline)                 | Full    |                                                           |
 | [`baseline-shift`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/baseline-shift)                         | Full    | `sub`, `super`, length                                    |
 | [`text-anchor`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/text-anchor)                               | Full    | `start`, `middle`, `end`                                  |
-| [`text-decoration`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/text-decoration)                       | Full    | `underline`, `line-through`, `overline`                   |
+| [`text-decoration`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/text-decoration)                       | Full    | `underline`, `line-through`, `overline`; `blink` parsed but never blinks (matches browsers) |
 | [`text-transform`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/text-transform)                         | Full    | `uppercase`, `lowercase`, `capitalize`                    |
 | [`text-orientation`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/text-orientation)                     | Partial | `mixed`, `sideways`                                       |
 | [`direction`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/direction)                                   | Full    | `ltr`, `rtl`                                              |
 | [`letter-spacing`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/letter-spacing)                         | Full    |                                                           |
 | [`word-spacing`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/word-spacing)                             | Full    |                                                           |
 | [`writing-mode`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/writing-mode)                             | Partial | Vertical text layout is applied; `textPath` method/spacing/side and full bidi are not |
-| [`glyph-orientation-vertical`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/glyph-orientation-vertical) | None    | Parsed but not applied (no vertical text layout)          |
+| [`glyph-orientation-vertical`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/glyph-orientation-vertical) | None    | Parsed but not applied; vertical text layout itself is supported |
 
 ### Rendering
 
@@ -223,7 +223,7 @@
 | [`vector-effect`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/vector-effect)                             | Full    | `non-scaling-stroke`, `none`               |
 | [`isolation`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/isolation)                                     | Full    | `auto`, `isolate`                          |
 | [`mix-blend-mode`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/mix-blend-mode)                           | Full    | CSS compositing                            |
-| [`color-interpolation-filters`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/color-interpolation-filters) | Full    |                                            |
+| [`color-interpolation-filters`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/color-interpolation-filters) | Partial | Honored by feColorMatrix/feComposite/lighting paths; gradients always interpolate in sRGB |
 | [`viewport-fill`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/viewport-fill)                             | Full    | SVG2                                       |
 | [`viewport-fill-opacity`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/viewport-fill-opacity)             | Full    | SVG2                                       |
 

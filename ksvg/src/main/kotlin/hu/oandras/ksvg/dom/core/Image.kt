@@ -20,6 +20,7 @@ package hu.oandras.ksvg.dom.core
 import android.graphics.Matrix
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.PreserveAspectRatio
+import hu.oandras.ksvg.parser.SVGParserImpl
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.parser.parseLength
@@ -57,6 +58,7 @@ internal class Image(
         parent: Container?,
     ) : ConditionalContainer.Builder<Image>(document, parent) {
         private var href: String? = null
+        private var xlinkHref: String? = null
         private var x: CSSLength? = null
         private var y: CSSLength? = null
         private var width: CSSLength? = null
@@ -69,7 +71,16 @@ internal class Image(
             value: String
         ): Boolean {
             when (attr) {
-                SVGAttr.href -> href = value
+                SVGAttr.href -> {
+                    // Per SVG2, plain href wins over xlink:href regardless of
+                    // document order, so the two are tracked separately.
+                    val uri = attributes.getURI(index)
+                    if (uri == "") {
+                        href = value
+                    } else if (uri == SVGParserImpl.XLINK_NAMESPACE) {
+                        xlinkHref = value
+                    }
+                }
                 SVGAttr.x -> x = parseLength(value)
                 SVGAttr.y -> y = parseLength(value)
                 SVGAttr.width -> width = parseNonNegativeLength(
@@ -90,7 +101,8 @@ internal class Image(
                 baseParams = getBaseParams(),
                 conditionalBundle = getSvgConditionalBundle(),
                 preserveAspectRatio = getPreserveAspectRatio(),
-                href = href ?: throw KSVGParseException("Invalid <image> element. href attribute is required"),
+                href = href ?: xlinkHref
+                    ?: throw KSVGParseException("Invalid <image> element. href attribute is required"),
                 x = x,
                 y = y,
                 width = width,

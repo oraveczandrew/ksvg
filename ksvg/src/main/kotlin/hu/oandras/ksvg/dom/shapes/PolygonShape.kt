@@ -26,12 +26,14 @@ internal class PolygonShape(
     baseParams: BaseParams,
     conditionalBundle: Conditional,
     transform: Matrix?,
-    points: FloatArray?
+    points: FloatArray?,
+    pathLength: Float? = null
 ) : PolyLineShape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
     transform = transform,
-    points = points
+    points = points,
+    pathLength = pathLength
 ) {
 
     override fun getNodeName(): String {
@@ -47,7 +49,8 @@ internal class PolygonShape(
                 baseParams = getBaseParams(),
                 conditionalBundle = getSvgConditionalBundle(),
                 transform = getTransform(),
-                points = requireNotNull(getPoints()) { "Invalid <polygon> element. points attribute is required" }
+                points = requireNotNull(getPoints()) { "Invalid <polygon> element. points attribute is required" },
+                pathLength = getPathLength()
             )
         }
     }

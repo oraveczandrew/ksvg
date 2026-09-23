@@ -24,6 +24,7 @@ import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseLength
+import hu.oandras.ksvg.parser.parseNonNegativeFloat
 import org.xml.sax.Attributes
 
 internal class LineShape(
@@ -38,6 +39,8 @@ internal class LineShape(
     val x2: CSSLength?,
     @JvmField
     val y2: CSSLength?,
+    @JvmField
+    val pathLength: Float? = null,
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -56,6 +59,7 @@ internal class LineShape(
         private var y1: CSSLength? = null
         private var x2: CSSLength? = null
         private var y2: CSSLength? = null
+        private var pathLength: Float? = null
 
         override fun onAttribute(
             attributes: Attributes,
@@ -68,6 +72,10 @@ internal class LineShape(
                 SVGAttr.y1 -> y1 = parseLength(value)
                 SVGAttr.x2 -> x2 = parseLength(value)
                 SVGAttr.y2 -> y2 = parseLength(value)
+                SVGAttr.pathLength -> pathLength = parseNonNegativeFloat(
+                    value = value,
+                    errorMessage = "Invalid <line> element. pathLength cannot be negative"
+                )
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
             return true
@@ -81,7 +89,8 @@ internal class LineShape(
                 x1 = x1,
                 y1 = y1,
                 x2 = x2,
-                y2 = y2
+                y2 = y2,
+                pathLength = pathLength
             )
         }
     }

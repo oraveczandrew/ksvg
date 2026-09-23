@@ -59,29 +59,42 @@ internal class MarkerVector(
             dx /= len
             dy /= len
         }
-        // Check for degenerate result where the two unit vectors canceled each other out
-        if (dx == -this.dx && dy == -this.dy) {
+        // Check for degenerate result where the two unit vectors canceled each other
+        // out. Exact float equality almost never triggers after normalization, so test
+        // the summed magnitude instead: near-reversals otherwise jitter frame to frame.
+        val sx = this.dx + dx
+        val sy = this.dy + dy
+        if (hypot(sx, sy) < REVERSAL_EPSILON) {
             this.isAmbiguous = true
             // Choose one of the perpendiculars now. We will get a chance to switch it later.
             this.dx = -dy
             this.dy = dx
         } else {
-            this.dx += dx
-            this.dy += dy
+            this.dx = sx
+            this.dy = sy
         }
     }
 
     fun add(v2: MarkerVector) {
-        // Check for degenerate result where the two unit vectors canceled each other out
-        if (v2.dx == -this.dx && v2.dy == -this.dy) {
+        // Same degenerate-sum test as above.
+        val sx = this.dx + v2.dx
+        val sy = this.dy + v2.dy
+        if (hypot(sx, sy) < REVERSAL_EPSILON) {
             this.isAmbiguous = true
             // Choose one of the perpendiculars now. We will get a chance to switch it later.
             this.dx = -v2.dy
             this.dy = v2.dx
         } else {
-            this.dx += v2.dx
-            this.dy += v2.dy
+            this.dx = sx
+            this.dy = sy
         }
+    }
+
+    companion object {
+        // Summed unit-vector magnitude below which two directions count as
+        // opposite (about 0.06° from exact reversal). Exact float equality
+        // essentially never fires after hypot normalization.
+        private const val REVERSAL_EPSILON = 1e-3f
     }
 
 

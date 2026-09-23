@@ -91,6 +91,7 @@ import hu.oandras.ksvg.dom.shapes.CircleShape
 import hu.oandras.ksvg.dom.shapes.EllipseShape
 import hu.oandras.ksvg.dom.shapes.LineShape
 import hu.oandras.ksvg.dom.shapes.PathShape
+import hu.oandras.ksvg.dom.shapes.PolygonShape
 import hu.oandras.ksvg.dom.shapes.PolyLineShape
 import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.dom.shapes.Shape
@@ -147,7 +148,10 @@ import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.takeIfNonZeroOrElse
 import hu.oandras.ksvg.utils.textXMLSpaceTransform
 import java.util.*
+import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.PI
+import kotlin.math.sqrt
 
 /**
  * Hard cap on render-tree build recursion depth. Reference cycles through
@@ -996,7 +1000,9 @@ internal class RenderTreeBuilder(
             return false
         }
 
-        // Check language
+        // Check language. systemLanguage is existential (any match passes), so an
+        // empty list matches nothing and fails; requiredFeatures below is universal
+        // (vacuous truth on empty). The asymmetry is per-spec, not a bug.
         val deviceLanguage = Locale.getDefault().language
         val sysLang = condObj.systemLanguage
         if (sysLang != null && (sysLang.isEmpty() || !sysLang.contains(deviceLanguage))) {
@@ -1900,15 +1906,68 @@ internal class RenderTreeBuilder(
     }
 
     private fun computePathLengthScale(obj: ElementBase): Float {
-        if (obj !is PathShape) return 1f
-        val declared = obj.pathLength ?: return 1f
-        if (declared <= 0f) return 1f
-        val d = obj.d ?: return 1f
-        val measure = PathMeasure()
-        measure.setPath(PathConverter(d).path, false)
-        val length = measure.length
-        if (length <= 0f) return 1f
-        return length / declared
+        // SVG2 allows pathLength on shapes, not just <path>. Lengths resolve in the
+        // build-time viewport context (percent geometry + later resizes can stale
+        // the scale the same way other precomputed geometry stales; the common
+        // absolute-geometry case stays exact).
+        val actualLength = when (obj) {
+            is PathShape -> {
+                val d = obj.d ?: return 1f
+                val measure = PathMeasure()
+                measure.setPath(PathConverter(d).path, false)
+                measure.length
+            }
+            is RectShape -> {
+                val w = obj.width?.floatValueXInContext() ?: return 1f
+                val h = obj.height?.floatValueYInContext() ?: return 1f
+                val rx = obj.rx?.floatValueXInContext() ?: 0f
+                val ry = obj.ry?.floatValueYInContext() ?: 0f
+                val r = minOf(rx.coerceAtLeast(0f), ry.coerceAtLeast(0f), w / 2f, h / 2f)
+                2f * (w + h - 4f * r) + (2f * PI.toFloat() * r)
+            }
+            is CircleShape -> {
+                val r = obj.r?.floatValueInContext() ?: return 1f
+                2f * PI.toFloat() * r
+            }
+            is EllipseShape -> {
+                val rx = obj.rx?.floatValueXInContext() ?: return 1f
+                val ry = obj.ry?.floatValueYInContext() ?: return 1f
+                // Ramanujan's second approximation (dash scaling only needs it close).
+                (PI * (3f * (rx + ry) - sqrt((3f * rx + ry) * (rx + 3f * ry)))).toFloat()
+            }
+            is LineShape -> {
+                val x1 = obj.x1?.floatValueXInContext() ?: 0f
+                val y1 = obj.y1?.floatValueYInContext() ?: 0f
+                val x2 = obj.x2?.floatValueXInContext() ?: 0f
+                val y2 = obj.y2?.floatValueYInContext() ?: 0f
+                hypot(x2 - x1, y2 - y1)
+            }
+            is PolyLineShape -> {
+                val points = obj.points ?: return 1f
+                var length = 0f
+                var i = 2
+                while (i + 1 < points.size) {
+                    length += hypot(points[i] - points[i - 2], points[i + 1] - points[i - 1])
+                    i += 2
+                }
+                if (obj is PolygonShape && points.size >= 4) {
+                    length += hypot(points[0] - points[i - 2], points[1] - points[i - 1])
+                }
+                length
+            }
+            else -> return 1f
+        }
+        val declared: Float? = when (obj) {
+            is PathShape -> obj.pathLength
+            is RectShape -> obj.pathLength
+            is CircleShape -> obj.pathLength
+            is EllipseShape -> obj.pathLength
+            is LineShape -> obj.pathLength
+            is PolyLineShape -> obj.pathLength
+            else -> null
+        }
+        if (declared == null || declared <= 0f || actualLength <= 0f) return 1f
+        return actualLength / declared
     }
 
     private fun updateStyleForElement(state: RendererState, builder: Style.Builder, obj: ElementBase) {
@@ -1950,7 +2009,15 @@ internal class RenderTreeBuilder(
     * Will also update the current paints etc. where appropriate.
     */
     private fun updateStyle(state: RendererState, builder: Style.Builder, sourceStyle: Style) {
-        updateStyle(state, builder, sourceStyle, this.currentFontSize, sourceStyle.fontWeight)
+        // Resolve relative weights here as well: selectTypefaceAndFontStyling runs at
+        // build time, so the raw lighter/bolder sentinels would otherwise leak into
+        // variable-font axes and external resolvers (audit #34).
+        val resolvedFontWeight = if (sourceStyle.isSpecified(Style.SPECIFIED_FONT_WEIGHT)) {
+            resolveRelativeFontWeight(sourceStyle.fontWeight, builder.fontWeight)
+        } else {
+            Float.NaN
+        }
+        updateStyle(state, builder, sourceStyle, this.currentFontSize, resolvedFontWeight)
     }
 
     private fun makeViewPort(

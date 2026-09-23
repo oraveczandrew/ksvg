@@ -24,6 +24,7 @@ import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseLength
+import hu.oandras.ksvg.parser.parseNonNegativeFloat
 import hu.oandras.ksvg.parser.parseNonNegativeLength
 import org.xml.sax.Attributes
 
@@ -37,6 +38,8 @@ internal class CircleShape(
     val cy: CSSLength?,
     @JvmField
     val r: CSSLength?,
+    @JvmField
+    val pathLength: Float? = null,
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -54,6 +57,7 @@ internal class CircleShape(
         private var cx: CSSLength? = null
         private var cy: CSSLength? = null
         private var r: CSSLength? = null
+        private var pathLength: Float? = null
 
         override fun onAttribute(
             attributes: Attributes,
@@ -68,6 +72,10 @@ internal class CircleShape(
                     value,
                     "Invalid <circle> element. r cannot be negative"
                 )
+                SVGAttr.pathLength -> pathLength = parseNonNegativeFloat(
+                    value = value,
+                    errorMessage = "Invalid <circle> element. pathLength cannot be negative"
+                )
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
             return true
@@ -80,7 +88,8 @@ internal class CircleShape(
                 transform = getTransform(),
                 cx = cx,
                 cy = cy,
-                r = r
+                r = r,
+                pathLength = pathLength
             )
         }
     }

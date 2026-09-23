@@ -54,6 +54,7 @@ internal class Use(
         parent: Container?,
     ) : Group.Builder<Use>(document, parent) {
         private var href: String? = null
+        private var xlinkHref: String? = null
         private var x: CSSLength? = null
         private var y: CSSLength? = null
         private var width: CSSLength? = null
@@ -67,9 +68,13 @@ internal class Use(
         ): Boolean {
             when (attr) {
                 SVGAttr.href -> {
+                    // Per SVG2, plain href wins over xlink:href regardless of
+                    // document order, so the two are tracked separately.
                     val uri = attributes.getURI(index)
-                    if (uri == "" || uri == SVGParserImpl.XLINK_NAMESPACE) {
+                    if (uri == "") {
                         href = value
+                    } else if (uri == SVGParserImpl.XLINK_NAMESPACE) {
+                        xlinkHref = value
                     }
                 }
                 SVGAttr.x -> x = parseLength(value)
@@ -92,7 +97,7 @@ internal class Use(
                 baseParams = getBaseParams(),
                 conditionalBundle = getSvgConditionalBundle(),
                 transform = getTransform(),
-                href = href,
+                href = href ?: xlinkHref,
                 x = x,
                 y = y,
                 width = width,

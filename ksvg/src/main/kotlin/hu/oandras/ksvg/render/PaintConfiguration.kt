@@ -20,6 +20,7 @@ import android.graphics.Paint
 import android.graphics.PathEffect
 import android.graphics.Shader
 import android.graphics.Typeface
+import hu.oandras.ksvg.compat.setWordSpacingCompat
 
 /**
  * The paint-driving state of a [RendererState]: everything we would write into
@@ -268,6 +269,12 @@ internal object PaintConfigSync {
         paint.pathEffect = cfg.pathEffect
         paint.textSize = cfg.textSize
         paint.letterSpacing = cfg.letterSpacing
+        // word-spacing must be written here too: the lazy diff path
+        // (writeConfigDiff) seeds its snapshot from this configuration, so a
+        // value missing here would never register as changed (audit #15).
+        if (!cfg.wordSpacing.isNaN()) {
+            paint.setWordSpacingCompat(cfg.wordSpacing)
+        }
         paint.isStrikeThruText = cfg.strikeThruText
         paint.isUnderlineText = cfg.underlineText
         paint.strokeWidth = cfg.strokeWidth

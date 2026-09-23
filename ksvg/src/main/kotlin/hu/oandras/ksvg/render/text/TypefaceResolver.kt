@@ -18,6 +18,7 @@ package hu.oandras.ksvg.render.text
 
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.util.LruCache
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.dom.style.FontStyle
@@ -134,6 +135,9 @@ private fun resolveFontFromFontFamily(
     return null
 }
 
+/** Build-time cache for synthesized generic typefaces (family + style). LruCache is internally synchronized. */
+private val genericTypefaceCache: LruCache<String, Typeface> = LruCache(16)
+
 internal fun checkGenericFont(
     fontName: String,
     fontWeight: Float,
@@ -158,13 +162,20 @@ internal fun checkGenericFont(
         }
     }
 
-    return when (fontName.lowercase(Locale.US)) {
+    // Build-time cache for synthesized system faces: at most 4 families × 4 styles.
+    // Key allocation per lookup is acceptable (build path, never the render hot path).
+    val normalized = fontName.lowercase(Locale.US)
+    val key = normalized + '|' + typefaceStyle
+    genericTypefaceCache.get(key)?.let { return it }
+    val typeface = when (normalized) {
         "serif" -> Typeface.create(Typeface.SERIF, typefaceStyle)
         "sans-serif",
         "cursive",
         "fantasy" -> Typeface.create(Typeface.SANS_SERIF, typefaceStyle)
 
         "monospace" -> Typeface.create(Typeface.MONOSPACE, typefaceStyle)
-        else -> null
+        else -> return null
     }
+    genericTypefaceCache.put(key, typeface)
+    return typeface
 }

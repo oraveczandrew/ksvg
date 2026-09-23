@@ -49,7 +49,7 @@ class ArcToTest {
         val ops: List<String> = canvas.asShadow().getOperations()
         assertEquals(8, ops.size)
         assertEquals(
-            "drawPath('M 163.63701 412.02103 C 151.5625 466.03125 139.4375 520.0156 127.32401 574.021', Paint(cap:BUTT; color:#ff000000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 163.63701 412.02103 C 151.5625 466.03125 139.4375 520.0156 127.32401 574.021', Paint(cap:BUTT; color:#ff000000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16; ws:0))",
             ops[4]
         )
     }
@@ -71,7 +71,7 @@ class ArcToTest {
         val ops: List<String> = canvas.asShadow().getOperations()
         assertEquals(8, ops.size)
         assertEquals(
-            "drawPath('M 422.77603 332.65903 C 415.15625 323.8125 407.53125 314.96875 399.92102 306.101', Paint(cap:BUTT; color:#ff000000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 422.77603 332.65903 C 415.15625 323.8125 407.53125 314.96875 399.92102 306.101', Paint(cap:BUTT; color:#ff000000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16; ws:0))",
             ops[4]
         )
     }

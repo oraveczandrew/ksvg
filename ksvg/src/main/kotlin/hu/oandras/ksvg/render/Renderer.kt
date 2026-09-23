@@ -1334,30 +1334,7 @@ internal class Renderer internal constructor(
     private fun updateStyle(state: RendererState, builder: Style.Builder, sourceStyle: Style) {
         val resolvedFontWeight = if (sourceStyle.isSpecified(Style.SPECIFIED_FONT_WEIGHT)) {
             // Font weights are 0..1000
-            // Relative weight rules from CSS-Fonts-4: https://www.w3.org/TR/css-fonts-4/#relative-weights
-            when (sourceStyle.fontWeight) {
-                Style.FONT_WEIGHT_LIGHTER -> {
-                    val fw = builder.fontWeight
-                    when {
-                        fw in 100f..<550f -> 100f
-                        fw in 550f..<750f -> 400f
-                        fw >= 750f -> 700f
-                        else -> fw
-                    }
-                }
-
-                Style.FONT_WEIGHT_BOLDER -> {
-                    val fw = builder.fontWeight
-                    when {
-                        fw < 350f -> 400f
-                        fw in 350f..<550f -> 700f
-                        fw in 550f..<900f -> 900f
-                        else -> fw
-                    }
-                }
-
-                else -> sourceStyle.fontWeight
-            }
+            resolveRelativeFontWeight(sourceStyle.fontWeight, builder.fontWeight)
         } else {
             Float.NaN
         }

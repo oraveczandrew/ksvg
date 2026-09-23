@@ -22,6 +22,7 @@ import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
+import hu.oandras.ksvg.parser.parseNonNegativeFloat
 import hu.oandras.ksvg.parser.parsePoints
 import org.xml.sax.Attributes
 
@@ -30,7 +31,9 @@ internal open class PolyLineShape(
     conditionalBundle: Conditional,
     transform: Matrix?,
     @JvmField
-    val points: FloatArray?
+    val points: FloatArray?,
+    @JvmField
+    val pathLength: Float? = null
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -46,6 +49,7 @@ internal open class PolyLineShape(
         parent: Container?,
     ) : Shape.Builder<T>(document, parent) {
         private var points: FloatArray? = null
+        private var pathLength: Float? = null
 
         override fun onAttribute(
             attributes: Attributes,
@@ -55,6 +59,10 @@ internal open class PolyLineShape(
         ): Boolean {
             when (attr) {
                 SVGAttr.points -> points = parsePoints(value)
+                SVGAttr.pathLength -> pathLength = parseNonNegativeFloat(
+                    value = value,
+                    errorMessage = "Invalid <polyline>/<polygon> element. pathLength cannot be negative"
+                )
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
             return true
@@ -66,10 +74,12 @@ internal open class PolyLineShape(
                 baseParams = getBaseParams(),
                 conditionalBundle = getSvgConditionalBundle(),
                 transform = getTransform(),
-                points = requireNotNull(points) { "Invalid <polyline> element. points attribute is required" }
+                points = requireNotNull(points) { "Invalid <polyline> element. points attribute is required" },
+                pathLength = pathLength
             ) as T
         }
 
         protected fun getPoints(): FloatArray? = points
+        protected fun getPathLength(): Float? = pathLength
     }
 }

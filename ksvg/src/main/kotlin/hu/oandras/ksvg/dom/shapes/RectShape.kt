@@ -24,6 +24,7 @@ import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseLength
+import hu.oandras.ksvg.parser.parseNonNegativeFloat
 import hu.oandras.ksvg.parser.parseNonNegativeLength
 import org.xml.sax.Attributes
 
@@ -44,6 +45,8 @@ internal class RectShape(
     val rx: CSSLength?,
     @JvmField
     val ry: CSSLength?,
+    @JvmField
+    val pathLength: Float? = null,
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -64,6 +67,7 @@ internal class RectShape(
         private var height: CSSLength? = null
         private var rx: CSSLength? = null
         private var ry: CSSLength? = null
+        private var pathLength: Float? = null
 
         override fun onAttribute(
             attributes: Attributes,
@@ -78,6 +82,10 @@ internal class RectShape(
                 SVGAttr.height -> height = parseNonNegativeLength(value, "Invalid <rect> element. height cannot be negative")
                 SVGAttr.rx -> rx = parseNonNegativeLength(value, "Invalid <rect> element. rx cannot be negative")
                 SVGAttr.ry -> ry = parseNonNegativeLength(value, "Invalid <rect> element. ry cannot be negative")
+                SVGAttr.pathLength -> pathLength = parseNonNegativeFloat(
+                    value = value,
+                    errorMessage = "Invalid <rect> element. pathLength cannot be negative"
+                )
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
             return true
@@ -93,7 +101,8 @@ internal class RectShape(
                 width = width,
                 height = height,
                 rx = rx,
-                ry = ry
+                ry = ry,
+                pathLength = pathLength
             )
         }
     }

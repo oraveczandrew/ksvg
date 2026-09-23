@@ -49,7 +49,7 @@ class RenderToCanvasTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals("concat(Matrix(1 0 0 1 0 50))", ops[2])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(cap:BUTT; color:#ff008000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(cap:BUTT; color:#ff008000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16; ws:0))",
             ops[4]
         )
     }
@@ -71,7 +71,7 @@ class RenderToCanvasTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals("concat(Matrix(0.5 0 0 0.5 50 75))", ops[2])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(cap:BUTT; color:#ff008000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(cap:BUTT; color:#ff008000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16; ws:0))",
             ops[4]
         )
     }
@@ -133,7 +133,7 @@ class RenderToCanvasTest {
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals("concat(Matrix(0.5 0 0 0.5 100 100))", ops[2])
         assertEquals(
-            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(cap:BUTT; color:#ff008000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16))",
+            "drawPath('M 0 0 L 200 0 L 200 100 L 0 100 L 0 0 Z', Paint(cap:BUTT; color:#ff008000; dash:null; f:ANTI_ALIAS|LINEAR_TEXT|SUBPIXEL_TEXT; ff:; fv:; grad:null; h:OFF; join:MITER; ls:0; miter:4; s:FILL; sw:1; tf:android.graphics.Typeface@0; ts:16; ws:0))",
             ops[4]
         )
     }
