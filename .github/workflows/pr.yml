@@ -1,0 +1,76 @@
+# PR gate: host unit tests (incl. native parity), Android lint, coverage report,
+# and a secret-free release-assemble guard (signing must never be required here).
+name: PR checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per PR head: newer pushes cancel stale in-progress runs.
+concurrency:
+  group: "pr-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GRADLE_OPTS: -Dorg.gradle.warning.mode=none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager --install "platforms;android-37" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
+          yes | sdkmanager --licenses > /dev/null
+
+      # Host unit tests, incl. the filtering native-parity suites (x86_64
+      # libksvgblur is built by the buildHostNativeLib task dependency).
+      - name: Unit + parity tests
+        run: |
+          ./gradlew :ksvg:testDebugUnitTest -PexcludeSlowTests \
+            :filtering:testDebugUnitTest :glide:testDebugUnitTest
+
+      - name: Android lint
+        run: ./gradlew :ksvg:lintDebug
+
+      - name: Coverage report
+        run: ./gradlew :ksvg:jacocoTestReport
+
+      # Signing guard: release assembly must succeed with NO signing secrets
+      # configured (signing only runs on publish, never on the PR path).
+      # No signing.* properties or key files are provided here on purpose.
+      - name: Secret-free release assemble
+        run: ./gradlew :ksvg:assembleRelease
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            ksvg/build/test-results/testDebugUnitTest/
+            filtering/build/test-results/testDebugUnitTest/
+            glide/build/test-results/testDebugUnitTest/
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ksvg/build/reports/jacoco/jacocoTestReport/
