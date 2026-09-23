@@ -517,8 +517,13 @@ internal class Style internal constructor(
 
         fun reset(original: Style) {
             this.original = original
-            this.specifiedFlags = original.specifiedFlags
-            this.specifiedFlags2 = original.specifiedFlags2
+            // Audit D10: "specified" means author-declared. The builder inherits
+            // the *values* from the original, but the declaration flags start
+            // empty: updateStyle gates then fire only for properties the source
+            // style actually declares. cssWideKeyword/important flags are still
+            // inherited (they qualify values, not declarations).
+            this.specifiedFlags = 0L
+            this.specifiedFlags2 = 0L
             this.cssWideKeywordFlags = original.cssWideKeywordFlags
             this.importantFlags = original.importantFlags
             this.lastTouchedFlag = 0L
@@ -1238,15 +1243,9 @@ internal class Style internal constructor(
         const val SPECIFIED_PAINT_ORDER: Long = 1L shl 0
 
         // Flags for the settings that are applied to reset the root style
-        // NOTE (#46): -1 marks EVERY property "specified" on DEFAULT_STYLE, and
-        // Builder.reset() copies the flags, so the -1 lineage flows into every
-        // inherited node style: isSpecified() is effectively always-true and the
-        // updateStyle gates degrade to unconditional copies. Harmless today (the
-        // copied values are the correctly resolved ones — perf-only), but no new
-        // code may read isSpecified as "author-declared" until D10 decides the
-        // semantic fix (reset() clearing flags vs. keeping the lineage).
-        private const val SPECIFIED_RESET: Long = -1L
-
+        // NOTE (#46, audit D10): DEFAULT_STYLE declares nothing, so its flags
+        // stay empty (all-zero); the default *values* below are what reset()
+        // inherits. isSpecified() means author-declared again.
         private val DEFAULT_STYLE: Style = run {
             val def = Builder()
             def.reset(Style())
@@ -1317,7 +1316,6 @@ internal class Style internal constructor(
             def.glyphOrientationVertical = GlypOrientationVertical.auto
             def.textOrientation = TextOrientation.mixed
 
-            def.specifiedFlags = SPECIFIED_RESET
             def.build()
         }
 

@@ -754,16 +754,16 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.green == 255 } > 500)
     }
 
-    // Audit #46: DEFAULT_STYLE stamps specifiedFlags=-1 and Builder.reset()
-    // copies it, so an inherited style reports isSpecified for properties that
-    // were never declared. The updateStyle gates therefore always pass today;
-    // the copied values are the correctly resolved ones, so this is perf-only.
-    // Pins the lineage until D10 decides the semantic fix.
+    // Audit #46/D10: "specified" means author-declared. Builder.reset() inherits
+    // values but clears the declaration flags, and DEFAULT_STYLE declares
+    // nothing — so an inherited style reports undeclared properties as
+    // unspecified, and the updateStyle gates fire only on declared sources.
     @Test
-    fun inheritedStyleReportsUndeclaredPropertiesAsSpecified() {
+    fun inheritedStyleReportsUndeclaredPropertiesAsUnspecified() {
         val child = Style.Builder().also { it.reset(Style.getDefaultStyle()) }.build()
-        assertTrue(child.isSpecified(Style.SPECIFIED_WORD_SPACING))
-        assertTrue(child.isSpecified(Style.SPECIFIED_FONT_WEIGHT))
-        assertTrue(child.isSpecified(Style.SPECIFIED_FILL))
+        assertFalse(child.isSpecified(Style.SPECIFIED_WORD_SPACING))
+        assertFalse(child.isSpecified(Style.SPECIFIED_FONT_WEIGHT))
+        assertFalse(child.isSpecified(Style.SPECIFIED_FILL))
+        assertFalse(Style.getDefaultStyle().isSpecified(Style.SPECIFIED_FILL))
     }
 }

@@ -62,6 +62,96 @@ internal fun resolveRelativeFontWeight(specified: Float, baseWeight: Float): Flo
     }
 }
 
+/**
+ * Applies the *final* builder values to the live renderer state, unconditionally.
+ *
+ * Audit D10: [updateStyle] gates only merge *declared* values into the builder,
+ * so it can no longer populate a fresh state's paints/configs (the old -1
+ * lineage did that as a side effect). Fresh-state init sites
+ * (`reset(DEFAULT)` + build) call this instead: every write below mirrors the
+ * corresponding [updateStyle] gate's state half, reading the builder rather
+ * than a source. Per-element tier paths keep using [updateStyle] — their
+ * carried-over state plus declared-only overrides is exactly the old behavior
+ * for clean (non-lineage) sources.
+ *
+ * Preconditions: [builder] holds complete values (e.g. reset from
+ * `DEFAULT_STYLE`); [builder]'s font weight must already be resolved to an
+ * absolute value (never a lighter/bolder sentinel).
+ */
+context(renderContext: DisplayContext)
+internal fun applyStateFromBuilder(
+    state: RendererState,
+    builder: Style.Builder,
+    currentFontSize: Float,
+) {
+    val fill = builder.fill
+    state.hasFill = fill != null && fill != ColorValue.TRANSPARENT
+    setFillPaintColor(state, builder, fill)
+
+    val stroke = builder.stroke
+    state.hasStroke = stroke != null && stroke != ColorValue.TRANSPARENT
+    setStrokePaintColor(state, builder, stroke)
+
+    val strokeWidth = builder.strokeWidth
+    if (strokeWidth == null || strokeWidth.isZero) {
+        state.hasStroke = false
+    } else {
+        state.strokeConfig.setStrokeWidth(strokeWidth.floatValueInContext())
+    }
+    state.strokeConfig.setStrokeCap(Paint.Cap.entries[builder.strokeLineCap])
+    state.strokeConfig.setStrokeJoin(Paint.Join.entries[builder.strokeLineJoin])
+    state.strokeConfig.setStrokeMiter(builder.strokeMiterLimit)
+    state.updateStrokeDash(
+        builder.strokeDashArray,
+        builder.strokeDashOffset,
+        builder.strokeDashArrayResolved,
+        builder.strokeDashOffsetResolved,
+    )
+
+    builder.fontSize?.let { fontSize ->
+        state.fillConfig.setTextSize(fontSize.floatValueInContext(currentFontSize))
+        state.strokeConfig.setTextSize(fontSize.floatValueInContext(currentFontSize))
+    }
+
+    state.getFontVariationSetBuilder().addSetting(CSSFontVariationSettings.VARIATION_WEIGHT, builder.fontWeight)
+    builder.fontStyle?.let { fontStyle ->
+        state.getFontVariationSetBuilder().apply {
+            if (fontStyle == FontStyle.italic) {
+                addSetting(CSSFontVariationSettings.VARIATION_ITALIC, CSSFontVariationSettings.VARIATION_ITALIC_VALUE_ON)
+            } else if (fontStyle == FontStyle.oblique) {
+                addSetting(CSSFontVariationSettings.VARIATION_SLANT, CSSFontVariationSettings.VARIATION_OBLIQUE_VALUE_ON)
+            }
+        }
+    }
+    state.getFontVariationSetBuilder().addSetting(CSSFontVariationSettings.VARIATION_WIDTH, builder.fontWidth)
+
+    // Decorations render manually in TextRenderer; the configs stay cleared.
+    state.fillConfig.setTextDecorations(strikeThru = false, underline = false)
+    state.strokeConfig.setTextDecorations(strikeThru = false, underline = false)
+
+    state.getFontFeatureSetBuilder().applyKerning(builder.fontKerning)
+    state.getFontFeatureSetBuilder().addSettings(builder.fontFeatureSettings)
+    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantLigatures)
+    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantPosition)
+    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantCaps)
+    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantNumeric)
+    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantEastAsian)
+    state.getFontVariationSetBuilder().addSettings(builder.fontVariationSettings)
+
+    var spacing = builder.letterSpacing?.floatValueInContext() ?: 0f
+    if (spacing > 0 && currentFontSize > 0) {
+        spacing /= currentFontSize
+    }
+    state.fillConfig.setLetterSpacing(spacing)
+    state.strokeConfig.setLetterSpacing(spacing)
+
+    if (supportsWordSpacing()) {
+        val wordSpacing = builder.wordSpacing?.floatValueInContext() ?: 0f
+        state.fillConfig.setWordSpacing(wordSpacing)
+        state.strokeConfig.setWordSpacing(wordSpacing)
+    }
+}
+
 context(renderContext: DisplayContext)
 internal fun updateStyle(
     state: RendererState,

@@ -209,7 +209,9 @@ internal class RenderTreeBuilder(
         state = RendererState()
         styleBuilderPool.withPooledObject { builder ->
             builder.reset(Style.getDefaultStyle())
-            updateStyle(state, builder, Style.getDefaultStyle())
+            // Audit D10: updateStyle only merges declared values (DEFAULT_STYLE
+            // declares nothing), so fresh-state setup comes from the builder.
+            applyStateFromBuilder(state, builder, currentFontSize)
             state.style = builder.build()
         }
         state.viewPort = viewPort
@@ -236,7 +238,8 @@ internal class RenderTreeBuilder(
         state = RendererState()
         styleBuilderPool.withPooledObject { builder ->
             builder.reset(Style.getDefaultStyle())
-            updateStyle(state, builder, Style.getDefaultStyle())
+            // Audit D10: see build(viewPort) init above.
+            applyStateFromBuilder(state, builder, currentFontSize)
             state.style = builder.build()
         }
 
@@ -1507,7 +1510,9 @@ internal class RenderTreeBuilder(
         val newState = RendererState()
         obj.styleBuilder.also { builder ->
             builder.reset(Style.getDefaultStyle())
-            updateStyle(newState, builder, Style.getDefaultStyle())
+            // Audit D10: updateStyle only merges declared values (DEFAULT_STYLE
+            // declares nothing), so fresh-state setup comes from the builder.
+            applyStateFromBuilder(newState, builder, currentFontSize)
             newState.style = builder.build()
         }
         newState.viewPort = state.viewPort
