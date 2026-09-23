@@ -356,7 +356,12 @@ public interface SVG {
 
         /**
          * Read and parse an SVG from the given `InputStream`.
-         * 
+         *
+         * Ownership transfer: the parser closes `inputStream` in a finally block,
+         * whether parsing succeeds or fails. Do not reuse or reset the stream
+         * afterwards (in particular, Glide decoders must not expect a re-readable
+         * stream after `handles()` consumed bytes — rewind it themselves first).
+         *
          * @param inputStream the input stream from which to read the file.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.

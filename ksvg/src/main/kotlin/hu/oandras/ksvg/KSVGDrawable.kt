@@ -31,6 +31,15 @@ import hu.oandras.ksvg.render.pool.PoolOwner
 
 /**
  * A [Drawable] backed by an [SVG] document.
+ *
+ * Single-thread affinity: draws, scene rebuilds and hit-region computation share
+ * mutable state ([scene], pools, cached regions) without synchronization. Use one
+ * drawable per thread, normally the main thread. Concurrent [draw] calls corrupt
+ * rendering state.
+ *
+ * Sizing: SVGs without intrinsic width/height report -1 intrinsics, so
+ * `wrap_content` hosts collapse. Give the view explicit bounds (or the SVG
+ * explicit dimensions) instead.
  */
 public open class KSVGDrawable @JvmOverloads public constructor(
     @JvmField

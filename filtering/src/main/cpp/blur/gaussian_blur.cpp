@@ -33,6 +33,7 @@
  */
 
 #include <jni.h>
+#include <algorithm>
 #include <cmath>
 #include <vector>
 #include <cstdint>
@@ -224,6 +225,11 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
     if (s.fbuf.size() < fn) s.fbuf.resize(fn);
     float* fbuf0 = s.fbuf.data();             // valid pointer for pin = fbuf0
     float* fbuf_mid = fbuf0 + (size_t)r * 4;  // float4 per padded column
+    // The horizontal pass reads fbuf0[0..r), which no pass ever writes: the
+    // correct value there is the transparent-black edge pedestal (0.0f).
+    // resize() zero-fills today, but spell it out so a future
+    // reserve()+uninitialized growth cannot corrupt left-edge columns (audit F5).
+    std::fill(fbuf0, fbuf0 + (size_t)r * 4, 0.0f);
 
     for (int y = pad; y < pad + h; ++y) {
         const uint8_t* inTop = in.data() + static_cast<size_t>((y - r) * pw) * 4;

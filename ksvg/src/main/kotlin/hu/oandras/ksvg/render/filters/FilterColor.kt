@@ -88,16 +88,20 @@ internal fun doFeColorMatrixFilter(
 
 internal fun buildColorMatrix(type: FeColorMatrixType, values: FloatArray?): ColorMatrix = when (type) {
         FeColorMatrixType.matrix -> {
-            val values = (values ?: identity).copyOf()
-
-            if (values.size >= 20) {
-                values[4] *= 255f
-                values[9] *= 255f
-                values[14] *= 255f
-                values[19] *= 255f
+            // android.graphics.ColorMatrix requires exactly 20 elements (it throws
+            // otherwise). Short lists fall back to identity (matching browsers, where
+            // the malformed primitive is ignored); long lists keep the first 20.
+            val src = when {
+                values == null || values.size < 20 -> identity
+                else -> values.copyOf(20)
             }
+            val mapped = src.copyOf()
+            mapped[4] *= 255f
+            mapped[9] *= 255f
+            mapped[14] *= 255f
+            mapped[19] *= 255f
 
-            ColorMatrix(values)
+            ColorMatrix(mapped)
         }
 
         FeColorMatrixType.saturate -> {

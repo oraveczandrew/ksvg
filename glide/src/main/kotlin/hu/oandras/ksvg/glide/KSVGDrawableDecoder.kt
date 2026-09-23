@@ -16,7 +16,6 @@
 
 package hu.oandras.ksvg.glide
 
-import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import com.bumptech.glide.load.Options
 import com.bumptech.glide.load.ResourceDecoder
@@ -24,6 +23,7 @@ import com.bumptech.glide.load.engine.Resource
 import hu.oandras.ksvg.KSVGDrawable
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.SVG
+import java.io.IOException
 import java.io.InputStream
 
 /**
@@ -36,6 +36,7 @@ public class KSVGDrawableDecoder : ResourceDecoder<InputStream, Drawable> {
         return isSvg(source)
     }
 
+    @Throws(IOException::class)
     override fun decode(
         source: InputStream,
         width: Int,
@@ -52,15 +53,9 @@ public class KSVGDrawableDecoder : ResourceDecoder<InputStream, Drawable> {
                 svg.toDrawable()
             }
 
-            if (false) {
-                val canvas = Canvas()
-                drawable.setBounds(0, 0, width, height)
-                drawable.draw(canvas)
-            }
-
             return KSVGDrawableResource(drawable)
         } catch (e: KSVGParseException) {
-            throw RuntimeException("Cannot load SVG from stream", e)
+            throw IOException("Cannot load SVG from stream", e)
         }
     }
 }

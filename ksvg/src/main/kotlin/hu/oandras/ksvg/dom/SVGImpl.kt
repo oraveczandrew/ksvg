@@ -63,6 +63,7 @@ import hu.oandras.ksvg.utils.forEachElement
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
+import kotlin.jvm.Volatile
 
 internal const val COLOR_WHITE: Int = 0xFFFFFFFF.toInt()
 internal const val COLOR_TRANSPARENT: Int = 0
@@ -776,6 +777,7 @@ internal class SVGImpl internal constructor(
 
         // Parser configuration singletons
         // Configures the parser that will be used for the next SVG that gets parsed
+        @Volatile
         private var externalFileResolverSingleton: ExternalFileResolver? = null
         private var enableInternalEntitiesSingleton = true
 
@@ -909,8 +911,12 @@ internal class SVGImpl internal constructor(
          * Register an [ExternalFileResolver] instance that the renderer should use when resolving
          * external references such as images, fonts, and CSS stylesheets.
          *
+         * The registration is process-global and sticky: it applies to every subsequent
+         * parse until [deregisterExternalFileResolver]. Last registration wins;
+         * concurrent registrations from multiple threads race (visibility only).
+         *
          * @param fileResolver the resolver to use.
-    
+         *
          */
         fun registerExternalFileResolver(fileResolver: ExternalFileResolver?) {
             externalFileResolverSingleton = fileResolver

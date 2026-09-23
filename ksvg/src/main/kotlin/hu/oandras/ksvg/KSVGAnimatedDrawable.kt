@@ -80,6 +80,25 @@ public open class KSVGAnimatedDrawable @JvmOverloads public constructor(
 
     override fun isRunning(): Boolean = running
 
+    /**
+     * Pauses the ticker while invisible (detached/recycled views, hidden tabs)
+     * and resumes it when visible again. `running` is preserved across the gap
+     * so hosts that only toggle visibility never leak a ticking drawable.
+     * Hosts that drop the drawable must still call [stop] (or `Glide.clear()`).
+     */
+    override fun setVisible(visible: Boolean, restart: Boolean): Boolean {
+        val changed = super.setVisible(visible, restart)
+        if (visible) {
+            if (running) {
+                invalidateSelf()
+                scheduleNextFrame()
+            }
+        } else {
+            unscheduleSelf(frameRunnable)
+        }
+        return changed
+    }
+
     override fun registerAnimationCallback(callback: Animatable2.AnimationCallback) {
         if (callback !in callbacks) {
             callbacks.add(callback)

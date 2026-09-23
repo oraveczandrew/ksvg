@@ -1184,6 +1184,11 @@ internal class RenderTreeBuilder(
                     width = image.width.toFloat(),
                     height = image.height.toFloat()
                 )
+            } else {
+                // Only base64 data: URLs decode in-house; anything else needs the
+                // app's resolver, else the image stays transparent. Truncated href:
+                // data URIs can carry megabytes of payload.
+                logW("KSVG") { "Could not resolve image href='${href.take(120)}'; rendering transparent" }
             }
         }
 

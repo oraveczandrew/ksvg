@@ -233,7 +233,10 @@ inline void applyScalarPixel_full(
                 if (dot < -1.0) dot = -1.0; else if (dot > 1.0) dot = 1.0;
                 auto f = static_cast<float>(dot);
                 if (static_cast<double>(f) < light.spotCos) f = 0.f;
-                factor = f < 0.f ? 0.f : f;
+                if (f < 0.f) f = 0.f;
+                // Beam-focus exponent (params[7], default 1.0). Branch preserves
+                // the default path bit-exactly; mirrors the Kotlin reference.
+                factor = (params[7] == 1.0) ? f : std::pow(f, static_cast<float>(params[7]));
             }
         }
     }
@@ -1073,7 +1076,10 @@ void runForced(const jint* pix, jint* out, const jint width, const jint height,
                const float fr, const float fg, const float fb, const jdouble* params,
                const bool premultiplied, const bool useLinear,
                const jint backend) {
-    if (backend == SIMD_BACKEND_SCALAR) {
+    // Same non-default beam-exponent decline as the auto path: forced SIMD must
+    // not silently compute the wrong focus. Parity then gates scalar-vs-Kotlin,
+    // which is the meaningful comparison for this combo.
+    if (backend == SIMD_BACKEND_SCALAR || (lightType == 2 /* SPOT */ && params[7] != 1.0)) {
         applyScalar(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
                     ss, invCanvasScaleX, invCanvasScaleY, userLeft, userTop, originX, originY,
                     unitSizeX, unitSizeY, canvasScaleX, canvasScaleY,
@@ -1116,6 +1122,20 @@ Java_hu_oandras_ksvg_filtering_LightingNative_nativeBackend(
     return nativeBackendForAbi();
 }
 
+// Normalizes short params arrays to the fixed 8-entry contract for the beam-
+// exponent slot [7]: test-built arrays carry only the indices their light type
+// reads. Returns either the input pointer or the caller-provided scratch buffer
+// (valid until the current JNI call returns). Lower indices keep the established
+// blind-index contract untouched (audit R6: a fuzzer-built 7-entry spot array
+// over-read the heap here).
+inline const jdouble* withSpotExpDefault(JNIEnv* env, jdoubleArray jParams, jdouble* params, jdouble (&scratch)[8]) {
+    if (env->GetArrayLength(jParams) >= 8) return params;
+    const jsize n = env->GetArrayLength(jParams);
+    for (jsize i = 0; i < n && i < 7; ++i) scratch[i] = params[i];
+    scratch[7] = 1.0;
+    return scratch;
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_LightingNative_applyForced(
         JNIEnv* env, [[maybe_unused]] jclass clazz,
@@ -1150,12 +1170,15 @@ Java_hu_oandras_ksvg_filtering_LightingNative_applyForced(
         return;
     }
 
+    jdouble scratch8[8];
+    const jdouble* params8 = withSpotExpDefault(env, jParams, params, scratch8);
+
     runForced(pix, out, width, height, clipLeft, clipTop, clipRight, clipBottom,
               surfaceScaleNormalized, invCanvasScaleX, invCanvasScaleY,
               userLeft, userTop, originX, originY, unitSizeX, unitSizeY,
               canvasScaleX, canvasScaleY, lightType, specular == JNI_TRUE,
               k, exponent, static_cast<float>(lightR), static_cast<float>(lightG),
-              static_cast<float>(lightB), params, premultipliedOutput == JNI_TRUE,
+              static_cast<float>(lightB), params8, premultipliedOutput == JNI_TRUE,
               useLinearInput == JNI_TRUE, simdBackend);
 
     env->ReleaseIntArrayElements(jOut, out, 0);
@@ -1196,6 +1219,9 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
         return;
     }
 
+    jdouble scratch8[8];
+    const jdouble* params8 = withSpotExpDefault(env, jParams, params, scratch8);
+
     const bool isSpecular = specular == JNI_TRUE;
     const bool premultiplied = premultipliedOutput == JNI_TRUE;
     const bool useLinear = useLinearInput == JNI_TRUE;
@@ -1215,17 +1241,35 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
     if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
 #endif
 
-    applyVector(pix, out, width, height,
-                clipLeft, clipTop, clipRight, clipBottom,
-                surfaceScaleNormalized,
-                invCanvasScaleX, invCanvasScaleY,
-                userLeft, userTop, originX, originY,
-                unitSizeX, unitSizeY,
-                canvasScaleX, canvasScaleY,
-                lightType, isSpecular, k, exponent,
-                static_cast<float>(lightR), static_cast<float>(lightG),
-                static_cast<float>(lightB), params,
-                premultiplied, useLinear, backend);
+    // A non-default spot beam exponent has no SIMD kernel: the spot rows only
+    // implement the default focus. Decline the whole primitive to scalar
+    // (audit R6; mirrors the premultiplied-specular outer-guard pattern).
+    // params8 is length-normalized above, so [7] always reads safely.
+    if (lightType == 2 /* SPOT */ && params8[7] != 1.0) {
+        applyScalar(pix, out, width, height,
+                    clipLeft, clipTop, clipRight, clipBottom,
+                    surfaceScaleNormalized,
+                    invCanvasScaleX, invCanvasScaleY,
+                    userLeft, userTop, originX, originY,
+                    unitSizeX, unitSizeY,
+                    canvasScaleX, canvasScaleY,
+                    lightType, isSpecular, k, exponent,
+                    static_cast<float>(lightR), static_cast<float>(lightG),
+                    static_cast<float>(lightB), params8,
+                    premultiplied, useLinear);
+    } else {
+        applyVector(pix, out, width, height,
+                    clipLeft, clipTop, clipRight, clipBottom,
+                    surfaceScaleNormalized,
+                    invCanvasScaleX, invCanvasScaleY,
+                    userLeft, userTop, originX, originY,
+                    unitSizeX, unitSizeY,
+                    canvasScaleX, canvasScaleY,
+                    lightType, isSpecular, k, exponent,
+                    static_cast<float>(lightR), static_cast<float>(lightG),
+                    static_cast<float>(lightB), params8,
+                    premultiplied, useLinear, backend);
+    }
 
     env->ReleaseIntArrayElements(jOut, out, 0);
     env->ReleaseIntArrayElements(jPix, pix, JNI_ABORT);

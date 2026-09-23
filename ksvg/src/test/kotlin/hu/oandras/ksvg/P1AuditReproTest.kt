@@ -627,4 +627,89 @@ class P1AuditReproTest {
         assertEquals(0, countPixels(out) { it.red == 255 })
         assertTrue(countPixels(out) { it.green == 255 } > 1000)
     }
+
+    // Audit #33: visibility pauses the ticker without losing the running state;
+    // stop() still terminates.
+    @Test
+    fun animatedDrawableVisibilityPausesTicker() {
+        val svg = SVG.getFromString(
+            svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<rect width="100" height="100" fill="red" opacity="0.8">""" +
+                """<animate attributeName="opacity" to="0.2" dur="1s" fill="freeze"/></rect></svg>""",
+            parseAnimations = true
+        )
+        val drawable = KSVGAnimatedDrawable(svg)
+        assertFalse(drawable.isRunning)
+        drawable.start()
+        assertTrue(drawable.isRunning)
+        assertTrue(drawable.setVisible(false, false))
+        assertTrue(drawable.isRunning)
+        drawable.setVisible(true, false)
+        assertTrue(drawable.isRunning)
+        drawable.stop()
+        assertFalse(drawable.isRunning)
+    }
+
+    // Audit cmatrix: short value lists fall back to identity (instead of crashing
+    // ColorMatrix, which needs exactly 20 elements); long lists keep the first 20.
+    @Test
+    fun shortColorMatrixFallsBackToIdentity() {
+        fun render(filter: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<defs><filter id="f">$filter</filter></defs>""" +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000" filter="url(#f)"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        val baseline = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertTrue(render("""<feColorMatrix type="matrix" values="1 0 0"/>""").sameAs(baseline))
+        assertTrue(
+            render("""<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 9 9 9 9 9"/>""")
+                .sameAs(render("""<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>"""))
+        )
+    }
+
+    // Audit morph-neg: negative radii clamp to 0 (passthrough), identically on
+    // every backend (parsed once, upstream of all of them).
+    @Test
+    fun negativeMorphologyIsPassthrough() {
+        fun render(filter: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<defs><filter id="f">$filter</filter></defs>""" +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000" filter="url(#f)"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        val baseline = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertTrue(render("""<feMorphology operator="dilate" radius="-5"/>""").sameAs(baseline))
+    }
+
+    // Audit R6 feSpotLight: the per-light beam exponent takes effect (default 1.0
+    // renders, explicit values refocus; both non-blank so the diff is real).
+    @Test
+    fun spotBeamExponentTakesEffect() {
+        fun render(beamExp: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="240" height="220" viewBox="0 0 240 220">""" +
+                """<defs><filter id="spot" x="-30%" y="-30%" width="160%" height="160%">""" +
+                """<feSpecularLighting in="SourceGraphic" surfaceScale="4" specularConstant="1" """ +
+                """specularExponent="18" lighting-color="white">""" +
+                """<feSpotLight x="60" y="60" z="100" pointsAtX="120" pointsAtY="110" pointsAtZ="0" """ +
+                """limitingConeAngle="35" specularExponent="$beamExp"/>""" +
+                """</feSpecularLighting></filter></defs>""" +
+                """<circle cx="170" cy="110" r="50" fill="seagreen" filter="url(#spot)"/></svg>""",
+            Bitmap.createBitmap(240, 220, Bitmap.Config.ARGB_8888),
+            true
+        )
+        val soft = render("1")
+        val focused = render("5")
+        assertTrue(countPixels(soft) { it.alpha != 0 } > 1000)
+        assertTrue(countPixels(focused) { it.alpha != 0 } > 1000)
+        assertFalse(soft.sameAs(focused))
+    }
 }

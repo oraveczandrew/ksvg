@@ -27,6 +27,14 @@ import android.graphics.Typeface
  *
  * The default behavior of each method is to tell KSVG that the reference could not be found.
  * Extend this class and override the methods if you want to customize how KSVG treats font, image, and external CSS references.
+ *
+ * Security and scope contract (applies to every override):
+ * - KSVG performs no network fetch itself and resolves no base URIs: relative
+ *   `href` values (`../foo.png`, `/abs/path`, `http(s)://…`) reach your resolver
+ *   verbatim. Enforce your own allow-list there (no `..` escapes, no unexpected
+ *   schemes) if the SVG source is untrusted.
+ * - `data:` image URLs decode only with `;base64` payloads; anything else falls
+ *   through to [resolveImage] (which then usually also declines).
  */
 public open class ExternalFileResolver {
     /**

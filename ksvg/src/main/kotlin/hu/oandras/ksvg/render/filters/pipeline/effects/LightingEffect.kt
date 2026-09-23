@@ -357,6 +357,10 @@ private fun createLightingShader(
         }
 
         is FeSpotLight -> {
+            // The AGSL shader has no beam-exponent uniform (it always evaluates
+            // the default focus): decline exotic focus to software instead of
+            // rendering it wrong (audit R6; mirrors CPU-side scalar decline).
+            if (light.specularExponent != 1f) return null
             shader.setIntUniform("uLightType", 2)
             shader.setFloatUniform("uLightPosDir", light.x, light.y, light.z)
             shader.setFloatUniform("uPointsAt", light.pointsAtX, light.pointsAtY, light.pointsAtZ)

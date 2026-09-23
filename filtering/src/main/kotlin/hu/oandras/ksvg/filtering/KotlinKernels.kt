@@ -89,6 +89,9 @@ public object KotlinKernels {
         preserveAlpha: Boolean,
         edgeMode: Int,
     ) {
+        // Same contract as SoftwareKernels.convolveMatrix (checked on both so the
+        // pure reference cannot silently diverge from the native kernels).
+        require(srcPixels !== outPixels) { "convolveMatrix src and dst must not alias" }
         val bias255 = bias * 255f
 
         // Fast interior path: no edge handling is needed because every sampled
@@ -451,6 +454,9 @@ public object KotlinKernels {
             distantLy = 0f
             distantLz = 0f
         }
+        // Beam-focus exponent (params contract: 8 entries with the exponent at [7];
+        // shorter test-built arrays fall back to the default).
+        val spotExp: Float = if (params.size > 7) params[7].toFloat() else 1f
         val spotTargetX: Double
         val spotTargetY: Double
         val spotTargetZ: Double
@@ -550,7 +556,10 @@ public object KotlinKernels {
                                 dot = dot.coerceIn(-1.0, 1.0)
                                 var f = dot.toFloat()
                                 if (f.toDouble() < spotConeCosine) f = 0f
-                                factor = f.coerceAtLeast(0f)
+                                val base = f.coerceAtLeast(0f)
+                                // Branch preserves the default path bit-exactly:
+                                // pow() runs only for explicit exponents.
+                                factor = if (spotExp == 1f) base else base.pow(spotExp)
                             }
                         }
                     }

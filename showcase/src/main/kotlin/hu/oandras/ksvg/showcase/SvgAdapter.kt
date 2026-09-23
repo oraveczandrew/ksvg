@@ -45,6 +45,11 @@ internal class SvgAdapter(
                 .load(entry.uri)
                 .into(imageView)
         }
+
+        fun onRecycled() {
+            // Stop ticking animated drawables on recycled cells (audit #33/R5).
+            requestManager.clear(imageView)
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -54,6 +59,11 @@ internal class SvgAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.onBind(getItem(position))
+    }
+
+    override fun onViewRecycled(holder: ViewHolder) {
+        holder.onRecycled()
+        super.onViewRecycled(holder)
     }
 
     private object SvgEntryDiffCallback : DiffUtil.ItemCallback<SvgEntry>() {

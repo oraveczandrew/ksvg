@@ -65,10 +65,14 @@ public class SimpleAssetResolver(
         }
 
         // That failed, so try ".ttc" (True-type collection), if supported on this version of Android
-        val builder = Typeface.Builder(assetManager, "$fontFamily.ttc")
-        // Get the first font file in the collection
-        builder.setTtcIndex(0)
-        return builder.build()
+        return try {
+            val builder = Typeface.Builder(assetManager, "$fontFamily.ttc")
+            // Get the first font file in the collection
+            builder.setTtcIndex(0)
+            builder.build()
+        } catch (_: RuntimeException) {
+            null
+        }
     }
 
 

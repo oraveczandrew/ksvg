@@ -94,6 +94,9 @@ public object SoftwareKernels {
         preserveAlpha: Boolean,
         edgeMode: Int,
     ) {
+        // In-place convolution is unsupported: interior taps read rows the kernel
+        // already overwrote (audit: convolve aliasing contract gap).
+        require(src !== dst) { "convolveMatrix src and dst must not alias" }
         if (ConvolveNative.isAvailable) {
             ConvolveNative.apply(
                 src, dst, width, height, kernel, orderX, orderY, targetX, targetY,
