@@ -129,9 +129,13 @@ private class PoolOwnerImpl: PoolOwner {
     }
 
     override fun clear() {
+        savedRendererStatePool.clear()
+        renderStatePool.clear()
         matrixPool.clear()
         canvasPool.clear()
         bitmapPool.clear()
+        pathPool.clear()
+        rectFPool.clear()
         floatArray3Pool.clear()
         styleBuilderPool.clear()
     }

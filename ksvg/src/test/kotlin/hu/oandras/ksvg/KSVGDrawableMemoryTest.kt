@@ -20,7 +20,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.pool.BitmapPool
+import hu.oandras.ksvg.render.pool.PoolOwner
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,6 +74,27 @@ class KSVGDrawableMemoryTest {
             "expected at least cached bitmaps, got ${drawable.getMemorySizeBytes()}",
             drawable.getMemorySizeBytes() >= 2L * 100 * 100 * 4
         )
+    }
+
+    // Audit D5: PoolOwner.clear() must empty every pool, including the small
+    // object pools (matrix/path/rectF/render-state) — reuse before, fresh
+    // instance after.
+    @Test
+    fun poolOwnerClearEmptiesAllPools() {
+        val pools = PoolOwner()
+        val matrix = pools.matrixPool.pull()
+        pools.matrixPool.release(matrix)
+        assertSame(matrix, pools.matrixPool.pull())
+        pools.matrixPool.release(matrix)
+        val path = pools.pathPool.pull()
+        pools.pathPool.release(path)
+        assertSame(path, pools.pathPool.pull())
+        pools.pathPool.release(path)
+
+        pools.clear()
+
+        assertNotSame(matrix, pools.matrixPool.pull())
+        assertNotSame(path, pools.pathPool.pull())
     }
 
     @Test

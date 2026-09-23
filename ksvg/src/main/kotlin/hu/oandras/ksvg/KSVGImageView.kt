@@ -271,5 +271,8 @@ public class KSVGImageView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         scope.cancel()
+        // Release pooled bitmap memory eagerly: the drawable (and its native
+        // pixel buffers) would otherwise linger until GC (audit D5).
+        (drawable as? KSVGDrawable)?.trimMemory()
     }
 }

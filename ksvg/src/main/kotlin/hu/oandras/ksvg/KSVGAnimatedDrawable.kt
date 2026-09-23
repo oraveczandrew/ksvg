@@ -70,6 +70,13 @@ public open class KSVGAnimatedDrawable @JvmOverloads public constructor(
         scheduleNextFrame()
     }
 
+    /**
+     * Stops the ticker and releases all pooled render memory ([trimMemory]).
+     * Stopping is terminal: a later [start] reallocates the pools, so hosts
+     * that only toggle visibility should rely on `setVisible` (which keeps
+     * the pools) instead of stop/start cycles. Hosts that drop the drawable
+     * must still call [stop] (or `Glide.clear()`).
+     */
     override fun stop() {
         if (!running) return
         running = false
