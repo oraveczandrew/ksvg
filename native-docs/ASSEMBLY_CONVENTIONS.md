@@ -42,7 +42,7 @@ ISA-specific; never copy across ISAs.
 ## 2. Register budget / liveness
 
 Budget:
-- x86-64: 16 XMM/YMM · i386: **8** (`xmm0–7` / `ymm0–7`) · AArch64: `v0–31` caller-saved · ARMv7: 16 q-regs, `d8–d15` (`q4–q7`) **callee-saved**
+- x86-64: 16 XMM/YMM · i386: **8** (`xmm0–7` / `ymm0–7`) · AArch64: `v0–v7`, `v16–v31` caller-saved, `d8–d15` (`v8–v15` low halves) **callee-saved** (this line previously misstated v0–31 as caller-saved; the convolve NEON kernel clobbered d14/d15 unspilled because of it — audit R2) · ARMv7: 16 q-regs, `d8–d15` (`q4–q7`) **callee-saved**
 
 Liveness rule: a register is dead only if dead across the **entire remaining control flow** — straight-line, LUT/fallback paths, epilogues, and every later branch.
 

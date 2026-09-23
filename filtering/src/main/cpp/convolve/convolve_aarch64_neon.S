@@ -47,15 +47,21 @@
 .global ksvgConvolveGenericNeonAsm
 .type ksvgConvolveGenericNeonAsm, %function
 ksvgConvolveGenericNeonAsm:
-    // Save all callee-saved GPRs we use (x19..x30 = 12 regs => 96 bytes, keeps
-    // the 16-byte stack alignment required by AAPCS64).
-    sub     sp, sp, #96
+    // Save all callee-saved GPRs we use (x19..x30 = 12 regs => 96 bytes) plus
+    // the callee-saved FP low halves we clobber (d8..d15 = 8 regs => 128
+    // bytes). Total frame 224 bytes, keeps the 16-byte stack alignment
+    // required by AAPCS64. (Audit R2: v14/v15 accumulators used to leak.)
+    sub     sp, sp, #224
     stp     x19, x20, [sp, #0]
     stp     x21, x22, [sp, #16]
     stp     x23, x24, [sp, #32]
     stp     x25, x26, [sp, #48]
     stp     x27, x28, [sp, #64]
     stp     x29, x30, [sp, #80]
+    stp     q8, q9, [sp, #96]
+    stp     q10, q11, [sp, #128]
+    stp     q12, q13, [sp, #160]
+    stp     q14, q15, [sp, #192]
 
     mov     x19, x1  // dst
     mov     x20, x2  // src
@@ -243,12 +249,16 @@ ksvgConvolveGenericNeonAsm:
 .Ldone:
     mov     w0, w30  // interior row tail x (constant per row)
 
+    ldp     q14, q15, [sp, #192]
+    ldp     q12, q13, [sp, #160]
+    ldp     q10, q11, [sp, #128]
+    ldp     q8, q9, [sp, #96]
     ldp     x29, x30, [sp, #80]
     ldp     x27, x28, [sp, #64]
     ldp     x25, x26, [sp, #48]
     ldp     x23, x24, [sp, #32]
     ldp     x21, x22, [sp, #16]
-    ldp     x19, x20, [sp], #96
+    ldp     x19, x20, [sp], #224
     ret
 
 .size ksvgConvolveGenericNeonAsm, .-ksvgConvolveGenericNeonAsm
