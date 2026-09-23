@@ -76,7 +76,9 @@ ksvgConvolveGenericNeonAsm:
     ldr     s1, [x0, #36]  // bias
     ldrb    w4, [x0, #40]  // preserve flag (0 = convolve alpha)
 
-    // Constants.
+    // Constants. NOTE: multiply-by-reciprocal (not per-pixel fdiv): for
+    // non-power-of-two divisors 1/d is inexact, so exact .5 ties may differ
+    // by +-1 LSB from scalar division (device parity allows maxDelta=1 there).
     fmov    s2, #1.0
     fdiv    s2, s2, s0
     dup     v30.4s, v2.s[0]  // v30 = 1 / divisor

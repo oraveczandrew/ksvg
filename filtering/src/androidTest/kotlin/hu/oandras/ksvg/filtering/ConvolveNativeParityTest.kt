@@ -21,12 +21,20 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Byte-exact parity between the native `convolve_matrix.cpp` SIMD kernels
+ * Parity between the native `convolve_matrix.cpp` SIMD kernels
  * ([ConvolveNative.applyForced]) and the pure-Kotlin reference
  * ([KotlinKernels.convolveMatrix]). For every configuration in the shared
- * [ConvolveValidationCorpus], every SIMD backend this host advertises is forced
- * and compared byte-for-byte, covering kernel orders, anchors, divisors,
+ * [ConvolveValidationCorpus], every SIMD backend this device advertises is forced
+ * and compared, covering kernel orders, anchors, divisors,
  * preserveAlpha, and the duplicate/wrap/none edge modes.
+ *
+ * Tolerance (F4-characterization, device-PROVEN 2026-09-23): the AArch64/ARM32
+ * NEON kernels hoist `1/divisor` (single `fdiv`) and multiply per pixel, while
+ * the reference and the x86 kernels divide per pixel. For non-power-of-two
+ * divisors the reciprocal is inexact, so exact .5 ties can differ by ±1 LSB
+ * (observed: 1 alpha pixel +1 on `divisor 3.0 5x5 [neon64]`). NEON backends
+ * therefore allow `maxDelta=1` when the divisor is not an exact power of two;
+ * every other combination stays byte-exact.
  */
 @NativeParityTest
 @RunWith(Parameterized::class)
@@ -49,6 +57,14 @@ class ConvolveNativeParityTest(
                 }
             }
         }
+
+        private fun isExactPowerOfTwo(d: Float): Boolean {
+            if (!d.isFinite() || d <= 0f) return false
+            return (java.lang.Float.floatToIntBits(d) and 0x7FFFFF) == 0
+        }
+
+        private fun tolerance(case: ConvolveValidationCorpus.Case, backend: Int): Int =
+            if ((backend == SIMD_NEON64 || backend == SIMD_NEON32) && !isExactPowerOfTwo(case.divisor)) 1 else 0
     }
 
     @Test
@@ -67,7 +83,7 @@ class ConvolveNativeParityTest(
 
         assertColorArrayEquals(
             "convolve mismatch on [$name] backend ${backendName(backend)}",
-            ref, out,
+            ref, out, maxDelta = tolerance(case, backend),
         )
     }
 }

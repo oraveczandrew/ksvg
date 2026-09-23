@@ -137,5 +137,9 @@ public object GaussianBlurValidationCorpus {
         // Large radius (routes to scalar)
         add(Case("large 10.0 16x16", 16, 16, 10f, 10f,
             UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+
+        // F6-tiny: radius-3 kernel on sub-kernel geometry (pure edge path).
+        add(Case("tiny 2x2 1.0", 2, 2, 1f, 1f,
+            UnLinearizeValidationCorpus.fixedSeedRandom(2 * 2)))
     }
 }

@@ -109,5 +109,22 @@ public object ConvolveValidationCorpus {
             UnLinearizeValidationCorpus.fixedSeedRandom(20 * 20)))
         add(Case("asm 5x5 preserve 20x20", 20, 20, blur5x5, 5, 5, 2, 2, 1f, 0f, true, 0,
             UnLinearizeValidationCorpus.fixedSeedRandom(20 * 20)))
+
+        // F4-sweep: non-power-of-two divisor (3.0) stresses the AArch64 NEON
+        // rcp-approximation path (device-only) while the host x86 path uses
+        // true division; both must stay within the byte-exact gate here.
+        add(Case("divisor 3.0 3x3 16x16", 16, 16, sharpen, 3, 3, 1, 1, 3f, 0f, true, 0,
+            UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)))
+        add(Case("divisor 3.0 5x5 20x20", 20, 20, blur5x5, 5, 5, 2, 2, 3f, 0.5f, false, 0,
+            UnLinearizeValidationCorpus.fixedSeedRandom(20 * 20)))
+
+        // F6-tiny: sub-kernel geometry (no SIMD interior; pure edge-sampler path).
+        // Guards against narrow-image overread on device SIMD entry.
+        add(Case("tiny 1x1 3x3", 1, 1, sharpen, 3, 3, 1, 1, 1f, 0f, true, 0,
+            UnLinearizeValidationCorpus.fixedSeedRandom(1)))
+        add(Case("tiny 2x2 3x3", 2, 2, sharpen, 3, 3, 1, 1, 1f, 0f, false, 0,
+            UnLinearizeValidationCorpus.fixedSeedRandom(2 * 2)))
+        add(Case("tiny 3x3 3x3", 3, 3, sharpen, 3, 3, 1, 1, 1f, 0f, true, 0,
+            UnLinearizeValidationCorpus.fixedSeedRandom(3 * 3)))
     }
 }

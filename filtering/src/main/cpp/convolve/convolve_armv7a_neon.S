@@ -113,7 +113,9 @@ ksvgConvolveGenericNeonAsm32:
     add     r3, r3, #1
     str     r3, [sp, #4]
 
-    //       Pre-compute reciprocal: 1.0f / divisor -> sp+12.
+    //       Pre-compute reciprocal: 1.0f / divisor -> sp+12. NOTE: same
+    //       multiply-by-reciprocal tradeoff as the AArch64 kernel: non-pow2
+    //       divisors may deviate +-1 LSB on exact .5 ties (parity maxDelta=1).
     vldr    s0, [r0, #28]
     vmov.f32 s1, #1.0
     vdiv.f32 s0, s1, s0
