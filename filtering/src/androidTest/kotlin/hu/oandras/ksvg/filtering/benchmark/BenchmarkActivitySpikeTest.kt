@@ -17,11 +17,14 @@
 package hu.oandras.ksvg.filtering.benchmark
 
 import android.app.Activity
+import android.app.KeyguardManager
 import android.content.Context
 import android.os.PowerManager
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -38,7 +41,30 @@ class BenchmarkActivitySpikeTest {
 
     @Test
     fun launchActivity_andReportEnvironment() {
-        val activity = BenchmarkActivity.launchSingleton()
+        // Audit R8-spike: activity launch can time out waiting for an idle main
+        // thread after marathon benchmark runs (hot, throttled, possibly
+        // non-interactive device). Retry with backoff and dump the device state
+        // on every attempt, so the next timeout names its cause instead of
+        // just saying "not idle".
+        var activity: Activity? = null
+        var lastError: Throwable? = null
+        for (attempt in 1..LAUNCH_ATTEMPTS) {
+            try {
+                activity = BenchmarkActivity.launchSingleton()
+                lastError = null
+                break
+            } catch (t: Throwable) {
+                lastError = t
+                Log.w("BenchmarkSpike", "launch attempt $attempt/$LAUNCH_ATTEMPTS failed: $t")
+                Log.w("BenchmarkSpike", environmentReport("attempt-$attempt-failure"))
+                if (attempt < LAUNCH_ATTEMPTS) Thread.sleep(LAUNCH_RETRY_DELAY_MS)
+            }
+        }
+        if (activity == null) {
+            Log.e("BenchmarkSpike", environmentReport("final-failure"))
+            fail("BenchmarkActivity launch failed after $LAUNCH_ATTEMPTS attempts: $lastError")
+        }
+        val launched = activity!!
 
         // The app's activity is RESUMED immediately, but the Window only gains focus once the
         // screen is interactive and no keyguard/other window covers it. Sample the transition
@@ -46,18 +72,19 @@ class BenchmarkActivitySpikeTest {
         // device during a run.
         var everFocused = false
         repeat(FOCUS_SAMPLE_COUNT) {
-            val focused = activity.hasWindowFocus()
+            val focused = launched.hasWindowFocus()
             if (focused) everFocused = true
             Log.i(
                 "BenchmarkSpike",
                 "focusSample t=${((it + 1) * FOCUS_SAMPLE_INTERVAL_MS).toString().padStart(4)}ms " +
-                    "focused=$focused interactive=${activity.powerManagerInteractive()}"
+                    "focused=$focused interactive=${launched.powerManagerInteractive()}"
             )
             Thread.sleep(FOCUS_SAMPLE_INTERVAL_MS)
         }
 
         assertTrue("BenchmarkActivity must reach RESUME", BenchmarkActivity.resumeObserved)
-        Log.i("BenchmarkSpike", "everFocused=$everFocused (final=${activity.hasWindowFocus()})")
+        Log.i("BenchmarkSpike", "everFocused=$everFocused (final=${launched.hasWindowFocus()})")
+        Log.i("BenchmarkSpike", environmentReport("success"))
 
         val report = BenchmarkActivity.report()
         Log.i("BenchmarkSpike", report)
@@ -69,8 +96,37 @@ class BenchmarkActivitySpikeTest {
     private fun Activity.powerManagerInteractive(): Boolean =
         (getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive ?: false
 
+    /**
+     * One-line device-state snapshot for launch-timeout forensics: interactive
+     * screen, keyguard, thermal status, resume/focus flags. Best-effort —
+     * every probe is individually guarded so diagnostics never throw.
+     */
+    private fun environmentReport(tag: String): String {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val interactive = try {
+            (ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive
+        } catch (_: Exception) {
+            null
+        }
+        val keyguardLocked = try {
+            (ctx.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)?.isKeyguardLocked
+        } catch (_: Exception) {
+            null
+        }
+        val thermal = try {
+            ThermalStateMonitor.create(ctx).currentThermalStatus()
+        } catch (_: Exception) {
+            null
+        }
+        return "BenchmarkSpike env[$tag]: interactive=$interactive " +
+            "keyguardLocked=$keyguardLocked thermalStatus=$thermal " +
+            "resumed=${BenchmarkActivity.resumeObserved} focused=${BenchmarkActivity.isWindowFocused}"
+    }
+
     companion object {
         private const val FOCUS_SAMPLE_COUNT = 30
         private const val FOCUS_SAMPLE_INTERVAL_MS = 100L
+        private const val LAUNCH_ATTEMPTS = 3
+        private const val LAUNCH_RETRY_DELAY_MS = 5_000L
     }
 }
