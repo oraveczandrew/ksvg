@@ -187,6 +187,12 @@ internal class SVGParserImpl(
                 // Read that number of bytes into a buffer so we
                 val checkBuf = ByteArray(ENTITY_WATCH_BUFFER_SIZE)
                 val n = input.read(checkBuf)
+                if (n < 0) {
+                    // Empty input: InputStream.read returns -1 at end-of-stream, and
+                    // String(checkBuf, 0, -1) would throw a raw
+                    // StringIndexOutOfBoundsException instead of our parse contract.
+                    throw KSVGParseException("Empty SVG input")
+                }
                 // Read in the bytes as a string. We should probably use UTF-8 here, but the string
                 // constructor that takes a charset requires SDK 9. We should be okay though, since we
                 // are only looking for plain ASCII. And that'll be the same in any encoding.
@@ -1043,11 +1049,21 @@ internal class SVGParserImpl(
 
         val currentElement = requireCurrentElement()
         val builder = Image.Builder(requireSvgDocument(), currentElement)
-        builder.parseAttributes(attributes)
-        val obj = builder.build()
+        try {
+            builder.parseAttributes(attributes)
+            val obj = builder.build()
 
-        currentElement.addChild(obj)
-        this.currentElement = obj
+            currentElement.addChild(obj)
+            this.currentElement = obj
+        } catch (e: KSVGParseException) {
+            // A broken <image> (missing href, invalid geometry) renders as nothing;
+            // it must not abort the whole document (audit #32). Nothing was pushed,
+            // so enter the ignoring state (same as unknown elements): the matching
+            // end tag then unwinds without popping the parent container.
+            logger.logE(TAG) { "Skipping <image>: ${e.message}" }
+            ignoring = true
+            ignoreDepth = 1
+        }
     }
 
 

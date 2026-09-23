@@ -18,6 +18,7 @@
 package hu.oandras.ksvg.dom.core
 
 import android.graphics.Matrix
+import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.SVGImpl
@@ -89,7 +90,7 @@ internal class Image(
                 baseParams = getBaseParams(),
                 conditionalBundle = getSvgConditionalBundle(),
                 preserveAspectRatio = getPreserveAspectRatio(),
-                href = requireNotNull(href) { "Invalid <image> element. href attribute is required" },
+                href = href ?: throw KSVGParseException("Invalid <image> element. href attribute is required"),
                 x = x,
                 y = y,
                 width = width,

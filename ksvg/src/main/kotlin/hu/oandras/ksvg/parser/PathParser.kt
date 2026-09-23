@@ -339,6 +339,13 @@ internal fun parsePath(value: String): PathDefinition {
         if (scan.hasLetter()) {
             // Nope, so get the new path command instead
             pathCommand = scan.nextChar()
+        } else if (pathCommand == 'Z' || pathCommand == 'z') {
+            // 'Z' takes no coordinates, so trailing numbers are a malformed path rather
+            // than an implicit repeat. Returning (instead of looping) matters: the loop
+            // body consumes nothing for 'Z', so repeating would append CLOSE segments
+            // without bound until the heap is exhausted (audit #24).
+            loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
+            return path
         }
     }
     return path

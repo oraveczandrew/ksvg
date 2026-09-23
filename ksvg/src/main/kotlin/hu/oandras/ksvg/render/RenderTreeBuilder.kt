@@ -149,6 +149,14 @@ import hu.oandras.ksvg.utils.textXMLSpaceTransform
 import java.util.*
 import kotlin.math.max
 
+/**
+ * Hard cap on render-tree build recursion depth. Reference cycles through
+ * anonymous elements (which carry no id for [buildingIds]) and merely
+ * pathological nesting would otherwise end in a StackOverflowError; exceeding
+ * the cap treats the element as empty with a warning (audit #23).
+ */
+private const val MAX_BUILD_DEPTH = 256
+
 internal class RenderTreeBuilder(
     private val document: SVGImpl,
     override val dPI: Float,
@@ -172,6 +180,9 @@ internal class RenderTreeBuilder(
     // empty/missing reference instead of causing unbounded recursion.
     private val buildingIds: ArraySet<String> = ArraySet()
 
+    // Current build() recursion depth; see MAX_BUILD_DEPTH.
+    private var buildDepth: Int = 0
+
     private var ruleMatchContext: CSSParser.RuleMatchContext? = null
 
     override val currentFontSize: Float
@@ -189,6 +200,7 @@ internal class RenderTreeBuilder(
     fun build(viewPort: Box): RenderNode<*>? {
         val rootObj = document.rootElement ?: return null
         buildingIds.clear()
+        buildDepth = 0
 
         state = RendererState()
         styleBuilderPool.withPooledObject { builder ->
@@ -204,6 +216,7 @@ internal class RenderTreeBuilder(
     fun build(renderOptions: RenderOptions): RenderNode<*>? {
         val rootObj = document.rootElement ?: return null
         buildingIds.clear()
+        buildDepth = 0
 
         val css = renderOptions.css
         if (css != null) {
@@ -281,6 +294,12 @@ internal class RenderTreeBuilder(
             logW("KSVG") { "Cyclic reference detected for id '$id'; treating as empty" }
             return null
         }
+        if (buildDepth >= MAX_BUILD_DEPTH) {
+            logW("KSVG") { "Maximum build depth exceeded; treating element as empty" }
+            if (id != null) buildingIds.remove(id)
+            return null
+        }
+        buildDepth++
         try {
         // A DOM element may be referenced by several <use> instances; its cached
         // bounding box must be recomputed fresh for each build instead of
@@ -358,6 +377,7 @@ internal class RenderTreeBuilder(
         statePop()
         return if (hideInvalidReference) null else node
         } finally {
+            buildDepth--
             if (id != null) buildingIds.remove(id)
         }
     }
@@ -1010,6 +1030,25 @@ internal class RenderTreeBuilder(
         return true
     }
 
+    /**
+     * Builds a directly-referenced viewport element (`<symbol>`/`<svg>` from `<use>`)
+     * under the cycle guard. These bypass `build()` (and its guard), so an anonymous
+     * inner `<use>` would otherwise recurse without bound (audit #23): the guard
+     * keys on the *referenced* element's id instead.
+     */
+    private inline fun <T> buildGuarded(ref: Element, build: () -> T): T? {
+        val id = (ref as? ElementBase)?.id
+        if (id != null && !buildingIds.add(id)) {
+            logW("KSVG") { "Cyclic reference detected for id '$id'; treating as empty" }
+            return null
+        }
+        try {
+            return build()
+        } finally {
+            if (id != null) buildingIds.remove(id)
+        }
+    }
+
     private fun buildUse(obj: Use): GroupRenderNode<Use>? {
         updateStyleForElement(state, obj)
         if (!display()) return null
@@ -1023,8 +1062,8 @@ internal class RenderTreeBuilder(
 
         parentPush(obj)
         val refNode = when (ref) {
-            is Symbol -> buildSymbol(ref, obj.width, obj.height)
-            is Svg -> buildSvg(ref, effectiveViewport = makeViewPort(null, null, obj.width, obj.height))
+            is Symbol -> buildGuarded(ref) { buildSymbol(ref, obj.width, obj.height) }
+            is Svg -> buildGuarded(ref) { buildSvg(ref, effectiveViewport = makeViewPort(null, null, obj.width, obj.height)) }
             else -> build(ref)
         }
         refNode?.hasAnimationsInSubtree = refNode.computeHasAnimations()

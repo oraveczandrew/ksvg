@@ -15,9 +15,14 @@
  */
 package hu.oandras.ksvg
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.dom.core.PathDefinition
+import hu.oandras.ksvg.parser.parsePath
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.test.countPixels
+import hu.oandras.ksvg.test.renderWithLibrary
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.green
@@ -33,7 +38,9 @@ import org.robolectric.annotation.GraphicsMode
  * Regression tests for audit P1 findings (tmp/AUDIT_FINDINGS.md).
  *
  * Covers: SMIL to-only/by-only float animation (base-relative resolution),
- * unknown calcMode fallback, dur="indefinite", case-insensitive !important.
+ * unknown calcMode fallback, dur="indefinite", case-insensitive !important,
+ * audit round 4 (R1): stray coords after Z, empty input, use-cycle/depth guards,
+ * image href/validity skip.
  * Raster assertions use NATIVE graphics + pixel reads (per AGENTS.md).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -243,5 +250,70 @@ class P1AuditReproTest {
         // The .b rule after the !IMPORTANT declaration must still apply.
         // (Before the fix the whole stylesheet was dropped -> black fill.)
         assertEquals(255, bitmap.getPixel(50, 50).blue)
+    }
+
+    // Audit #24: stray coordinates after Z must terminate the path instead of
+    // looping forever (appending CLOSE segments until OOM).
+    @Test
+    fun strayCoordsAfterZTerminate() {
+        val path: PathDefinition
+        val clean: PathDefinition
+        with(NoopLoggerContext) {
+            path = parsePath("M0 0Z10 10")
+            clean = parsePath("M0 0Z")
+        }
+        assertTrue(path.commandsEquals(clean))
+    }
+
+    // Audit #44: empty input must raise the parse contract, not StringIndexOutOfBounds.
+    @Test
+    fun emptyInputThrowsParseException() {
+        try {
+            SVG.getFromString("")
+            throw AssertionError("expected KSVGParseException for empty input")
+        } catch (e: KSVGParseException) {
+            assertTrue(e.message?.isNotEmpty() == true)
+        }
+    }
+
+    // Audit #23: an anonymous cyclic <use> must render siblings instead of
+    // overflowing the stack.
+    @Test
+    fun useSymbolCycleRendersSiblings() {
+        val out = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<symbol id="s"><use href="#s" width="10" height="10"/></symbol>""" +
+                """<use href="#s" width="50" height="50"/>""" +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertTrue(countPixels(out) { it.red == 255 } > 1000)
+    }
+
+    // Audit #23 (depth cap): pathological nesting truncates gracefully.
+    @Test
+    fun deepNestingTruncatesGracefully() {
+        val deep = "<g>".repeat(3000) + """<rect width="10" height="10"/>""" + "</g>".repeat(3000)
+        val out = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                deep +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertTrue(countPixels(out) { it.red == 255 } > 1000)
+    }
+
+    // Audit #32: a broken <image> (missing href, bad geometry) is skipped,
+    // siblings still render.
+    @Test
+    fun brokenImageIsSkipped() {
+        val out = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<image width="10" height="10"/>""" +
+                """<image width="bogus" height="10" href="x.png"/>""" +
+                """<rect x="10" y="10" width="40" height="40" fill="#FF0000"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertTrue(countPixels(out) { it.red == 255 } > 1000)
     }
 }
