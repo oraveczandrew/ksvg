@@ -328,6 +328,7 @@ internal class SVGImpl internal constructor(
             document = this,
             dPI = renderDPI,
             pools = pools,
+            gpuBackendFactory = options.gpuBackendFactory,
         )
 
         renderer.renderDocument(canvas, node, renderOptions)

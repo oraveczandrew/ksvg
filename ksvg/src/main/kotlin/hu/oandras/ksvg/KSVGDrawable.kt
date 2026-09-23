@@ -52,6 +52,8 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         document = svg as SVGImpl,
         dPI = svg.renderDPI,
         pools = pools,
+        // Member (not the nullable constructor parameter, which shadows it here).
+        gpuBackendFactory = this.renderOptions.gpuBackendFactory,
     )
 
     private var scene: RenderScene? = null

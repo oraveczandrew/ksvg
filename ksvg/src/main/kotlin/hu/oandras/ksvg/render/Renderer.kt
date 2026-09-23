@@ -117,6 +117,9 @@ internal class Renderer internal constructor(
     // dots per inch. Needed for accurate conversion of length values that have real world units, such as "cm".
     override val dPI: Float,
     pools: PoolOwner,
+    // Filter-backend factory (API-routed by default, injectable for tests so the
+    // Impl31 path runs on any API 31+ device).
+    private val gpuBackendFactory: FilterBackendFactory = FilterBackendFactory.forApi(),
 ): AnimationContext, PoolOwner by pools, LoggerContext by document {
     // Renderer state
     private var state: RendererState = RendererState()
@@ -1244,7 +1247,7 @@ internal class Renderer internal constructor(
         if (!forceSoftwareFiltering && canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31 &&
             state.style.opacity == 1f && state.style.mixBlendMode == CSSBlendMode.normal
         ) {
-            val gpu = gpuBackend ?: FilterBackendFactory.createGpuOrNull(this)?.also { gpuBackend = it }
+            val gpu = gpuBackend ?: gpuBackendFactory.createGpuOrNull(this)?.also { gpuBackend = it }
             if (gpu != null) {
                 val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
                 val pScaleX = if (primitiveUnitsAreUser) sx else boundingBox.width * sx
@@ -1275,7 +1278,7 @@ internal class Renderer internal constructor(
             }
         }
 
-        return softwareBackend ?: FilterBackendFactory.createSoftware(this).also { softwareBackend = it }
+        return softwareBackend ?: gpuBackendFactory.createSoftware(this).also { softwareBackend = it }
     }
 
     override fun resolveFloodColor(

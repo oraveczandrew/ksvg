@@ -31,6 +31,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.render.filters.pipeline.FilterBackendFactory
 import hu.oandras.ksvg.render.filters.pipeline.GpuChainEvents
 import hu.oandras.ksvg.test.decodePng
 import hu.oandras.ksvg.test.renderWithLibrary
@@ -167,6 +168,9 @@ internal fun renderOnHardware(
     svgString: String,
     width: Int = GPU_PARITY_SIZE,
     height: Int = GPU_PARITY_SIZE,
+    // Injected filter-backend factory: tests pass FilterBackendFactoryImpl31 to
+    // exercise the Impl31 path on API 33+ hardware (default keeps API routing).
+    gpuBackendFactory: FilterBackendFactory = FilterBackendFactory.forApi(),
 ): Bitmap {
     installChainEventLog()
     clearChainEvents()
@@ -183,6 +187,7 @@ internal fun renderOnHardware(
         // Match the software path's eraseColor(0): transparent background.
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
         val options = RenderOptions.create()
+        (options as hu.oandras.ksvg.render.RenderOptionsImpl).gpuBackendFactory = gpuBackendFactory
         options.viewPort(0f, 0f, width.toFloat(), height.toFloat())
         svg.renderToCanvas(canvas, options)
         node.endRecording()

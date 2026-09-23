@@ -23,6 +23,7 @@ import hu.oandras.ksvg.css.CSS
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.Source
 import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.render.filters.pipeline.FilterBackendFactory
 
 /**
  * Internal implementation of the [RenderOptions] interface.
@@ -35,6 +36,14 @@ internal class RenderOptionsImpl internal constructor(
     private var _viewId: String?,
     private var _viewPort: Box?,
     private var _softwareFiltering: Boolean,
+    /**
+     * Test-only seam: overrides which filter-backend factory the renderer uses.
+     * Defaults to the API-routed factory; device tests inject
+     * `FilterBackendFactoryImpl31` to exercise the Impl31 path on API 33+ hardware.
+     * Deliberately excluded from equals/hashCode and rebuild semantics (scene
+     * content is backend-independent).
+     */
+    internal var gpuBackendFactory: FilterBackendFactory = FilterBackendFactory.forApi(),
 ) : RenderOptions {
 
     override val css: CSS?
@@ -82,6 +91,9 @@ internal class RenderOptionsImpl internal constructor(
         _viewPort = other.viewPort,
         _targetId = other.targetId,
         _softwareFiltering = other.hasSoftwareFiltering(),
+        // Test seam travels with the copy; foreign impls fall back to API routing.
+        gpuBackendFactory = (other as? RenderOptionsImpl)?.gpuBackendFactory
+            ?: FilterBackendFactory.forApi(),
     )
 
     /**
