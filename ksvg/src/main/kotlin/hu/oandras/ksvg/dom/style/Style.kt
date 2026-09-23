@@ -1238,6 +1238,13 @@ internal class Style internal constructor(
         const val SPECIFIED_PAINT_ORDER: Long = 1L shl 0
 
         // Flags for the settings that are applied to reset the root style
+        // NOTE (#46): -1 marks EVERY property "specified" on DEFAULT_STYLE, and
+        // Builder.reset() copies the flags, so the -1 lineage flows into every
+        // inherited node style: isSpecified() is effectively always-true and the
+        // updateStyle gates degrade to unconditional copies. Harmless today (the
+        // copied values are the correctly resolved ones — perf-only), but no new
+        // code may read isSpecified as "author-declared" until D10 decides the
+        // semantic fix (reset() clearing flags vs. keeping the lineage).
         private const val SPECIFIED_RESET: Long = -1L
 
         private val DEFAULT_STYLE: Style = run {
