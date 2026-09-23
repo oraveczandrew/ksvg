@@ -219,14 +219,14 @@ public data class PreserveAspectRatio internal constructor(
          * instance of this class.
          * @param value a string in the same format as an SVG `preserveAspectRatio` attribute
          * @return an instance of this class
+         * @throws KSVGParseException if `value` is not a valid `preserveAspectRatio` value
+         * (audit D4: parse errors surface as `KSVGParseException`, never `IllegalArgumentException`,
+         * so the per-element forgiveness dispatch catches them).
          */
         @JvmStatic
+        @Throws(KSVGParseException::class)
         public fun of(value: String): PreserveAspectRatio {
-            try {
-                return parsePreserveAspectRatio(value)
-            } catch (e: KSVGParseException) {
-                throw IllegalArgumentException(e.message)
-            }
+            return parsePreserveAspectRatio(value)
         }
 
         @Throws(KSVGParseException::class)

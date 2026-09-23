@@ -742,6 +742,22 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.green == 255 } > 500)
     }
 
+    // Audit D4: a bad preserveAspectRatio must surface as KSVGParseException
+    // (via PreserveAspectRatio.of), so the D2 per-element dispatch skips only
+    // the broken element and siblings still render. No IAE escapes.
+    @Test
+    fun invalidPreserveAspectRatioSkipsElementOnly() {
+        val out = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<svg x="0" y="0" width="50" height="50" preserveAspectRatio="xMidYMid bogus">""" +
+                """<rect x="5" y="5" width="20" height="20" fill="#FF0000"/></svg>""" +
+                """<circle cx="70" cy="70" r="15" fill="#00FF00"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        assertEquals(0, countPixels(out) { it.red == 255 })
+        assertTrue(countPixels(out) { it.green == 255 } > 500)
+    }
+
     // Audit #46: DEFAULT_STYLE stamps specifiedFlags=-1 and Builder.reset()
     // copies it, so an inherited style reports isSpecified for properties that
     // were never declared. The updateStyle gates therefore always pass today;

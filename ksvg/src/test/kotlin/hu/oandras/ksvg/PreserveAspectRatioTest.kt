@@ -79,7 +79,7 @@ class PreserveAspectRatioTest {
         assertEquals(PreserveAspectRatio.Alignment.xMaxYMax, PreserveAspectRatio.of("xMaxYMax meet").alignment)
     }
 
-    @Test(expected = IllegalArgumentException::class)
+    @Test(expected = KSVGParseException::class)
     fun testParseInvalidMeetOrSlice() {
         PreserveAspectRatio.of("xMidYMid invalid")
     }
