@@ -492,16 +492,12 @@ class P1AuditReproTest {
                 return null
             }
         }
-        SVG.registerExternalFileResolver(resolver)
-        try {
-            renderWithLibrary(
-                """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60">""" +
-                    """<text x="10" y="40" font-size="40" font-family="NoSuchFont" font-weight="bolder">A</text></svg>""",
-                Bitmap.createBitmap(100, 60, Bitmap.Config.ARGB_8888)
-            )
-        } finally {
-            SVG.deregisterExternalFileResolver()
-        }
+        renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60">""" +
+                """<text x="10" y="40" font-size="40" font-family="NoSuchFont" font-weight="bolder">A</text></svg>""",
+            Bitmap.createBitmap(100, 60, Bitmap.Config.ARGB_8888),
+            externalFileResolver = resolver,
+        )
         assertEquals(700f, seenWeight)
     }
 

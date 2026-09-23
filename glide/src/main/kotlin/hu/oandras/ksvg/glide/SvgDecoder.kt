@@ -61,7 +61,12 @@ public class SvgDecoder(
     ): Resource<Bitmap> {
         try {
             val parseAnimations = options.get(KSVGOptions.PARSE_ANIMATIONS) ?: false
-            val svg = SVG.getFromInputStream(source, parseAnimations)
+            val svg = SVG.getFromInputStream(
+                source,
+                parseAnimations,
+                externalFileResolver = options.get(KSVGOptions.EXTERNAL_FILE_RESOLVER),
+                enableInternalEntities = options.get(KSVGOptions.ENABLE_INTERNAL_ENTITIES) ?: true,
+            )
 
             if (svg.documentWidth == -1f || svg.documentHeight == -1f) {
                 if (width != Target.SIZE_ORIGINAL && height != Target.SIZE_ORIGINAL) {

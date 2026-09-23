@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.glide
 
 import com.bumptech.glide.load.Option
+import hu.oandras.ksvg.ExternalFileResolver
 
 /**
  * Options for the KSVG Glide integration.
@@ -28,4 +29,20 @@ public object KSVGOptions {
      */
     @JvmField
     public val PARSE_ANIMATIONS: Option<Boolean> = Option.memory("hu.oandras.ksvg.glide.ParseAnimations", false)
+
+    /**
+     * [ExternalFileResolver] used for external references (images, fonts,
+     * stylesheets) in this decode. Default is a no-op resolver that declines
+     * everything.
+     */
+    @JvmField
+    public val EXTERNAL_FILE_RESOLVER: Option<ExternalFileResolver> =
+        Option.memory("hu.oandras.ksvg.glide.ExternalFileResolver", ExternalFileResolver())
+
+    /**
+     * Whether to expand internal entities in this decode. Default true
+     */
+    @JvmField
+    public val ENABLE_INTERNAL_ENTITIES: Option<Boolean> =
+        Option.memory("hu.oandras.ksvg.glide.EnableInternalEntities", true)
 }

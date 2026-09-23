@@ -45,7 +45,12 @@ public class KSVGDrawableDecoder : ResourceDecoder<InputStream, Drawable> {
     ): Resource<Drawable> {
         try {
             val parseAnimations = options.get(KSVGOptions.PARSE_ANIMATIONS) ?: false
-            val svg = SVG.getFromInputStream(source, parseAnimations)
+            val svg = SVG.getFromInputStream(
+                source,
+                parseAnimations,
+                externalFileResolver = options.get(KSVGOptions.EXTERNAL_FILE_RESOLVER),
+                enableInternalEntities = options.get(KSVGOptions.ENABLE_INTERNAL_ENTITIES) ?: true,
+            )
 
             val drawable: KSVGDrawable = if (parseAnimations) {
                 svg.toAnimatedDrawable()

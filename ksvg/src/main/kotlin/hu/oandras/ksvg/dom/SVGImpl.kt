@@ -773,13 +773,6 @@ internal class SVGImpl internal constructor(
     }
 
     internal companion object {
-        //static final String  TAG = "SVGBase";
-
-        // Parser configuration singletons
-        // Configures the parser that will be used for the next SVG that gets parsed
-        @Volatile
-        private var externalFileResolverSingleton: ExternalFileResolver? = null
-        private var enableInternalEntitiesSingleton = true
 
         /**
          * Read and parse an SVG from the given `InputStream`.
@@ -793,9 +786,12 @@ internal class SVGImpl internal constructor(
         fun getFromInputStream(
             inputStream: InputStream,
             parseAnimations: Boolean = false,
-            logger: LoggerContext
+            logger: LoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVGImpl {
-            return createParser(parseAnimations, logger).parseStream(inputStream)
+            return createParser(parseAnimations, logger, externalFileResolver, enableInternalEntities)
+                .parseStream(inputStream)
         }
 
         /**
@@ -810,9 +806,12 @@ internal class SVGImpl internal constructor(
         fun getFromString(
             svg: String,
             parseAnimations: Boolean = false,
-            logger: LoggerContext
+            logger: LoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVGImpl {
-            return createParser(parseAnimations, logger).parseStream(ByteArrayInputStream(svg.toByteArray()))
+            return createParser(parseAnimations, logger, externalFileResolver, enableInternalEntities)
+                .parseStream(ByteArrayInputStream(svg.toByteArray()))
         }
 
         /**
@@ -830,11 +829,14 @@ internal class SVGImpl internal constructor(
             resources: Resources,
             resourceId: Int,
             parseAnimations: Boolean = false,
-            logger: LoggerContext
+            logger: LoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVGImpl {
             val inputStream = resources.openRawResource(resourceId)
             try {
-                return createParser(parseAnimations, logger).parseStream(inputStream)
+                return createParser(parseAnimations, logger, externalFileResolver, enableInternalEntities)
+                    .parseStream(inputStream)
             } finally {
                 try {
                     inputStream.close()
@@ -859,11 +861,14 @@ internal class SVGImpl internal constructor(
             assetManager: AssetManager,
             filename: String,
             parseAnimations: Boolean = false,
-            logger: LoggerContext
+            logger: LoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVGImpl {
             val inputStream = assetManager.open(filename)
             try {
-                return createParser(parseAnimations, logger).parseStream(inputStream)
+                return createParser(parseAnimations, logger, externalFileResolver, enableInternalEntities)
+                    .parseStream(inputStream)
             } finally {
                 try {
                     inputStream.close()
@@ -891,51 +896,15 @@ internal class SVGImpl internal constructor(
             return pathConv.path
         }
 
-        //===============================================================================
-         /**
-          * Tells the parser whether to allow the expansion of internal entities.
-          *
-          * Entities are useful in some circumstances, but SVG files that use them are quite rare.  Note
-          * also that enabling entity expansion makes you vulnerable to the
-          * [Billion Laughs Attack](https://en.wikipedia.org/wiki/Billion_laughs_attack)
-          *
-          * Entity expansion is enabled by default.
-          *
-          * @param enable Set true if you want to enable entity expansion by the parser.
-          */
-        fun setInternalEntitiesEnabled(enable: Boolean) {
-            enableInternalEntitiesSingleton = enable
-        }
-
-        /**
-         * Register an [ExternalFileResolver] instance that the renderer should use when resolving
-         * external references such as images, fonts, and CSS stylesheets.
-         *
-         * The registration is process-global and sticky: it applies to every subsequent
-         * parse until [deregisterExternalFileResolver]. Last registration wins;
-         * concurrent registrations from multiple threads race (visibility only).
-         *
-         * @param fileResolver the resolver to use.
-         *
-         */
-        fun registerExternalFileResolver(fileResolver: ExternalFileResolver?) {
-            externalFileResolverSingleton = fileResolver
-        }
-
-        /**
-         * De-register the current [ExternalFileResolver] instance.
-         * 
-    
-         */
-        fun deregisterExternalFileResolver() {
-            externalFileResolverSingleton = null
-        }
-
-        //===============================================================================
-        private fun createParser(parseAnimations: Boolean, logger: LoggerContext): SVGParser {
+        private fun createParser(
+            parseAnimations: Boolean,
+            logger: LoggerContext,
+            externalFileResolver: ExternalFileResolver?,
+            enableInternalEntities: Boolean,
+        ): SVGParser {
             return SVGParserImpl(
-                enableInternalEntities = enableInternalEntitiesSingleton,
-                externalFileResolver = externalFileResolverSingleton,
+                enableInternalEntities = enableInternalEntities,
+                externalFileResolver = externalFileResolver,
                 animationsEnabled = parseAnimations,
                 logger = logger,
             )

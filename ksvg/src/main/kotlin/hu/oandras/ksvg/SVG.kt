@@ -364,6 +364,10 @@ public interface SVG {
          *
          * @param inputStream the input stream from which to read the file.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param enableInternalEntities whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error parsing the document.
          */
@@ -373,9 +377,11 @@ public interface SVG {
         public fun getFromInputStream(
             inputStream: InputStream,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext
+            logger: LoggerContext = AndroidLoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVG {
-            return SVGImpl.getFromInputStream(inputStream, parseAnimations, logger)
+            return SVGImpl.getFromInputStream(inputStream, parseAnimations, logger, externalFileResolver, enableInternalEntities)
         }
 
 
@@ -384,6 +390,10 @@ public interface SVG {
          * 
          * @param svg the String instance containing the SVG document.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param enableInternalEntities whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error parsing the document.
          */
@@ -393,9 +403,11 @@ public interface SVG {
         public fun getFromString(
             svg: String,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext
+            logger: LoggerContext = AndroidLoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVG {
-            return SVGImpl.getFromString(svg, parseAnimations, logger)
+            return SVGImpl.getFromString(svg, parseAnimations, logger, externalFileResolver, enableInternalEntities)
         }
 
 
@@ -415,9 +427,11 @@ public interface SVG {
             context: Context,
             resourceId: Int,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext
+            logger: LoggerContext = AndroidLoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVG {
-            return getFromResource(context.resources, resourceId, parseAnimations, logger)
+            return getFromResource(context.resources, resourceId, parseAnimations, logger, externalFileResolver, enableInternalEntities)
         }
 
 
@@ -438,9 +452,11 @@ public interface SVG {
             resources: Resources,
             resourceId: Int,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext
+            logger: LoggerContext = AndroidLoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVG {
-            return SVGImpl.getFromResource(resources, resourceId, parseAnimations, logger)
+            return SVGImpl.getFromResource(resources, resourceId, parseAnimations, logger, externalFileResolver, enableInternalEntities)
         }
 
 
@@ -461,9 +477,11 @@ public interface SVG {
             assetManager: AssetManager,
             filename: String,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext
+            logger: LoggerContext = AndroidLoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            enableInternalEntities: Boolean = true,
         ): SVG {
-            return SVGImpl.getFromAsset(assetManager, filename, parseAnimations, logger)
+            return SVGImpl.getFromAsset(assetManager, filename, parseAnimations, logger, externalFileResolver, enableInternalEntities)
         }
 
 
@@ -484,44 +502,9 @@ public interface SVG {
 
 
         //===============================================================================
-         /**
-          * Tells the parser whether to allow the expansion of internal entities.
-          *
-          * Entities are useful in some circumstances, but SVG files that use them are quite rare.  Note
-          * also that enabling entity expansion makes you vulnerable to the
-          * [Billion Laughs Attack](https://en.wikipedia.org/wiki/Billion_laughs_attack)
-          *
-          * Entity expansion is enabled by default.
-          *
-          * @param enable Set true if you want to enable entity expansion by the parser.
-          */
-        @JvmStatic
-        public fun setInternalEntitiesEnabled(enable: Boolean) {
-            SVGImpl.setInternalEntitiesEnabled(enable)
-        }
-
-        /**
-         * Register an [ExternalFileResolver] instance that the renderer should use when resolving
-         * external references such as images, fonts, and CSS stylesheets.
-         *
-         * @param fileResolver the resolver to use.
-    
-         */
-        @JvmStatic
-        public fun registerExternalFileResolver(fileResolver: ExternalFileResolver?) {
-            SVGImpl.registerExternalFileResolver(fileResolver)
-        }
-
-
-        /**
-         * De-register the current [ExternalFileResolver] instance.
-         * 
-    
-         */
-        @JvmStatic
-        public fun deregisterExternalFileResolver() {
-            SVGImpl.deregisterExternalFileResolver()
-        }
+        // No process-global parse configuration (audit D6, pre-1.0 API call):
+        // pass `externalFileResolver` / `enableInternalEntities` per parse request
+        // on the getFrom* entry points above.
 
         //===============================================================================
         // Other document utility API functions

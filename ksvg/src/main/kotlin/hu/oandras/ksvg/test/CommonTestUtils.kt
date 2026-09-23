@@ -52,8 +52,13 @@ internal fun renderWithLibrary(input: InputStream, outBitmap: Bitmap, softwareFi
 }
 
 @VisibleForTesting
-internal fun renderWithLibrary(input: String, outBitmap: Bitmap, softwareFiltering: Boolean = false): Bitmap {
-    val svg = SVG.getFromString(input)
+internal fun renderWithLibrary(
+    input: String,
+    outBitmap: Bitmap,
+    softwareFiltering: Boolean = false,
+    externalFileResolver: hu.oandras.ksvg.ExternalFileResolver? = null,
+): Bitmap {
+    val svg = SVG.getFromString(input, externalFileResolver = externalFileResolver)
     return renderSvgTo(svg, outBitmap, softwareFiltering)
 }
 
