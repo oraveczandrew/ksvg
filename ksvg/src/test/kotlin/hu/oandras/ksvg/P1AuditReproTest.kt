@@ -17,10 +17,15 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Typeface
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.PathDefinition
+import hu.oandras.ksvg.dom.style.FontStyle
+import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.dom.style.parseFontFamily
 import hu.oandras.ksvg.parser.parsePath
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.render.text.checkGenericFont
 import hu.oandras.ksvg.test.countPixels
 import hu.oandras.ksvg.test.renderWithLibrary
 import hu.oandras.ksvg.utils.alpha
@@ -315,5 +320,153 @@ class P1AuditReproTest {
             Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
         )
         assertTrue(countPixels(out) { it.red == 255 } > 1000)
+    }
+
+    // Audit #30: negative arc radii take abs() instead of dropping the path tail.
+    @Test
+    fun negativeArcRadiiTreatedAsAbs() {
+        val positive: PathDefinition
+        val negative: PathDefinition
+        with(NoopLoggerContext) {
+            positive = parsePath("M0 0 A30 50 0 0 1 60 0 L100 100")
+            negative = parsePath("M0 0 A-30 50 0 0 1 60 0 L100 100")
+        }
+        assertTrue(negative.commandsEquals(positive))
+    }
+
+    // Audit #31: unclamped acos(p/n) yields NaN arcs when FP rounding pushes the
+    // ratio to 1±e (start direction nearly +x). Fuzz near-horizontal arcs: every
+    // non-degenerate one must rasterize something.
+    @Test
+    fun nearHorizontalArcsAlwaysRasterize() {
+        var checked = 0
+        for (r in listOf(40f, 100f, 400f)) {
+            for (dy in listOf(0.0001f, 0.001f, 0.01f)) {
+                for (flags in listOf("0 0", "0 1", "1 0", "1 1")) {
+                    val d = "M20 50 A$r $r 0 $flags 80 ${50 + dy}"
+                    val out = renderWithLibrary(
+                        """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                            """<path d="$d" fill="#FF0000"/></svg>""",
+                        Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+                    )
+                    assertTrue(
+                        "arc d=$d rasterized nothing",
+                        countPixels(out) { it.red == 255 } > 0
+                    )
+                    checked++
+                }
+            }
+        }
+        assertEquals(36, checked)
+    }
+
+    // Audit #28: symbol viewports clip oversized content (was: full bleed).
+    @Test
+    fun symbolViewportClips() {
+        val out = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<symbol id="s" viewBox="0 0 10 10"><rect width="100" height="100" fill="#FF0000"/></symbol>""" +
+                """<use href="#s" width="10" height="10"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        val red = countPixels(out) { it.red == 255 }
+        assertTrue("expected ~100 clipped px, got $red", red in 1..200)
+    }
+
+    // Audit font findings: family items are trimmed; generic matching is
+    // case-insensitive; 600+ synthesizes bold (CSS Fonts 4 §5.2: above-500
+    // matches ascending), 500 and below stay normal.
+    @Test
+    fun fontFamilyTrimAndGenericCase() {
+        assertEquals(listOf("Arial", "serif"), parseFontFamily("Arial ,serif"))
+        assertTrue(
+            checkGenericFont("Sans-Serif", Style.FONT_WEIGHT_NORMAL, FontStyle.normal)?.style ==
+                Typeface.NORMAL
+        )
+    }
+
+    @Test
+    fun semiboldMapsToBold() {
+        assertTrue(
+            checkGenericFont("sans-serif", 600f, FontStyle.normal)?.style == Typeface.BOLD
+        )
+        assertTrue(
+            checkGenericFont("sans-serif", 500f, FontStyle.normal)?.style == Typeface.NORMAL
+        )
+        assertTrue(
+            checkGenericFont("sans-serif", 400f, FontStyle.normal)?.style == Typeface.NORMAL
+        )
+    }
+
+    // Audit #35: S reflects only after C/S (else first control = current point),
+    // T only after Q/T. Cross-type smooths must match their explicit curves.
+    @Test
+    fun crossTypeSmoothMatchesExplicitCurve() {
+        fun render(d: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="220" height="130" viewBox="-10 -60 220 130">""" +
+                """<path d="$d" fill="#FF0000"/></svg>""",
+            Bitmap.createBitmap(220, 130, Bitmap.Config.ARGB_8888)
+        )
+        // S after Q: first control is the current point (100,0).
+        assertTrue(
+            render("M0 0 Q50 50 100 0 S150 -50 200 0")
+                .sameAs(render("M0 0 Q50 50 100 0 C100 0 150 -50 200 0"))
+        )
+        // T after C: first control is the current point (100,50).
+        assertTrue(
+            render("M0 0 C50 0 50 50 100 50 T200 50")
+                .sameAs(render("M0 0 C50 0 50 50 100 50 Q100 50 200 50"))
+        )
+    }
+
+    // Audit #36: hit regions must follow bounds-only resizes (viewport re-applied
+    // in place without a rebuild).
+    @Test
+    fun hitTestFollowsBoundsResize() {
+        val svg = SVG.getFromString(
+            svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">""" +
+                """<a href="https://example.com"><rect x="10" y="10" width="80" height="80"/></a></svg>"""
+        ) as SVGImpl
+        val drawable = KSVGDrawable(svg)
+        drawable.setBounds(0, 0, 100, 100)
+        drawable.draw(Canvas(Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)))
+        assertEquals("https://example.com", drawable.hitTest(50f, 50f))
+        drawable.setBounds(0, 0, 200, 200)
+        drawable.draw(Canvas(Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)))
+        assertEquals("https://example.com", drawable.hitTest(150f, 150f))
+    }
+
+    // Audit #4: media types are ASCII case-insensitive (`@media SCREEN` applies).
+    @Test
+    fun uppercaseMediaTypeMatches() {
+        fun render(media: String): Bitmap = renderWithLibrary(
+            """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                """<style>@media $media { rect { fill: #00FF00 } }</style>""" +
+                """<rect x="10" y="10" width="40" height="40"/></svg>""",
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        )
+        val ref = render("screen")
+        assertTrue(countPixels(ref) { it.green == 255 } > 1000)
+        assertTrue(render("SCREEN").sameAs(ref))
+    }
+
+    // Audit #17: pattern tile overflow is clipped with and without viewBox
+    // (hasOverflow gate verified empirically in both spaces; fully-outside
+    // content paints nothing, so the gate cannot be vacuous here).
+    @Test
+    fun patternTileOverflowClipped() {
+        fun render(content: String, patternDef: String): Int = countPixels(
+            renderWithLibrary(
+                """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">""" +
+                    """<defs><pattern id="p" patternUnits="userSpaceOnUse" $patternDef>""" +
+                    content +
+                    """</pattern></defs>""" +
+                    """<rect width="100" height="100" fill="url(#p)"/></svg>""",
+                Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+            )
+        ) { it.red == 255 }
+        val outside = """<rect x="-15" y="-15" width="10" height="10" fill="#FF0000"/>"""
+        assertEquals(0, render(outside, """width="20" height="20" viewBox="0 0 20 20""""))
+        assertEquals(0, render(outside, """width="20" height="20""""))
     }
 }

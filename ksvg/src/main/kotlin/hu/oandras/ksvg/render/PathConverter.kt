@@ -266,7 +266,7 @@ internal fun arcTo(
     var n: Double = hypot(ux, uy) // len(u) * len(1,0) == len(u)
     var p: Double = ux // u.v == (ux,uy).(1,0) == (1 * ux) + (0 * uy) == ux
     sign = if (uy < 0) -1.0 else 1.0 // u x v == (1 * uy - ux * 0) == uy
-    var angleStart = sign * acos(p / n) // No need for checkedArcCos() here. (p >= n) should always be true.
+    var angleStart = sign * checkedArcCos(p / n) // Clamped: FP rounding routinely pushes p/n to 1±ε.
 
     // Compute the angle extent
     n = sqrt((ux * ux + uy * uy) * (vx * vx + vy * vy))

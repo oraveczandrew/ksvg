@@ -147,13 +147,16 @@ internal fun parseFontFamily(value: String?): List<String>? {
     var fonts: MutableList<String>? = null
     val scan = TextScanner(value)
     while (true) {
-        val item = scan.nextQuotedString()
-            ?: scan.nextTokenWithWhitespace(',')
-            ?: break
-        if (fonts == null) {
-            fonts = ArrayList()
+        // Outer whitespace is already trimmed by TextScanner, but interior
+        // whitespace around separators survives ("Arial ,serif" keeps "Arial ");
+        // CSS treats it as insignificant, so trim every item.
+        val item = (scan.nextQuotedString() ?: scan.nextTokenWithWhitespace(',') ?: break).trim()
+        if (item.isNotEmpty()) {
+            if (fonts == null) {
+                fonts = ArrayList()
+            }
+            fonts.add(item)
         }
-        fonts.add(item)
         scan.skipCommaWhitespace()
         if (scan.empty()) break
     }

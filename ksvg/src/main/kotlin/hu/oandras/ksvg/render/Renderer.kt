@@ -54,6 +54,7 @@ import hu.oandras.ksvg.dom.core.MarkerOrient
 import hu.oandras.ksvg.dom.core.SolidColor
 import hu.oandras.ksvg.dom.core.Svg
 import hu.oandras.ksvg.dom.core.SvgObject
+import hu.oandras.ksvg.dom.core.Symbol
 import hu.oandras.ksvg.dom.gradient.GradientSpread
 import hu.oandras.ksvg.dom.shapes.LineShape
 import hu.oandras.ksvg.dom.shapes.PathShape
@@ -274,7 +275,10 @@ internal class Renderer internal constructor(
     internal fun renderGroupNode(canvas: Canvas, node: GroupRenderNode<*>) {
         withNewNodeState(canvas, node, saveCanvas = true) { canvas, _ ->
             val sourceElement = node.sourceElement
-            if (sourceElement is Svg && node.renderState.style.overflow == false) {
+            // Viewport-establishing elements clip to their viewport unless overflow
+            // is explicitly visible (SVG 1.1: initial overflow is hidden here).
+            // <symbol> was missing: oversized symbol content bled out (audit #28).
+            if ((sourceElement is Svg || sourceElement is Symbol) && node.renderState.style.overflow == false) {
                 node.viewPort?.let { setClipRect(canvas, it) }
             }
 

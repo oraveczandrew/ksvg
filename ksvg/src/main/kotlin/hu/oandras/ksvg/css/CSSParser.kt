@@ -391,10 +391,9 @@ internal class CSSParser internal constructor(
             val typeList = ArrayList<MediaType>()
             while (!scan.empty()) {
                 val type = scan.nextWord() ?: break
-                try {
-                    typeList.add(MediaType.valueOf(type))
-                } catch (_: IllegalArgumentException) {
-                    // Ignore invalid media types
+                // Media types are ASCII case-insensitive; unknown ones are ignored.
+                MediaType.entries.firstOrNull { it.name.equals(type, ignoreCase = true) }?.let {
+                    typeList.add(it)
                 }
                 // If there is a comma, keep looping, otherwise break
                 if (!scan.skipCommaWhitespace()) break

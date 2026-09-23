@@ -20,6 +20,7 @@ package hu.oandras.ksvg.parser
 import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.dom.core.PathDefinition
 import hu.oandras.ksvg.logE
+import kotlin.math.abs
 
 private const val TAG = "PathParser"
 
@@ -33,6 +34,9 @@ internal fun parsePath(value: String): PathDefinition {
     var lastMoveY = 0f // The initial point of current subpath
     var lastControlX = 0f
     var lastControlY = 0f // Last control point of the just completed Bézier curve.
+    // Curve family of the last completed segment, driving smooth-command reflection:
+    // 'C' after C/S (cubic control stored), 'Q' after Q/T (quadratic control stored).
+    var prevCurve = ' '
     var x: Float
     var y: Float
     var x1: Float
@@ -150,12 +154,21 @@ internal fun parsePath(value: String): PathDefinition {
                 lastControlY = y2
                 currentX = x
                 currentY = y
+                prevCurve = 'C'
             }
 
             'S',
             's' -> {
-                x1 = 2 * currentX - lastControlX
-                y1 = 2 * currentY - lastControlY
+                // Smooth-curveto reflects the previous control point only after
+                // another cubic (C/S); otherwise the first control coincides
+                // with the current point.
+                if (prevCurve == 'C') {
+                    x1 = 2 * currentX - lastControlX
+                    y1 = 2 * currentY - lastControlY
+                } else {
+                    x1 = currentX
+                    y1 = currentY
+                }
                 x2 = scan.nextFloat()
                 y2 = scan.checkedNextFloat(x2)
                 x = scan.checkedNextFloat(y2)
@@ -182,6 +195,7 @@ internal fun parsePath(value: String): PathDefinition {
                 lastControlY = y2
                 currentX = x
                 currentY = y
+                prevCurve = 'C'
             }
 
             'Z',
@@ -265,12 +279,20 @@ internal fun parsePath(value: String): PathDefinition {
                 lastControlY = y1
                 currentX = x
                 currentY = y
+                prevCurve = 'Q'
             }
 
             'T',
             't' -> {
-                x1 = 2 * currentX - lastControlX
-                y1 = 2 * currentY - lastControlY
+                // Smooth-quad mirrors S: reflect only after another quadratic
+                // (Q/T); otherwise start from the current point.
+                if (prevCurve == 'Q') {
+                    x1 = 2 * currentX - lastControlX
+                    y1 = 2 * currentY - lastControlY
+                } else {
+                    x1 = currentX
+                    y1 = currentY
+                }
                 x = scan.nextFloat()
                 y = scan.checkedNextFloat(x)
                 if (y.isNaN()) {
@@ -291,6 +313,7 @@ internal fun parsePath(value: String): PathDefinition {
                 lastControlY = y1
                 currentX = x
                 currentY = y
+                prevCurve = 'Q'
             }
 
             'A',
@@ -302,10 +325,13 @@ internal fun parsePath(value: String): PathDefinition {
                 sweepFlag = scan.checkedNextFlag(largeArcFlag)
                 x = scan.checkedNextFloat(sweepFlag)
                 y = scan.checkedNextFloat(x)
-                if (y.isNaN() || rx < 0 || ry < 0) {
+                if (y.isNaN()) {
                     loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
                     return path
                 }
+                // SVG 1.1 §8.3.8: the sign of the radii is ignored.
+                rx = abs(rx)
+                ry = abs(ry)
                 if (pathCommand == 'a') {
                     x += currentX
                     y += currentY
@@ -337,7 +363,13 @@ internal fun parsePath(value: String): PathDefinition {
 
         // Test to see if there is another set of coords for the current path command
         if (scan.hasLetter()) {
-            // Nope, so get the new path command instead
+            // Nope, so get the new path command instead. Record the completed
+            // segment's curve family for smooth-command reflection.
+            prevCurve = when (pathCommand) {
+                'C', 'c', 'S', 's' -> 'C'
+                'Q', 'q', 'T', 't' -> 'Q'
+                else -> ' '
+            }
             pathCommand = scan.nextChar()
         } else if (pathCommand == 'Z' || pathCommand == 'z') {
             // 'Z' takes no coordinates, so trailing numbers are a malformed path rather

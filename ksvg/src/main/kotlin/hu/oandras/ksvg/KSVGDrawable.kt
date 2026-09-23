@@ -130,6 +130,8 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         } else {
             // Bounds-only change: update viewports/transforms in place, no rebuild.
             currentScene.applyViewport(bounds, options, pools)
+            // Viewport geometry changed: cached hit regions map to the old one.
+            hitRegionsDirty = true
         }
 
         if (node != null) {

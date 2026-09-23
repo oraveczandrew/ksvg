@@ -21,9 +21,9 @@ import android.graphics.Typeface
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.dom.style.FontStyle
-import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.pool.FloatArrayBucket
+import java.util.Locale
 
 private const val DEFAULT_FONT_FAMILY = "serif"
 
@@ -141,7 +141,10 @@ internal fun checkGenericFont(
 ): Typeface? {
     val italic = fontStyle == FontStyle.italic || fontStyle == FontStyle.oblique
 
-    val typefaceStyle: Int = if (fontWeight >= Style.FONT_WEIGHT_BOLD) {
+    // CSS Fonts 4 §5.2: desired weights above 500 match ascending (closest heavier
+    // face wins), so with only normal/bold synthesized faces 600+ is bold while
+    // 500 and below stay normal.
+    val typefaceStyle: Int = if (fontWeight >= 600f) {
         if (italic) {
             Typeface.BOLD_ITALIC
         } else {
@@ -155,7 +158,7 @@ internal fun checkGenericFont(
         }
     }
 
-    return when (fontName) {
+    return when (fontName.lowercase(Locale.US)) {
         "serif" -> Typeface.create(Typeface.SERIF, typefaceStyle)
         "sans-serif",
         "cursive",

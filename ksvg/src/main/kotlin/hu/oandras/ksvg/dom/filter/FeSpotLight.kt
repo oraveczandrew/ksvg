@@ -38,6 +38,13 @@ internal class FeSpotLight(
     val pointsAtZ: Float,
     @JvmField
     val limitingConeAngle: Float?,
+    /**
+     * Beam-focus exponent (default 1.0). Parsed and stored; the lighting kernels
+     * currently evaluate the default (`factor = dot`, i.e. pow(dot, 1)) — explicit
+     * values are not yet applied (audit R6).
+     */
+    @JvmField
+    val specularExponent: Float,
 ) : Lighting(
     baseParams = baseParams,
 ) {
@@ -60,6 +67,7 @@ internal class FeSpotLight(
         private var pointsAtY: Float = 0f
         private var pointsAtZ: Float = 0f
         private var limitingConeAngle: Float? = null
+        private var specularExponent: Float = 1f
 
         override fun onAttribute(
             attributes: Attributes,
@@ -75,6 +83,7 @@ internal class FeSpotLight(
                 SVGAttr.pointsAtY -> pointsAtY = parseFloat(value)
                 SVGAttr.pointsAtZ -> pointsAtZ = parseFloat(value)
                 SVGAttr.limitingConeAngle -> limitingConeAngle = parseFloat(value)
+                SVGAttr.specularExponent -> specularExponent = parseFloat(value)
 
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
@@ -93,6 +102,7 @@ internal class FeSpotLight(
                 pointsAtY = pointsAtY,
                 pointsAtZ = pointsAtZ,
                 limitingConeAngle = limitingConeAngle,
+                specularExponent = specularExponent,
             )
         }
     }
