@@ -1,6 +1,6 @@
 # KSVG
 
-KSVG is a high-performance SVG parser and renderer for Android, rewritten in **100% Kotlin**. It is an optimized fork and evolution of the original [AndroidSVG](https://github.com/BigBadaboom/androidsvg) library, designed for modern Android development with a focus on memory efficiency, immutability, and expanded feature support.
+KSVG is a high-performance SVG parser and renderer for Android. The framework is **100% Kotlin**; filters are **fully hardware-accelerated on API 33+** through an AGSL-shader pipeline (`RenderEffect` chain, API 31+), backed by a native SIMD engine (x86_64/x86 SSSE3 baselines with AVX2 rows; ARMv7/ARM64 NEON) and a bit-exact pure-Kotlin CPU fallback. It is an optimized fork and evolution of the original [AndroidSVG](https://github.com/BigBadaboom/androidsvg) library, designed for modern Android development with a focus on memory efficiency, immutability, and expanded feature support.
 
 *KSVG is licensed under the [Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0)*.
 
@@ -13,9 +13,11 @@ KSVG is a high-performance SVG parser and renderer for Android, rewritten in **1
     - **Filters**: Comprehensive support for SVG filter primitives (e.g., `feGaussianBlur`, `feColorMatrix`, `feComposite`, `feTurbulence`, `feDisplacementMap`, and more).
     - **Animations**: Support for declarative SVG animations including `<animate>`, `<animateTransform>`, and `<animateColor>`.
     - **Modern Typography**: First-class support for **Variable Fonts** (`font-variation-settings`) and **OpenType features** (`font-feature-settings`).
+- **Native Filter Engine**: per-ABI handwritten SIMD kernels (x86_64 and 32-bit x86: SSE2/SSSE3 baselines with AVX2 rows — except the arithmetic-composite kernel, which is scalar-only on 32-bit x86; ARMv7/ARM64: NEON), each bit-exact against the portable Kotlin reference.
+- **Dual Filter Backends**: GPU `RenderEffect` pipeline on hardware canvases (AGSL shaders on API 33+, `RenderEffect` chain on API 31+) with automatic decline to the CPU software path; `RenderOptions.softwareFiltering(true)` forces deterministic software rendering.
 - **Rendering Performance**: Optimized rendering pipeline with lazy builder initialization and smart style inheritance.
 
-## KSVG vs AndroidSVG Comparison
+## KSVG vs. AndroidSVG Comparison
 
 | Feature                 | AndroidSVG (Original)  | KSVG                                         |
 |:------------------------|:-----------------------|:---------------------------------------------|
@@ -28,6 +30,15 @@ KSVG is a high-performance SVG parser and renderer for Android, rewritten in **1
 | **Font Features**       | Not Supported          | **Supported** (`font-feature-settings`)      |
 | **Modern Graphics API** | PorterDuff only        | PorterDuff + **BlendMode** (API 29+)         |
 | **GC Pressure**         | Regular                | **Minimal** (Optimized for 60/120 FPS)       |
+
+## Modules
+
+| Module       | Artifact                                 | Description                       |
+|:-------------|:-----------------------------------------|:----------------------------------|
+| `:ksvg`      | `hu.oandras.ksvg:ksvg`                   | Parser, DOM, renderer, public API |
+| `:filtering` | `hu.oandras.ksvg:filtering` (transitive) | Native + Kotlin filter kernels    |
+| `:glide`     | `hu.oandras.ksvg:glide`                  | Glide integration (optional)      |
+| `:showcase`  | — (demo app, not published)              | Sample application                |
 
 ## Detailed Feature Support
 
@@ -57,12 +68,13 @@ Supported declarative animation elements:
 
 ## Installation
 
-[Add implementation details here, e.g., JitPack or Maven Central]
-
 ```kotlin
-// later
+dependencies {
+    implementation("hu.oandras.ksvg:ksvg:1.0.0-beta01")
+    // Optional Glide integration:
+    implementation("hu.oandras.ksvg:glide:1.0.0-beta01")
+}
 ```
-<!-- implementation("hu.oandras:ksvg:x.y.z") -->
 
 ## Basic Usage
 
@@ -79,10 +91,8 @@ For more advanced usage, including custom CSS, viewPorts, and target element ren
 ## Contributing
 
 ### Find a bug?
-Please file a [bug report](https://github.com/oandras/ksvg/issues) and include as much detail as you can. If possible, include a sample SVG file showing the error.
+Please file a [bug report](https://github.com/oraveczandrew/ksvg/issues) and include as much detail as you can. If possible, include a sample SVG file showing the error.
 
 ### Feedback
 If you wish to contact the author with feedback on this project, you can email me at [info@oandras.hu](mailto:info@oandras.hu).
 
----
-*Based on the original work by Paul LeBeau, Cave Rock Software Ltd.*
