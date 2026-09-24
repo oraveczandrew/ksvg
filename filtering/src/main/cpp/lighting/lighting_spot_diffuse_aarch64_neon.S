@@ -1064,3 +1064,6 @@ ksvgLightingSpotDiffuseRowNeon64Linear:
     ret
 
 .size ksvgLightingSpotDiffuseRowNeon64Linear, .-ksvgLightingSpotDiffuseRowNeon64Linear
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

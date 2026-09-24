@@ -120,7 +120,14 @@
 #define ADDRSIG
 #define HIDE_SYM(x)
 #else
+// On ARM/AArch64 '@' starts a comment, so the section type prefix is '%'
+// there (as in the pre-existing displacement_map_arm32_neon32.S); elsewhere
+// it is '@'.
+#if defined(__arm__) || defined(__aarch64__)
+#define GNU_STACK .section .note.GNU-stack,"",%progbits
+#else
 #define GNU_STACK .section .note.GNU-stack,"",@progbits
+#endif
 #define ADDRSIG .addrsig
 #define HIDE_SYM(x) .hidden SYM(x)
 #endif

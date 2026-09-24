@@ -333,3 +333,6 @@ ksvgConvolveGenericNeonAsm32:
     pop     {r4-r11, r12, pc}
 
 .size ksvgConvolveGenericNeonAsm32, .-ksvgConvolveGenericNeonAsm32
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

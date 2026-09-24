@@ -970,3 +970,6 @@ const_255:
 .double 255.0
 
 .size turbulence64Asm, .-turbulence64Asm
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

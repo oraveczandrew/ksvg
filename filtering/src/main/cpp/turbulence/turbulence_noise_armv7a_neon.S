@@ -492,3 +492,6 @@ finish:
     pop     {r4-r11, pc}
 
 .size turbulence32Asm, .-turbulence32Asm
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

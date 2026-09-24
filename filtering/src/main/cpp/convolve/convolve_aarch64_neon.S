@@ -264,3 +264,6 @@ ksvgConvolveGenericNeonAsm:
     ret
 
 .size ksvgConvolveGenericNeonAsm, .-ksvgConvolveGenericNeonAsm
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

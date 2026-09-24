@@ -977,3 +977,6 @@ ksvgLightingSpotDiffuseRowNeon32Linear:
     vpop    {d8-d15}
     pop     {r4-r11, r12, pc}
 .size ksvgLightingSpotDiffuseRowNeon32Linear, .-ksvgLightingSpotDiffuseRowNeon32Linear
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

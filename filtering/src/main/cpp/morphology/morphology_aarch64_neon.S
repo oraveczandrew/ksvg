@@ -259,3 +259,6 @@ ksvgMorphologyApplyRowNeon64:
     ret
 
 .size ksvgMorphologyApplyRowNeon64, .-ksvgMorphologyApplyRowNeon64
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

@@ -1866,3 +1866,6 @@ ENTRY(rsdIntrinsicBlurU4_K)
             ldp         x19,x30, [sp], #16
             ret
 END(rsdIntrinsicBlurU4_K)
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

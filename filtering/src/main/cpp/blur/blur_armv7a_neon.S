@@ -1822,3 +1822,6 @@ ENTRY(rsdIntrinsicBlurU4_K)
 1:          vpop        {d8-d15}
             pop         {r4,r5,r6,r7,r8,r9,r10,r11,r12,pc}
 END(rsdIntrinsicBlurU4_K)
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

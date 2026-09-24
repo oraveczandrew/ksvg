@@ -1325,3 +1325,6 @@ ksvgLightingSpotSpecularRowNeon64Linear:
 .size ksvgLightingSpotSpecularRowNeon64Linear, .-ksvgLightingSpotSpecularRowNeon64Linear
 
 EMIT_POW4_NEON_TABLES
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif

@@ -309,3 +309,6 @@ ksvgMorphologyApplyRowNeon32:
     pop     {r4-r11, pc}
 
 .size ksvgMorphologyApplyRowNeon32, .-ksvgMorphologyApplyRowNeon32
+#ifndef __APPLE__
+.section .note.GNU-stack,"",%progbits
+#endif
