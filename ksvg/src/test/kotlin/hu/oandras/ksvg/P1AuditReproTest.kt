@@ -45,11 +45,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Regression tests for audit P1 findings (tmp/AUDIT_FINDINGS.md).
+ * Regression tests for P1 parser/render findings.
  *
  * Covers: SMIL to-only/by-only float animation (base-relative resolution),
  * unknown calcMode fallback, dur="indefinite", case-insensitive !important,
- * audit round 4 (R1): stray coords after Z, empty input, use-cycle/depth guards,
+ * stray coords after Z, empty input, use-cycle/depth guards,
  * image href/validity skip.
  * Raster assertions use NATIVE graphics + pixel reads (per AGENTS.md).
  */
@@ -262,7 +262,7 @@ class P1AuditReproTest {
         assertEquals(255, bitmap.getPixel(50, 50).blue)
     }
 
-    // Audit #24: stray coordinates after Z must terminate the path instead of
+    // Stray coordinates after Z must terminate the path instead of
     // looping forever (appending CLOSE segments until OOM).
     @Test
     fun strayCoordsAfterZTerminate() {
@@ -275,7 +275,7 @@ class P1AuditReproTest {
         assertTrue(path.commandsEquals(clean))
     }
 
-    // Audit #44: empty input must raise the parse contract, not StringIndexOutOfBounds.
+    // Empty input must raise the parse contract, not StringIndexOutOfBounds.
     @Test
     fun emptyInputThrowsParseException() {
         try {
@@ -286,7 +286,7 @@ class P1AuditReproTest {
         }
     }
 
-    // Audit #23: an anonymous cyclic <use> must render siblings instead of
+    // An anonymous cyclic <use> must render siblings instead of
     // overflowing the stack.
     @Test
     fun useSymbolCycleRendersSiblings() {
@@ -300,7 +300,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.red == 255 } > 1000)
     }
 
-    // Audit #23 (depth cap): pathological nesting truncates gracefully.
+    // Depth cap: pathological nesting truncates gracefully.
     @Test
     fun deepNestingTruncatesGracefully() {
         val deep = "<g>".repeat(3000) + """<rect width="10" height="10"/>""" + "</g>".repeat(3000)
@@ -313,7 +313,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.red == 255 } > 1000)
     }
 
-    // Audit #32: a broken <image> (missing href, bad geometry) is skipped,
+    // A broken <image> (missing href, bad geometry) is skipped,
     // siblings still render.
     @Test
     fun brokenImageIsSkipped() {
@@ -327,7 +327,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.red == 255 } > 1000)
     }
 
-    // Audit #30: negative arc radii take abs() instead of dropping the path tail.
+    // Negative arc radii take abs() instead of dropping the path tail.
     @Test
     fun negativeArcRadiiTreatedAsAbs() {
         val positive: PathDefinition
@@ -339,7 +339,7 @@ class P1AuditReproTest {
         assertTrue(negative.commandsEquals(positive))
     }
 
-    // Audit #31: unclamped acos(p/n) yields NaN arcs when FP rounding pushes the
+    // Unclamped acos(p/n) yields NaN arcs when FP rounding pushes the
     // ratio to 1±e (start direction nearly +x). Fuzz near-horizontal arcs: every
     // non-degenerate one must rasterize something.
     @Test
@@ -365,7 +365,7 @@ class P1AuditReproTest {
         assertEquals(36, checked)
     }
 
-    // Audit #28: symbol viewports clip oversized content (was: full bleed).
+    // Symbol viewports clip oversized content (was: full bleed).
     @Test
     fun symbolViewportClips() {
         val out = renderWithLibrary(
@@ -378,7 +378,7 @@ class P1AuditReproTest {
         assertTrue("expected ~100 clipped px, got $red", red in 1..200)
     }
 
-    // Audit font findings: family items are trimmed; generic matching is
+    // Font family items are trimmed; generic matching is
     // case-insensitive; 600+ synthesizes bold (CSS Fonts 4 §5.2: above-500
     // matches ascending), 500 and below stay normal.
     @Test
@@ -403,7 +403,7 @@ class P1AuditReproTest {
         )
     }
 
-    // Audit #35: S reflects only after C/S (else first control = current point),
+    // S reflects only after C/S (else first control = current point),
     // T only after Q/T. Cross-type smooths must match their explicit curves.
     @Test
     fun crossTypeSmoothMatchesExplicitCurve() {
@@ -424,7 +424,7 @@ class P1AuditReproTest {
         )
     }
 
-    // Audit #36: hit regions must follow bounds-only resizes (viewport re-applied
+    // Hit regions must follow bounds-only resizes (viewport re-applied
     // in place without a rebuild).
     @Test
     fun hitTestFollowsBoundsResize() {
@@ -441,7 +441,7 @@ class P1AuditReproTest {
         assertEquals("https://example.com", drawable.hitTest(150f, 150f))
     }
 
-    // Audit #4: media types are ASCII case-insensitive (`@media SCREEN` applies).
+    // Media types are ASCII case-insensitive (`@media SCREEN` applies).
     @Test
     fun uppercaseMediaTypeMatches() {
         fun render(media: String): Bitmap = renderWithLibrary(
@@ -455,7 +455,7 @@ class P1AuditReproTest {
         assertTrue(render("SCREEN").sameAs(ref))
     }
 
-    // Audit #15: word-spacing must reach Paint (previously dropped between the
+    // Word-spacing must reach Paint (previously dropped between the
     // detached apply and the lazy diff, which seeded equality).
     @Test
     fun wordSpacingWidensText() {
@@ -467,7 +467,7 @@ class P1AuditReproTest {
         assertFalse(render("0").sameAs(render("20")))
     }
 
-    // Audit #34: relative weights resolve against the base (table unit test) and
+    // Relative weights resolve against the base (table unit test) and
     // never reach external resolvers as sentinels (end-to-end with a capturing
     // resolver; font-family is non-generic so the resolver is actually called).
     @Test
@@ -501,7 +501,7 @@ class P1AuditReproTest {
         assertEquals(700f, seenWeight)
     }
 
-    // Audit plen: SVG2 pathLength applies to shapes, not just <path>.
+    // SVG2 pathLength applies to shapes, not just <path>.
     // Same rect geometry, different pathLength -> different dash density.
     @Test
     fun rectPathLengthScalesDash() {
@@ -518,7 +518,7 @@ class P1AuditReproTest {
         assertFalse(sparse.sameAs(dense))
     }
 
-    // Audit #17: pattern tile overflow is clipped with and without viewBox
+    // Pattern tile overflow is clipped with and without viewBox
     // (hasOverflow gate verified empirically in both spaces; fully-outside
     // content paints nothing, so the gate cannot be vacuous here).
     @Test
@@ -538,7 +538,7 @@ class P1AuditReproTest {
         assertEquals(0, render(outside, """width="20" height="20""""))
     }
 
-    // Audit tcache: generic typefaces are deduplicated (same instance back).
+    // Generic typefaces are deduplicated (same instance back).
     @Test
     fun genericTypefaceCached() {
         val first = checkGenericFont("sans-serif", 400f, FontStyle.normal)
@@ -550,7 +550,7 @@ class P1AuditReproTest {
         )
     }
 
-    // Audit poly1: a single-point polyline renders nothing, so it takes no markers.
+    // A single-point polyline renders nothing, so it takes no markers.
     @Test
     fun singlePointPolylineTakesNoMarker() {
         val defs = """<defs><marker id="m" markerWidth="10" markerHeight="10" refX="5" refY="5">""" +
@@ -564,7 +564,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(render("10,10 90,90", """marker-start="url(#m)"""")) { it.red == 255 } > 0)
     }
 
-    // Audit marker180: near-reversal sums flag ambiguous instead of jittering.
+    // Near-reversal sums flag ambiguous instead of jittering.
     @Test
     fun nearReversalIsAmbiguous() {
         val direct = MarkerVector(0f, 0f, 1f, 0f)
@@ -575,7 +575,7 @@ class P1AuditReproTest {
         assertTrue(viaVector.isAmbiguous)
     }
 
-    // Audit view-blank: a <view> without viewBox must not blank the scene.
+    // A <view> without viewBox must not blank the scene.
     @Test
     fun viewWithoutViewBoxDoesNotBlank() {
         val svg = SVG.getFromString(
@@ -590,7 +590,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(bitmap) { it.red == 255 } > 1000)
     }
 
-    // Audit xlink: plain href wins over xlink:href regardless of order (SVG2).
+    // Plain href wins over xlink:href regardless of order (SVG2).
     @Test
     fun plainHrefBeatsXlinkHref() {
         fun render(first: String, second: String): Bitmap = renderWithLibrary(
@@ -610,7 +610,7 @@ class P1AuditReproTest {
         }
     }
 
-    // Audit empty-conditional: systemLanguage="" matches nothing (existential),
+    // Empty conditional: systemLanguage="" matches nothing (existential),
     // requiredFeatures="" constrains nothing (universal). Both per-spec; locked here.
     @Test
     fun emptyConditionalsBehavePerSpec() {
@@ -624,7 +624,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.green == 255 } > 1000)
     }
 
-    // Audit #33: visibility pauses the ticker without losing the running state;
+    // Visibility pauses the ticker without losing the running state;
     // stop() still terminates.
     @Test
     fun animatedDrawableVisibilityPausesTicker() {
@@ -646,7 +646,7 @@ class P1AuditReproTest {
         assertFalse(drawable.isRunning)
     }
 
-    // Audit cmatrix: short value lists fall back to identity (instead of crashing
+    // Short value lists fall back to identity (instead of crashing
     // ColorMatrix, which needs exactly 20 elements); long lists keep the first 20.
     @Test
     fun shortColorMatrixFallsBackToIdentity() {
@@ -668,7 +668,7 @@ class P1AuditReproTest {
         )
     }
 
-    // Audit morph-neg: negative radii clamp to 0 (passthrough), identically on
+    // Negative radii clamp to 0 (passthrough), identically on
     // every backend (parsed once, upstream of all of them).
     @Test
     fun negativeMorphologyIsPassthrough() {
@@ -686,7 +686,7 @@ class P1AuditReproTest {
         assertTrue(render("""<feMorphology operator="dilate" radius="-5"/>""").sameAs(baseline))
     }
 
-    // Audit R6 feSpotLight: the per-light beam exponent takes effect (default 1.0
+    // feSpotLight: the per-light beam exponent takes effect (default 1.0
     // renders, explicit values refocus; both non-blank so the diff is real).
     @Test
     fun spotBeamExponentTakesEffect() {
@@ -709,7 +709,7 @@ class P1AuditReproTest {
         assertFalse(soft.sameAs(focused))
     }
 
-    // Audit D2 (browser parity): an element with invalid attribute values is
+    // Browser parity: an element with invalid attribute values is
     // skipped with a warning; siblings still render. No exception escapes.
     @Test
     fun invalidGeometrySkipsElementOnly() {
@@ -723,7 +723,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.green == 255 } > 500)
     }
 
-    // Audit D2: the skip keeps the element stack balanced even nested.
+    // The skip keeps the element stack balanced even nested.
     @Test
     fun invalidNestedGeometryKeepsStackBalanced() {
         val out = renderWithLibrary(
@@ -738,7 +738,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.green == 255 } > 500)
     }
 
-    // Audit D4: a bad preserveAspectRatio must surface as KSVGParseException
+    // A bad preserveAspectRatio must surface as KSVGParseException
     // (via PreserveAspectRatio.of), so the D2 per-element dispatch skips only
     // the broken element and siblings still render. No IAE escapes.
     @Test
@@ -754,7 +754,7 @@ class P1AuditReproTest {
         assertTrue(countPixels(out) { it.green == 255 } > 500)
     }
 
-    // Audit #46/D10: "specified" means author-declared. Builder.reset() inherits
+    // "specified" means author-declared. Builder.reset() inherits
     // values but clears the declaration flags, and DEFAULT_STYLE declares
     // nothing — so an inherited style reports undeclared properties as
     // unspecified, and the updateStyle gates fire only on declared sources.

@@ -268,7 +268,7 @@ private fun lightBitmap(
             params[5] = lightSource.pointsAtZ.toDouble()
             params[6] = lightSource.limitingConeAngle?.toDouble() ?: Double.NaN
             // Beam-focus exponent (default 1.0). The params contract is fixed at
-            // 8 entries; test corpora must match (audit R6).
+            // 8 entries; test corpora must match.
             params[7] = lightSource.specularExponent.toDouble()
         }
     }

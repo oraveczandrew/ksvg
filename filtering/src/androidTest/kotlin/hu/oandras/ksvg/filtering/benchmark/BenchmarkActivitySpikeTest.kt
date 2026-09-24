@@ -41,7 +41,7 @@ class BenchmarkActivitySpikeTest {
 
     @Test
     fun launchActivity_andReportEnvironment() {
-        // Audit R8-spike: activity launch can time out waiting for an idle main
+        // Activity launch can time out waiting for an idle main
         // thread after marathon benchmark runs (hot, throttled, possibly
         // non-interactive device). Retry with backoff and dump the device state
         // on every attempt, so the next timeout names its cause instead of

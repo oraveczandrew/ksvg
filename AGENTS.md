@@ -113,6 +113,7 @@ If the user asks for a report, make it in the tmp folder as a Markdown file.
 - For non-trivial tasks, maintain a problem-specific Markdown work log (for example, SVG_FILTER_RENDERING.md or ISSUE_142_WORKLOG.md) in `tmp/`.
 - Record important findings, attempted approaches, failures, decisions, and next steps. Read it before starting or resuming work, and do not repeat failed approaches unless new evidence justifies them.
 - Update the log after each major investigation step or milestone, so the current state can be recovered after interruption.
+- Work-log/audit identifiers ("#45", "D10", "R7") live ONLY in `tmp/` logs and commit messages — never in code, KDoc, logs, or docs (`tmp/` is git-ignored, so such a reference points nowhere). Write the self-contained reason instead.
 
 ## Quick Commands
 - Always use the Gradle daemon (omit `--no-daemon`).

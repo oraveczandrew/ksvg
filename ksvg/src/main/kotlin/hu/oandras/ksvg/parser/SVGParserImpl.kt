@@ -342,7 +342,7 @@ internal class SVGParserImpl(
 
                     // Undefined entity references (entities disabled, or bypassed
                     // sniffing) have no text: drop them instead of crashing on the
-                    // platform null (audit R2).
+                    // platform null.
                     XmlPullParser.ENTITY_REF -> parser.text?.let { text(it) }
                     XmlPullParser.CDSECT -> parser.text?.let { text(it) }
                     XmlPullParser.PROCESSING_INSTRUCTION -> {
@@ -491,7 +491,7 @@ internal class SVGParserImpl(
     }
 
     /**
-     * Browser parity (audit D2): a broken element (bad attribute values, misplaced
+     * Browser parity: a broken element (bad attribute values, misplaced
      * structural tags) is skipped with a warning instead of aborting the whole
      * document. Nothing was pushed for it, so enter the ignoring state (same as
      * unknown elements): the matching end tag then unwinds without popping the
@@ -1116,7 +1116,7 @@ internal class SVGParserImpl(
             this.currentElement = obj
         } catch (e: KSVGParseException) {
             // A broken <image> (missing href, invalid geometry) renders as nothing;
-            // it must not abort the whole document (audit #32). Nothing was pushed,
+            // it must not abort the whole document. Nothing was pushed,
             // so enter the ignoring state (same as unknown elements): the matching
             // end tag then unwinds without popping the parent container.
             logger.logE(TAG) { "Skipping <image>: ${e.message}" }
@@ -1808,7 +1808,7 @@ internal class SVGParserImpl(
         // a doctype definition that has internal entities defined.
         const val ENTITY_WATCH_BUFFER_SIZE: Int = 4096
 
-        // Billion-laughs guard (audit D1/R2): total characters accepted from inside
+        // Billion-laughs guard: total characters accepted from inside
         // entity expansions on the SAX path (the XPP fast path never expands custom
         // entities, so it needs no cap). Exponential nesting exceeds any fixed cap
         // within a few levels, while legitimate entity use stays orders of magnitude

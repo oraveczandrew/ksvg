@@ -71,7 +71,7 @@ class SvgDecoderTest {
         }
     }
 
-    // Audit #26: Glide hands the same stream to decode() after handles().
+    // Glide hands the same stream to decode() after handles().
     @Test
     fun testHandlesDoesNotConsumeStream() {
         val bytes = resourceAsInputStream("example.svg").use { it.readBytes() }
@@ -80,7 +80,7 @@ class SvgDecoderTest {
         assertNotNull(decoder.decode(shared, 192, 192, Options()))
     }
 
-    // Audit R2/D5: absurd document dimensions clamp aspect-preserving
+    // Absurd document dimensions clamp aspect-preserving
     // instead of exploding the bitmap allocation.
     @Test
     fun testHugeDocumentClamps() {

@@ -47,7 +47,7 @@ internal class SvgAdapter(
         }
 
         fun onRecycled() {
-            // Stop ticking animated drawables on recycled cells (audit #33/R5).
+            // Stop ticking animated drawables on recycled cells.
             requestManager.clear(imageView)
         }
     }

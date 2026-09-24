@@ -157,7 +157,7 @@ import kotlin.math.sqrt
  * Hard cap on render-tree build recursion depth. Reference cycles through
  * anonymous elements (which carry no id for [buildingIds]) and merely
  * pathological nesting would otherwise end in a StackOverflowError; exceeding
- * the cap treats the element as empty with a warning (audit #23).
+ * the cap treats the element as empty with a warning.
  */
 private const val MAX_BUILD_DEPTH = 256
 
@@ -209,8 +209,8 @@ internal class RenderTreeBuilder(
         state = RendererState()
         styleBuilderPool.withPooledObject { builder ->
             builder.reset(Style.getDefaultStyle())
-            // Audit D10: updateStyle only merges declared values (DEFAULT_STYLE
-            // declares nothing), so fresh-state setup comes from the builder.
+            // updateStyle only merges declared values (DEFAULT_STYLE declares
+            // nothing), so fresh-state setup comes from the builder.
             applyStateFromBuilder(state, builder, currentFontSize)
             state.style = builder.build()
         }
@@ -238,7 +238,7 @@ internal class RenderTreeBuilder(
         state = RendererState()
         styleBuilderPool.withPooledObject { builder ->
             builder.reset(Style.getDefaultStyle())
-            // Audit D10: see build(viewPort) init above.
+            // See build(viewPort) init above.
             applyStateFromBuilder(state, builder, currentFontSize)
             state.style = builder.build()
         }
@@ -1042,7 +1042,7 @@ internal class RenderTreeBuilder(
     /**
      * Builds a directly-referenced viewport element (`<symbol>`/`<svg>` from `<use>`)
      * under the cycle guard. These bypass `build()` (and its guard), so an anonymous
-     * inner `<use>` would otherwise recurse without bound (audit #23): the guard
+     * inner `<use>` would otherwise recurse without bound: the guard
      * keys on the *referenced* element's id instead.
      */
     private inline fun <T> buildGuarded(ref: Element, build: () -> T): T? {
@@ -1510,8 +1510,8 @@ internal class RenderTreeBuilder(
         val newState = RendererState()
         obj.styleBuilder.also { builder ->
             builder.reset(Style.getDefaultStyle())
-            // Audit D10: updateStyle only merges declared values (DEFAULT_STYLE
-            // declares nothing), so fresh-state setup comes from the builder.
+            // updateStyle only merges declared values (DEFAULT_STYLE declares
+            // nothing), so fresh-state setup comes from the builder.
             applyStateFromBuilder(newState, builder, currentFontSize)
             newState.style = builder.build()
         }
@@ -2021,7 +2021,7 @@ internal class RenderTreeBuilder(
     private fun updateStyle(state: RendererState, builder: Style.Builder, sourceStyle: Style) {
         // Resolve relative weights here as well: selectTypefaceAndFontStyling runs at
         // build time, so the raw lighter/bolder sentinels would otherwise leak into
-        // variable-font axes and external resolvers (audit #34).
+        // variable-font axes and external resolvers.
         val resolvedFontWeight = if (sourceStyle.isSpecified(Style.SPECIFIED_FONT_WEIGHT)) {
             resolveRelativeFontWeight(sourceStyle.fontWeight, builder.fontWeight)
         } else {

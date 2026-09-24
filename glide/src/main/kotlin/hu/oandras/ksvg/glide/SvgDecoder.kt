@@ -42,7 +42,7 @@ public class SvgDecoder(
 
         /**
          * Decode-time dimension budget: texture-safe ceiling browsers likewise
-         * enforce before allocating (audit R2/D5). Larger requests clamp
+         * enforce before allocating. Larger requests clamp
          * aspect-preserving instead of throwing OOM.
          */
         internal const val MAX_DECODE_DIMENSION: Int = 8192
@@ -107,7 +107,7 @@ public class SvgDecoder(
             var finalWidth: Int = (scale * documentWidth).roundToInt()
             var finalHeight: Int = (scale * documentHeight).roundToInt()
 
-            // Decode-time budget (audit R2, browser parity): attacker-controlled
+            // Decode-time budget (browser parity): attacker-controlled
             // dimensions must never drive an unbounded allocation. Clamp
             // aspect-preserving to the texture-safe ceiling instead of OOMing.
             if (finalWidth > MAX_DECODE_DIMENSION || finalHeight > MAX_DECODE_DIMENSION) {

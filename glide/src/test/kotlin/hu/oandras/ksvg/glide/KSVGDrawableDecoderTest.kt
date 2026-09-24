@@ -40,7 +40,7 @@ class KSVGDrawableDecoderTest {
         }
     }
 
-    // Audit R5: parse failures must surface as IOException (Glide's decode
+    // Parse failures must surface as IOException (Glide's decode
     // contract, mirroring SvgDecoder), never as RuntimeException.
     @Test
     fun testDecodeInvalidThrowsIOException() {

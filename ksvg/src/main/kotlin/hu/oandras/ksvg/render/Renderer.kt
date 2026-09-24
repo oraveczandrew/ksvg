@@ -205,8 +205,8 @@ internal class Renderer internal constructor(
         // Initialize the style state properties like Paints etc. using a fresh instance of Style
         styleBuilderPool.withPooledObject { builder ->
             builder.reset(Style.getDefaultStyle())
-            // Audit D10: updateStyle only merges declared values (DEFAULT_STYLE
-            // declares nothing), so fresh-state setup comes from the builder.
+            // updateStyle only merges declared values (DEFAULT_STYLE declares
+            // nothing), so fresh-state setup comes from the builder.
             applyStateFromBuilder(state, builder, currentFontSize)
             state.style = builder.build()
         }
@@ -279,7 +279,7 @@ internal class Renderer internal constructor(
             val sourceElement = node.sourceElement
             // Viewport-establishing elements clip to their viewport unless overflow
             // is explicitly visible (SVG 1.1: initial overflow is hidden here).
-            // <symbol> was missing: oversized symbol content bled out (audit #28).
+            // <symbol> was missing: oversized symbol content bled out.
             if ((sourceElement is Svg || sourceElement is Symbol) && node.renderState.style.overflow == false) {
                 node.viewPort?.let { setClipRect(canvas, it) }
             }
@@ -1600,7 +1600,7 @@ internal class Renderer internal constructor(
         val newState = renderStatePool.pull()
         obj.styleBuilder.also { builder ->
             builder.reset(Style.getDefaultStyle())
-            // Audit D10: see createSoftwareBackend init above.
+            // See createSoftwareBackend init above.
             applyStateFromBuilder(newState, builder, currentFontSize)
             newState.style = builder.build()
         }

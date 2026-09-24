@@ -1126,7 +1126,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_nativeBackend(
 // exponent slot [7]: test-built arrays carry only the indices their light type
 // reads. Returns either the input pointer or the caller-provided scratch buffer
 // (valid until the current JNI call returns). Lower indices keep the established
-// blind-index contract untouched (audit R6: a fuzzer-built 7-entry spot array
+// blind-index contract untouched (a fuzzer-built 7-entry spot array
 // over-read the heap here).
 inline const jdouble* withSpotExpDefault(JNIEnv* env, jdoubleArray jParams, jdouble* params, jdouble (&scratch)[8]) {
     if (env->GetArrayLength(jParams) >= 8) return params;
@@ -1243,7 +1243,7 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
 
     // A non-default spot beam exponent has no SIMD kernel: the spot rows only
     // implement the default focus. Decline the whole primitive to scalar
-    // (audit R6; mirrors the premultiplied-specular outer-guard pattern).
+    // (mirrors the premultiplied-specular outer-guard pattern).
     // params8 is length-normalized above, so [7] always reads safely.
     if (lightType == 2 /* SPOT */ && params8[7] != 1.0) {
         applyScalar(pix, out, width, height,

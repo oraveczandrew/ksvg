@@ -271,7 +271,7 @@ internal object PaintConfigSync {
         paint.letterSpacing = cfg.letterSpacing
         // word-spacing must be written here too: the lazy diff path
         // (writeConfigDiff) seeds its snapshot from this configuration, so a
-        // value missing here would never register as changed (audit #15).
+        // value missing here would never register as changed.
         if (!cfg.wordSpacing.isNaN()) {
             paint.setWordSpacingCompat(cfg.wordSpacing)
         }

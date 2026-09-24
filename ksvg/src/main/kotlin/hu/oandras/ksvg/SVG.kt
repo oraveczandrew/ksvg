@@ -502,7 +502,7 @@ public interface SVG {
 
 
         //===============================================================================
-        // No process-global parse configuration (audit D6, pre-1.0 API call):
+        // No process-global parse configuration (pre-1.0 API decision):
         // pass `externalFileResolver` / `enableInternalEntities` per parse request
         // on the getFrom* entry points above.
 

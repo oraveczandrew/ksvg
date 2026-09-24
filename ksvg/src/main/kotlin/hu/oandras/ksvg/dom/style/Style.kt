@@ -517,7 +517,7 @@ internal class Style internal constructor(
 
         fun reset(original: Style) {
             this.original = original
-            // Audit D10: "specified" means author-declared. The builder inherits
+            // "specified" means author-declared. The builder inherits
             // the *values* from the original, but the declaration flags start
             // empty: updateStyle gates then fire only for properties the source
             // style actually declares. cssWideKeyword/important flags are still
@@ -1243,7 +1243,7 @@ internal class Style internal constructor(
         const val SPECIFIED_PAINT_ORDER: Long = 1L shl 0
 
         // Flags for the settings that are applied to reset the root style
-        // NOTE (#46, audit D10): DEFAULT_STYLE declares nothing, so its flags
+        // NOTE: DEFAULT_STYLE declares nothing, so its flags
         // stay empty (all-zero); the default *values* below are what reset()
         // inherits. isSpecified() means author-declared again.
         private val DEFAULT_STYLE: Style = run {

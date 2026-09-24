@@ -375,7 +375,7 @@ internal fun parsePath(value: String): PathDefinition {
             // 'Z' takes no coordinates, so trailing numbers are a malformed path rather
             // than an implicit repeat. Returning (instead of looping) matters: the loop
             // body consumes nothing for 'Z', so repeating would append CLOSE segments
-            // without bound until the heap is exhausted (audit #24).
+            // without bound until the heap is exhausted.
             loggerContext.logE(TAG) { "Bad path coords for $pathCommand path segment" }
             return path
         }

@@ -39,9 +39,8 @@ internal class FeSpotLight(
     @JvmField
     val limitingConeAngle: Float?,
     /**
-     * Beam-focus exponent (default 1.0). Parsed and stored; the lighting kernels
-     * currently evaluate the default (`factor = dot`, i.e. pow(dot, 1)) — explicit
-     * values are not yet applied (audit R6).
+     * Beam-focus exponent (default 1.0). The software lighting kernels evaluate
+     * it per light; the GPU path declines non-default values to software.
      */
     @JvmField
     val specularExponent: Float,

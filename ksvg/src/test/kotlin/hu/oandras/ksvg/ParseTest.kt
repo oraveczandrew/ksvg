@@ -261,8 +261,8 @@ class ParseTest {
 
     /**
      * Issue 199
-     * Per-request parsing properties (enableInternalEntities and externalFileResolver,
-     * audit D6): no process-global state, so one parse can never leak config into another.
+     * Per-request parsing properties (enableInternalEntities and externalFileResolver):
+     * no process-global state, so one parse can never leak config into another.
      */
     @Test
     @Throws(KSVGParseException::class)

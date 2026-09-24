@@ -613,7 +613,7 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
 
-        // Spot light, diffuse, non-default beam exponent (audit R6: exercises the
+        // Spot light, diffuse, non-default beam exponent (exercises the
         // params[7] focus path on every backend).
         add(Case(
             name = "spot diffuse beamexp2 16x16",

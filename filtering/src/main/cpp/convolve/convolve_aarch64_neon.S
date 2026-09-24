@@ -50,7 +50,7 @@ ksvgConvolveGenericNeonAsm:
     // Save all callee-saved GPRs we use (x19..x30 = 12 regs => 96 bytes) plus
     // the callee-saved FP low halves we clobber (d8..d15 = 8 regs => 128
     // bytes). Total frame 224 bytes, keeps the 16-byte stack alignment
-    // required by AAPCS64. (Audit R2: v14/v15 accumulators used to leak.)
+    // required by AAPCS64 (v14/v15 accumulators must not leak across the call).
     sub     sp, sp, #224
     stp     x19, x20, [sp, #0]
     stp     x21, x22, [sp, #16]

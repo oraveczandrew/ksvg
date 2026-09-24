@@ -28,7 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Device counterpart of the host billion-laughs guard test (audit D1/R2):
+ * Device counterpart of the host billion-laughs guard test:
  * decides whether Android's Expat-based SAX stack reports internal-entity
  * boundaries (startEntity/endEntity), which the expansion counter depends on.
  * Few expansions (21), many chars (2M): only OUR guard can fire here.
@@ -38,8 +38,8 @@ class ParserEntityLimitTest {
 
     @Test
     fun billionLaughsTripsExpansionLimitOnDevice() {
-        // Entity expansion defaults to enabled; per-request now (audit D6),
-        // so no global setup/restore needed.
+        // Entity expansion defaults to enabled; it is a per-request setting,
+        // so no global setup/restore is needed.
         // Sized past the SAX_CHAR_LIMIT backstop (10M chars out): on stacks that
         // report entity boundaries the precise 1M guard fires first; on blind
         // stacks (Android Expat, device-measured) the backstop must fire.

@@ -24,14 +24,14 @@ import java.io.InputStream
 /**
  * Detection lookahead budget: the `<svg` marker must appear within this many
  * leading bytes (existing fixtures use <1KB). Bounded so the mark stays valid
- * and [isSvg] can rewind for the subsequent decode (audit #26).
+ * and [isSvg] can rewind for the subsequent decode.
  */
 private const val SVG_DETECT_LOOKAHEAD = 65536
 
 internal fun isSvg(inputStream: InputStream): Boolean {
     // Operate on the CALLER's stream with its own mark/reset: wrapping it in a
     // local buffered() would leave the caller's position consumed after we return,
-    // breaking decode() on the same stream (audit #26). Streams without mark
+    // breaking decode() on the same stream. Streams without mark
     // support are declined (we must not consume what we cannot rewind).
     if (!inputStream.markSupported()) return false
     inputStream.mark(SVG_DETECT_LOOKAHEAD)

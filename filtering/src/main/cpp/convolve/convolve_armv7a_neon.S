@@ -74,7 +74,7 @@
 ksvgConvolveGenericNeonAsm32:
     push    {r4-r11, r12, lr} // 10 words -> sp stays 8-byte aligned for vpush
     // Save callee-saved d8-d15 (q4-q7 accumulators/mask).
-    // (Audit R7: used to leak.)
+    // (q4-q7 must not leak across the call).
     vpush   {d8-d15}
     sub     sp, sp, #32
 

@@ -36,7 +36,7 @@ import hu.oandras.ksvg.utils.forEachElement
  * base weight. Relative weight rules from CSS-Fonts-4:
  * https://www.w3.org/TR/css-fonts-4/#relative-weights
  * Shared by the builder and renderer style paths so variable-font axes and
- * external resolvers never see the raw sentinels (audit #34).
+ * external resolvers never see the raw sentinels.
  */
 internal fun resolveRelativeFontWeight(specified: Float, baseWeight: Float): Float {
     return when (specified) {
@@ -65,7 +65,7 @@ internal fun resolveRelativeFontWeight(specified: Float, baseWeight: Float): Flo
 /**
  * Applies the *final* builder values to the live renderer state, unconditionally.
  *
- * Audit D10: [updateStyle] gates only merge *declared* values into the builder,
+ * [updateStyle] gates only merge *declared* values into the builder,
  * so it can no longer populate a fresh state's paints/configs (the old -1
  * lineage did that as a side effect). Fresh-state init sites
  * (`reset(DEFAULT)` + build) call this instead: every write below mirrors the

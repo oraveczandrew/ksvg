@@ -76,7 +76,7 @@ class KSVGDrawableMemoryTest {
         )
     }
 
-    // Audit D5: PoolOwner.clear() must empty every pool, including the small
+    // PoolOwner.clear() must empty every pool, including the small
     // object pools (matrix/path/rectF/render-state) — reuse before, fresh
     // instance after.
     @Test

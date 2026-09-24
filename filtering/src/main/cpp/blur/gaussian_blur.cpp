@@ -228,7 +228,7 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
     // The horizontal pass reads fbuf0[0..r), which no pass ever writes: the
     // correct value there is the transparent-black edge pedestal (0.0f).
     // resize() zero-fills today, but spell it out so a future
-    // reserve()+uninitialized growth cannot corrupt left-edge columns (audit F5).
+    // reserve()+uninitialized growth cannot corrupt left-edge columns.
     std::fill(fbuf0, fbuf0 + (size_t)r * 4, 0.0f);
 
     for (int y = pad; y < pad + h; ++y) {
