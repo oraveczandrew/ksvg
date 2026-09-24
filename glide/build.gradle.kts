@@ -68,7 +68,7 @@ android {
     }
 }
 
-
+//noinspection UseTomlInstead
 dependencies {
     implementation("com.github.bumptech.glide:glide:5.0.9")
     ksp("com.github.bumptech.glide:ksp:5.0.9")
@@ -80,5 +80,5 @@ dependencies {
     implementation(ksvgProject)
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("org.robolectric:robolectric:4.17")
 }

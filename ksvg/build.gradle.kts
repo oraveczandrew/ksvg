@@ -127,7 +127,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 //noinspection UseTomlInstead
 dependencies.apply {
-    implementation("androidx.annotation:annotation:1.10.0")
+    implementation("androidx.annotation:annotation:1.11.0")
     implementation("androidx.lifecycle:lifecycle-common:2.11.0")
     implementation("com.google.guava:guava:33.7.1-android")
     implementation("androidx.collection:collection:1.6.0")
