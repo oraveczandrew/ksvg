@@ -199,6 +199,7 @@
 | [`font-variant-east-asian`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/font-variant-east-asian)       | Full    |                                                           |
 | [`font-feature-settings`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/font-feature-settings)           | Full    |                                                           |
 | [`font-variation-settings`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/font-variation-settings)       | Full    | Variable fonts (API 26+)                                  |
+| [`font`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/font)                                             | Partial | Shorthand parsed; system-font keywords (`caption`, `icon`, `menu`, `message-box`, `small-caption`, `status-bar`) are ignored, not mapped to a generic family |
 | [`dominant-baseline`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/dominant-baseline)                   | Partial | `auto`, `middle`, `hanging`; several keywords approximate |
 | [`alignment-baseline`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/alignment-baseline)                 | Full    |                                                           |
 | [`baseline-shift`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/baseline-shift)                         | Full    | `sub`, `super`, length                                    |
@@ -220,7 +221,7 @@
 | [`visibility`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/visibility)                                   | Full    | `visible`, `hidden`, `collapse`            |
 | [`overflow`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/overflow)                                       | Full    | `hidden`, `visible`                        |
 | [`image-rendering`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/image-rendering)                         | Full    | `auto`, `optimizeSpeed`, `optimizeQuality` |
-| [`vector-effect`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/vector-effect)                             | Full    | `non-scaling-stroke`, `none`               |
+| [`vector-effect`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/vector-effect)                             | Partial | `non-scaling-stroke`, `none` on path/shape stroke; text stroke always scales with the transform |
 | [`isolation`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/isolation)                                     | Full    | `auto`, `isolate`                          |
 | [`mix-blend-mode`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/mix-blend-mode)                           | Full    | CSS compositing                            |
 | [`color-interpolation-filters`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/color-interpolation-filters) | Partial | Honored by feColorMatrix/feComposite/lighting paths; gradients always interpolate in sRGB |

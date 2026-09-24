@@ -839,8 +839,13 @@ class StylePropertyParsingTest {
 
     @Test
     fun testFontShorthandSystemFont() {
-        val s = process("font", "caption", isFromAttribute = false)
-        assertFalse(specified(s.specifiedFlags, Style.SPECIFIED_FONT_SIZE))
+        // System-font keywords have no generic-family mapping: the whole
+        // declaration is ignored (no DEFAULT-mapping), setting no flags.
+        for (keyword in listOf("caption", "icon", "menu", "message-box", "small-caption", "status-bar")) {
+            val s = process("font", keyword, isFromAttribute = false).buildAndGet()
+            assertEquals(0L, s.specifiedFlags)
+            assertNull(s.fontFamily)
+        }
     }
 
     // --- mix-blend-mode / isolation (only from style, not attribute) ---

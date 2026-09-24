@@ -37,6 +37,12 @@ import hu.oandras.ksvg.render.pool.PoolOwner
  * drawable per thread, normally the main thread. Concurrent [draw] calls corrupt
  * rendering state.
  *
+ * Scene ownership: the cached [scene] (plus renderer and pools) belongs to this
+ * drawable instance alone and is rebuilt when bounds, DPI or options change. Do
+ * not share one drawable between concurrently-drawn views; create a drawable per
+ * view instead (they can share the same parsed [SVG] document, which is read-only
+ * after parsing).
+ *
  * Sizing: SVGs without intrinsic width/height report -1 intrinsics, so
  * `wrap_content` hosts collapse. Give the view explicit bounds (or the SVG
  * explicit dimensions) instead.
