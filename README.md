@@ -51,7 +51,7 @@ KSVG provides a highly optimized implementation for almost all SVG 1.1 filter pr
 - `feDisplacementMap`
 - `feDiffuseLighting`, `feSpecularLighting`
 - `feMorphology` (erode and dilate)
-- `feConvolveMatrix`, `feTile`, `feFlood`, `feImage`, `feMerge`
+- `feConvolveMatrix`, `feTile`, `feFlood`, `feImage`, `feMerge`, `feDropShadow`
 
 ### SVG Animations (SMIL)
 Supported declarative animation elements:
