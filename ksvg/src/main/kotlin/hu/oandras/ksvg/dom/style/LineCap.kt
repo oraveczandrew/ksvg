@@ -32,13 +32,13 @@ import androidx.annotation.IntDef
     LineCap.SQUARE,
     LineCap.UNSPECIFIED,
 )
-public annotation class LineCap {
+internal annotation class LineCap {
     public companion object {
-        public const val UNSPECIFIED: Int = -1
+        internal const val UNSPECIFIED: Int = -1
 
-        public const val BUTT: Int = 0
-        public const val ROUND: Int = 1
-        public const val SQUARE: Int = 2
+        internal const val BUTT: Int = 0
+        internal const val ROUND: Int = 1
+        internal const val SQUARE: Int = 2
     }
 }
 

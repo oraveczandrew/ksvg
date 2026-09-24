@@ -31,12 +31,12 @@ import androidx.annotation.IntDef
     FillRule.EVEN_ODD,
     FillRule.UNSPECIFIED,
 )
-public annotation class FillRule {
+internal annotation class FillRule {
     public companion object {
-        public const val UNSPECIFIED: Int = -1
+        internal const val UNSPECIFIED: Int = -1
 
-        public const val NON_ZERO: Int = 0
-        public const val EVEN_ODD: Int = 1
+        internal const val NON_ZERO: Int = 0
+        internal const val EVEN_ODD: Int = 1
     }
 }
 

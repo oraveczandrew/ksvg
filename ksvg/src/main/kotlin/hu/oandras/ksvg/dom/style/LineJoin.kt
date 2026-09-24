@@ -32,13 +32,13 @@ import androidx.annotation.IntDef
     LineJoin.BEVEL,
     LineJoin.UNSPECIFIED,
 )
-public annotation class LineJoin {
+internal annotation class LineJoin {
     public companion object {
-        public const val UNSPECIFIED: Int = -1
+        internal const val UNSPECIFIED: Int = -1
 
-        public const val MITER: Int = 0
-        public const val ROUND: Int = 1
-        public const val BEVEL: Int = 2
+        internal const val MITER: Int = 0
+        internal const val ROUND: Int = 1
+        internal const val BEVEL: Int = 2
     }
 }
 

@@ -42,23 +42,23 @@ import java.util.*
     PaintOrder.MARKERS_STROKE_FILL,
     PaintOrder.UNSPECIFIED,
 )
-public annotation class PaintOrder {
+internal annotation class PaintOrder {
     public companion object {
-        public const val UNSPECIFIED: Int = 0
+        internal const val UNSPECIFIED: Int = 0
 
-        public const val FILL: Int = 1
-        public const val STROKE: Int = 2
-        public const val MARKERS: Int = 3
+        internal const val FILL: Int = 1
+        internal const val STROKE: Int = 2
+        internal const val MARKERS: Int = 3
 
-        public const val FILL_STROKE_MARKERS: Int = (FILL shl 4) or (STROKE shl 2) or MARKERS
-        public const val STROKE_FILL_MARKERS: Int = (STROKE shl 4) or (FILL shl 2) or MARKERS
-        public const val FILL_MARKERS_STROKE: Int = (FILL shl 4) or (MARKERS shl 2) or STROKE
-        public const val MARKERS_FILL_STROKE: Int = (MARKERS shl 4) or (FILL shl 2) or STROKE
-        public const val STROKE_MARKERS_FILL: Int = (STROKE shl 4) or (MARKERS shl 2) or FILL
-        public const val MARKERS_STROKE_FILL: Int = (MARKERS shl 4) or (STROKE shl 2) or FILL
+        internal const val FILL_STROKE_MARKERS: Int = (FILL shl 4) or (STROKE shl 2) or MARKERS
+        internal const val STROKE_FILL_MARKERS: Int = (STROKE shl 4) or (FILL shl 2) or MARKERS
+        internal const val FILL_MARKERS_STROKE: Int = (FILL shl 4) or (MARKERS shl 2) or STROKE
+        internal const val MARKERS_FILL_STROKE: Int = (MARKERS shl 4) or (FILL shl 2) or STROKE
+        internal const val STROKE_MARKERS_FILL: Int = (STROKE shl 4) or (MARKERS shl 2) or FILL
+        internal const val MARKERS_STROKE_FILL: Int = (MARKERS shl 4) or (STROKE shl 2) or FILL
 
         /** Parses a `paint-order` value; returns [UNSPECIFIED] when invalid or empty. */
-        public fun parse(value: String): Int {
+        internal fun parse(value: String): Int {
             var seen = 0
             var count = 0
             var order = 0
