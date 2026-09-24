@@ -36,7 +36,7 @@ internal fun Canvas.saveLayer(box: Box, paint: Paint?): Int {
 }
 
 /** Wrap the specified [block] in calls to [Canvas.save] and [Canvas.restoreToCount]. */
-public inline fun Canvas.withSave(block: Canvas.() -> Unit) {
+internal inline fun Canvas.withSave(block: Canvas.() -> Unit) {
     val checkpoint = save()
     try {
         block()
@@ -49,7 +49,7 @@ public inline fun Canvas.withSave(block: Canvas.() -> Unit) {
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.translate] and
  * [Canvas.restoreToCount].
  */
-public inline fun Canvas.withTranslation(
+internal inline fun Canvas.withTranslation(
     x: Float = 0.0f,
     y: Float = 0.0f,
     block: Canvas.() -> Unit,
@@ -66,7 +66,7 @@ public inline fun Canvas.withTranslation(
 /**
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.rotate] and [Canvas.restoreToCount].
  */
-public inline fun Canvas.withRotation(
+internal inline fun Canvas.withRotation(
     degrees: Float = 0.0f,
     pivotX: Float = 0.0f,
     pivotY: Float = 0.0f,
@@ -84,7 +84,7 @@ public inline fun Canvas.withRotation(
 /**
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.scale] and [Canvas.restoreToCount].
  */
-public inline fun Canvas.withScale(
+internal inline fun Canvas.withScale(
     x: Float = 1.0f,
     y: Float = 1.0f,
     pivotX: Float = 0.0f,
@@ -103,7 +103,7 @@ public inline fun Canvas.withScale(
 /**
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.skew] and [Canvas.restoreToCount].
  */
-public inline fun Canvas.withSkew(x: Float = 0.0f, y: Float = 0.0f, block: Canvas.() -> Unit) {
+internal inline fun Canvas.withSkew(x: Float = 0.0f, y: Float = 0.0f, block: Canvas.() -> Unit) {
     val checkpoint = save()
     skew(x, y)
     try {
@@ -116,7 +116,7 @@ public inline fun Canvas.withSkew(x: Float = 0.0f, y: Float = 0.0f, block: Canva
 /**
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.concat] and [Canvas.restoreToCount].
  */
-public inline fun Canvas.withMatrix(matrix: Matrix = Matrix(), block: Canvas.() -> Unit) {
+internal inline fun Canvas.withMatrix(matrix: Matrix = Matrix(), block: Canvas.() -> Unit) {
     val checkpoint = save()
     concat(matrix)
     try {
@@ -130,7 +130,7 @@ public inline fun Canvas.withMatrix(matrix: Matrix = Matrix(), block: Canvas.() 
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.clipRect] and
  * [Canvas.restoreToCount].
  */
-public inline fun Canvas.withClip(clipRect: Rect, block: Canvas.() -> Unit) {
+internal inline fun Canvas.withClip(clipRect: Rect, block: Canvas.() -> Unit) {
     val checkpoint = save()
     clipRect(clipRect)
     try {
@@ -144,7 +144,7 @@ public inline fun Canvas.withClip(clipRect: Rect, block: Canvas.() -> Unit) {
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.clipRect] and
  * [Canvas.restoreToCount].
  */
-public inline fun Canvas.withClip(clipRect: RectF, block: Canvas.() -> Unit) {
+internal inline fun Canvas.withClip(clipRect: RectF, block: Canvas.() -> Unit) {
     val checkpoint = save()
     clipRect(clipRect)
     try {
@@ -158,7 +158,7 @@ public inline fun Canvas.withClip(clipRect: RectF, block: Canvas.() -> Unit) {
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.clipRect] and
  * [Canvas.restoreToCount].
  */
-public inline fun Canvas.withClip(
+internal inline fun Canvas.withClip(
     left: Int,
     top: Int,
     right: Int,
@@ -178,7 +178,7 @@ public inline fun Canvas.withClip(
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.clipRect] and
  * [Canvas.restoreToCount].
  */
-public inline fun Canvas.withClip(
+internal inline fun Canvas.withClip(
     left: Float,
     top: Float,
     right: Float,
@@ -198,7 +198,7 @@ public inline fun Canvas.withClip(
  * Wrap the specified [block] in calls to [Canvas.save]/[Canvas.clipPath] and
  * [Canvas.restoreToCount].
  */
-public inline fun Canvas.withClip(clipPath: Path, block: Canvas.() -> Unit) {
+internal inline fun Canvas.withClip(clipPath: Path, block: Canvas.() -> Unit) {
     val checkpoint = save()
     clipPath(clipPath)
     try {
