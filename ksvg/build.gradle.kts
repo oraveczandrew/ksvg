@@ -14,6 +14,7 @@
  *    limitations under the License.
  */
 
+import ksvg.gradle.findStringProperty
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -98,11 +99,11 @@ android.apply {
         unitTests.all {
             it.jvmArgs("-noverify")
             // Forward `-PverifyFilter=name` so visual-comparison tests can run on a single SVG.
-            val verifyFilter = project.findProperty("verifyFilter") as? String
+            val verifyFilter = project.findStringProperty("verifyFilter")
             if (!verifyFilter.isNullOrBlank()) {
                 it.systemProperty("ksvg.verify.filter", verifyFilter)
             }
-            val turbDebug = project.findProperty("turbDebug") as? String
+            val turbDebug = project.findStringProperty("turbDebug")
             if (!turbDebug.isNullOrBlank()) {
                 it.systemProperty("ksvg.debug.turbulence", turbDebug)
             }
@@ -170,8 +171,8 @@ val licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0.txt"
 val releaseRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
 val snapshotRepoUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
 
-val sonatypeUsername = project.findProperty("sonatypeUsername") as? String ?: ""
-val sonatypePassword = project.findProperty("sonatypePassword") as? String ?: ""
+val sonatypeUsername = project.findStringProperty("sonatypeUsername").orEmpty()
+val sonatypePassword = project.findStringProperty("sonatypePassword").orEmpty()
 
 configure<PublishingExtension> {
     repositories {

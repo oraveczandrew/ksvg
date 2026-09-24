@@ -3,6 +3,8 @@
 import ksvg.bench.Adb
 import ksvg.bench.BenchmarkTableWriter
 import ksvg.bench.readBenchmarkRows
+import ksvg.gradle.csvProperty
+import ksvg.gradle.findStringProperty
 
 /*
  *    Copyright 2026 András Oravecz <info@oandras.hu>
@@ -52,8 +54,9 @@ android {
         // Optional ABI filter: pass -PfilterAbis=armeabi-v7a to build a 32-bit-only
         // test APK (useful for exercising the ARM32 NEON kernel on arm64 devices).
         // Without the property, all ABIs are built as usual.
-        project.findProperty("filterAbis")?.toString()?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toList()?.let { abis ->
-            ndk { abiFilters.addAll(abis) }
+        //noinspection ChromeOsAbiSupport
+        csvProperty("filterAbis").takeIf { it.isNotEmpty() }?.let { abis ->
+            ndk { abiFilters += abis }
         }
     }
 
@@ -114,9 +117,9 @@ android {
                 // does not use this — 32-bit HotSpot cannot start on the
                 // hosted runners' kernels (SI_KERNEL SIGSEGV under
                 // vsyscall=none), so the i386 leg only builds, never executes.
-                val testJava32: String? = project.findProperty("ksvg.testJava32")?.toString()
-                    ?.takeIf { it.isNotBlank() }
-                    ?: System.getenv("KSVG_TEST_JAVA32")?.takeIf { it.isNotBlank() }
+                val testJava32: String? = project.findStringProperty("ksvg.testJava32")
+                    ?.takeIf { v -> v.isNotBlank() }
+                    ?: System.getenv("KSVG_TEST_JAVA32")?.takeIf { v -> v.isNotBlank() }
                 if (testJava32 != null) {
                     it.executable(testJava32)
                 }
@@ -203,7 +206,7 @@ tasks.matching { it.name == "connectedDebugAndroidTest" }
  *
  * Results are pulled with `adb pull` once the instrumentation run finishes and
  * printed as a single flat Markdown table (kernels alphabetical, sizes ascending,
- * backends in ISA superset order; speedup vs the (kernel,size) group's scalar median).
+ * backends in ISA superset order; speedup vs. the (kernel, size) group's scalar median).
  * `android.injected.androidTest.leaveApksInstalledAfterRun=true` keeps the
  * test APK (and its cache dir) on the device so the file survives the run
  * window long enough to be pulled.
@@ -241,7 +244,7 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
     dependsOn(uninstallBenchmarkApk, tasks.named("connectedDebugAndroidTest"))
 
     doLast {
-        // Clear previous results from the host's ABI result directory so the
+        // Clear previous results from the host's ABI result directory, so the
         // Markdown report only reflects the current run.
         // The ABI is the one the benchmark process actually ran as: the
         // installed test package's primary ABI. This covers both the default
@@ -273,12 +276,12 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
         abiDir.mkdirs()
 
         // The instrumented run leaves the adb server in a stale state that can
-        // return "error: device '' not found" for a freshly-spawned adb client;
+        // return "error: device '' not found" for a freshly spawned adb client;
         // the server restart above (Adb.waitForDevice) already handled that, so
         // target the resolved serial explicitly with -s for both find and pull.
 
         // Locate every benchmark CSV the run left behind and pull it into tmp/device-bench-<abi>/.
-        // The benchmark writes to Context.externalCacheDir/benchmarks/<suite>/, i.e. the canonical
+        // The benchmark writes to Context.externalCacheDir/benchmarks/<suite>/, i.e., the canonical
         // /storage/emulated/0/Android/data/<pkg>/cache/benchmarks/ path. adb pull needs that
         // exact path, not the /sdcard symlink. `find` recurses into the per-suite
         // subdirectories on its own; scoping the search to benchmarks/ also keeps
@@ -319,7 +322,7 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
         // Cell names are simpleperf_benchmark_<Kernel>_<Backend>_<W>x<H>; both the raw
         // simpleperf text dump (.txt) and the parsed CSV are fetched. Profiles live in
         // the per-suite benchmarks/<suite>/ subdirectories; distinctness keys on the
-        // suite-qualified path so same-named cells from different suites both survive.
+        // suite-qualified path, so same-named cells from different suites both survive.
         val profileRemote = Adb.run(
             adb, "-s", serial, "shell", "find", "/storage/emulated/0/Android/data/hu.oandras.filtering.test/cache/benchmarks",
             "-name", "simpleperf_benchmark_*.csv", "-type", "f",
@@ -366,8 +369,8 @@ val exportBenchmarkTable = tasks.register("exportBenchmarkTable") {
     description = "Converts a benchmark results CSV file into a formatted Markdown table following ISA superset order."
 
     val rootDirFile = rootProject.rootDir
-    val propCsv = project.findProperty("csv")?.toString() ?: "tmp/benchmarks_host.csv"
-    val propOut = project.findProperty("output")?.toString()
+    val propCsv = project.findStringProperty("csv") ?: "tmp/benchmarks_host.csv"
+    val propOut = project.findStringProperty("output")
 
     doLast {
         val csvFile = File(rootDirFile, propCsv)
