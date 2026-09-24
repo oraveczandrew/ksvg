@@ -48,7 +48,7 @@ internal sealed class AnimationNode(
     val beginMs: Long = sourceElement.beginMs
 
     @JvmField
-    val repeatCount: Int = sourceElement.repeatCount
+    val repeatCount: Float = sourceElement.repeatCount
 
     @JvmField
     val repeatDurMs: Long = sourceElement.repeatDurMs

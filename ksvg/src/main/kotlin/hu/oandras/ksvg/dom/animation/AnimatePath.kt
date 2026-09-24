@@ -38,7 +38,7 @@ internal class AnimatePath(
     val to: PathDefinition?,
     durMs: Long,
     beginMs: Long,
-    repeatCount: Int,
+    repeatCount: Float,
     repeatDurMs: Long,
     endMs: Long,
     fillFreeze: Boolean,

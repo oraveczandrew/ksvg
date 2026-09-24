@@ -37,7 +37,7 @@ internal class AnimateFloat(
     val by: Float?,
     durMs: Long,
     beginMs: Long,
-    repeatCount: Int,
+    repeatCount: Float,
     repeatDurMs: Long,
     endMs: Long,
     fillFreeze: Boolean,

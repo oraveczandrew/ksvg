@@ -30,6 +30,7 @@ import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.optimizeReadOnlyList
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.sqrt
 
 internal fun interpolate(from: Float, to: Float, progress: Float): Float {
@@ -463,22 +464,20 @@ internal fun isColorAttribute(attr: SVGAttr?): Boolean {
     }
 }
 
-internal fun calculateProgress(
-    durMs: Long,
-    repeatCount: Int,
-    repeatDurMs: Long,
-    elapsed: Long,
-): Float {
-    if (durMs <= 0) return 1f
-
+/**
+ * Total active time: repeatCount iterations of durMs, capped by repeatDurMs.
+ * repeatCount is fractional per SMIL ("2.5" plays two and a half iterations).
+ */
+internal fun activeDurationMs(durMs: Long, repeatCount: Float, repeatDurMs: Long): Long {
+    if (durMs <= 0L) return 0L
     // dur="indefinite" maps to Long.MAX_VALUE; saturate instead of overflowing.
     val totalDurMs = if (durMs == Long.MAX_VALUE || repeatCount == Animation.REPEAT_INDEFINITE) {
         Long.MAX_VALUE
     } else {
-        durMs * repeatCount
+        (durMs.toDouble() * repeatCount).toLong()
     }
 
-    val activeDurMs = if (repeatDurMs != 0L) {
+    return if (repeatDurMs != 0L) {
         if (repeatDurMs == Animation.REPEAT_INDEFINITE.toLong()) {
             Long.MAX_VALUE
         } else {
@@ -487,6 +486,33 @@ internal fun calculateProgress(
     } else {
         totalDurMs
     }
+}
+
+/**
+ * Fully completed iterations behind the current (or frozen) position, for
+ * accumulate="sum". During the run it is floor(elapsed/dur); frozen past the
+ * active end the in-progress value already holds the final partial iteration,
+ * so only the strictly-earlier full ones count (ceil - 1, never negative).
+ * This also caps the old unbounded elapsed/dur growth past the active end.
+ */
+internal fun completedIterations(elapsed: Long, durMs: Long, activeDurMs: Long): Int {
+    if (durMs <= 0L || activeDurMs <= 0L) return 0
+    return if (elapsed >= activeDurMs) {
+        (ceil(activeDurMs.toDouble() / durMs).toInt() - 1).coerceAtLeast(0)
+    } else {
+        (elapsed / durMs).toInt()
+    }
+}
+
+internal fun calculateProgress(
+    durMs: Long,
+    repeatCount: Float,
+    repeatDurMs: Long,
+    elapsed: Long,
+): Float {
+    if (durMs <= 0) return 1f
+
+    val activeDurMs = activeDurationMs(durMs, repeatCount, repeatDurMs)
 
     return if (elapsed >= activeDurMs) {
         1f
@@ -497,7 +523,7 @@ internal fun calculateProgress(
 
 internal fun isFinished(
     durMs: Long,
-    repeatCount: Int,
+    repeatCount: Float,
     repeatDurMs: Long,
     endMs: Long,
     animationTimeMs: Long,
@@ -505,22 +531,5 @@ internal fun isFinished(
 ): Boolean {
     if (animationTimeMs >= endMs) return true
 
-    // dur="indefinite" maps to Long.MAX_VALUE; saturate instead of overflowing.
-    val totalDurMs = if (durMs == Long.MAX_VALUE || repeatCount == Animation.REPEAT_INDEFINITE) {
-        Long.MAX_VALUE
-    } else {
-        durMs * repeatCount
-    }
-
-    val activeDurMs = if (repeatDurMs != 0L) {
-        if (repeatDurMs == Animation.REPEAT_INDEFINITE.toLong()) {
-            Long.MAX_VALUE
-        } else {
-            minOf(totalDurMs, repeatDurMs)
-        }
-    } else {
-        totalDurMs
-    }
-
-    return elapsed >= activeDurMs
+    return elapsed >= activeDurationMs(durMs, repeatCount, repeatDurMs)
 }

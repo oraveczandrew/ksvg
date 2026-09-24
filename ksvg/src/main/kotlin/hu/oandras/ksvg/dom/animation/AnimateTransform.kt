@@ -38,7 +38,7 @@ internal sealed class AnimateTransform(
     val by: FloatList?,
     durMs: Long,
     beginMs: Long,
-    repeatCount: Int,
+    repeatCount: Float,
     repeatDurMs: Long,
     endMs: Long,
     fillFreeze: Boolean,

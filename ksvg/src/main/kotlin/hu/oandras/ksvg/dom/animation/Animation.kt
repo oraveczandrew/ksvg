@@ -35,7 +35,7 @@ internal sealed class Animation(
     @JvmField
     val beginMs: Long,
     @JvmField
-    val repeatCount: Int,
+    val repeatCount: Float,
     @JvmField
     val repeatDurMs: Long,
     @JvmField
@@ -65,7 +65,7 @@ internal sealed class Animation(
     }
 
     companion object {
-        const val REPEAT_INDEFINITE = -1
+        const val REPEAT_INDEFINITE = -1f
     }
 
     abstract class Builder<T : Animation>(
@@ -76,7 +76,7 @@ internal sealed class Animation(
         protected var durMs: Long = 0L
         protected var durSpecified: Boolean = false
         protected var beginMs: Long = 0L
-        protected var repeatCount: Int = 1
+        protected var repeatCount: Float = 1f
         protected var repeatDurMs: Long = 0L
         protected var endMs: Long = Long.MAX_VALUE
         protected var fillFreeze: Boolean = false
@@ -120,10 +120,12 @@ internal sealed class Animation(
                     durSpecified = true
                 }
                 SVGAttr.begin -> beginMs = parseClockValueMillis(value)
+                // SMIL allows fractional counts ("2.5" plays two and a half
+                // iterations); "0" never runs, invalid stays 1.
                 SVGAttr.repeatCount -> repeatCount = if (value == "indefinite") {
-                    REPEAT_INDEFINITE
+                    REPEAT_INDEFINITE.toFloat()
                 } else {
-                    value.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                    value.toFloatOrNull()?.takeIf { it >= 0f } ?: 1f
                 }
                 SVGAttr.repeatDur -> repeatDurMs = if (value == "indefinite") {
                     REPEAT_INDEFINITE.toLong()

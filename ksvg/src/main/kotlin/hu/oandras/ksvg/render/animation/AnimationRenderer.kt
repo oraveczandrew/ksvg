@@ -719,10 +719,10 @@ internal inline fun AnimateFloatNode.withValueAt(animationTimeMs: Long, handler:
     }
 
     if (accumulateSum) {
-        val repeatCount = (elapsed / durMs).toInt()
-        if (repeatCount > 0) {
+        val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+        if (completed > 0) {
             val range = effectiveValues[effectiveValues.size - 1] - effectiveValues[0]
-            result += range * repeatCount
+            result += range * completed
         }
     }
 
@@ -797,13 +797,13 @@ internal fun AnimateTransformNode.applyValueAt(animationTimeMs: Long, out: Float
     }
 
     if (accumulateSum) {
-        val repeatCount = (elapsed / durMs).toInt()
-        if (repeatCount > 0) {
+        val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+        if (completed > 0) {
             val firstIdx = 0
             val lastIdx = effectiveValues.size - stride
             for (i in 0 until stride) {
                 if (transformType == TransformType.rotate && i > 0) continue // cx, cy not accumulated
-                out[i] += (effectiveValues[lastIdx + i] - effectiveValues[firstIdx + i]) * repeatCount
+                out[i] += (effectiveValues[lastIdx + i] - effectiveValues[firstIdx + i]) * completed
             }
         }
     }
@@ -918,12 +918,12 @@ internal fun AnimateDashArrayNode.withDashArrayAt(
     }
 
     if (accumulateSum) {
-        val repeatCount = (elapsed / durMs).toInt()
-        if (repeatCount > 0) {
+        val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+        if (completed > 0) {
             val firstIdx = 0
             val lastIdx = effectiveValues.size - stride
             for (i in 0 until stride) {
-                out[i] += (effectiveValues[lastIdx + i] - effectiveValues[firstIdx + i]) * repeatCount
+                out[i] += (effectiveValues[lastIdx + i] - effectiveValues[firstIdx + i]) * completed
             }
         }
     }
@@ -946,11 +946,11 @@ internal fun AnimateFloatNode.withPointsAt(animationTimeMs: Long, stride: Int, o
     }
 
     if (accumulateSum) {
-        val repeatCount = (elapsed / durMs).toInt()
-        if (repeatCount > 0) {
+        val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+        if (completed > 0) {
             val lastIdx = effectiveValues.size - stride
             for (i in 0 until stride) {
-                out[i] += (effectiveValues[lastIdx + i] - effectiveValues[i]) * repeatCount
+                out[i] += (effectiveValues[lastIdx + i] - effectiveValues[i]) * completed
             }
         }
     }
@@ -1099,11 +1099,11 @@ internal fun AnimateMotionNode.applyMotionAt(animationTimeMs: Long, out: Matrix)
         }
 
         if (accumulateSum) {
-            val repeatCount = (elapsed / durMs).toInt()
-            if (repeatCount > 0) {
+            val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+            if (completed > 0) {
                 // For motion, we accumulate the distance between the last and first points of the path
                 if (pathMeasure.getPosTan(0f, startPos, null) && pathMeasure.getPosTan(length, endPos, null)) {
-                    out.postTranslate((endPos[0] - startPos[0]) * repeatCount, (endPos[1] - startPos[1]) * repeatCount)
+                    out.postTranslate((endPos[0] - startPos[0]) * completed, (endPos[1] - startPos[1]) * completed)
                 }
             }
         }

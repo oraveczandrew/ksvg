@@ -39,7 +39,7 @@ internal class AnimateDashArray(
     val by: FloatArray?,
     durMs: Long,
     beginMs: Long,
-    repeatCount: Int,
+    repeatCount: Float,
     repeatDurMs: Long,
     endMs: Long,
     fillFreeze: Boolean,

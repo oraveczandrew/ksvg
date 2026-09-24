@@ -38,7 +38,7 @@ internal class AnimateColor(
     val by: Int?,
     durMs: Long,
     beginMs: Long,
-    repeatCount: Int,
+    repeatCount: Float,
     repeatDurMs: Long,
     endMs: Long,
     fillFreeze: Boolean,

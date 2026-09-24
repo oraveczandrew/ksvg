@@ -128,58 +128,58 @@ class AnimationUtilsExtendedTest {
 
     @Test
     fun testCalculateProgressZeroDuration() {
-        assertEquals(1f, calculateProgress(0, 1, 0, 0))
+        assertEquals(1f, calculateProgress(0, 1f, 0, 0))
     }
 
     @Test
     fun testCalculateProgressHalfway() {
-        assertEquals(0.5f, calculateProgress(1000, 1, 0, 500))
+        assertEquals(0.5f, calculateProgress(1000, 1f, 0, 500))
     }
 
     @Test
     fun testCalculateProgressAtEnd() {
-        assertEquals(1f, calculateProgress(1000, 1, 0, 1000))
+        assertEquals(1f, calculateProgress(1000, 1f, 0, 1000))
     }
 
     @Test
     fun testCalculateProgressWithRepeat() {
         // duration=1000, repeatCount=3, total=3000
         // elapsed=1500 -> 1500 % 1000 = 500 -> 500/1000 = 0.5
-        assertEquals(0.5f, calculateProgress(1000, 3, 0, 1500))
+        assertEquals(0.5f, calculateProgress(1000, 3f, 0, 1500))
     }
 
     @Test
     fun testCalculateProgressExceedsDuration() {
-        assertEquals(1f, calculateProgress(1000, 1, 0, 2000))
+        assertEquals(1f, calculateProgress(1000, 1f, 0, 2000))
     }
 
     @Test
     fun testCalculateProgressRepeatDurLimits() {
         // dur=1000, repeatCount=3, repeatDur=1500, activeDur=min(3000,1500)=1500
         // elapsed=1500 -> 1f (at end)
-        assertEquals(1f, calculateProgress(1000, 3, 1500, 1500))
+        assertEquals(1f, calculateProgress(1000, 3f, 1500, 1500))
     }
 
     // --- isFinished ---
 
     @Test
     fun testIsFinishedAnimationTimeExceedsEnd() {
-        assertTrue(isFinished(1000, 1, 0, 500, 600, 600))
+        assertTrue(isFinished(1000, 1f, 0, 500, 600, 600))
     }
 
     @Test
     fun testIsFinishedAnimationTimeBeforeEnd() {
-        assertFalse(isFinished(1000, 1, 0, 500, 400, 400))
+        assertFalse(isFinished(1000, 1f, 0, 500, 400, 400))
     }
 
     @Test
     fun testIsFinishedElapsedExceedsActiveDur() {
-        assertTrue(isFinished(1000, 1, 0, Long.MAX_VALUE, 0, 1001))
+        assertTrue(isFinished(1000, 1f, 0, Long.MAX_VALUE, 0, 1001))
     }
 
     @Test
     fun testIsFinishedElapsedWithinActiveDur() {
-        assertFalse(isFinished(1000, 2, 0, Long.MAX_VALUE, 0, 1500))
+        assertFalse(isFinished(1000, 2f, 0, Long.MAX_VALUE, 0, 1500))
     }
 
     // --- parseDashArrayKeyframes ---

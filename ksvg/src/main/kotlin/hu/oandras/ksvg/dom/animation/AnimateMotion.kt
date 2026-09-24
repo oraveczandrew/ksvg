@@ -39,7 +39,7 @@ internal class AnimateMotion(
     val keyPoints: FloatList?,
     durMs: Long,
     beginMs: Long,
-    repeatCount: Int,
+    repeatCount: Float,
     repeatDurMs: Long,
     endMs: Long,
     fillFreeze: Boolean,
