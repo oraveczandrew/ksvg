@@ -31,11 +31,13 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # ubuntu-latest images ship a preinstalled Android SDK
+      # ($ANDROID_SDK_ROOT). Do NOT use android-actions/setup-android@v3
+      # here: it installs the long-removed obsolete "tools" package and
+      # fails on current cmdline-tools ("Failed to find package 'tools'").
       - name: Install SDK packages
         run: |
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
           sdkmanager --install "platforms;android-37" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
           yes | sdkmanager --licenses > /dev/null
 
