@@ -123,7 +123,7 @@ internal sealed class Animation(
                 // SMIL allows fractional counts ("2.5" plays two and a half
                 // iterations); "0" never runs, invalid stays 1.
                 SVGAttr.repeatCount -> repeatCount = if (value == "indefinite") {
-                    REPEAT_INDEFINITE.toFloat()
+                    REPEAT_INDEFINITE
                 } else {
                     value.toFloatOrNull()?.takeIf { it >= 0f } ?: 1f
                 }

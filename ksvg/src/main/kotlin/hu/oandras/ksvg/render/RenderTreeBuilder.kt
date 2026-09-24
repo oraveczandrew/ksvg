@@ -2003,6 +2003,7 @@ internal class RenderTreeBuilder(
             }
             else -> return 1f
         }
+
         val declared: Float? = when (obj) {
             is PathShape -> obj.pathLength
             is RectShape -> obj.pathLength
@@ -2010,8 +2011,8 @@ internal class RenderTreeBuilder(
             is EllipseShape -> obj.pathLength
             is LineShape -> obj.pathLength
             is PolyLineShape -> obj.pathLength
-            else -> null
         }
+
         if (declared == null || declared <= 0f || actualLength <= 0f) return 1f
         return actualLength / declared
     }

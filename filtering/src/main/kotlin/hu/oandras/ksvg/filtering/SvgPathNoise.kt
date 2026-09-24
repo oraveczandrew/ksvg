@@ -71,7 +71,10 @@ public class SvgPathNoise(
         }
     }
 
+    @Suppress("NOTHING_TO_INLINE")
     private inline fun sCurve(t: Double): Double = t * t * (3.0 - 2.0 * t)
+
+    @Suppress("NOTHING_TO_INLINE")
     private inline fun lerp(t: Double, a: Double, b: Double): Double = a + t * (b - a)
 
     /**

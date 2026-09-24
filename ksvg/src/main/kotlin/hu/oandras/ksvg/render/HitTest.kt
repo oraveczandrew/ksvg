@@ -50,16 +50,19 @@ private fun collectHitRegionsRecursive(
     regions: MutableList<HitRegion>,
     parentMatrix: Matrix
 ) {
-    if (node is GroupRenderNode<*> && node.sourceElement is A) {
-        val href = (node.sourceElement as A).href
-        val bb = node.boundingBox
-        if (href != null && bb != null) {
-            val world = Matrix(parentMatrix)
-            node.transform?.let { world.postConcat(it) }
-            node.viewBoxTransform?.let { world.postConcat(it) }
-            val rect = bb.toRectF()
-            world.mapRect(rect)
-            regions.add(HitRegion(href, rect))
+    if (node is GroupRenderNode<*>) {
+        val sourceElement = node.sourceElement
+        if (sourceElement is A) {
+            val href = sourceElement.href
+            val bb = node.boundingBox
+            if (href != null && bb != null) {
+                val world = Matrix(parentMatrix)
+                node.transform?.let { world.postConcat(it) }
+                node.viewBoxTransform?.let { world.postConcat(it) }
+                val rect = bb.toRectF()
+                world.mapRect(rect)
+                regions.add(HitRegion(href, rect))
+            }
         }
     }
     if (node is GroupRenderNode<*>) {
