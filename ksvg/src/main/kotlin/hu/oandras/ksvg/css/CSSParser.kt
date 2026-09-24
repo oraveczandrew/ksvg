@@ -248,10 +248,31 @@ internal class CSSParser internal constructor(
         }
     }
 
+    /**
+     * CSS error recovery: skip to the next `;` or balanced block end so one
+     * malformed statement cannot kill the rest of the sheet (per CSS, only the
+     * bad statement is dropped). A depth-0 `}` is left for the enclosing
+     * ruleset — it ends this one.
+     */
+    private fun skipToNextStatement(scan: CSSTextScanner) {
+        var depth = 0
+        while (!scan.empty()) {
+            when (scan.nextChar()) {
+                ';' -> if (depth == 0) return
+                '{' -> depth++
+                '}' -> if (depth == 0) {
+                    return
+                } else {
+                    depth--
+                }
+            }
+        }
+    }
+
     private fun parseRuleset(scan: CSSTextScanner): CSSRuleset {
         val ruleset = CSSRuleset()
-        try {
-            while (!scan.empty()) {
+        while (!scan.empty()) {
+            try {
                 if (scan.consume("<!--")) continue
                 if (scan.consume("-->")) continue
 
@@ -263,10 +284,11 @@ internal class CSSParser internal constructor(
 
                 // Nothing recognizable found. Could be end of rule set. Return.
                 break
+            } catch (e: CSSParseException) {
+                logger.logE(TAG) { "CSS statement dropped due to error: " + e.message.orEmpty() }
+                if (BuildConfig.DEBUG) logger.logE(TAG) { "Stacktrace:\n" + e.stackTraceToString() }
+                skipToNextStatement(scan)
             }
-        } catch (e: CSSParseException) {
-            logger.logE(TAG) { "CSS parser terminated early due to error: " + e.message.orEmpty() }
-            if (BuildConfig.DEBUG) logger.logE(TAG) { "Stacktrace:\n" + e.stackTraceToString() }
         }
         return ruleset
     }
@@ -359,9 +381,13 @@ internal class CSSParser internal constructor(
         private const val SPECIFICITY_ELEMENT_OR_PSEUDOELEMENT = 1
 
         internal fun mediaMatches(mediaListStr: String, rendererMediaType: MediaType?): Boolean {
+            // No media query at all matches everything; an all-unknown list
+            // matches nothing (unknown media types are false per CSS).
+            if (mediaListStr.isBlank()) return true
             val scan = CSSTextScanner(mediaListStr)
             scan.skipWhitespace()
             val mediaList = parseMediaList(scan)
+            if (mediaList.isEmpty()) return false
             return mediaMatches(mediaList, rendererMediaType)
         }
 
