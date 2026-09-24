@@ -177,3 +177,4 @@ SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3):
     popl %ebp
     ret
 # SIZE(SYM(rsdIntrinsicBlurHFU4_K_i386_ssse3))
+GNU_STACK

@@ -426,3 +426,4 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     CFI_END
 
     ADDRSIG
+GNU_STACK

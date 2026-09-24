@@ -785,3 +785,4 @@ SYM(ksvgLightingSpotSpecularRowSsse3Linear):
     popq      %r12
     popq      %rbp
     retq
+GNU_STACK

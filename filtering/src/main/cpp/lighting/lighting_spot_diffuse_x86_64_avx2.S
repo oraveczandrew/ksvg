@@ -577,3 +577,4 @@ SYM(ksvgLightingSpotDiffuseRowAvx2Linear):
     retq
 .Lfunc_end1:
 SIZE(SYM(ksvgLightingSpotDiffuseRowAvx2Linear))
+GNU_STACK

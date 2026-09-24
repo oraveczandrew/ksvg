@@ -117,3 +117,4 @@ SYM(ksvg_l2s_corr_lo):
 .globl SYM(ksvg_l2s_corr_xor)
 SYM(ksvg_l2s_corr_xor):
     .byte 16,0,0,0,42,0,1,0,0,0,0,168,0,80,128,170
+GNU_STACK

@@ -292,3 +292,4 @@ SYM(ksvgDisplacementMapApplySsse3):
 .float 255.0
 .Ldm_halfs:
 .float 0.5
+GNU_STACK

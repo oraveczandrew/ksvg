@@ -343,3 +343,4 @@ TYPE(SYM(ksvgMorphologyApplyRowSse2), @function)
     pop     %rbx
     ret
     // SIZE(SYM(ksvgMorphologyApplyRowSse2))
+GNU_STACK

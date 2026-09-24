@@ -456,3 +456,4 @@ SYM(applyArithmeticNeon):
     ret
 
 SIZE(SYM(applyArithmeticNeon))
+GNU_STACK

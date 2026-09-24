@@ -494,3 +494,4 @@ TYPE(SYM(ksvgConvolveApplyInteriorSse2), @function)
 .long 255, 255, 255, 255
 .Lsse2_255f:
 .long 0x437f0000
+GNU_STACK

@@ -480,3 +480,4 @@ SYM(ksvgLightingDistantSpecularRowAvx2Linear):
 .cfi_endproc
 
 ADDRSIG
+GNU_STACK

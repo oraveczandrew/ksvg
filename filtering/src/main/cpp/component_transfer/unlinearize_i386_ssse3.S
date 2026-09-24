@@ -221,3 +221,4 @@ SIZE(SYM(ksvgUnlinearizeApplySsse3ApproxV31))
     .long 0x00ffffff,0x00ffffff,0x00ffffff,0x00ffffff
 .L_rounding:
     .short 16,16,16,16,16,16,16,16
+GNU_STACK

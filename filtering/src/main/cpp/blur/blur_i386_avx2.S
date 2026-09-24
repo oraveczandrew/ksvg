@@ -264,3 +264,4 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     popl %ebp
     ret
 # SIZE(SYM(ksvgBlurHorizontalAvx2_i386))
+GNU_STACK

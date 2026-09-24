@@ -605,3 +605,4 @@ LBB2_2:
 LBB2_4:
     retq
 .cfi_endproc
+GNU_STACK

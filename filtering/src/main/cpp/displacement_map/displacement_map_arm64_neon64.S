@@ -254,3 +254,4 @@ TYPE(SYM(ksvgDisplacementMapApplyNeon64), %function)
 .align 2
 .Lincrements:
 .word 0, 1, 2, 3
+GNU_STACK

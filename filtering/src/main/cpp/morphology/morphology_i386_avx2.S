@@ -279,3 +279,4 @@ TYPE(SYM(ksvgMorphologyApplyRowAvx2), @function)
     pop     %ebp
     ret
     # // SIZE(SYM(ksvgMorphologyApplyRowAvx2))
+GNU_STACK

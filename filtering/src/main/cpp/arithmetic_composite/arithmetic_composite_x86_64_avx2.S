@@ -1192,3 +1192,4 @@ SIZE(SYM(ksvgArithmeticApplyAvx2))
 .LCPI0_38:
     .byte 14  // 0xe
 .p2align 4, 0x90
+GNU_STACK

@@ -548,3 +548,4 @@ RODATA
 .Ls_rgb_mask: .long 0x00ffffff,0x00ffffff,0x00ffffff,0x00ffffff
 .Ls_rgb_low_mask: .long 0x000000ff,0x000000ff,0x000000ff,0x000000ff
 .Ls_rounding: .short 16,16,16,16,16,16,16,16
+GNU_STACK

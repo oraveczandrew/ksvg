@@ -573,3 +573,4 @@ CFI_START
     retq
 .Lfunc_end1:
 CFI_END
+GNU_STACK

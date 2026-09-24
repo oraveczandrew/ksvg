@@ -206,3 +206,4 @@ SYM(ksvgBlurHorizontalAvx2_x86_64):
     pop %r12
     ret
 // SIZE(SYM(ksvgBlurHorizontalAvx2_x86_64))
+GNU_STACK

@@ -620,3 +620,4 @@ SIZE(SYM(ksvgLightingPointDiffuseRowAvx2Linear))
 CFI_END
 
 ADDRSIG
+GNU_STACK

@@ -353,3 +353,4 @@ SYM(ksvgLightingPointSpecularRowSsse3Linear):
 
 SIZE(SYM(ksvgLightingPointSpecularRowSsse3))
 SIZE(SYM(ksvgLightingPointSpecularRowSsse3Linear))
+GNU_STACK

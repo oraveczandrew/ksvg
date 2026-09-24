@@ -228,3 +228,4 @@ PACK_FORCE_ALPHA
 
 SIZE(SYM(ksvgLightingPointDiffuseRowSsse3))
 SIZE(SYM(ksvgLightingPointDiffuseRowSsse3Linear))
+GNU_STACK

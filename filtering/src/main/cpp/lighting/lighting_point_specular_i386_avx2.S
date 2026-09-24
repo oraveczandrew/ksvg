@@ -340,3 +340,4 @@ SYM(ksvgLightingPointSpecularRowAvx2Linear):
     ret
 SIZE(SYM(ksvgLightingPointSpecularRowAvx2))
 SIZE(SYM(ksvgLightingPointSpecularRowAvx2Linear))
+GNU_STACK

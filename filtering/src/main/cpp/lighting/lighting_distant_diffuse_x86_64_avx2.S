@@ -520,3 +520,4 @@ RODATA
 .L_correction_hi: .byte 16,0,0,0,42,0,1,0,0,0,0,168,0,80,128,170
 .L_alpha_mask: .long 0xff000000,0xff000000,0xff000000,0xff000000
 .L_rgb_mask: .long 0x00ffffff,0x00ffffff,0x00ffffff,0x00ffffff
+GNU_STACK

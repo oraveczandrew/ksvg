@@ -37,3 +37,4 @@ TYPE(SYM(ksvgLightingSpotDiffuseRowAvx2Linear), @function)
 SYM(ksvgLightingSpotDiffuseRowAvx2Linear):
     JMP(ksvgLightingSpotDiffuseRowSsse3Linear)
 SIZE(SYM(ksvgLightingSpotDiffuseRowAvx2Linear))
+GNU_STACK

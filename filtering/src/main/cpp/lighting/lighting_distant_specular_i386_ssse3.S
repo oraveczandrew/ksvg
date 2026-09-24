@@ -224,3 +224,4 @@ PACK_MAX_ALPHA
     ret
 SIZE(SYM(ksvgLightingDistantSpecularRowSsse3))
 SIZE(SYM(ksvgLightingDistantSpecularRowSsse3Linear))
+GNU_STACK

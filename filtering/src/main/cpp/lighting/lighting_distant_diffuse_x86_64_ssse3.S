@@ -476,3 +476,4 @@ RODATA
 .Lhalf: .float 0.5, 0.5, 0.5, 0.5
 .Lthree_halves: .float 1.5, 1.5, 1.5, 1.5
 .LmaskAlphaShifted: .long 0xFF000000, 0xFF000000, 0xFF000000, 0xFF000000
+GNU_STACK

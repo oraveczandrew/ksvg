@@ -650,3 +650,4 @@ LBB5_2:
 LBB5_4:
     retq
 .cfi_endproc
+GNU_STACK

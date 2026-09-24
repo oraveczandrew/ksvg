@@ -231,3 +231,4 @@ SIZE(SYM(ksvgUnlinearizeApplyAvx2ApproxV26))
     .rept 8
     .long 0xff000000
     .endr
+GNU_STACK

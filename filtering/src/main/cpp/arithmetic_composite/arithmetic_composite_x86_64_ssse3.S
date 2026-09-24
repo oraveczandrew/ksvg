@@ -808,3 +808,4 @@ SYM(ksvgArithmeticApplySse):
 .Ls2lSubHi:
     .byte 16,16,36,20,8,16,60,32,184,4,2,16,0,32,0,0
 SIZE(SYM(ksvgArithmeticApplySse))
+GNU_STACK

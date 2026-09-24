@@ -876,3 +876,4 @@ LBB0_30:
     retl
 .cfi_endproc
     #    SIZE(SYM(ksvgTurbulenceApplyAvx2_i386))
+GNU_STACK

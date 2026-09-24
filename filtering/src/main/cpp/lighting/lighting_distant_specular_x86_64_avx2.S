@@ -613,3 +613,4 @@ EMIT_POW_COMMON_CONSTANTS
 .LCPI1_0:
 .long	0x3f800000
 .p2align 4  // float 1
+GNU_STACK

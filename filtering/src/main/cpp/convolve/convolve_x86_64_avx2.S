@@ -407,3 +407,4 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     popq    %rbp
     vzeroupper
     retq
+GNU_STACK

@@ -392,3 +392,4 @@ SYM(applyArithmeticNeon):
     add     sp, sp, #16
     vpop    {d8-d15}
     pop     {r4-r11, pc}
+GNU_STACK

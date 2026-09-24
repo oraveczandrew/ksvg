@@ -706,3 +706,4 @@ SYM(ksvgLightingSpotSpecularRowAvx2Linear):
     popq         %r12
     popq         %rbp
     retq
+GNU_STACK
