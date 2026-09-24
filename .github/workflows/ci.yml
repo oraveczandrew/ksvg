@@ -29,6 +29,7 @@ jobs:
         include:
           - host: x64
             java-arch: x64
+            distribution: temurin
             host32bit: "false"
             test-tasks: ":ksvg:testDebugUnitTest -PexcludeSlowTests :filtering:testDebugUnitTest :glide:testDebugUnitTest"
             artifact: ci-test-reports
@@ -38,6 +39,9 @@ jobs:
               glide/build/test-results/testDebugUnitTest/
           - host: i386
             java-arch: x86
+            # No 32-bit Linux Temurin 17 exists (x86 dropped after 11),
+            # Zulu still ships one.
+            distribution: zulu
             host32bit: "true"
             test-tasks: ":filtering:testDebugUnitTest"
             artifact: ci-test-reports-i386
@@ -52,7 +56,7 @@ jobs:
       - name: Set up JDK 17 (${{ matrix.host }})
         uses: actions/setup-java@v5
         with:
-          distribution: temurin
+          distribution: ${{ matrix.distribution }}
           java-version: "17"
           architecture: ${{ matrix.java-arch }}
           cache: gradle
