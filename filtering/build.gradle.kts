@@ -106,11 +106,14 @@ android {
         unitTests {
             all {
                 it.jvmArgs("-Djava.library.path=${layout.buildDirectory.get().asFile.resolve("host-native").absolutePath}")
-                // CI i386 leg: fork the test workers with a 32-bit JVM
+                // Local-dev escape hatch: fork the test workers with a 32-bit JVM
                 // (-Pksvg.testJava32 / KSVG_TEST_JAVA32) so the -m32 host lib
                 // can load, while Gradle itself stays on a 64-bit JVM
                 // (Gradle native services don't exist for i386 and the daemon
-                // won't even start there). Unset locally: no behavior change.
+                // won't even start there). Unset: no behavior change. NOTE: CI
+                // does not use this — 32-bit HotSpot cannot start on the
+                // hosted runners' kernels (SI_KERNEL SIGSEGV under
+                // vsyscall=none), so the i386 leg only builds, never executes.
                 val testJava32: String? = project.findProperty("ksvg.testJava32")?.toString()
                     ?.takeIf { it.isNotBlank() }
                     ?: System.getenv("KSVG_TEST_JAVA32")?.takeIf { it.isNotBlank() }

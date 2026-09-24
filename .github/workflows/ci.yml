@@ -17,9 +17,14 @@ concurrency:
 
 jobs:
   # Single job definition, two legs on the same ubuntu-latest image: x64 runs
-  # the full suite against the x86_64 kernels, i386 rebuilds the host
-  # libksvgfilters with -m32 from the i386 .S kernels and runs the
-  # native-parity suites, so x86-only asm regressions fail here, not on device.
+  # the full suite against the x86_64 kernels, i386 build-verifies the 32-bit
+  # Intel kernels (-m32 host lib from the i386 .S files + Android x86 ABI via
+  # the NDK), so x86-only asm regressions fail here, not on device.
+  # NOTE: the i386 leg does NOT execute tests: a 32-bit JVM cannot start on
+  # the hosted runners' kernels (32-bit HotSpot dies at startup with an
+  # SI_KERNEL SIGSEGV in its signal handler under vsyscall=none, a kernel
+  # boot setting we cannot change there). This already caught one real bug
+  # (.addrsig rejected by gas in 32-bit mode).
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -28,50 +33,29 @@ jobs:
       matrix:
         include:
           - host: x64
-            java-arch: x64
-            distribution: temurin
             host32bit: "false"
             test-tasks: ":ksvg:testDebugUnitTest -PexcludeSlowTests :filtering:testDebugUnitTest :glide:testDebugUnitTest"
-            extra-args: ""
             artifact: ci-test-reports
             report-path: |
               ksvg/build/test-results/testDebugUnitTest/
               filtering/build/test-results/testDebugUnitTest/
               glide/build/test-results/testDebugUnitTest/
           - host: i386
-            java-arch: x86
-            # No 32-bit Linux Temurin 17 exists (x86 dropped after 11),
-            # Zulu still ships one.
-            distribution: zulu
             host32bit: "true"
-            test-tasks: ":filtering:testDebugUnitTest"
-            # Gradle itself cannot run on a 32-bit JVM (no native services for
-            # i386), so it stays on 64-bit Temurin and only the test workers
-            # fork the 32-bit java (see ksvg.testJava32 in filtering/build.gradle.kts).
-            extra-args: "-Pksvg.testJava32=$JAVA_HOME_17_X86/bin/java"
+            # No test execution (see NOTE above): build the -m32 host lib
+            # (assembles + links every i386 .S kernel) and the Android x86
+            # ABI with the NDK (the actual on-device 32-bit Intel path).
+            test-tasks: ":filtering:buildHostNativeLib :filtering:assembleDebug -PfilterAbis=x86"
             artifact: ci-test-reports-i386
             report-path: |
-              filtering/build/test-results/testDebugUnitTest/
+              filtering/build/host-native/
     env:
       GRADLE_OPTS: -Dorg.gradle.warning.mode=none
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # Test JVM (32-bit Zulu on the i386 leg, 64-bit Temurin elsewhere).
-      - name: Set up test JDK 17 (${{ matrix.host }})
-        uses: actions/setup-java@v5
-        with:
-          distribution: ${{ matrix.distribution }}
-          java-version: "17"
-          architecture: ${{ matrix.java-arch }}
-          cache: gradle
-
-      # Gradle daemon JVM: always 64-bit (Gradle has no native services for
-      # i386 and won't start on a 32-bit JVM). Runs last so JAVA_HOME ends
-      # up 64-bit; the 32-bit path stays available as JAVA_HOME_17_X86.
-      - name: Set up Gradle JDK 17 (x64)
-        if: matrix.host32bit == 'true'
+      - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -82,11 +66,9 @@ jobs:
       - name: Install 32-bit multilib toolchain
         if: matrix.host32bit == 'true'
         run: |
-          sudo dpkg --add-architecture i386
           sudo apt-get update
-          # gcc-multilib covers compiling -m32; the :i386 runtime libs are for
-          # executing 32-bit binaries (the 32-bit test-worker java).
-          sudo apt-get install -y gcc-multilib g++-multilib zlib1g:i386 libstdc++6:i386
+          # Only needed to compile/link -m32; nothing 32-bit is executed.
+          sudo apt-get install -y gcc-multilib g++-multilib
 
       # ubuntu-latest images ship a preinstalled Android SDK
       # ($ANDROID_SDK_ROOT). Do NOT use android-actions/setup-android@v3
@@ -102,8 +84,8 @@ jobs:
         if: matrix.host32bit != 'true'
         run: ./gradlew :ksvg:assembleDebug :filtering:assembleDebug :glide:assembleDebug
 
-      - name: Unit tests (${{ matrix.host }})
-        run: ./gradlew ${{ matrix.test-tasks }} -Pksvg.host32bit=${{ matrix.host32bit }} ${{ matrix.extra-args }}
+      - name: Build and test (${{ matrix.host }})
+        run: ./gradlew ${{ matrix.test-tasks }} -Pksvg.host32bit=${{ matrix.host32bit }}
 
       - name: Upload test reports
         if: always()
