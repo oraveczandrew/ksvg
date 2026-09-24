@@ -65,10 +65,11 @@ class GpuImpl31ParityTest {
             name = "impl31-feGaussianBlurTiny",
             svg = filteredSvg("""<feGaussianBlur stdDeviation="1"/>"""),
             maxAbsTol = 6,
-            // TODO audit-#45: measured 0.00275 outlier on the base path (fringe at
-            // the blurred shape edge); the Api33 sibling holds 0.001. Tighten to
-            // 0.001 after the base pad-alignment investigation.
-            maxOutlierRatio = 0.004,
+            // The base (Impl31) pad is aligned with the Api33 override (blur
+            // 5f, +20f) since the base serves only Impl31 — the tiny-sigma edge
+            // fringe (0.00275 outlier ratio, device-measured) is gone, so this
+            // holds the 0.001 Api33-sibling level.
+            maxOutlierRatio = 0.001,
             premultiplyReference = true,
         )
     }

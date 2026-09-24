@@ -119,8 +119,12 @@ internal open class GpuFilterBackend internal constructor(
         filterNode.primitives.forEachElement { primitive ->
             when (primitive) {
                 is FeGaussianBlurRenderNode -> {
-                    expandX += primitive.stdDeviationX * scaleX * 4f
-                    expandY += primitive.stdDeviationY * scaleY * 4f
+                    // 5f matches the Api33 override; the old 4f left a fringe at
+                    // the blurred shape edge on tiny sigmas (0.00275 outlier
+                    // ratio vs the 0.001 Api33 level, device-measured). This base
+                    // serves only Impl31 (Api33 overrides, pre-31 has no backend).
+                    expandX += primitive.stdDeviationX * scaleX * 5f
+                    expandY += primitive.stdDeviationY * scaleY * 5f
                 }
                 is FeMorphologyRenderNode -> {
                     expandX += primitive.sourceElement.radiusX * scaleX
@@ -169,8 +173,9 @@ internal open class GpuFilterBackend internal constructor(
             }
         }
 
-        val padX = (expandX + offsetX + 10f).ceilToInt()
-        val padY = (expandY + offsetY + 10f).ceilToInt()
+        // +20f matches the Api33 override (was +10f); see the blur note above.
+        val padX = (expandX + offsetX + 20f).ceilToInt()
+        val padY = (expandY + offsetY + 20f).ceilToInt()
 
         return (padX.toLong() shl 32) or (padY.toLong() and 0xFFFFFFFFL)
     }
