@@ -86,7 +86,32 @@ val canvas = Canvas(bitmap)
 svg.renderToCanvas(canvas)
 ```
 
-For more advanced usage, including custom CSS, viewPorts, and target element rendering, see the `RenderOptions` documentation.
+Showing an SVG in an `ImageView` (static or animated):
+
+```kotlin
+val svg = SVG.getFromAsset(assets, "sample.svg", parseAnimations = true)
+imageView.setImageDrawable(svg.toAnimatedDrawable())
+```
+
+Or directly from assets with `KSVGImageView`:
+
+```kotlin
+ksvgImageView.setImageAsset("sample.svg")
+```
+
+Loading through Glide (add the `glide` artifact; `KSVGGlideModule` registers itself):
+
+```kotlin
+Glide.with(context)
+    .asDrawable()
+    .set(KSVGOptions.PARSE_ANIMATIONS, true)
+    .load(uri)
+    .into(imageView)
+```
+
+For more advanced usage, including `RenderOptions` (custom CSS, viewPorts, target
+element rendering, `softwareFiltering(true)` for deterministic CPU rendering),
+see the `RenderOptions` documentation.
 
 ## Contributing
 
