@@ -16,6 +16,7 @@
 
 #include <jni.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include <sys/syscall.h>
 #include <linux/perf_event.h>
 #include <stdint.h>
@@ -82,7 +83,7 @@ Java_hu_oandras_ksvg_filtering_LinuxHardwareProfiler_nativeClose(JNIEnv *env, jo
         if (group->fd_cycles != -1) close(group->fd_cycles);
         if (group->fd_instructions != -1) close(group->fd_instructions);
         delete group;
-    }y
+    }
 }
 
 extern "C"
