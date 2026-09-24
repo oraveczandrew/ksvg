@@ -64,8 +64,11 @@ jobs:
       - name: Install 32-bit multilib toolchain
         if: matrix.host32bit == 'true'
         run: |
+          sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib
+          # gcc-multilib covers compiling -m32; the :i386 runtime libs are for
+          # executing 32-bit binaries (32-bit java itself, sdkmanager under it).
+          sudo apt-get install -y gcc-multilib g++-multilib zlib1g:i386 libstdc++6:i386
 
       # ubuntu-latest images ship a preinstalled Android SDK
       # ($ANDROID_SDK_ROOT). Do NOT use android-actions/setup-android@v3
