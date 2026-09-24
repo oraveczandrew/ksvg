@@ -26,6 +26,10 @@ import android.util.Log
  * methods to route all parser and renderer logging through it.
  */
 public interface LoggerContext {
+    /**
+     * Logs [message] for [tag] at the given [level] (one of the `VERBOSE..ERROR`
+     * constants below, mirroring Android's [Log] levels).
+     */
     public fun log(level: Int, tag: String, message: String)
 
     /**
@@ -35,6 +39,7 @@ public interface LoggerContext {
     public fun isLoggable(tag: String, level: Int): Boolean
 
     public companion object {
+        /** Log levels mirroring Android's [Log] constants. */
         public const val VERBOSE: Int = Log.VERBOSE
         public const val DEBUG: Int = Log.DEBUG
         public const val INFO: Int = Log.INFO
@@ -54,6 +59,10 @@ public object AndroidLoggerContext : LoggerContext {
     public override fun isLoggable(tag: String, level: Int): Boolean = Log.isLoggable(tag, level)
 }
 
+/**
+ * [LoggerContext] that drops every message. Pass it to the `SVG.getFrom*` methods
+ * to silence all parser and renderer logging.
+ */
 public object NoopLoggerContext : LoggerContext {
     public override fun log(level: Int, tag: String, message: String) {}
 

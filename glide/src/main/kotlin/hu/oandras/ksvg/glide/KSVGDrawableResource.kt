@@ -20,6 +20,10 @@ import android.graphics.drawable.Drawable
 import com.bumptech.glide.load.resource.drawable.DrawableResource
 import hu.oandras.ksvg.KSVGDrawable
 
+/**
+ * Glide [Drawable] resource wrapping a [KSVGDrawable]. Reports the drawable's
+ * retained memory for cache weighing and releases its pools on [recycle].
+ */
 public class KSVGDrawableResource(private val drawable: KSVGDrawable) : DrawableResource<Drawable>(drawable) {
     override fun getResourceClass(): Class<Drawable> = Drawable::class.java
     override fun getSize(): Int =

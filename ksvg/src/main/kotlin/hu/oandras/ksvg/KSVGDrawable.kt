@@ -282,6 +282,11 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         }
     }
 
+    /**
+     * Releases cached bitmaps held by this drawable's pools. Call it from
+     * `ComponentCallbacks2.onTrimMemory` (or Glide's `Resource.recycle`) when
+     * the system is low on memory; the drawable re-renders on demand.
+     */
     public fun trimMemory() {
         pools.clear()
     }

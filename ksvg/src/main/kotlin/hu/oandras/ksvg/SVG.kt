@@ -347,14 +347,6 @@ public interface SVG {
 
     public companion object {
         /**
-         * Returns the version number of this library.
-         * 
-         * @return the version number in string format
-         */
-        //static final String  TAG = "SVG";
-        public const val VERSION: String = "1.0"
-
-        /**
          * Read and parse an SVG from the given `InputStream`.
          *
          * Ownership transfer: the parser closes `inputStream` in a finally block,

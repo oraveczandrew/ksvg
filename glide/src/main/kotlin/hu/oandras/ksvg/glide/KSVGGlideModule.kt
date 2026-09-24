@@ -25,6 +25,13 @@ import com.bumptech.glide.annotation.GlideModule
 import com.bumptech.glide.module.LibraryGlideModule
 import java.io.InputStream
 
+/**
+ * Glide integration entry point. Auto-registered as a [LibraryGlideModule]:
+ * adding the `hu.oandras.ksvg:glide` artifact is enough, no manual setup needed.
+ *
+ * Registers [SvgDecoder] (`InputStream` to `Bitmap`) and [KSVGDrawableDecoder]
+ * (`InputStream` to `Drawable`, animated when [KSVGOptions.PARSE_ANIMATIONS] is set).
+ */
 @GlideModule
 public class KSVGGlideModule : LibraryGlideModule() {
     override fun registerComponents(context: Context, glide: Glide, registry: Registry) {
