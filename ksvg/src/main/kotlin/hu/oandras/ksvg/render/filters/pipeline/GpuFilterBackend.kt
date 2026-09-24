@@ -546,7 +546,7 @@ internal open class GpuFilterBackend internal constructor(
          * r=1.0 → 1.05, r=1.833 → 1.55, r=2.25 → 1.75, r=4.0 → 2.80,
          * r=5.657 → 3.75, r=6.0 → 3.95 (Adreno + SwiftShader agree).
          * [skiaBlurRadiusForSigma] inverts this table so the effective sigma
-         * matches the requested one; re-fit against [GpuPrimitiveParityTest]
+         * matches the requested one; re-fit against `GpuPrimitiveParityTest`
          * if the blur changes.
          */
         private val SKIA_BLUR_RESPONSE_SIGMA: FloatArray = floatArrayOf(1.05f, 1.55f, 1.75f, 2.80f, 3.75f, 3.95f)

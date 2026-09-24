@@ -22,7 +22,7 @@ import java.io.InputStream
 
 internal interface SVGParser {
     /**
-     * Try to parse the stream contents to an [SVG] instance.
+     * Try to parse the stream contents to an [hu.oandras.ksvg.SVG] instance.
      */
     @Throws(KSVGParseException::class)
     fun parseStream(input: InputStream): SVGImpl

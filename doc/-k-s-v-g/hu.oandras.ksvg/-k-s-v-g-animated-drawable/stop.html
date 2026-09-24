@@ -108,7 +108,7 @@
   <div class="cover ">
     <h1 class="cover"><span><span>stop</span></span></h1>
   </div>
-  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="stop.html"><span class="token function">stop</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div></div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="stop.html"><span class="token function">stop</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><p class="paragraph">Stops the ticker and releases all pooled render memory (<a href="../-k-s-v-g-drawable/trim-memory.html">trimMemory</a>). Stopping is terminal: a later <a href="start.html">start</a> reallocates the pools, so hosts that only toggle visibility should rely on <code class="lang-kotlin">setVisible</code> (which keeps the pools) instead of stop/start cycles. Hosts that drop the drawable must still call <a href="stop.html">stop</a> (or <code class="lang-kotlin">Glide.clear()</code>).</p></div></div>
 </div>
     <div class="footer">
         <div class="footer--container">

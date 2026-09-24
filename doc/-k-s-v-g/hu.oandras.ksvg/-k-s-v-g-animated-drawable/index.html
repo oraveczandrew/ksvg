@@ -212,6 +212,21 @@
               </div>
             </div>
           </div>
+<a data-name="-2142190940%2FFunctions%2F444996287" anchor-label="setVisible" id="-2142190940%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-visible.html"><span>set</span><wbr></wbr><span><span>Visible</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2142190940%2FFunctions%2F444996287"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="set-visible.html"><span class="token function">setVisible</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">visible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter ">restart<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Pauses the ticker while invisible (detached/recycled views, hidden tabs) and resumes it when visible again. <code class="lang-kotlin">running</code> is preserved across the gap so hosts that only toggle visibility never leak a ticking drawable. Hosts that drop the drawable must still call <a href="stop.html">stop</a> (or <code class="lang-kotlin">Glide.clear()</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-1099485171%2FFunctions%2F444996287" anchor-label="start" id="-1099485171%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
           <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
             <div class="main-subrow keyValue ">
@@ -237,7 +252,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="stop.html"><span class="token function">stop</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="stop.html"><span class="token function">stop</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Stops the ticker and releases all pooled render memory (<a href="../-k-s-v-g-drawable/trim-memory.html">trimMemory</a>). Stopping is terminal: a later <a href="start.html">start</a> reallocates the pools, so hosts that only toggle visibility should rely on <code class="lang-kotlin">setVisible</code> (which keeps the pools) instead of stop/start cycles. Hosts that drop the drawable must still call <a href="stop.html">stop</a> (or <code class="lang-kotlin">Glide.clear()</code>).</p></div></div></div>
                 </div>
               </div>
             </div>

@@ -107,7 +107,7 @@
   <div class="breadcrumbs"><a href="../../../index.html">KSVG</a><span class="delimiter">/</span><a href="../index.html">hu.oandras.ksvg</a><span class="delimiter">/</span><span class="current">KSVGDrawable</span></div>
   <div class="cover ">
     <h1 class="cover"><span><span>KSVGDrawable</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">class </span><a href="index.html">KSVGDrawable</a> <span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a> </span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">svg<span class="token operator">: </span><a href="../-s-v-g/index.html">SVG</a><span class="token punctuation">, </span></span><span class="parameter ">renderOptions<span class="token operator">: </span><a href="../-render-options/index.html">RenderOptions</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span> : <a href="https://developer.android.com/reference/kotlin/android/graphics/drawable/Drawable.html">Drawable</a></div><p class="paragraph">A <a href="https://developer.android.com/reference/kotlin/android/graphics/drawable/Drawable.html">Drawable</a> backed by an <a href="../-s-v-g/index.html">SVG</a> document.</p><h4 class="tableheader">Inheritors</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../-k-s-v-g-animated-drawable/index.html">KSVGAnimatedDrawable</a></div></span></div><div></div></div></div></div></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">class </span><a href="index.html">KSVGDrawable</a> <span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a> </span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">svg<span class="token operator">: </span><a href="../-s-v-g/index.html">SVG</a><span class="token punctuation">, </span></span><span class="parameter ">renderOptions<span class="token operator">: </span><a href="../-render-options/index.html">RenderOptions</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span> : <a href="https://developer.android.com/reference/kotlin/android/graphics/drawable/Drawable.html">Drawable</a></div><p class="paragraph">A <a href="https://developer.android.com/reference/kotlin/android/graphics/drawable/Drawable.html">Drawable</a> backed by an <a href="../-s-v-g/index.html">SVG</a> document.</p><p class="paragraph">Single-thread affinity: draws, scene rebuilds and hit-region computation share mutable state (<span data-unresolved-link="hu.oandras.ksvg/KSVGDrawable/scene/#/PointingToDeclaration/">scene</span>, pools, cached regions) without synchronization. Use one drawable per thread, normally the main thread. Concurrent <a href="draw.html">draw</a> calls corrupt rendering state.</p><p class="paragraph">Scene ownership: the cached <span data-unresolved-link="hu.oandras.ksvg/KSVGDrawable/scene/#/PointingToDeclaration/">scene</span> (plus renderer and pools) belongs to this drawable instance alone and is rebuilt when bounds, DPI or options change. Do not share one drawable between concurrently-drawn views; create a drawable per view instead (they can share the same parsed <a href="../-s-v-g/index.html">SVG</a> document, which is read-only after parsing).</p><p class="paragraph">Sizing: SVGs without intrinsic width/height report -1 intrinsics, so <code class="lang-kotlin">wrap_content</code> hosts collapse. Give the view explicit bounds (or the SVG explicit dimensions) instead.</p><h4 class="tableheader">Inheritors</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../-k-s-v-g-animated-drawable/index.html">KSVGAnimatedDrawable</a></div></span></div><div></div></div></div></div></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -272,6 +272,21 @@
               </div>
             </div>
           </div>
+<a data-name="1903614197%2FFunctions%2F444996287" anchor-label="getMemorySizeBytes" id="1903614197%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-memory-size-bytes.html"><span>get</span><wbr></wbr><span>Memory</span><wbr></wbr><span>Size</span><wbr></wbr><span><span>Bytes</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1903614197%2FFunctions%2F444996287"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">fun </span><a href="get-memory-size-bytes.html"><span class="token function">getMemorySizeBytes</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Estimated retained memory in bytes: pooled bitmaps plus render-tree bitmaps and pixel-sized buffers (scene caches, filter LUTs/lattices, pixel buckets). Excludes the DOM, geometry, paints and GPU display lists (not measurable via public APIs, and small next to bitmaps). Best-effort under concurrency; intended for cache weighing (e.g. Glide's <code class="lang-kotlin">Resource.getSize</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="1235097875%2FFunctions%2F444996287" anchor-label="getOpacity" id="1235097875%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
           <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
             <div class="main-subrow keyValue ">
@@ -328,6 +343,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="set-color-filter.html"><span class="token function">setColorFilter</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">colorFilter<span class="token operator">: </span><a href="https://developer.android.com/reference/kotlin/android/graphics/ColorFilter.html">ColorFilter</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="551647461%2FFunctions%2F444996287" anchor-label="trimMemory" id="551647461%2FFunctions%2F444996287" data-filterable-set=":ksvg/release"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ksvg/release" data-filterable-set=":ksvg/release">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="trim-memory.html"><span>trim</span><wbr></wbr><span><span>Memory</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="551647461%2FFunctions%2F444996287"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ksvg/release"><div class="symbol monospace"><span class="token keyword">fun </span><a href="trim-memory.html"><span class="token function">trimMemory</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Releases cached bitmaps held by this drawable's pools. Call it from <code class="lang-kotlin">ComponentCallbacks2.onTrimMemory</code> (or Glide's <code class="lang-kotlin">Resource.recycle</code>) when the system is low on memory; the drawable re-renders on demand.</p></div></div></div>
                 </div>
               </div>
             </div>

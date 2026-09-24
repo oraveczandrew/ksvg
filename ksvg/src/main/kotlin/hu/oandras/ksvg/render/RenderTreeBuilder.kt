@@ -155,7 +155,7 @@ import kotlin.math.sqrt
 
 /**
  * Hard cap on render-tree build recursion depth. Reference cycles through
- * anonymous elements (which carry no id for [buildingIds]) and merely
+ * anonymous elements (which carry no id for `buildingIds`) and merely
  * pathological nesting would otherwise end in a StackOverflowError; exceeding
  * the cap treats the element as empty with a warning.
  */

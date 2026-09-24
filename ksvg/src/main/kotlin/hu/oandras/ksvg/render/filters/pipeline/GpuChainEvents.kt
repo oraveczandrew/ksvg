@@ -30,7 +30,7 @@ import hu.oandras.ksvg.render.FilterRenderNode
  * guards the per-element slot fix (shared `#shadow` must appear twice).
  *
  * Zero production cost when unregistered: [record] is a single null check.
- * Registration is test-only ([GpuParityHarness] registers around renders).
+ * Registration is test-only (`GpuParityHarness` registers around renders).
  * Events are cleared per render by the harness; assert immediately after
  * the measured render.
  */
