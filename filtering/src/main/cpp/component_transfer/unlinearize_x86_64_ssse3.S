@@ -186,7 +186,7 @@ SYM(ksvgUnlinearizeApplySsse3):
 .L_done:
     ret
 
-SIZE(SYM(ksvgUnlinearizeApplySsse3ApproxV12))
+SIZE(SYM(ksvgUnlinearizeApplySsse3))
 
 RODATA
 .p2align 4

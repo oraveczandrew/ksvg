@@ -244,6 +244,11 @@
 // (like POW8_AVX2/POW4_SSSE3) are immune. Same reason: no $0x hex,
 // no bare $N below without this guard.
 .macro POW1_X64 dummy
+    // Consume \dummy so GNU as sees the named parameter as used
+    // (silences -W "named parameters not used" on Linux) while keeping
+    // the Apple-LLVM $N-literal guard intact. No code emitted.
+    .ifeqs "\dummy", "__ksvg_never__"
+    .endif
     xorps   %xmm2, %xmm2
     ucomiss %xmm2, %xmm0
     jbe     77f
