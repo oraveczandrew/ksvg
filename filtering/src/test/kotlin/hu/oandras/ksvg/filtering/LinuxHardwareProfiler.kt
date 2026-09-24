@@ -58,7 +58,7 @@ class LinuxHardwareProfiler : HostProfiler {
     companion object {
         init {
             try {
-                System.loadLibrary("ksvgblur")
+                System.loadLibrary("ksvgfilters")
             } catch (_: Throwable) {
             }
         }

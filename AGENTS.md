@@ -75,7 +75,7 @@ If static audit is inconclusive, trace one instruction live with qemu-trace-brid
  *   **Native vs. Kotlin kernel parity**: `filtering/.../*NativeParityTest` compares the
      native kernels (via `SoftwareKernels`) against the pure-Kotlin reference
      (`KotlinKernels`) bit-exactly. It is a host-JVM test that loads a host-architecture
-     (`x86_64`) build of `libksvgblur`. The `:filtering` `buildHostNativeLib` task generates it
+     (`x86_64`) build of `libksvgfilters`. The `:filtering` `buildHostNativeLib` task generates it
      automatically (into `filtering/build/host-native/`) and the test task depends on it, so
      running the test is all you need ex:
      ```bash

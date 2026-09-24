@@ -23,7 +23,7 @@ package hu.oandras.ksvg.filtering
  * uses the `ConvolveMatrixEdgeMode` ordinal: 0=duplicate, 1=wrap, 2=none.
  *
  * Stateless: caller-owned pixel/kernel arrays, no shared state. Availability
- * follows `libksvgblur` ([NativeBackend.isAvailable]).
+ * follows `libksvgfilters` ([NativeBackend.isAvailable]).
  */
 internal object ConvolveNative {
 

@@ -23,7 +23,7 @@ package hu.oandras.ksvg.filtering
  * becomes transparent black.
  *
  * Stateless: lattice tables are rebuilt per call on the native stack; no
- * shared/global state. Availability follows `libksvgblur`
+ * shared/global state. Availability follows `libksvgfilters`
  * ([NativeBackend.isAvailable]).
  */
 internal object TurbulenceNative {

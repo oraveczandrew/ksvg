@@ -19,7 +19,7 @@ package hu.oandras.ksvg.filtering
 /**
  * feDisplacementMap kernel over unpremultiplied ARGB_8888.
  *
- * Stateless and availability follows `libksvgblur` ([NativeBackend.isAvailable]).
+ * Stateless and availability follows `libksvgfilters` ([NativeBackend.isAvailable]).
  */
 internal object DisplacementMapNative {
 

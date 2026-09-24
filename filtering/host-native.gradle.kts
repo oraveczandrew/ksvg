@@ -9,13 +9,13 @@ val hostNativeCpp: FileTree = fileTree("src/main/cpp") {
 }
 val hostNativeOutputDir: File = layout.buildDirectory.dir("host-native").get().asFile
 val hostLibName: String = when {
-    System.getProperty("os.name").lowercase().contains("mac") -> "libksvgblur.dylib"
-    System.getProperty("os.name").lowercase().contains("linux") -> "libksvgblur.so"
-    else -> "ksvgblur.dll"
+    System.getProperty("os.name").lowercase().contains("mac") -> "libksvgfilters.dylib"
+    System.getProperty("os.name").lowercase().contains("linux") -> "libksvgfilters.so"
+    else -> "ksvgfilters.dll"
 }
 val buildHostNativeLib = tasks.register<Exec>("buildHostNativeLib") {
     group = "verification"
-    description = "Builds a host-architecture libksvgblur for native-vs-Kotlin kernel parity tests."
+    description = "Builds a host-architecture libksvgfilters for native-vs-Kotlin kernel parity tests."
     inputs.files(hostNativeCpp)
     inputs.file(rootProject.file("filtering/host-native/CMakeLists.txt"))
     outputs.file(hostNativeOutputDir.resolve(hostLibName))

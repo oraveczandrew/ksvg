@@ -27,7 +27,7 @@ import org.junit.runners.Parameterized
  * the shared [TurbulenceValidationCorpus] is forced through every SIMD backend
  * this host advertises.
  *
- * This is a host JVM test: it loads a host-architecture build of `libksvgblur`
+ * This is a host JVM test: it loads a host-architecture build of `libksvgfilters`
  * (produced for `x86_64` by the CMake project in `filtering/host-native/`) so the
  * natively-dispatched path is genuinely exercised, not just the Kotlin fallback.
  *

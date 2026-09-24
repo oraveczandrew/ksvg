@@ -29,7 +29,7 @@ package hu.oandras.ksvg.filtering
  * limitingConeAngleDeg] (NaN = no cone).
  *
  * Stateless: caller-owned pixel arrays, no shared state. Availability follows
- * `libksvgblur` ([NativeBackend.isAvailable]).
+ * `libksvgfilters` ([NativeBackend.isAvailable]).
  */
 internal object LightingNative {
 

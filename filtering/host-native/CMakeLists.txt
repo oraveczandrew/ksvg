@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22.1)
-project("ksvgblur_host" LANGUAGES C CXX ASM)
+project("ksvgfilters_host" LANGUAGES C CXX ASM)
 
 set(JAVA_HOME "$ENV{JAVA_HOME}")
 
-add_library(ksvgblur SHARED
+add_library(ksvgfilters SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/common/color_luts.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/simd_capabilities.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/blur/gaussian_blur.cpp
@@ -44,12 +44,12 @@ add_library(ksvgblur SHARED
 )
 
 if(APPLE)
-  target_sources(ksvgblur PRIVATE profiler_macos.cpp)
+  target_sources(ksvgfilters PRIVATE profiler_macos.cpp)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  target_sources(ksvgblur PRIVATE profiler_linux.cpp)
+  target_sources(ksvgfilters PRIVATE profiler_linux.cpp)
 endif()
 
-target_include_directories(ksvgblur PRIVATE
+target_include_directories(ksvgfilters PRIVATE
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/common
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve
@@ -60,10 +60,10 @@ target_include_directories(ksvgblur PRIVATE
   ${JAVA_HOME}/include/linux
 )
 
-target_compile_options(ksvgblur PRIVATE -ffp-contract=off -mssse3)
+target_compile_options(ksvgfilters PRIVATE -ffp-contract=off -mssse3)
 
 # Host build only: lets unlinearize.cpp expose the experimental vA..vD SSSE3
 # assembly variants (UnLinearizeNative.applySsse3Variant) for the structural /
 # algorithmic-overhead correctness + benchmark harness. Never defined for the
 # Android/NDK build, so the device kernels never reference the variants.
-target_compile_definitions(ksvgblur PRIVATE KSSVG_HOST_BUILD)
+target_compile_definitions(ksvgfilters PRIVATE KSSVG_HOST_BUILD)

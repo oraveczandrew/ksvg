@@ -22,11 +22,11 @@ internal object NativeBackend {
 
     @JvmField
     val isAvailable: Boolean = try {
-        System.loadLibrary("ksvgblur")
+        System.loadLibrary("ksvgfilters")
         true
     } catch (t: Throwable) {
         loadError = RuntimeException(
-            "Failed to load native KSVG filter library (libksvgblur.so). " +
+            "Failed to load native KSVG filter library (libksvgfilters.so). " +
                     "Falling back to slow Kotlin kernels. Performance will be significantly degraded. " +
                     "Check if the APK contains the correct .so files for the current device ABI.",
             t

@@ -43,7 +43,7 @@ internal class StackBlurAxisScratch {
 }
 
 /**
- * Pure-Kotlin stack blur used as the fallback when the native `libksvgblur.so`
+ * Pure-Kotlin stack blur used as the fallback when the native `libksvgfilters.so`
  * is unavailable (e.g. under the JVM/Robolectric unit-test runner).
  */
 public object StackBlur {

@@ -21,7 +21,7 @@ package hu.oandras.ksvg.filtering
  *
  * result = clamp(k1 * in1 * in2 + k2 * in1 + k3 * in2 + k4)
  *
- * Stateless and availability follows `libksvgblur` ([NativeBackend.isAvailable]).
+ * Stateless and availability follows `libksvgfilters` ([NativeBackend.isAvailable]).
  */
 internal object ArithmeticCompositeNative {
 

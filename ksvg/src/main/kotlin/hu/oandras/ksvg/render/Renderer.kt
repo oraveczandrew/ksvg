@@ -1241,7 +1241,7 @@ internal class Renderer internal constructor(
             } else if (SoftwareKernels.isNativeAvailable) {
                 logI(TAG) {
                     val backends = SoftwareKernels.supportedSimdBackends
-                    "Native filter library (libksvgblur) loaded successfully. " +
+                    "Native filter library (libksvgfilters) loaded successfully. " +
                         "Supported SIMD execution sets: $backends"
                 }
             }

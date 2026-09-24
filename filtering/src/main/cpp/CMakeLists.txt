@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-project("ksvgblur" LANGUAGES C CXX ASM)
+project("ksvgfilters" LANGUAGES C CXX ASM)
 
 # ----------------------------------------------------------------------------
 # Each file below is an OPTIMIZED kernel set for one ISA, compiled into
-# libksvgblur.so for the matching ABI only. gaussian_blur.cpp dispatches the
+# libksvgfilters.so for the matching ABI only. gaussian_blur.cpp dispatches the
 # isotropic case (stdDeviationX == stdDeviationY, radius <= 25) through these
 # kernels (with a zero-padded copy so edges read transparent black), and uses
 # its own pure-C++ scalar two-pass fallback for anisotropic / large radii.
@@ -138,7 +138,7 @@ if (ANDROID_ABI STREQUAL "x86")
     )
 endif ()
 
-add_library(ksvgblur SHARED
+add_library(ksvgfilters SHARED
         common/color_luts.S
         simd_capabilities.cpp
         blur/gaussian_blur.cpp
@@ -153,7 +153,7 @@ add_library(ksvgblur SHARED
         ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES})
 
 # Include path so per-filter headers resolve (convolve.h, turbulence_tables.h, etc.)
-target_include_directories(ksvgblur PRIVATE
+target_include_directories(ksvgfilters PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/common
         ${CMAKE_CURRENT_SOURCE_DIR}/blur
@@ -166,24 +166,24 @@ target_include_directories(ksvgblur PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/turbulence)
 
 # Bit-exact float parity with the Kotlin reference loops: forbid FMA contraction.
-target_compile_options(ksvgblur PRIVATE -ffp-contract=off)
+target_compile_options(ksvgfilters PRIVATE -ffp-contract=off)
 
 # SSSE3 is required for the x86 pshufb LUT path (component_transfer.cpp).
 # Every known Android x86 device satisfies this.
 if (ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
-    target_compile_options(ksvgblur PRIVATE -mssse3)
+    target_compile_options(ksvgfilters PRIVATE -mssse3)
     # All i386 asm is PIC now ({rodata,LCPI} constants live in .text, addressed
     # via the call/1: popl/1b symdiff pattern), so the library no longer needs
     # -z,notext and links TEXTREL-free on x86-32.
     if (FALSE)
-        target_link_options(ksvgblur PRIVATE "-Wl,-z,notext")
+        target_link_options(ksvgfilters PRIVATE "-Wl,-z,notext")
     endif ()
 endif ()
 
 # The ARM32 kernels use NEON instructions; enable the FPU for the C++ side too.
 if (BLUR_NEEDS_NEON)
-    target_compile_options(ksvgblur PRIVATE -mfpu=neon)
+    target_compile_options(ksvgfilters PRIVATE -mfpu=neon)
 endif ()
 
 find_library(log-lib log)
-target_link_libraries(ksvgblur ${log-lib})
+target_link_libraries(ksvgfilters ${log-lib})

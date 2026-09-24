@@ -371,7 +371,7 @@ CSV columns (`Kernel,Backend,Size,AvgMs,MPix/s,GB/s,Speedup,IPC,CyclesPerIter`).
   -Dbenchmark.kernel=Turbulence -Dbenchmark.quick=true -Dorg.gradle.warning.mode=none
 ```
 
-The host parity run depends on `buildHostNativeLib` (compiles `libksvgblur` for
+The host parity run depends on `buildHostNativeLib` (compiles `libksvgfilters` for
 the host CPU); the `benchmark.*` JVM system props are forwarded to the test fork
 by `testOptions.unitTests` in `filtering/build.gradle.kts`.
 
@@ -492,7 +492,7 @@ removed once the general driver landed.
 It provides, per benchmark block (measured region = **only the JNI call**, spec §20):
 
 - foreground `BenchmarkActivity` + focus wait (the window is held by the same process
-  that loads `libksvgblur`),
+  that loads `libksvgfilters`),
 - benchmark-thread priority key: bump `setThreadPriority(myTid(), -20)`, restored at end,
 - `warmup` → repeated `measurementBatches` × `iterationsPerBatch`, per-iteration
   `System.nanoTime()` sampling, with **warmup-based batch calibration**: when

@@ -26,7 +26,7 @@ package hu.oandras.ksvg.filtering
  *
  * Stateless and allocation-free: both pixel arrays are caller-owned scratch
  * (reused buffers), no shared/global state. Availability follows the same
- * `libksvgblur` library as [NativeGaussianBlur].
+ * `libksvgfilters` library as [NativeGaussianBlur].
  */
 internal object ComponentTransferNative {
 

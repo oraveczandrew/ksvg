@@ -17,7 +17,7 @@
 package hu.oandras.ksvg.filtering.benchmark
 
 /**
- * JNI bridge to the Linux `sched_setaffinity` controls added to `libksvgblur`
+ * JNI bridge to the Linux `sched_setaffinity` controls added to `libksvgfilters`
  * (`benchmark/cpu_affinity.cpp`). Lets the diagnostic benchmark pin the caller
  * thread to one concrete CPU so scalar and NEON runs share the same core and
  * frequency state.

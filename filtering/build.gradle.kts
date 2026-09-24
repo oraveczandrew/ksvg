@@ -99,9 +99,9 @@ android {
     }
 
     // JVM unit tests may drive the native kernels directly through the host build
-    // of libksvgblur (see TurbulenceNativeParityTest). Point the test JVM at the
+    // of libksvgfilters (see TurbulenceNativeParityTest). Point the test JVM at the
     // generated host library directory (produced by the `buildHostNativeLib` task
-    // below) so System.loadLibrary("ksvgblur") resolves it.
+    // below) so System.loadLibrary("ksvgfilters") resolves it.
     testOptions {
         unitTests {
             all {

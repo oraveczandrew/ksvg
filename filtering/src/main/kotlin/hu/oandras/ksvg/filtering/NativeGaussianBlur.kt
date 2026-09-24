@@ -108,7 +108,7 @@ public fun StackBlurScratch(): StackBlurScratch =
     if (NativeBackend.isAvailable) NativeScratch() else FallbackScratch()
 
 /**
- * Native, true-Gaussian blur backed by a bundled shared library (`libksvgblur.so`,
+ * Native, true-Gaussian blur backed by a bundled shared library (`libksvgfilters.so`,
  * built from the RIR Toolkit's separable Gaussian kernel).
  *
  * The blur operates on the ARGB pixels as supplied by [android.graphics.Bitmap.getPixels]

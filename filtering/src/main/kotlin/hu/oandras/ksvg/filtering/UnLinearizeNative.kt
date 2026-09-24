@@ -28,7 +28,7 @@ package hu.oandras.ksvg.filtering
  * and alpha needs no lookup — it is a pure element-wise byte map, so `src` and
  * `dst` may alias (in-place). Stateless and allocation-free: the pixel arrays
  * are caller-owned scratch (reused buffers), no shared/global state. Avail-
- * ability follows the same `libksvgblur` library as [NativeGaussianBlur].
+ * ability follows the same `libksvgfilters` library as [NativeGaussianBlur].
  */
 internal object UnLinearizeNative {
 

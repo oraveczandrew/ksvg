@@ -29,7 +29,7 @@ import kotlin.math.sqrt
  *
  * These are the scalar reference implementations of the native kernels in this
  * module ([ComponentTransferNative], [ConvolveNative], [MorphologyNative]):
- * they run on JVMs where `libksvgblur` cannot load (Robolectric unit tests) and
+ * they run on JVMs where `libksvgfilters` cannot load (Robolectric unit tests) and
  * serve as the executable specification the C++ ports must match bit-exactly.
  *
  * All functions are stateless, allocation-free (caller-owned arrays) and take

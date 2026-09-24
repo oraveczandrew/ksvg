@@ -22,7 +22,7 @@ package hu.oandras.ksvg.filtering
  * transparent-black padding semantics, clip-region-only output.
  *
  * Stateless: caller-owned pixel arrays (reused node buffers), no shared state.
- * Availability follows `libksvgblur` ([NativeBackend.isAvailable]).
+ * Availability follows `libksvgfilters` ([NativeBackend.isAvailable]).
  */
 internal object MorphologyNative {
 

@@ -19,7 +19,7 @@ package hu.oandras.ksvg.filtering
 /**
  * Unified software-kernel dispatch for filter primitives.
  *
- * Each method routes to the native C++ backend (when `libksvgblur` is loaded)
+ * Each method routes to the native C++ backend (when `libksvgfilters` is loaded)
  * or to the pure-Kotlin reference implementation in [KotlinKernels].
  * Callers in `:ksvg` never branch on native availability — the choice is
  * encapsulated here.
@@ -37,7 +37,7 @@ public object SoftwareKernels {
         get() = NativeBackend.loadError
 
     /**
-     * True if the native filter library (libksvgblur) is loaded and available.
+     * True if the native filter library (libksvgfilters) is loaded and available.
      */
     @JvmStatic
     public val isNativeAvailable: Boolean

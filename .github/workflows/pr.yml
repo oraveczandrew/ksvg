@@ -42,7 +42,7 @@ jobs:
           yes | sdkmanager --licenses > /dev/null
 
       # Host unit tests, incl. the filtering native-parity suites (x86_64
-      # libksvgblur is built by the buildHostNativeLib task dependency).
+      # libksvgfilters is built by the buildHostNativeLib task dependency).
       - name: Unit + parity tests
         run: |
           ./gradlew :ksvg:testDebugUnitTest -PexcludeSlowTests \
