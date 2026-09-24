@@ -3,6 +3,9 @@
 import ksvg.bench.Adb
 import ksvg.bench.BenchmarkTableWriter
 import ksvg.bench.readBenchmarkRows
+import ksvg.gradle.configureKsvgPublication
+import ksvg.gradle.configureKsvgRepositories
+import ksvg.gradle.configureKsvgSigning
 import ksvg.gradle.csvProperty
 import ksvg.gradle.findStringProperty
 
@@ -24,6 +27,10 @@ import ksvg.gradle.findStringProperty
 
 plugins {
     id("com.android.library")
+    id("maven-publish")
+    id("signing")
+    id("org.jetbrains.dokka")
+    id("org.jetbrains.dokka-javadoc")
 }
 
 kotlin {
@@ -131,6 +138,11 @@ android {
         }
     }
 
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
 }
 
 apply(from = "host-native.gradle.kts")
@@ -413,4 +425,28 @@ dependencies {
     androidTestImplementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     androidTestImplementation(testFixtures(project(":filtering")))
+}
+
+// PUBLISHING (coordinates live in root gradle.properties: ksvg.group / ksvg.version)
+
+configureKsvgPublication(
+    artifactId = "filtering",
+    displayName = "KSVG Filtering",
+    description = "Native SIMD and pure-Kotlin software filter kernels for KSVG.",
+    // Test-fixture-only deps (junit, monitor) would otherwise leak into the main
+    // POM as runtime deps; Gradle consumers already get correct GMM variants.
+    stripPomDependencies = setOf("junit:junit", "androidx.test:monitor"),
+)
+configureKsvgRepositories()
+configureKsvgSigning()
+
+dokka {
+    moduleName.set("KSVG Filtering")
+}
+
+tasks.register<Jar>("javadocJar") {
+    description = "Packages Dokka Javadoc output for publication."
+    dependsOn("dokkaGeneratePublicationJavadoc")
+    archiveClassifier.set("javadoc")
+    from(tasks.named("dokkaGeneratePublicationJavadoc"))
 }

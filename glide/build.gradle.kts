@@ -14,9 +14,17 @@
  *    limitations under the License.
  */
 
+import ksvg.gradle.configureKsvgPublication
+import ksvg.gradle.configureKsvgRepositories
+import ksvg.gradle.configureKsvgSigning
+
 plugins {
     id("com.android.library")
     id("com.google.devtools.ksp")
+    id("maven-publish")
+    id("signing")
+    id("org.jetbrains.dokka")
+    id("org.jetbrains.dokka-javadoc")
 }
 
 kotlin {
@@ -66,6 +74,12 @@ android {
             "-Xreturn-value-checker=check",
         )
     }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
 }
 
 //noinspection UseTomlInstead
@@ -81,4 +95,25 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.17")
+}
+
+// PUBLISHING (coordinates live in root gradle.properties: ksvg.group / ksvg.version)
+
+configureKsvgPublication(
+    artifactId = "glide",
+    displayName = "KSVG Glide",
+    description = "Glide image-loading integration for KSVG.",
+)
+configureKsvgRepositories()
+configureKsvgSigning()
+
+dokka {
+    moduleName.set("KSVG Glide")
+}
+
+tasks.register<Jar>("javadocJar") {
+    description = "Packages Dokka Javadoc output for publication."
+    dependsOn("dokkaGeneratePublicationJavadoc")
+    archiveClassifier.set("javadoc")
+    from(tasks.named("dokkaGeneratePublicationJavadoc"))
 }

@@ -14,8 +14,10 @@
  *    limitations under the License.
  */
 
+import ksvg.gradle.configureKsvgPublication
+import ksvg.gradle.configureKsvgRepositories
+import ksvg.gradle.configureKsvgSigning
 import ksvg.gradle.findStringProperty
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("com.android.library")
@@ -109,6 +111,12 @@ android.apply {
             }
         }
     }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
 }
 
 tasks.withType<Test>().configureEach {
@@ -147,116 +155,15 @@ dependencies.apply {
     androidTestImplementation(testFixtures(project(":filtering")))
 }
 
-// PUBLISHING
+// PUBLISHING (coordinates live in root gradle.properties: ksvg.group / ksvg.version)
 
-val libraryVersion = "1.0-SNAPSHOT"
-
-val libraryName = "KSVG"
-val libraryDescription = "SVG rendering library for Android."
-
-val artifactIdAAR = "ksvg"
-val artifactIdJAR = "ksvg-jar"
-val libraryGroup = "hu.oandras"
-
-val developerId = "oraveczandrew"
-val developerName = "András Oravecz"
-val developerEmail = "info@oandras.hu"
-
-val siteUrl = "https://github.com/oraveczandrew/ksvg"
-val gitUrl = "https://github.com/oraveczandrew/ksvg.git"
-
-val licenseName = "The Apache Software License, Version 2.0"
-val licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0.txt"
-
-val releaseRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-val snapshotRepoUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
-
-val sonatypeUsername = project.findStringProperty("sonatypeUsername").orEmpty()
-val sonatypePassword = project.findStringProperty("sonatypePassword").orEmpty()
-
-configure<PublishingExtension> {
-    repositories {
-        maven {
-            url = uri(if (libraryVersion.endsWith("SNAPSHOT")) snapshotRepoUrl else releaseRepoUrl)
-            credentials {
-                username = sonatypeUsername
-                password = sonatypePassword
-            }
-        }
-    }
-
-    publications {
-        create<MavenPublication>("mavenAAR") {
-            artifactId = artifactIdAAR
-            groupId = libraryGroup
-            version = libraryVersion
-
-            artifact(layout.buildDirectory.file("outputs/aar/ksvg-release.aar")) {
-                builtBy(tasks.named("assemble"))
-            }
-
-            pom {
-                packaging = "aar"
-                name.set(libraryName)
-                description.set(libraryDescription)
-                url.set(siteUrl)
-
-                licenses {
-                    license {
-                        name.set(licenseName)
-                        url.set(licenseUrl)
-                        distribution.set("repo")
-                    }
-                }
-                developers {
-                    developer {
-                        id.set(developerId)
-                        name.set(developerName)
-                        email.set(developerEmail)
-                    }
-                }
-                scm {
-                    connection.set(gitUrl)
-                    developerConnection.set(gitUrl)
-                    url.set(siteUrl)
-                }
-            }
-        }
-
-        create<MavenPublication>("mavenJAR") {
-            artifactId = artifactIdJAR
-            groupId = libraryGroup
-            version = libraryVersion
-
-            pom {
-                packaging = "jar"
-                name.set(libraryName)
-                description.set(libraryDescription)
-                url.set(siteUrl)
-
-                licenses {
-                    license {
-                        name.set(licenseName)
-                        url.set(licenseUrl)
-                        distribution.set("repo")
-                    }
-                }
-                developers {
-                    developer {
-                        id.set(developerId)
-                        name.set(developerName)
-                        email.set(developerEmail)
-                    }
-                }
-                scm {
-                    connection.set(gitUrl)
-                    developerConnection.set(gitUrl)
-                    url.set(siteUrl)
-                }
-            }
-        }
-    }
-}
+configureKsvgPublication(
+    artifactId = "ksvg",
+    displayName = "KSVG",
+    description = "SVG rendering library for Android.",
+)
+configureKsvgRepositories()
+configureKsvgSigning()
 
 dokka {
     moduleName.set("KSVG")
@@ -279,56 +186,11 @@ dokka {
     }
 }
 
-tasks.register<Jar>("sourcesJar") {
-    description = ""
-    from("src/main/java")
-    from("src/main/kotlin")
-    archiveClassifier.set("sources")
-}
-
 tasks.register<Jar>("javadocJar") {
-    description = ""
+    description = "Packages Dokka Javadoc output for publication."
     dependsOn("dokkaGeneratePublicationJavadoc")
     archiveClassifier.set("javadoc")
     from(tasks.named("dokkaGeneratePublicationJavadoc"))
-}
-
-tasks.register<Jar>("libraryJar") {
-    description = ""
-
-    dependsOn("compileReleaseKotlin")
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    exclude("META-INF/*.SF")
-    exclude("META-INF/*.DSA")
-    exclude("META-INF/*.RSA")
-
-    from(tasks.named<KotlinCompile>("compileReleaseKotlin").map { it.destinationDirectory })
-
-    // Java classes, ha vannak Java source-ok is
-    dependsOn("compileReleaseJavaWithJavac")
-    from(tasks.named<JavaCompile>("compileReleaseJavaWithJavac").map { it.destinationDirectory })
-
-    // Add all dependencies except android.jar and JUnit
-    from(
-        configurations.named("releaseRuntimeClasspath").map { configuration ->
-            configuration.filter {
-                it.name != "android.jar" &&
-                        !it.name.startsWith("junit")
-            }.map {
-                if (it.isDirectory) it else zipTree(it)
-            }
-        }
-    )
-
-    archiveFileName.set("${artifactIdJAR}-${libraryVersion}.jar")
-}
-
-configure<SigningExtension> {
-    val publishing = extensions.getByType<PublishingExtension>()
-    sign(publishing.publications["mavenAAR"])
-    sign(publishing.publications["mavenJAR"])
 }
 
 tasks.register<JacocoReport>("jacocoTestReport") {
@@ -402,18 +264,5 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
                 minimum = "0.50".toBigDecimal()
             }
         }
-    }
-}
-
-afterEvaluate {
-    val publishing = extensions.getByType<PublishingExtension>()
-    publishing.publications.getByName<MavenPublication>("mavenAAR").apply {
-        artifact(tasks.named("sourcesJar"))
-        artifact(tasks.named("javadocJar"))
-    }
-    publishing.publications.getByName<MavenPublication>("mavenJAR").apply {
-        artifact(tasks.named("libraryJar"))
-        artifact(tasks.named("sourcesJar"))
-        artifact(tasks.named("javadocJar"))
     }
 }
