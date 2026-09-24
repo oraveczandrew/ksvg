@@ -37,6 +37,7 @@ jobs:
             echo "Tag does not match ksvg.version in gradle.properties"
             exit 1
           fi
+          echo "KSVG_VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Cache Android SDK packages
         uses: actions/cache@v5
@@ -61,12 +62,21 @@ jobs:
           :ksvg:publishReleasePublicationToMavenLocal
           :filtering:publishReleasePublicationToMavenLocal
           :glide:publishReleasePublicationToMavenLocal
+          :showcase:assembleDebug
           "-Dmaven.repo.local=$GITHUB_WORKSPACE/dist/repo"
+
+      - name: Collect demo APK
+        # Debug APK (auto-signed): try-out demo, not the published library.
+        run: |
+          cp showcase/build/outputs/apk/debug/showcase-debug.apk \
+            "dist/ksvg-showcase-$KSVG_VERSION.apk"
+          ls -la dist dist/repo | head -30
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            dist/*.apk
             dist/repo/**/*.aar
             dist/repo/**/*-sources.jar
             dist/repo/**/*-javadoc.jar
