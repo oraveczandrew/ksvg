@@ -24,7 +24,7 @@ pluginManagement {
     }
     plugins {
         id("com.android.library") version "9.4.1"
-        id("org.jetbrains.kotlin.android") version "2.4.10"
+        id("org.jetbrains.kotlin.android") version "2.4.20"
         id("org.jetbrains.dokka") version "2.2.0"
         id("org.jetbrains.dokka-javadoc") version "2.2.0"
     }
