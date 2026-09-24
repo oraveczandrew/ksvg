@@ -134,6 +134,52 @@ class AnimateMotionTest {
     }
 
     @Test
+    fun renderAppliesAnimateMotionAccumulateFreeze() {
+        val svg = SVG.getFromString(
+            svg = """
+                    <svg width="40" height="20" viewBox="0 0 40 20">
+                      <rect width="2" height="2">
+                        <animateMotion path="M 0 0 L 10 0" dur="1s" repeatCount="2" accumulate="sum" fill="freeze"/>
+                      </rect>
+                    </svg>
+                    """.trimIndent(),
+            parseAnimations = true
+        ) as SVGImpl
+        // Frozen past the active end: end point (10,0) + one completed range.
+        svg.animationTimeMs = 5000L
+
+        val bitmap = createBitmap(40, 20)
+        val canvas = Canvas(bitmap)
+        svg.renderToCanvas(canvas)
+
+        val operations = canvas.asShadow().getOperations()
+        assertTrue("Expected translation to (20,0), but got: $operations", operations.contains("concat(Matrix(1 0 0 1 20 0))"))
+    }
+
+    @Test
+    fun renderAppliesAnimateMotionKeyPointsWithoutKeyTimesIgnored() {
+        val svg = SVG.getFromString(
+            svg = """
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                      <rect width="2" height="2">
+                        <animateMotion path="M 0 0 L 10 0" dur="1s" keyPoints="0;0.2" fill="freeze"/>
+                      </rect>
+                    </svg>
+                    """.trimIndent(),
+            parseAnimations = true
+        ) as SVGImpl
+        // Per SMIL, keyPoints without keyTimes are ignored: linear progress.
+        svg.animationTimeMs = 500L
+
+        val bitmap = createBitmap(20, 20)
+        val canvas = Canvas(bitmap)
+        svg.renderToCanvas(canvas)
+
+        val operations = canvas.asShadow().getOperations()
+        assertTrue("Expected translation to (5,0), but got: $operations", operations.contains("concat(Matrix(1 0 0 1 5 0))"))
+    }
+
+    @Test
     fun renderAppliesAnimateMotionWithKeyPoints() {
         val svg = SVG.getFromString(
             svg = """
