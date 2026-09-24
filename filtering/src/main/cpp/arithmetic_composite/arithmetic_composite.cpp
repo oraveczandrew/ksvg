@@ -98,7 +98,11 @@ jint nativeBackendForAbi() {
     // i386 has no SIMD kernels anymore: arithmetic_composite routes every
     // backend (including forced) through the scalar reference there, so it
     // advertises only the scalar backend.
-    backends |= SIMD_BACKEND_SSSE3;
+    // SSSE3 only when the CPU has it (parity tests force every advertised
+    // backend; executing SSSE3 rows without SSSE3 is SIGILL).
+    if (detectSimdLevel() >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }

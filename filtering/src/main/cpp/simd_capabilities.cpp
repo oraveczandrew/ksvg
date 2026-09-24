@@ -19,9 +19,9 @@
 // Kernel-independent device capability report: which SIMD execution sets this
 // build can dispatch to on this CPU. Unlike the per-kernel nativeBackend()
 // masks (which describe what one kernel implements), this answers "what can
-// run here" for diagnostics. It intentionally mirrors the per-kernel ABI
-// logic (scalar always; i386 scalar-only since no SIMD kernels are built
-// there), so capability and dispatch stay consistent by construction.
+// run here" for diagnostics. A backend is reported only when the CPU supports
+// it (baseline x86-64 is SSE2, not SSSE3), mirroring the per-kernel masks,
+// so capability and dispatch stay consistent by construction.
 namespace {
 
 jint supportedBackendsForDevice() {
@@ -31,7 +31,9 @@ jint supportedBackendsForDevice() {
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     backends |= SIMD_BACKEND_NEON32;
 #elif defined(__x86_64__) || defined(_M_X64)
-    backends |= SIMD_BACKEND_SSSE3;
+    if (detectSimdLevel() >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }

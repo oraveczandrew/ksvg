@@ -237,12 +237,22 @@ void applyAvx2(
 jint nativeBackendForAbi() {
     jint backends = SIMD_BACKEND_SCALAR;
 #if defined(__x86_64__)
-    backends |= SIMD_BACKEND_SSSE3;
+    // SSSE3 is advertised only when the CPU has it: the parity tests force
+    // every advertised backend, and executing SSSE3 rows without SSSE3
+    // faults with SIGILL. (Baseline x86-64 is SSE2, not SSSE3.)
+    if (detectSimdLevel() >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }
 #elif defined(__i386__)
-    backends |= SIMD_BACKEND_SSSE3;
+    // SSSE3 is advertised only when the CPU has it: the parity tests force
+    // every advertised backend, and executing SSSE3 rows without SSSE3
+    // faults with SIGILL. (Baseline x86-64 is SSE2, not SSSE3.)
+    if (detectSimdLevel() >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
     if (detectSimdLevel() >= SIMD_AVX2) {
         backends |= SIMD_BACKEND_AVX2;
     }

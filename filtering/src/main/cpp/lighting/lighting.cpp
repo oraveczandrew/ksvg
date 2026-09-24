@@ -718,7 +718,13 @@ void applyVector(
                     }
                     case SIMD_BACKEND_SSSE3: {
                         const jint c4 = (ixHi - x) & ~3;
-                        if (c4 > 0) {
+                        // The x86_64 "Ssse3" point-specular row is AVX1-class
+                        // (VEX/YMM, see lighting_point_specular_x86_64_ssse3.S);
+                        // without AVX leave these pixels to the scalar tail
+                        // loop instead of faulting with SIGILL. Diffuse rows
+                        // are pure SSSE3 and run unconditionally.
+                        const bool specularSimd = !isSpecular || detectSimdLevel() >= SIMD_AVX2;
+                        if (c4 > 0 && specularSimd) {
                             if (isSpecular) {
                                 if (useLinear) {
                                     ksvgLightingPointSpecularRowSsse3Linear(srcT, srcM, srcB, rowOut, c4, &plp, exponent, ksvg_linear_to_srgb_lut);
@@ -1104,12 +1110,16 @@ jint nativeBackendForAbi() {
 #elif defined(__x86_64__)
     // x86_64 baseline lighting rows are the SSSE3 variants; i386 now shares
     // the same SSSE3 naming (its _sse2.S files became _ssse3.S).
-    backends |= SIMD_BACKEND_SSSE3;
+    // SSSE3 is advertised only when the CPU has it: the parity tests force
+    // every advertised backend, and executing SSSE3 rows without SSSE3
+    // faults with SIGILL. (Baseline x86-64 is SSE2, not SSSE3.)
     const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_SSSE3) backends |= SIMD_BACKEND_SSSE3;
     if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
 #elif defined(__i386__)
-    backends |= SIMD_BACKEND_SSSE3;
-    if (detectSimdLevel() >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
+    const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_SSSE3) backends |= SIMD_BACKEND_SSSE3;
+    if (level >= SIMD_AVX2) backends |= SIMD_BACKEND_AVX2;
 #endif
     return backends;
 }
@@ -1232,12 +1242,14 @@ Java_hu_oandras_ksvg_filtering_LightingNative_apply(
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     backend = SIMD_BACKEND_NEON32;
 #elif defined(__x86_64__)
-    backend = SIMD_BACKEND_SSSE3;
+    // SSSE3 default only when the CPU has it (baseline x86-64 is SSE2);
+    // without SSSE3 the whole primitive stays scalar instead of faulting.
     const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_SSSE3) backend = SIMD_BACKEND_SSSE3;
     if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
 #elif defined(__i386__)
-    backend = SIMD_BACKEND_SSSE3;
     const SimdLevel level = detectSimdLevel();
+    if (level >= SIMD_SSSE3) backend = SIMD_BACKEND_SSSE3;
     if (level >= SIMD_AVX2) backend = SIMD_BACKEND_AVX2;
 #endif
 

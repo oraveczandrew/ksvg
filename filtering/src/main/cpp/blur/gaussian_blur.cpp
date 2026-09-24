@@ -371,7 +371,11 @@ jint nativeBackendForAbi(const float stdDeviationX, const float stdDeviationY) {
 #elif defined(__arm__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
         backends |= SIMD_BACKEND_NEON32;
 #elif defined(__i386__) || defined(__x86_64__)
-        backends |= SIMD_BACKEND_SSSE3;
+        // SSSE3 only when the CPU has it (parity tests force every
+        // advertised backend; executing SSSE3 rows without SSSE3 is SIGILL).
+        if (detectSimdLevel() >= SIMD_SSSE3) {
+            backends |= SIMD_BACKEND_SSSE3;
+        }
         if (detectSimdLevel() >= SIMD_AVX2) {
             backends |= SIMD_BACKEND_AVX2;
         }
