@@ -92,7 +92,14 @@ private const val CONVOLVE_MATRIX_SHADER: String = """
                 }
                 float4 res = sum / uDivisor + uBias;
                 if (uPreserveAlpha != 0) res.a = uInput.eval(fragCoord).a;
-                return half4(res);
+                // Clamp like the CPU clamp255, then premultiply: the pipeline
+                // contract is premultiplied effect output (like the sibling
+                // shaders), and premultiplying by an unclamped alpha would
+                // blow out bright pixels. Straight output would only hide
+                // behind alpha-255 pixels and surface on computed mid-range
+                // alpha instead.
+                res = clamp(res, float4(0.0), float4(1.0));
+                return half4(res.rgb * res.a, res.a);
             }
         """
 
@@ -168,6 +175,15 @@ private fun createConvolveShaderEffect(
     val shader = RuntimeShader(CONVOLVE_MATRIX_SHADER)
     val paddedKernel = FloatArray(49)
     kernel.copyInto(paddedKernel)
+    // SVG 1.1 section 15.22: true convolution — the shader correlates its
+    // taps in row-major order, so mirror the spec-order kernel 180 degrees
+    // up front (zero padding beyond `size` stays put).
+    for (i in 0 until size / 2) {
+        val j = size - 1 - i
+        val tmp = paddedKernel[i]
+        paddedKernel[i] = paddedKernel[j]
+        paddedKernel[j] = tmp
+    }
     shader.setFloatUniform("uKernel", paddedKernel)
     shader.setIntUniform("uOrderX", node.orderX)
     shader.setIntUniform("uOrderY", node.orderY)

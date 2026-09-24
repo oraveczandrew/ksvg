@@ -113,13 +113,15 @@ public object KotlinKernels {
                 var b = 0f
                 var a = 0f
 
+                // SVG 1.1 §15.22: the kernel applies rotated 180° (true
+                // convolution): tap (kx, ky) takes
+                // kernel[(orderY-1-ky) * orderX + (orderX-1-kx)].
                 if (interior) {
                     for (ky in 0 until orderY) {
                         val srcRowOffset = (y + ky - targetY) * width
-                        var kernelIndex = ky * orderX
                         for (kx in 0 until orderX) {
                             val pixel = srcPixels[srcRowOffset + x + kx - targetX]
-                            val weight = kernel[kernelIndex++]
+                            val weight = kernel[(orderY - 1 - ky) * orderX + (orderX - 1 - kx)]
 
                             r += ((pixel shr 16) and 0xFF) * weight
                             g += ((pixel shr 8) and 0xFF) * weight
@@ -133,12 +135,11 @@ public object KotlinKernels {
                     for (ky in 0 until orderY) {
                         val srcY = sampleCoordinate(y + ky - targetY, height, edgeMode)
                         val srcRowOffset = if (srcY < 0) 0 else srcY * width
-                        var kernelIndex = ky * orderX
 
                         for (kx in 0 until orderX) {
                             val srcX = sampleCoordinate(x + kx - targetX, width, edgeMode)
                             val pixel = if (srcX < 0 || srcY < 0) 0 else srcPixels[srcRowOffset + srcX]
-                            val weight = kernel[kernelIndex++]
+                            val weight = kernel[(orderY - 1 - ky) * orderX + (orderX - 1 - kx)]
 
                             r += ((pixel shr 16) and 0xFF) * weight
                             g += ((pixel shr 8) and 0xFF) * weight

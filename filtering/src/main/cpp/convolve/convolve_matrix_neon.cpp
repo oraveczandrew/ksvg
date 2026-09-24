@@ -62,6 +62,7 @@ namespace Convolve {
         const float divisor, const float bias255,
         const bool preserve, const jint x, const jint y) {
         float r = 0.f, g = 0.f, b = 0.f, a = 0.f;
+        // The kernel arrives pre-flipped (see the JNI entries); taps correlate it.
         for (jint ky = 0; ky < orderY; ky++) {
             const jint srcY = sampleCoordinateNeonEdgeT<EDGE_MODE>(y + ky - targetY, height);
             for (jint kx = 0; kx < orderX; kx++) {

@@ -96,10 +96,15 @@ class GpuConvolveCorpusParityTest(
             // is accepted for uniformity with the other corpus runners.)
             val nameFilter: String? = InstrumentationRegistry.getArguments()
                 .getString("gpu_parity_filter")
+            // 1x1 images cannot exercise a filter visibly (a 3x3 sharpen of a
+            // single clamped pixel is the identity, tripping the harness's
+            // visible-effect guard on the SW reference itself). They stay in
+            // the shared corpus for the native overread parity, but not here.
+            val gpuCases = ConvolveValidationCorpus.cases.filter { it.width * it.height > 1 }
             val cases = if (nameFilter.isNullOrBlank()) {
-                ConvolveValidationCorpus.cases
+                gpuCases
             } else {
-                ConvolveValidationCorpus.cases.filter { it.name.contains(nameFilter) }
+                gpuCases.filter { it.name.contains(nameFilter) }
             }
             check(cases.isNotEmpty()) {
                 "GpuConvolveCorpusParityTest: no cases selected " +

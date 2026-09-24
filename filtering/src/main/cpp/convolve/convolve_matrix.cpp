@@ -17,6 +17,7 @@
 #include <jni.h>
 #include <cmath>
 #include <cassert>
+#include <vector>
 #include "cpu_dispatch.h"
 #include "convolve.h"
 #include "shared/math_utils.h"
@@ -44,6 +45,10 @@ void convolveScalarPixel(
         const jfloat divisor, const jfloat bias255, const bool preserve, const jint edgeMode, const jint x, const jint y) {
     float r = 0.f, g = 0.f, b = 0.f, a = 0.f;
 
+    // The kernel arrives pre-flipped for true convolution (SVG 1.1 section
+    // 15.22: kernel rotated 180 degrees); see the JNI entries below. Taps
+    // correlate the flipped array, so symmetric and asymmetric kernels alike
+    // match the spec formula.
     for (jint ky = 0; ky < orderY; ky++) {
         for (jint kx = 0; kx < orderX; kx++) {
             const jint sx = sampleCoordinate(x + kx - targetX, width, edgeMode);
@@ -157,6 +162,20 @@ jint nativeBackendForAbi() {
 
 namespace {
 
+// SVG 1.1 section 15.22 applies the kernel rotated 180 degrees (true
+// convolution); every kernel below correlates its taps, so the JNI entries
+// mirror the array once up front instead of touching the scalar, x86/ARM ASM
+// and NEON loops. The copy is orderX*orderY floats (tens of entries for real
+// filters) and never escapes this call.
+inline std::vector<jfloat> flippedKernel(const jfloat *kernel, jint orderX, jint orderY) {
+    const size_t taps = static_cast<size_t>(orderX) * static_cast<size_t>(orderY);
+    std::vector<jfloat> out(taps);
+    for (size_t i = 0; i < taps; ++i) {
+        out[i] = kernel[taps - 1 - i];
+    }
+    return out;
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_hu_oandras_ksvg_filtering_ConvolveNative_nativeBackend(
         [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz) {
@@ -182,17 +201,19 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_applyForced(
     jint *src = env->GetIntArrayElements(jSrc, nullptr);
     jint *dst = env->GetIntArrayElements(jDst, nullptr);
     jfloat *kernel = env->GetFloatArrayElements(jKernel, nullptr);
+    const std::vector<jfloat> flipped = flippedKernel(kernel, orderX, orderY);
+    const jfloat *oriented = flipped.data();
 
     if (simdBackend == SIMD_BACKEND_SCALAR) {
-        Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+        Convolve::applyScalar(src, dst, width, height, oriented, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
     } else {
 #if defined(__aarch64__) || defined(__arm__)
         assert(simdBackend == SIMD_BACKEND_NEON64 || simdBackend == SIMD_BACKEND_NEON32);
-        Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+        Convolve::applyNeonInterior(dst, src, width, height, oriented, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
 #elif defined(__i386__) || defined(__x86_64__)
-        Convolve::applyX86(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, simdBackend);
+        Convolve::applyX86(src, dst, width, height, oriented, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, simdBackend);
 #else
-        Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+        Convolve::applyScalar(src, dst, width, height, oriented, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
 #endif
     }
 
@@ -210,13 +231,15 @@ Java_hu_oandras_ksvg_filtering_ConvolveNative_apply(
     jint *src = env->GetIntArrayElements(jSrc, nullptr);
     jint *dst = env->GetIntArrayElements(jDst, nullptr);
     jfloat *kernel = env->GetFloatArrayElements(jKernel, nullptr);
+    const std::vector<jfloat> flipped = flippedKernel(kernel, orderX, orderY);
+    const jfloat *oriented = flipped.data();
 
 #if defined(__aarch64__) || defined(__arm__)
-    Convolve::applyNeonInterior(dst, src, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+    Convolve::applyNeonInterior(dst, src, width, height, oriented, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
 #elif defined(__i386__) || defined(__x86_64__)
-    Convolve::applyX86(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, -1);
+    Convolve::applyX86(src, dst, width, height, oriented, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode, -1);
 #else
-    Convolve::applyScalar(src, dst, width, height, kernel, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
+    Convolve::applyScalar(src, dst, width, height, oriented, orderX, orderY, targetX, targetY, divisor, bias, preserveAlpha, edgeMode);
 #endif
 
     env->ReleaseFloatArrayElements(jKernel, kernel, JNI_ABORT);
