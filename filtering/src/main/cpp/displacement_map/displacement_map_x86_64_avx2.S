@@ -63,8 +63,11 @@ SYM(ksvgDisplacementMapApplyAvx2):
     vmovdqa ymm11, YMMWORD PTR [rip+.Ldm_inc8]
     vmovdqa ymm10, YMMWORD PTR [rip+.Ldm_one8]
     vpxor   ymm9, ymm9, ymm9
-    vpbroadcastd ymm4, ecx
-    vpbroadcastd ymm8, r8d
+    /* vpbroadcastd ymm,r32 assembles to EVEX (SIGILL without AVX512). */
+    movd    xmm4, ecx
+    vpshufd ymm4, ymm4, 0
+    movd    xmm8, r8d
+    vpshufd ymm8, ymm8, 0
     vpsubd  ymm2, ymm4, ymm10
     vpsubd  ymm3, ymm8, ymm10
     xor     r10d, r10d
@@ -97,15 +100,17 @@ SYM(ksvgDisplacementMapApplyAvx2):
     vmulps  ymm5, ymm5, ymm15
     vcvttps2dq ymm5, ymm5
 
-    /* sx = clamp(x + dx, 0, width - 1). */
-    vpbroadcastd ymm0, r11d
+    /* sx = clamp(x + dx, 0, width - 1). Same VEX-only lowering. */
+    movd    xmm0, r11d
+    vpshufd ymm0, ymm0, 0
     vpaddd  ymm0, ymm0, ymm11
     vpaddd  ymm6, ymm0, ymm1
     vpmaxsd ymm6, ymm6, ymm9
     vpminsd ymm6, ymm6, ymm2
 
-    /* sy = clamp(y + dy, 0, height - 1). */
-    vpbroadcastd ymm0, r10d
+    /* sy = clamp(y + dy, 0, height - 1). Same VEX-only lowering. */
+    movd    xmm0, r10d
+    vpshufd ymm0, ymm0, 0
     vpaddd  ymm0, ymm0, ymm5
     vpmaxsd ymm5, ymm0, ymm9
     vpminsd ymm5, ymm5, ymm3
