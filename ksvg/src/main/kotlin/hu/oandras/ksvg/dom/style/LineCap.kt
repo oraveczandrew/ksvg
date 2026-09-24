@@ -33,7 +33,7 @@ import androidx.annotation.IntDef
     LineCap.UNSPECIFIED,
 )
 internal annotation class LineCap {
-    public companion object {
+    companion object {
         internal const val UNSPECIFIED: Int = -1
 
         internal const val BUTT: Int = 0
