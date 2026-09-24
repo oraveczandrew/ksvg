@@ -1873,11 +1873,7 @@ internal class RenderTreeBuilder(
                 }
                 FeImageRenderNode(sourceElement = primitive, image = image, referencedNode = referencedNode)
             }
-            is FeFlood -> FeFloodRenderNode(primitive).also { node ->
-                node.animationNodes = primitive.animations?.mapNotNullElements {
-                    buildAnimationNode(it)
-                }.orEmpty()
-            }
+            is FeFlood -> FeFloodRenderNode(primitive)
             is FeBlend -> FeBlendRenderNode(
                 sourceElement = primitive,
                 mode = primitive.mode,
@@ -1933,6 +1929,12 @@ internal class RenderTreeBuilder(
         node.y = primitive.y?.floatValueYInContext()
         node.width = primitive.width?.floatValueXInContext()
         node.height = primitive.height?.floatValueYInContext()
+
+        // Every primitive type carries its <animate> children (previously only
+        // feFlood did — other primitives' animations were silently dropped).
+        node.animationNodes = primitive.animations?.mapNotNullElements {
+            buildAnimationNode(it)
+        }.orEmpty()
 
         return node
     }

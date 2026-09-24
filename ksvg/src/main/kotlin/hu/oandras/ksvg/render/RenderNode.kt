@@ -194,7 +194,14 @@ internal sealed class RenderNode<T: SvgObject>(
     }
 
     internal open fun computeHasAnimations(): Boolean {
-        return animationNodes?.isNotEmpty() == true
+        if (animationNodes?.isNotEmpty() == true) return true
+        // Filter primitives carry their own <animate> children; without this
+        // the updateAnimations early-return skips the whole subtree even
+        // though FilterRenderNode.updateAnimations would apply them.
+        filterNode?.primitives?.forEachElement { primitive ->
+            if (primitive.animationNodes?.isNotEmpty() == true) return true
+        }
+        return false
     }
 
     /**
