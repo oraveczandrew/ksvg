@@ -17,3 +17,5 @@ build
 **/test-data/visual-diff/
 **/test-data/ai-helper/
 tmp/
+# Generated Dokka site (built by CI in static.yml, deployed to GitHub Pages)
+doc/
