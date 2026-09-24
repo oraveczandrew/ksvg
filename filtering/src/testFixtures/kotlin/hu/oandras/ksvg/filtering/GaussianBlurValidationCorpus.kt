@@ -141,5 +141,15 @@ public object GaussianBlurValidationCorpus {
         // F6-tiny: radius-3 kernel on sub-kernel geometry (pure edge path).
         add(Case("tiny 2x2 1.0", 2, 2, 1f, 1f,
             UnLinearizeValidationCorpus.fixedSeedRandom(2 * 2)))
+
+        // R4-narrow: widths below the NEON 4-wide fetch granularity (pw<4).
+        // The AOSP-derived NEON kernels fetch 4/16 halfwords per load, so
+        // 1px- and 3px-wide rows exercise the clamp/tail path that the
+        // overread suspicion targets; parity against the Kotlin reference
+        // proves no observable corruption on host and device alike.
+        add(Case("narrow 1x1 1.0", 1, 1, 1f, 1f,
+            UnLinearizeValidationCorpus.fixedSeedRandom(1 * 1)))
+        add(Case("narrow 3x3 1.0", 3, 3, 1f, 1f,
+            UnLinearizeValidationCorpus.fixedSeedRandom(3 * 3)))
     }
 }
