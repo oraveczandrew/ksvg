@@ -16,21 +16,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Single job definition, two legs on the same ubuntu-latest image: x64 runs
+  # the full suite against the x86_64 kernels, i386 rebuilds the host
+  # libksvgfilters with -m32 from the i386 .S kernels and runs the
+  # native-parity suites, so x86-only asm regressions fail here, not on device.
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: x64
+            java-arch: x64
+            host32bit: "false"
+            test-tasks: ":ksvg:testDebugUnitTest -PexcludeSlowTests :filtering:testDebugUnitTest :glide:testDebugUnitTest"
+            artifact: ci-test-reports
+            report-path: |
+              ksvg/build/test-results/testDebugUnitTest/
+              filtering/build/test-results/testDebugUnitTest/
+              glide/build/test-results/testDebugUnitTest/
+          - host: i386
+            java-arch: x86
+            host32bit: "true"
+            test-tasks: ":filtering:testDebugUnitTest"
+            artifact: ci-test-reports-i386
+            report-path: |
+              filtering/build/test-results/testDebugUnitTest/
     env:
       GRADLE_OPTS: -Dorg.gradle.warning.mode=none
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up JDK 17
+      - name: Set up JDK 17 (${{ matrix.host }})
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+          architecture: ${{ matrix.java-arch }}
           cache: gradle
+
+      - name: Install 32-bit multilib toolchain
+        if: matrix.host32bit == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib
 
       # ubuntu-latest images ship a preinstalled Android SDK
       # ($ANDROID_SDK_ROOT). Do NOT use android-actions/setup-android@v3
@@ -39,63 +70,19 @@ jobs:
       - name: Install SDK packages
         run: |
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          sdkmanager --install "platforms;android-37.2" "build-tools;37.0.0"
+          sdkmanager --install "platforms;android-37.2" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
           yes | sdkmanager --licenses > /dev/null
 
       - name: Assemble debug (all modules)
+        if: matrix.host32bit != 'true'
         run: ./gradlew :ksvg:assembleDebug :filtering:assembleDebug :glide:assembleDebug
 
-      - name: Fast unit tests (slow suites excluded)
-        run: ./gradlew :ksvg:testDebugUnitTest -PexcludeSlowTests :filtering:testDebugUnitTest :glide:testDebugUnitTest
+      - name: Unit tests (${{ matrix.host }})
+        run: ./gradlew ${{ matrix.test-tasks }} -Pksvg.host32bit=${{ matrix.host32bit }}
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: ci-test-reports
-          path: |
-            ksvg/build/test-results/testDebugUnitTest/
-            filtering/build/test-results/testDebugUnitTest/
-            glide/build/test-results/testDebugUnitTest/
-
-  # 32-bit Intel (i386) kernel parity: rebuilds the host libksvgfilters with
-  # -m32 from the i386 .S kernels and runs the same native-parity suites the
-  # 64-bit build exercises, so x86-only asm regressions fail here, not on device.
-  host-32bit-parity:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    env:
-      GRADLE_OPTS: -Dorg.gradle.warning.mode=none
-      KSVG_HOST_32BIT: "1"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install 32-bit multilib toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib
-
-      - name: Set up 32-bit JDK 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-          architecture: x86
-          cache: gradle
-
-      - name: Install SDK packages
-        run: |
-          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          sdkmanager --install "platforms;android-37.2" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
-          yes | sdkmanager --licenses > /dev/null
-
-      - name: 32-bit native parity tests
-        run: ./gradlew :filtering:testDebugUnitTest -Pksvg.host32bit=true
-
-      - name: Upload 32-bit test reports
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: ci-test-reports-i386
-          path: filtering/build/test-results/testDebugUnitTest/
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.report-path }}
