@@ -128,7 +128,15 @@
 #else
 #define GNU_STACK .section .note.GNU-stack,"",@progbits
 #endif
+// .addrsig is accepted by the LLVM integrated assembler (NDK/clang builds)
+// but rejected as "unknown pseudo-op" by GNU as, at least for 32-bit x86,
+// so only emit it under clang. It is purely a linker hint for
+// --gc-sections/ICF, never required for correctness.
+#if defined(__clang__)
 #define ADDRSIG .addrsig
+#else
+#define ADDRSIG
+#endif
 #define HIDE_SYM(x) .hidden SYM(x)
 #endif
 
