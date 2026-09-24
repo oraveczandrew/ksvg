@@ -31,15 +31,28 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      # ubuntu-latest images ship a preinstalled Android SDK
-      # ($ANDROID_SDK_ROOT). Do NOT use android-actions/setup-android@v3
-      # here: it installs the long-removed obsolete "tools" package and
-      # fails on current cmdline-tools ("Failed to find package 'tools'").
+      # The SDK packages live in a workspace-local directory (NOT the
+      # preinstalled $ANDROID_SDK_ROOT, which is image-provided and ephemeral)
+      # so actions/cache can persist them across runs: without the cache every
+      # run re-downloads ~GBs (mostly the NDK).
+      # Do NOT use android-actions/setup-android@v3 here: it installs the
+      # long-removed obsolete "tools" package and fails on current
+      # cmdline-tools ("Failed to find package 'tools'").
+      - name: Cache Android SDK packages
+        uses: actions/cache@v5
+        with:
+          path: .ci-android-sdk
+          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1
+
       - name: Install SDK packages
         run: |
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          sdkmanager --install "platforms;android-37.2" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
-          yes | sdkmanager --licenses > /dev/null
+          sdkmanager --sdk_root="$GITHUB_WORKSPACE/.ci-android-sdk" --install "platforms;android-37.2" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
+          yes | sdkmanager --sdk_root="$GITHUB_WORKSPACE/.ci-android-sdk" --licenses > /dev/null
+          # Point all later steps (Gradle/AGP) at the workspace SDK. CI-only:
+          # local checkouts keep using local.properties.
+          echo "ANDROID_SDK_ROOT=$GITHUB_WORKSPACE/.ci-android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$GITHUB_WORKSPACE/.ci-android-sdk" >> "$GITHUB_ENV"
 
       # Host unit tests, incl. the filtering native-parity suites (x86_64
       # libksvgfilters is built by the buildHostNativeLib task dependency).
