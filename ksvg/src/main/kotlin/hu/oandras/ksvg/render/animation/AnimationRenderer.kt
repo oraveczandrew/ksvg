@@ -25,6 +25,7 @@ import hu.oandras.ksvg.dom.animation.CalcMode
 import hu.oandras.ksvg.dom.animation.TransformType
 import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.HasTransform
+import hu.oandras.ksvg.dom.core.PathDefinition
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.dom.shapes.CircleShape
 import hu.oandras.ksvg.dom.shapes.EllipseShape
@@ -51,6 +52,7 @@ import hu.oandras.ksvg.render.updatePathAndBoundingBox
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.argb
 import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.CubicBezier
 import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.forEachElement
@@ -190,7 +192,8 @@ internal fun updatePathAndBoundingBox(
                 animatedPoints = buf
             }
         } else if (anim is AnimatePathNode && anim.attributeName == SVGAttr.points) {
-            if (anim.withPathAt(animationTimeMs, outPath)) {
+            // No PathDefinition base for point-list targets: to-only stays frozen.
+            if (anim.withPathAt(animationTimeMs, outPath, null)) {
                 pathChanged = true
             }
         }
@@ -222,7 +225,7 @@ internal fun updatePathAndBoundingBox(
     var dChanged = false
     node.animationNodes?.forEachElement { anim ->
         if (anim is AnimatePathNode && anim.attributeName == SVGAttr.d) {
-            if (anim.withPathAt(animationTimeMs, outPath)) {
+            if (anim.withPathAt(animationTimeMs, outPath, obj.d)) {
                 dChanged = true
             }
         }
@@ -342,8 +345,31 @@ internal fun applyAnimatedStyle(
 
             is AnimateDashArrayNode -> {
                 val out = animation.dashBuffer
-                if (animation.withDashArrayAt(renderContext.animationTimeMs, out)) {
-                    if (animation.additiveSum) {
+                // Base lanes for baseRelative nodes: the resolved array when
+                // present, else the lengths resolved into the node's reusable
+                // buffer (amortized one-time allocation, never per frame).
+                val resolvedBase = builder.strokeDashArrayResolved
+                val base: FloatArray?
+                val baseLen: Int
+                if (resolvedBase != null) {
+                    base = resolvedBase
+                    baseLen = resolvedBase.size
+                } else {
+                    val lengths = builder.strokeDashArray
+                    if (lengths != null) {
+                        val buf = animation.baseBufferFor(lengths.size)
+                        for (i in lengths.indices) buf[i] = lengths[i].floatValueInContext()
+                        base = buf
+                        baseLen = lengths.size
+                    } else {
+                        base = null
+                        baseLen = 0
+                    }
+                }
+                if (animation.withDashArrayAt(renderContext.animationTimeMs, out, base, baseLen)) {
+                    // Base-relative nodes already include the base per the
+                    // additive rules; the top-up below is only for frozen pairs.
+                    if (animation.additiveSum && !animation.baseRelative) {
                         val baseDashResolved = builder.strokeDashArrayResolved
                         if (baseDashResolved != null) {
                             for (i in out.indices) {
@@ -836,13 +862,54 @@ internal fun AnimateTransformNode.toMatrix(animationTimeMs: Long, out: Matrix): 
     }
 }
 
-internal fun AnimateDashArrayNode.withDashArrayAt(animationTimeMs: Long, out: FloatArray): Boolean {
+/**
+ * Eased 0..1 ramp for base-relative (to-only/by-only) animations: spline
+ * easing applies to the overall progress exactly as `selectAnimationSegment`
+ * would ease a two-point ramp with null keyTimes.
+ */
+internal fun easedBaseProgress(calcMode: CalcMode, parsedKeySplines: List<CubicBezier>?, progress: Float): Float {
+    return if (calcMode == CalcMode.spline && !parsedKeySplines.isNullOrEmpty()) {
+        applySplineInterpolation(progress, parsedKeySplines[0])
+    } else {
+        progress
+    }
+}
+
+internal fun AnimateDashArrayNode.withDashArrayAt(
+    animationTimeMs: Long,
+    out: FloatArray,
+    base: FloatArray?,
+    baseLen: Int,
+): Boolean {
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return false
 
     if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return false
 
     val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+
+    if (baseRelative) {
+        // SMIL to-only / by-only resolve against the base dash at apply time
+        // (the float/color baseRelative pattern). Lanes cycle like
+        // normalizeDashArrays; no allocation (reads go straight into `out`).
+        val p = if (calcMode == CalcMode.discrete) 1f else easedBaseProgress(calcMode, parsedKeySplines, progress)
+        val lanes = effectiveValues
+        if (baseRelativeIsBy) {
+            for (i in 0 until stride) {
+                val baseLane = if (base != null) base[i % baseLen] else 0f
+                out[i] = baseLane + lanes[i] * p
+            }
+        } else if (base == null) {
+            // No base dash (solid line): freeze at `to`.
+            for (i in 0 until stride) out[i] = lanes[i]
+        } else if (additiveSum) {
+            for (i in 0 until stride) out[i] = base[i % baseLen] + lanes[i] * p
+        } else {
+            for (i in 0 until stride) out[i] = interpolate(base[i % baseLen], lanes[i], p)
+        }
+        return true
+    }
+
     val effectiveKeyTimes = if (calcMode == CalcMode.paced) pacedKeyTimes ?: keyTimes else keyTimes
 
     when (calcMode) {
@@ -891,7 +958,7 @@ internal fun AnimateFloatNode.withPointsAt(animationTimeMs: Long, stride: Int, o
     return true
 }
 
-internal fun AnimatePathNode.withPathAt(animationTimeMs: Long, outPath: Path): Boolean {
+internal fun AnimatePathNode.withPathAt(animationTimeMs: Long, outPath: Path, base: PathDefinition?): Boolean {
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return false
 
@@ -901,6 +968,17 @@ internal fun AnimatePathNode.withPathAt(animationTimeMs: Long, outPath: Path): B
     val values = effectiveValues
     val count = values.size
     if (count == 0) return false
+
+    if (baseRelative && calcMode != CalcMode.discrete && base != null) {
+        // SMIL to-only: ramp base→to at apply time (the float/color
+        // baseRelative pattern). Mismatched structures fall back to a discrete
+        // switch inside enumerateInterpolated, so any base is safe.
+        val p = easedBaseProgress(calcMode, parsedKeySplines, progress)
+        outPath.reset()
+        pathAppender.target = outPath
+        base.enumerateInterpolated(values[0], p, pathAppender)
+        return true
+    }
 
     outPath.reset()
     pathAppender.target = outPath

@@ -179,6 +179,14 @@ internal class AnimatePathNode(
     val effectiveValues: List<PathDefinition>,
     @JvmField
     val parsedKeySplines: List<CubicBezier>? = null,
+    /**
+     * True for SMIL `to`-only animation (non-discrete): `effectiveValues` holds
+     * `[to, to]` and the ramp resolves against the base path at apply time
+     * (see `withPathAt`). Discrete `to`-only stays frozen at `to`.
+     * (`AnimatePath` has no `by`, so there is no by-only form.)
+     */
+    @JvmField
+    val baseRelative: Boolean = false,
 ) : AnimationNode(sourceElement) {
     @JvmField
     val pathAppender = PathAppender()
@@ -214,8 +222,28 @@ internal class AnimateDashArrayNode(
     @JvmField
     val parsedKeySplines: List<CubicBezier>? = null,
     @JvmField
-    val pacedKeyTimes: FloatList? = null
+    val pacedKeyTimes: FloatList? = null,
+    /**
+     * True for SMIL `to`-only / `by`-only animation (non-discrete): the
+     * endpoint ramps against the base dash array at apply time (see
+     * `withDashArrayAt`), mirroring the float/color `baseRelative` pattern.
+     * With [baseRelativeIsBy] the lanes are `base + by * p`, otherwise
+     * `lerp(base, to, p)` (or `base + to * p` for additive="sum").
+     * Discrete stays frozen (p = 1).
+     */
+    @JvmField
+    val baseRelative: Boolean = false,
+    @JvmField
+    val baseRelativeIsBy: Boolean = false,
 ) : AnimationNode(sourceElement) {
     @JvmField
     val dashBuffer = FloatArray(stride)
+
+    private var baseBuffer: FloatArray = FloatArray(0)
+
+    /** Reusable base-lane buffer (see `withDashArrayAt`); grows on demand. */
+    internal fun baseBufferFor(size: Int): FloatArray {
+        if (baseBuffer.size < size) baseBuffer = FloatArray(size)
+        return baseBuffer
+    }
 }

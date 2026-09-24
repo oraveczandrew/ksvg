@@ -683,11 +683,19 @@ internal class RenderTreeBuilder(
             }
 
             is AnimatePath -> {
+                var baseRelative = false
                 val effectiveValues = animation.values ?: run {
                     val fromVal = animation.from
                     val toVal = animation.to
                     when {
                         fromVal != null && toVal != null -> listOf(fromVal, toVal)
+                        // to-only interpolates base→to at apply time (the
+                        // float/color baseRelative pattern); discrete freezes
+                        // at `to`. AnimatePath has no `by` by design.
+                        toVal != null && animation.calcMode != CalcMode.discrete -> {
+                            baseRelative = true
+                            listOf(toVal, toVal)
+                        }
                         toVal != null -> listOf(toVal, toVal)
                         else -> null
                     }
@@ -697,6 +705,7 @@ internal class RenderTreeBuilder(
                     sourceElement = animation,
                     effectiveValues = effectiveValues,
                     parsedKeySplines = if (animation.calcMode == CalcMode.spline) parseKeySplines(animation.keySplines) else null,
+                    baseRelative = baseRelative,
                 )
             }
 
@@ -778,10 +787,13 @@ internal class RenderTreeBuilder(
 
             is AnimateDashArray -> {
                 var animationStride = 0
+                var baseRelative = false
+                var baseRelativeIsBy = false
                 val effectiveValues = animation.values ?: run {
                     val fromVal = animation.from
                     val toVal = animation.to
                     val byVal = animation.by
+                    val discrete = animation.calcMode == CalcMode.discrete
                     when {
                         fromVal != null && toVal != null -> {
                             val keyframes = listOf(fromVal, toVal)
@@ -796,6 +808,26 @@ internal class RenderTreeBuilder(
                                 result[i] = fromVal[i] + byVal[i]
                             }
                             val keyframes = listOf(fromVal, result)
+                            val (s, normalized) = normalizeDashArrays(keyframes)
+                            animationStride = s
+                            normalized
+                        }
+
+                        // SMIL to-only / by-only resolve against the base dash
+                        // at apply time (the float/color baseRelative pattern).
+                        // Discrete stays frozen (p = 1 at apply time).
+                        byVal != null -> {
+                            baseRelative = true
+                            baseRelativeIsBy = true
+                            val keyframes = listOf(byVal, byVal)
+                            val (s, normalized) = normalizeDashArrays(keyframes)
+                            animationStride = s
+                            normalized
+                        }
+
+                        toVal != null && !discrete -> {
+                            baseRelative = true
+                            val keyframes = listOf(toVal, toVal)
                             val (s, normalized) = normalizeDashArrays(keyframes)
                             animationStride = s
                             normalized
@@ -821,7 +853,9 @@ internal class RenderTreeBuilder(
                     pacedKeyTimes = if (animation.calcMode == CalcMode.paced && animation.keyTimes == null) computePacedKeyTimesDashArray(
                         effectiveValues,
                         effectiveStride
-                    ) else null
+                    ) else null,
+                    baseRelative = baseRelative,
+                    baseRelativeIsBy = baseRelativeIsBy,
                 )
             }
         }
