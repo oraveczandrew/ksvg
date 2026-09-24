@@ -58,8 +58,21 @@ jobs:
       - name: Install SDK packages
         run: |
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          sdkmanager --sdk_root="$GITHUB_WORKSPACE/.ci-android-sdk" --install "platforms;android-37.2" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
-          yes | sdkmanager --sdk_root="$GITHUB_WORKSPACE/.ci-android-sdk" --licenses > /dev/null
+          # Fast path: the cache already delivered every package. sdkmanager
+          # re-downloads them anyway when it cannot parse another image's
+          # metadata, so directory presence — not sdkmanager's verdict — is
+          # the check (AGP/CMake/NDK never read that metadata).
+          SDK="$GITHUB_WORKSPACE/.ci-android-sdk"
+          MISSING=0
+          for p in "platforms/android-37*" "build-tools/37.0.0" "ndk/29.0.14206865" "cmake/3.22.1"; do
+            if ! compgen -G "$SDK/$p" > /dev/null; then echo "missing: $p"; MISSING=1; fi
+          done
+          if [ "$MISSING" = "1" ]; then
+            sdkmanager --sdk_root="$SDK" --install "platforms;android-37.2" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
+          else
+            echo "all SDK packages present, skipping sdkmanager install"
+          fi
+          yes | sdkmanager --sdk_root="$SDK" --licenses > /dev/null
           echo "ANDROID_SDK_ROOT=$GITHUB_WORKSPACE/.ci-android-sdk" >> "$GITHUB_ENV"
           echo "ANDROID_HOME=$GITHUB_WORKSPACE/.ci-android-sdk" >> "$GITHUB_ENV"
 
