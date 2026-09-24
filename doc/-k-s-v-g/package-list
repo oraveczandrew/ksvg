@@ -26,49 +26,6 @@ $dokka.location:hu.oandras.ksvg.dom.filter/ColorInterpolation.Companion/LINEAR_R
 $dokka.location:hu.oandras.ksvg.dom.filter/ColorInterpolation.Companion/SRGB/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.filter/-color-interpolation/-companion/-s-r-g-b.html
 $dokka.location:hu.oandras.ksvg.dom.filter/ColorInterpolation.Companion/UNSPECIFIED/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.filter/-color-interpolation/-companion/-u-n-s-p-e-c-i-f-i-e-d.html
 $dokka.location:hu.oandras.ksvg.dom.filter/ColorInterpolation///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.filter/-color-interpolation/index.html
-$dokka.location:hu.oandras.ksvg.dom.style////PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/index.html
-$dokka.location:hu.oandras.ksvg.dom.style/FillRule.Companion///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-fill-rule/-companion/index.html
-$dokka.location:hu.oandras.ksvg.dom.style/FillRule.Companion/EVEN_ODD/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-fill-rule/-companion/-e-v-e-n_-o-d-d.html
-$dokka.location:hu.oandras.ksvg.dom.style/FillRule.Companion/NON_ZERO/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-fill-rule/-companion/-n-o-n_-z-e-r-o.html
-$dokka.location:hu.oandras.ksvg.dom.style/FillRule.Companion/UNSPECIFIED/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-fill-rule/-companion/-u-n-s-p-e-c-i-f-i-e-d.html
-$dokka.location:hu.oandras.ksvg.dom.style/FillRule///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-fill-rule/index.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineCap.Companion///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-cap/-companion/index.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineCap.Companion/BUTT/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-cap/-companion/-b-u-t-t.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineCap.Companion/ROUND/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-cap/-companion/-r-o-u-n-d.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineCap.Companion/SQUARE/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-cap/-companion/-s-q-u-a-r-e.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineCap.Companion/UNSPECIFIED/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-cap/-companion/-u-n-s-p-e-c-i-f-i-e-d.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineCap///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-cap/index.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineJoin.Companion///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-join/-companion/index.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineJoin.Companion/BEVEL/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-join/-companion/-b-e-v-e-l.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineJoin.Companion/MITER/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-join/-companion/-m-i-t-e-r.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineJoin.Companion/ROUND/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-join/-companion/-r-o-u-n-d.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineJoin.Companion/UNSPECIFIED/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-join/-companion/-u-n-s-p-e-c-i-f-i-e-d.html
-$dokka.location:hu.oandras.ksvg.dom.style/LineJoin///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-line-join/index.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/index.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/FILL/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-f-i-l-l.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/FILL_MARKERS_STROKE/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-f-i-l-l_-m-a-r-k-e-r-s_-s-t-r-o-k-e.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/FILL_STROKE_MARKERS/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-f-i-l-l_-s-t-r-o-k-e_-m-a-r-k-e-r-s.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/MARKERS/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-m-a-r-k-e-r-s.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/MARKERS_FILL_STROKE/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-m-a-r-k-e-r-s_-f-i-l-l_-s-t-r-o-k-e.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/MARKERS_STROKE_FILL/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-m-a-r-k-e-r-s_-s-t-r-o-k-e_-f-i-l-l.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/STROKE/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-s-t-r-o-k-e.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/STROKE_FILL_MARKERS/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-s-t-r-o-k-e_-f-i-l-l_-m-a-r-k-e-r-s.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/STROKE_MARKERS_FILL/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-s-t-r-o-k-e_-m-a-r-k-e-r-s_-f-i-l-l.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/UNSPECIFIED/#/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/-u-n-s-p-e-c-i-f-i-e-d.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder.Companion/parse/#kotlin.String/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/-companion/parse.html
-$dokka.location:hu.oandras.ksvg.dom.style/PaintOrder///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.dom.style/-paint-order/index.html
-$dokka.location:hu.oandras.ksvg.render////PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/index.html
-$dokka.location:hu.oandras.ksvg.render//withClip/android.graphics.Canvas#android.graphics.Path#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-clip.html
-$dokka.location:hu.oandras.ksvg.render//withClip/android.graphics.Canvas#android.graphics.Rect#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-clip.html
-$dokka.location:hu.oandras.ksvg.render//withClip/android.graphics.Canvas#android.graphics.RectF#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-clip.html
-$dokka.location:hu.oandras.ksvg.render//withClip/android.graphics.Canvas#kotlin.Float#kotlin.Float#kotlin.Float#kotlin.Float#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-clip.html
-$dokka.location:hu.oandras.ksvg.render//withClip/android.graphics.Canvas#kotlin.Int#kotlin.Int#kotlin.Int#kotlin.Int#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-clip.html
-$dokka.location:hu.oandras.ksvg.render//withMatrix/android.graphics.Canvas#android.graphics.Matrix#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-matrix.html
-$dokka.location:hu.oandras.ksvg.render//withRotation/android.graphics.Canvas#kotlin.Float#kotlin.Float#kotlin.Float#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-rotation.html
-$dokka.location:hu.oandras.ksvg.render//withSave/android.graphics.Canvas#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-save.html
-$dokka.location:hu.oandras.ksvg.render//withScale/android.graphics.Canvas#kotlin.Float#kotlin.Float#kotlin.Float#kotlin.Float#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-scale.html
-$dokka.location:hu.oandras.ksvg.render//withSkew/android.graphics.Canvas#kotlin.Float#kotlin.Float#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-skew.html
-$dokka.location:hu.oandras.ksvg.render//withTranslation/android.graphics.Canvas#kotlin.Float#kotlin.Float#kotlin.Function1[android.graphics.Canvas,kotlin.Unit]/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg.render/with-translation.html
 $dokka.location:hu.oandras.ksvg////PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg/index.html
 $dokka.location:hu.oandras.ksvg/AndroidLoggerContext///PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg/-android-logger-context/index.html
 $dokka.location:hu.oandras.ksvg/AndroidLoggerContext/isLoggable/#kotlin.String#kotlin.Int/PointingToDeclaration/-k-s-v-g/hu.oandras.ksvg/-android-logger-context/is-loggable.html
@@ -241,5 +198,3 @@ hu.oandras.ksvg
 hu.oandras.ksvg.css
 hu.oandras.ksvg.dom.core
 hu.oandras.ksvg.dom.filter
-hu.oandras.ksvg.dom.style
-hu.oandras.ksvg.render
