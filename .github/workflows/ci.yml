@@ -39,7 +39,7 @@ jobs:
       - name: Install SDK packages
         run: |
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          sdkmanager --install "platforms;android-37" "build-tools;37.0.0"
+          sdkmanager --install "platforms;android-37.2" "build-tools;37.0.0"
           yes | sdkmanager --licenses > /dev/null
 
       - name: Assemble debug (all modules)
