@@ -361,6 +361,49 @@ tasks.register<JacocoReport>("jacocoTestReport") {
     })
 }
 
+tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    description = "Fails the build when :ksvg unit-test coverage drops below the ratchet."
+    group = "Verification"
+    dependsOn("testDebugUnitTest")
+
+    // Same class/execution inputs as jacocoTestReport above; keep in sync.
+    val fileFilter = listOf(
+        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*", "**/*Test*.*", "android/**/*.*"
+    )
+
+    val kotlinClasses = fileTree("${layout.buildDirectory.get()}/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes") {
+        exclude(fileFilter)
+    }
+    val javaClasses = fileTree("${layout.buildDirectory.get()}/intermediates/javac/debug/compileDebugJavaWithJavac/classes") {
+        exclude(fileFilter)
+    }
+
+    sourceDirectories.setFrom(files("${project.projectDir}/src/main/kotlin", "${project.projectDir}/src/main/java"))
+    classDirectories.setFrom(files(kotlinClasses, javaClasses))
+    executionData.setFrom(fileTree(layout.buildDirectory.get()) {
+        include(
+            "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec",
+            "jacoco/testDebugUnitTest.exec"
+        )
+    })
+
+    // Ratchet just under the measured level (LINE ~75%, BRANCH ~58% as of the
+    // coverage round): normal PRs pass with headroom, large drops fail loudly.
+    // Raise together with real coverage gains, never lower to fit a PR.
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                minimum = "0.70".toBigDecimal()
+            }
+            limit {
+                counter = "BRANCH"
+                minimum = "0.50".toBigDecimal()
+            }
+        }
+    }
+}
+
 afterEvaluate {
     val publishing = extensions.getByType<PublishingExtension>()
     publishing.publications.getByName<MavenPublication>("mavenAAR").apply {

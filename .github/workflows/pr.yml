@@ -52,6 +52,11 @@ jobs:
       - name: Coverage report
         run: ./gradlew :ksvg:jacocoTestReport
 
+      # Numeric ratchet (LINE 0.70 / BRANCH 0.50): fails on large coverage
+      # drops. Raise together with real gains, never lower to fit a PR.
+      - name: Coverage gate
+        run: ./gradlew :ksvg:jacocoTestCoverageVerification
+
       # Signing guard: release assembly must succeed with NO signing secrets
       # configured (signing only runs on publish, never on the PR path).
       # No signing.* properties or key files are provided here on purpose.
