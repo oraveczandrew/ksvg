@@ -47,7 +47,17 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .ci-android-sdk
-          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1
+          # Trailing -vN is a manual epoch: bump it whenever the package list
+          # changes OR a run restores the cache yet sdkmanager re-downloads
+          # everything anyway (a stale blob pins itself on exact-match hits).
+          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1-v2
+
+      # Lists what the restore actually delivered (partial vs. unrecognized).
+      - name: Inspect restored SDK cache
+        run: |
+          du -sh .ci-android-sdk 2>/dev/null || echo "no .ci-android-sdk directory"
+          ls .ci-android-sdk 2>/dev/null || true
+          du -sh .ci-android-sdk/platforms .ci-android-sdk/build-tools .ci-android-sdk/ndk .ci-android-sdk/cmake 2>/dev/null || true
 
       - name: Install SDK packages
         run: |

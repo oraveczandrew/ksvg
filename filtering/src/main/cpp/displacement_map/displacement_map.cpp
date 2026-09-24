@@ -100,7 +100,13 @@ void runForced(const jint* src, const jint* map, jint* dst, int width, int heigh
                 applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
                 break;
             case SIMD_BACKEND_SSE2:
-                ksvgDisplacementMapApplySsse3(src, map, dst, width, height, scale, xChannel, yChannel);
+                // The SSE2-named vector row is an SSSE3 kernel; without SSSE3
+                // stay scalar instead of faulting (baseline x86-64 is SSE2).
+                if (detectSimdLevel() >= SIMD_SSSE3) {
+                    ksvgDisplacementMapApplySsse3(src, map, dst, width, height, scale, xChannel, yChannel);
+                } else {
+                    applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
+                }
                 break;
             case SIMD_BACKEND_AVX2:
                 ksvgDisplacementMapApplyAvx2(src, map, dst, width, height, scale, xChannel, yChannel);
@@ -215,8 +221,12 @@ Java_hu_oandras_ksvg_filtering_DisplacementMapNative_apply(
         const SimdLevel level = detectSimdLevel();
         if (level >= SIMD_AVX2) {
             ksvgDisplacementMapApplyAvx2(src, map, dst, width, height, scale, xChannel, yChannel);
-        } else {
+        } else if (level >= SIMD_SSSE3) {
             ksvgDisplacementMapApplySsse3(src, map, dst, width, height, scale, xChannel, yChannel);
+        } else {
+            // Baseline x86-64 is SSE2, not SSSE3: without SSSE3 stay
+            // scalar instead of faulting.
+            applyScalar(src, map, dst, width, height, mapWidth, mapHeight, scale, xChannel, yChannel);
         }
 #elif defined(__i386__)
         const SimdLevel level = detectSimdLevel();

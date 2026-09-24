@@ -194,18 +194,30 @@ Java_hu_oandras_ksvg_filtering_ArithmeticCompositeNative_applyNative(
         applyArithmeticNeon(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                             k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
 #elif defined(__x86_64__) || defined(_M_X64)
+        // The hand-written vector row is SSSE3-class ("Sse" naming is
+        // historical); without SSSE3 stay scalar instead of faulting
+        // (baseline x86-64 is SSE2, not SSSE3).
+        const SimdLevel level = detectSimdLevel();
         if (useLinear == JNI_TRUE) {
             // Linear light runs on the hand-written SSSE3 kernel: the AVX2 kernel's
             // 16-segment LUT spills its register file in linear mode and ends up
             // no faster than SSSE3.
-            ksvgArithmeticApplySse(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
-                                   k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
-        } else if (detectSimdLevel() >= SIMD_AVX2) {
+            if (level >= SIMD_SSSE3) {
+                ksvgArithmeticApplySse(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                       k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+            } else {
+                applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                      k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+            }
+        } else if (level >= SIMD_AVX2) {
             ksvgArithmeticApplyAvx2(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                    k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
-        } else {
+        } else if (level >= SIMD_SSSE3) {
             ksvgArithmeticApplySse(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                  k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
+        } else {
+            applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                  k1, k2, k3, k4, useLinear, srgbToLinear, linearToSrgb);
         }
 #else
         applyArithmeticScalar(src1, src2, dst, width, clipLeft, clipTop, clipRight, clipBottom,

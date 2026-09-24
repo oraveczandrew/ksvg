@@ -35,6 +35,11 @@ jobs:
       # preinstalled $ANDROID_SDK_ROOT, which is image-provided and ephemeral)
       # so actions/cache can persist them across runs: without the cache every
       # run re-downloads ~GBs (mostly the NDK).
+      # The trailing -vN suffix is a manual epoch: bump it whenever the
+      # package list changes OR a run restores the cache yet sdkmanager
+      # re-downloads everything anyway (a stale/partial blob pins itself
+      # forever on exact-match hits, so it must be abandoned, never
+      # repaired in place).
       # Do NOT use android-actions/setup-android@v3 here: it installs the
       # long-removed obsolete "tools" package and fails on current
       # cmdline-tools ("Failed to find package 'tools'").
@@ -42,7 +47,17 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .ci-android-sdk
-          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1
+          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1-v2
+
+      # The SDK cache has silently gone stale before (hit + full re-download
+      # of NDK/build-tools/platform). This lists what the restore actually
+      # delivered, so the log shows whether the blob is partial or merely
+      # unrecognized by this image's sdkmanager.
+      - name: Inspect restored SDK cache
+        run: |
+          du -sh .ci-android-sdk 2>/dev/null || echo "no .ci-android-sdk directory"
+          ls .ci-android-sdk 2>/dev/null || true
+          du -sh .ci-android-sdk/platforms .ci-android-sdk/build-tools .ci-android-sdk/ndk .ci-android-sdk/cmake 2>/dev/null || true
 
       - name: Install SDK packages
         run: |
@@ -53,6 +68,13 @@ jobs:
           # local checkouts keep using local.properties.
           echo "ANDROID_SDK_ROOT=$GITHUB_WORKSPACE/.ci-android-sdk" >> "$GITHUB_ENV"
           echo "ANDROID_HOME=$GITHUB_WORKSPACE/.ci-android-sdk" >> "$GITHUB_ENV"
+
+      - name: Log runner CPU and JVM identity
+        run: |
+          java -version 2>&1
+          grep -m1 'model name' /proc/cpuinfo
+          grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep -E 'sse|avx|fma|bmi|xsave|osxsave' | sort -u | tr '\n' ' '
+          echo
 
       # Host unit tests, incl. the filtering native-parity suites (x86_64
       # libksvgfilters is built by the buildHostNativeLib task dependency).
@@ -87,6 +109,9 @@ jobs:
             ksvg/build/test-results/testDebugUnitTest/
             filtering/build/test-results/testDebugUnitTest/
             glide/build/test-results/testDebugUnitTest/
+            filtering/hs_err_pid*.log
+            ksvg/hs_err_pid*.log
+            glide/hs_err_pid*.log
 
       - name: Upload coverage report
         if: always()
