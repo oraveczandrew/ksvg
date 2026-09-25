@@ -55,6 +55,18 @@ TYPE(SYM(ksvgDisplacementMapApplyNeon64), %function)
     SYM(\name):
     cbz     w3, .Lret_\name
     cbz     w4, .Lret_\name
+    /* Spill everything callee-saved this kernel touches (AAPCS64): x20-x22
+    (width mask/bounds) and d8-d15 (v8-v15 lanes). 80-byte frame keeps the
+    16-byte stack alignment. Without this the caller's registers die here and
+    the crash surfaces far away (observed: SIGSEGV in JNIHandles::resolve on
+    the NEXT test). */
+    sub     sp, sp, #80
+    stp     x20, x21, [sp, #0]
+    str     x22, [sp, #16]
+    stp     d8, d9, [sp, #24]
+    stp     d10, d11, [sp, #40]
+    stp     d12, d13, [sp, #56]
+    stp     d14, d15, [sp, #72]
     /* Constants / invariants. */
     dup     v0.4s, v0.s[0]  // scale
     fmov    v1.4s, #0.5
@@ -201,6 +213,13 @@ TYPE(SYM(ksvgDisplacementMapApplyNeon64), %function)
     add     w12, w12, #1
     b.ne    .Lrow_\name
 
+    ldp     d14, d15, [sp, #72]
+    ldp     d12, d13, [sp, #56]
+    ldp     d10, d11, [sp, #40]
+    ldp     d8, d9, [sp, #24]
+    ldr     x22, [sp, #16]
+    ldp     x20, x21, [sp, #0]
+    add     sp, sp, #80
     ret
 
 .Lret_\name:
