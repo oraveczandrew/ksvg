@@ -183,8 +183,10 @@ jobs:
       - name: Log runner CPU and JVM identity
         run: |
           java -version 2>&1
-          grep -m1 'model name' /proc/cpuinfo
-          grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep -E 'sse|avx|fma|bmi|xsave|osxsave|neon|asimd|sve' | sort -u | tr '\n' ' '
+          # ARM cpuinfo has neither `model name` nor `flags` (it shows CPU
+          # part / Features instead); the `|| true` keeps this step green.
+          grep -m1 -E 'model name|CPU part' /proc/cpuinfo || true
+          grep -m1 -E '^(flags|Features)' /proc/cpuinfo | tr ' ' '\n' | grep -E 'sse|avx|fma|bmi|xsave|osxsave|neon|asimd|sve' | sort -u | tr '\n' ' ' || true
           echo
           # vsyscall mode decides whether a 32-bit JVM can start at all.
           grep -o 'vsyscall[^ ]*' /proc/cmdline 2>/dev/null || echo "no vsyscall boot param"
