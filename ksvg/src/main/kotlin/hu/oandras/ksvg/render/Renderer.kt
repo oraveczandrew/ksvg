@@ -19,6 +19,8 @@
 package hu.oandras.ksvg.render
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -32,6 +34,7 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.RadialGradient
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Shader.TileMode
 import android.os.Build
 import hu.oandras.ksvg.BuildConfig
@@ -103,9 +106,19 @@ import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 
 private val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean  = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S // Android 12
+
+/**
+ * Bake raster cap (long side, px) for the API < 31 focal-gradient fallback.
+ * Bounds one-time memory (~1 MB worst case) and bake cost; larger rects
+ * upscale bilinearly, still far closer to the reference than the centered
+ * fallback.
+ */
+private const val FOCAL_BAKE_MAX_SIZE: Int = 512
 
 /*
  * The rendering part of KSVG.
@@ -1887,35 +1900,38 @@ internal class Renderer internal constructor(
         val _cx: Float
         val _cy: Float
         val _r: Float
-        var _fx = 0f
-        var _fy = 0f
-        var _fr = 0f
+        // Focal point is always resolved (it keys updateGeometry); only its
+        // USE is version-gated (platform two-point constructor vs bake below).
+        val _fx: Float
+        val _fy: Float
+        val _fr: Float
         if (userUnits) {
             _cx = gradient.cx?.floatValueXInContext() ?: CSSLength.PERCENT_50.floatValueXInContext()
             _cy = gradient.cy?.floatValueYInContext() ?: CSSLength.PERCENT_50.floatValueYInContext()
             _r = gradient.r?.floatValueInContext() ?: CSSLength.PERCENT_50.floatValueInContext()
 
-            if (SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS) {
-                _fx = gradient.fx?.floatValueXInContext() ?: _cx
-                _fy = gradient.fy?.floatValueYInContext() ?: _cy
-                _fr = gradient.fr?.floatValueInContext() ?: 0f
-            }
+            _fx = gradient.fx?.floatValueXInContext() ?: _cx
+            _fy = gradient.fy?.floatValueYInContext() ?: _cy
+            _fr = gradient.fr?.floatValueInContext() ?: 0f
         } else {
             _cx = gradient.cx?.floatValueInContext(1f) ?: 0.5f
             _cy = gradient.cy?.floatValueInContext(1f) ?: 0.5f
             _r = gradient.r?.floatValueInContext(1f) ?: 0.5f
 
-            if (SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS) {
-                // Per spec, fx/fy default to the gradient center (not 0.5), even in
-                // objectBoundingBox mode where cx/cy may have explicit non-default values.
-                _fx = gradient.fx?.floatValueInContext(1f) ?: _cx
-                _fy = gradient.fy?.floatValueInContext(1f) ?: _cy
-                _fr = gradient.fr?.floatValueInContext(1f) ?: 0f
-            }
+            // Per spec, fx/fy default to the gradient center (not 0.5), even in
+            // objectBoundingBox mode where cx/cy may have explicit non-default values.
+            _fx = gradient.fx?.floatValueInContext(1f) ?: _cx
+            _fy = gradient.fy?.floatValueInContext(1f) ?: _cy
+            _fr = gradient.fr?.floatValueInContext(1f) ?: 0f
         }
 
-        // fx and fy are ignored because Android RadialGradient doesn't support a
-        // 'focus' point that is different from cx,cy.
+        // API < 31 focal fallback: the platform single-center RadialGradient
+        // cannot express an off-center focal point (or focal radius), so such
+        // objectBoundingBox gradients are rasterized into a bitmap once per
+        // change (bakeFocalGradient) instead of falling back to centered.
+        // Centered gradients keep the fast platform path on every API level.
+        val needsFocalBake = !SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS && !userUnits &&
+            (_fx != _cx || _fy != _cy || _fr != 0f)
 
         // Push the state
         statePush(canvas)
@@ -2000,7 +2016,8 @@ internal class Renderer internal constructor(
                 // storage (extra pack pass, no allocation).
                 val effColors: GradientColorArray
                 val effPositions: FloatArray
-                if (needsDensify(straightColors, numStops)) {
+                val densified = needsDensify(straightColors, numStops)
+                if (densified) {
                     val m = denseCount(numStops)
                     var dense = resolved.denseColors
                     if (dense == null || dense.size != m) {
@@ -2038,36 +2055,57 @@ internal class Renderer internal constructor(
 
                 // Create shader instance
                 val prevGradient = resolved.shader
+                // Bake size keys the bitmap raster only; the platform-shader
+                // path is resolution-independent and ignores it.
+                val bakeW = if (needsFocalBake) {
+                    boundingBox.width.roundToInt().coerceIn(1, FOCAL_BAKE_MAX_SIZE)
+                } else {
+                    0
+                }
+                val bakeH = if (needsFocalBake) {
+                    boundingBox.height.roundToInt().coerceIn(1, FOCAL_BAKE_MAX_SIZE)
+                } else {
+                    0
+                }
                 val gr = if (
                     resolved.updateGeometry(_cx, _cy, _r, _fx, _fy, _fr, tileMode) ||
                     prevGradient == null ||
-                    resolved.colorsChanged()
+                    resolved.colorsChanged() ||
+                    (needsFocalBake && resolved.bakeSizeChanged(bakeW, bakeH))
                 ) {
-                    when (effColors) {
-                        is GradientColorArray.Longs -> {
-                            @Suppress("NewApi")
-                            RadialGradient(
-                                /* startX = */ _fx,
-                                /* startY = */ _fy,
-                                /* startRadius = */ _fr,
-                                /* endX = */ _cx,
-                                /* endY = */ _cy,
-                                /* endRadius = */ _r,
-                                /* colors = */ effColors.array,
-                                /* stops = */ effPositions,
-                                /* tileMode = */ tileMode
-                            )
-                        }
+                    if (needsFocalBake) {
+                        bakeFocalGradient(
+                            resolved, _fx, _fy, _fr, _cx, _cy, _r, tileMode,
+                            densified, straightColors, positions, numStops,
+                            bakeW, bakeH,
+                        )
+                    } else {
+                        when (effColors) {
+                            is GradientColorArray.Longs -> {
+                                @Suppress("NewApi")
+                                RadialGradient(
+                                    /* startX = */ _fx,
+                                    /* startY = */ _fy,
+                                    /* startRadius = */ _fr,
+                                    /* endX = */ _cx,
+                                    /* endY = */ _cy,
+                                    /* endRadius = */ _r,
+                                    /* colors = */ effColors.array,
+                                    /* stops = */ effPositions,
+                                    /* tileMode = */ tileMode
+                                )
+                            }
 
-                        is GradientColorArray.Ints -> {
-                            RadialGradient(
-                                /* centerX = */ _cx,
-                                /* centerY = */ _cy,
-                                /* radius = */ _r,
-                                /* colors = */ effColors.array,
-                                /* stops = */ effPositions,
-                                /* tileMode = */ tileMode
-                            )
+                            is GradientColorArray.Ints -> {
+                                RadialGradient(
+                                    /* centerX = */ _cx,
+                                    /* centerY = */ _cy,
+                                    /* radius = */ _r,
+                                    /* colors = */ effColors.array,
+                                    /* stops = */ effPositions,
+                                    /* tileMode = */ tileMode
+                                )
+                            }
                         }
                     }.also {
                         resolved.shader = it
@@ -2076,13 +2114,110 @@ internal class Renderer internal constructor(
                 } else {
                     prevGradient
                 }
-                gr.setLocalMatrix(m)
+                if (needsFocalBake) {
+                    // The bake bitmap lives in texel space, not gradient space:
+                    // map unit (0..1) across the referencing bbox onto texels
+                    // (0..bakeW/H). Pool-independent matrix (fresh per rebuild,
+                    // like the shader itself) so later pool reuse can never
+                    // corrupt the shader's transform.
+                    gr.setLocalMatrix(
+                        Matrix().apply {
+                            setTranslate(boundingBox.minX, boundingBox.minY)
+                            preScale(
+                                boundingBox.width / bakeW,
+                                boundingBox.height / bakeH,
+                            )
+                        },
+                    )
+                } else {
+                    gr.setLocalMatrix(m)
+                }
                 paint.setShader(gr)
                 paint.alpha = clamp255(paintOpacity * 255f)
             }
         } finally {
             statePop(canvas)
         }
+    }
+
+    //==============================================================================
+    // Focal-gradient bake (API < 31 fallback)
+    //==============================================================================
+
+    /**
+     * Rasterizes an objectBoundingBox focal radial gradient ([focalGradientT])
+     * into the cached unit-space bitmap and wraps it in a `BitmapShader`
+     * (always `CLAMP`: the bake region covers every painted sample, spread is
+     * applied per texel).
+     *
+     * Runs only on shader rebuild (geometry/colors/bake-size change), never
+     * per frame: [bitmap][row] storage is reused via [ResolvedPaint.Radial].
+     * Only the returned `BitmapShader` is fresh per rebuild — the same alloc
+     * profile as the platform `RadialGradient` path.
+     */
+    private fun bakeFocalGradient(
+        resolved: ResolvedPaint.Radial,
+        fx: Float,
+        fy: Float,
+        fr: Float,
+        cx: Float,
+        cy: Float,
+        r: Float,
+        tileMode: TileMode,
+        densified: Boolean,
+        straightColors: IntArray,
+        positions: FloatArray,
+        numStops: Int,
+        bakeW: Int,
+        bakeH: Int,
+    ): Shader {
+        val bakeColors: IntArray
+        val bakePositions: FloatArray
+        val bakeCount: Int
+        if (densified) {
+            bakeColors = resolved.denseInts
+            bakePositions = resolved.densePositions
+            bakeCount = resolved.denseInts.size
+        } else {
+            bakeColors = straightColors
+            bakePositions = positions
+            bakeCount = numStops
+        }
+        val bitmap: Bitmap = run {
+            val current = resolved.bakeBitmap
+            if (current != null && current.width == bakeW && current.height == bakeH) {
+                current
+            } else {
+                Bitmap.createBitmap(bakeW, bakeH, Bitmap.Config.ARGB_8888).also {
+                    resolved.bakeBitmap = it
+                }
+            }
+        }
+        var row = resolved.bakeRow
+        if (row.size < bakeW) {
+            row = IntArray(bakeW)
+            resolved.bakeRow = row
+        }
+        // One small scratch array per rebuild (same rarity as the shader
+        // rebuild itself); the per-texel loop below allocates nothing.
+        val clamped = clampFocalToCircle(fx, fy, cx, cy, r, FloatArray(2))
+        val cfx = clamped[0]
+        val cfy = clamped[1]
+        val spread = when (tileMode) {
+            TileMode.MIRROR -> GradientSpread.reflect
+            TileMode.REPEAT -> GradientSpread.repeat
+            else -> GradientSpread.pad
+        }
+        for (j in 0 until bakeH) {
+            val gy = (j + 0.5f) / bakeH
+            for (i in 0 until bakeW) {
+                val gx = (i + 0.5f) / bakeW
+                val t = applyGradientSpread(focalGradientT(gx, gy, cfx, cfy, fr, cx, cy, r), spread)
+                row[i] = sampleGradientStops(bakeColors, bakePositions, bakeCount, t)
+            }
+            bitmap.setPixels(row, 0, bakeW, 0, j, bakeW, 1)
+        }
+        return BitmapShader(bitmap, TileMode.CLAMP, TileMode.CLAMP)
     }
 
     //==============================================================================

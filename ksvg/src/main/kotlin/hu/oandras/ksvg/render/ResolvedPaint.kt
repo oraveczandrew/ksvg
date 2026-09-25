@@ -17,7 +17,8 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.LinearGradient
-import android.graphics.RadialGradient
+import android.graphics.Bitmap
+import android.graphics.Shader
 import android.graphics.Shader.TileMode
 import hu.oandras.ksvg.LoggerContext
 
@@ -134,8 +135,28 @@ internal sealed class ResolvedPaint {
         var denseInts: IntArray = IntArray(0)
         @JvmField
         var densePositions: FloatArray = FloatArray(0)
+        /**
+         * Cached shader: a platform `RadialGradient` on the fast path, or a
+         * `BitmapShader` over [bakeBitmap] when the API < 31 focal fallback
+         * is active (focal point invisible to the platform constructor).
+         */
         @JvmField
-        var shader: RadialGradient? = null
+        var shader: Shader? = null
+        /**
+         * Focal-bake raster (API < 31 only): the unit-space [0,1]² gradient
+         * rasterized by [focalGradientT], sized to the referencing element's
+         * bounding box (capped). Reused across frames; re-baked only when
+         * [bakeSizeChanged] reports a size change (geometry/colors go through
+         * [updateGeometry]/[colorsChanged] as before). Never null while the
+         * fallback is active.
+         */
+        @JvmField
+        var bakeBitmap: Bitmap? = null
+        /** Scratch row for the bake loop; reallocated only on width change. */
+        @JvmField
+        var bakeRow: IntArray = IntArray(0)
+        private var _bakeW = 0
+        private var _bakeH = 0
         private var colorsHash = 0
         private var positionsHash = 0
         private var _cx = 0f
@@ -175,6 +196,21 @@ internal sealed class ResolvedPaint {
             val c = colors ?: return true
             return c.contentHashCode() != colorsHash ||
                 positions.contentHashCode() != positionsHash
+        }
+
+        /**
+         * True when the focal-bake raster size differs from the last bake;
+         * part of the shader rebuild gate in `makeRadialGradient` (API < 31
+         * focal path only). The platform-shader path ignores bake size.
+         */
+        fun bakeSizeChanged(w: Int, h: Int): Boolean {
+            return if (_bakeW != w || _bakeH != h) {
+                _bakeW = w
+                _bakeH = h
+                true
+            } else {
+                false
+            }
         }
 
         fun markColorsClean() {
