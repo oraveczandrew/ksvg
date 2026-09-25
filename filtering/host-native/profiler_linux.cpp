@@ -44,34 +44,45 @@ JNIEXPORT jlong JNICALL
 Java_hu_oandras_ksvg_filtering_LinuxHardwareProfiler_nativeOpen(JNIEnv *env, jobject thiz) {
     struct perf_event_attr pe;
     memset(&pe, 0, sizeof(struct perf_event_attr));
+    // Try standard hardware cycles first
     pe.type = PERF_TYPE_HARDWARE;
     pe.size = sizeof(struct perf_event_attr);
     pe.config = PERF_COUNT_HW_CPU_CYCLES;
     pe.disabled = 1;
-    pe.exclude_kernel = 1;
-    pe.exclude_hv = 1;
+    pe.exclude_kernel = 0;
+    pe.exclude_hv = 0;
 
     int fd_cycles = perf_event_open(&pe, 0, -1, -1, 0);
-    if (fd_cycles == -1) return 0;
+    if (fd_cycles == -1) {
+        // Fallback for virtualized PMUs (e.g. VMware vPMC) using raw Intel CPU_CLK_UNHALTED (0x3c)
+        pe.type = PERF_TYPE_RAW;
+        pe.config = 0x3c;
+        fd_cycles = perf_event_open(&pe, 0, -1, -1, 0);
+    }
 
+    if (fd_cycles == -1) {
+        return 0;
+    }
+
+    // Instructions (optional; if unsupported by hypervisor vPMC, we use -1)
     memset(&pe, 0, sizeof(struct perf_event_attr));
     pe.type = PERF_TYPE_HARDWARE;
     pe.size = sizeof(struct perf_event_attr);
     pe.config = PERF_COUNT_HW_INSTRUCTIONS;
     pe.disabled = 1;
-    pe.exclude_kernel = 1;
-    pe.exclude_hv = 1;
+    pe.exclude_kernel = 0;
+    pe.exclude_hv = 0;
 
-    // Use a group to read them together
     int fd_instructions = perf_event_open(&pe, 0, -1, fd_cycles, 0);
     if (fd_instructions == -1) {
-        close(fd_cycles);
-        return 0;
+        pe.type = PERF_TYPE_RAW;
+        pe.config = 0xc0; // INST_RETIRED fallback or disable
+        fd_instructions = perf_event_open(&pe, 0, -1, fd_cycles, 0);
     }
 
     PerfGroup* group = new PerfGroup();
     group->fd_cycles = fd_cycles;
-    group->fd_instructions = fd_instructions;
+    group->fd_instructions = fd_instructions; // may be -1 if unsupported
     return (jlong)group;
 }
 
@@ -100,13 +111,15 @@ extern "C"
 JNIEXPORT jlongArray JNICALL
 Java_hu_oandras_ksvg_filtering_LinuxHardwareProfiler_nativeStop(JNIEnv *env, jobject thiz, jlong handle) {
     PerfGroup* group = (PerfGroup*)handle;
-    if (!group || group->fd_cycles == -1 || group->fd_instructions == -1) return nullptr;
+    if (!group || group->fd_cycles == -1) return nullptr;
 
     ioctl(group->fd_cycles, PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP);
 
-    uint64_t cycles, instructions;
+    uint64_t cycles = 0, instructions = 0;
     if (read(group->fd_cycles, &cycles, sizeof(uint64_t)) != sizeof(uint64_t)) return nullptr;
-    if (read(group->fd_instructions, &instructions, sizeof(uint64_t)) != sizeof(uint64_t)) return nullptr;
+    if (group->fd_instructions != -1) {
+        read(group->fd_instructions, &instructions, sizeof(uint64_t));
+    }
 
     jlongArray result = env->NewLongArray(2);
     if (result) {
