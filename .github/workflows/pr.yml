@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   pr:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       GRADLE_OPTS: -Dorg.gradle.warning.mode=none

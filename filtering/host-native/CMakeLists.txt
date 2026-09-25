@@ -12,7 +12,46 @@ else()
   set(HOST32BIT FALSE)
 endif()
 
-if(HOST32BIT)
+# Host ARM64 (Apple Silicon, CI ubuntu-24.04-arm runners): build the aarch64
+# NEON kernels so the JVM parity tests execute natively there. Detected from
+# the actual host CPU, no property needed; mirrors the NDK arm64-v8a source
+# selection (same .S files plus the ARM-specific C++ dispatchers the NDK
+# build also compiles: turbulence_arm.cpp, convolve_matrix_neon.cpp).
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+  set(HOSTAARCH64 TRUE)
+else()
+  set(HOSTAARCH64 FALSE)
+endif()
+
+if(HOSTAARCH64)
+add_library(ksvgfilters SHARED
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/common/color_luts.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/simd_capabilities.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/blur/gaussian_blur.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/blur/blur_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/component_transfer.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map_arm64_neon64.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix_neon.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_arm.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/turbulence/turbulence_noise_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_diffuse_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_distant_specular_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_point_diffuse_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_point_specular_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_spot_diffuse_aarch64_neon.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/lighting/lighting_spot_specular_aarch64_neon.S
+)
+elseif(HOST32BIT)
 add_library(ksvgfilters SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/common/color_luts.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/simd_capabilities.cpp
@@ -109,7 +148,11 @@ target_include_directories(ksvgfilters PRIVATE
   ${JAVA_HOME}/include/linux
 )
 
-target_compile_options(ksvgfilters PRIVATE -ffp-contract=off -mssse3)
+target_compile_options(ksvgfilters PRIVATE -ffp-contract=off)
+# -mssse3 is x86-only; aarch64 has NEON unconditionally, no flag needed.
+if(NOT HOSTAARCH64)
+  target_compile_options(ksvgfilters PRIVATE -mssse3)
+endif()
 if(HOST32BIT)
   target_compile_options(ksvgfilters PRIVATE -m32)
   target_link_options(ksvgfilters PRIVATE -m32)

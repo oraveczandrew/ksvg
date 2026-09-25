@@ -16,25 +16,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Single job definition, two legs on the same ubuntu-latest image: x64 runs
-  # the full suite against the x86_64 kernels, i386 build-verifies the 32-bit
-  # Intel kernels (-m32 host lib from the i386 .S files + Android x86 ABI via
-  # the NDK), so x86-only asm regressions fail here, not on device.
-  # NOTE: the i386 leg does NOT execute tests. Re-enabling was tried
-  # (2026-09-25): 44 tests passed, then the worker JVM died with an
-  # irrecoverable SI_KERNEL SIGSEGV in HotSpot's signal handler — the hosted
-  # kernel's 32-bit signal handling is unstable, so execution stays off
-  # (details: tmp/SIGILL_FLAKY_WORKLOG.md, git-ignored). This already caught
-  # one real bug (.addrsig rejected by gas in 32-bit mode).
+  # Two legs: x64 runs the full suite against the x86_64 kernels and assembles
+  # every Android ABI (incl. x86, the on-device 32-bit Intel path), arm64 runs
+  # the :filtering unit tests (incl. native parity) against the aarch64 NEON
+  # kernels built as a host lib on the runner itself. Either leg catches its
+  # ISA's asm regressions here, not on device. Past catches: .addrsig
+  # rejected by gas in 32-bit mode; EVEX-encoded broadcast (SIGILL on
+  # AVX512-less hosts, fixed by VEX-only lowering).
+  # NOTE: the 32-bit Intel kernels are additionally build-verified as a -m32
+  # host lib on x64 (different toolchain than the NDK: system GCC multilib).
+  # The i386 .S kernels are NEVER executed here: 32-bit test execution was
+  # tried (2026-09-25) and reverted — 44 tests passed, then the worker JVM
+  # died with an irrecoverable SI_KERNEL SIGSEGV in HotSpot's own signal
+  # handler (hosted kernel's 32-bit signal handling is unstable).
+  # Details: tmp/SIGILL_FLAKY_WORKLOG.md (git-ignored).
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - host: x64
-            host32bit: "false"
+            runs-on: ubuntu-24.04
+            jdk-arch: x64
+            cache-suffix: ""
             test-tasks: ":ksvg:testDebugUnitTest -PexcludeSlowTests :filtering:testDebugUnitTest :glide:testDebugUnitTest"
             artifact: ci-test-reports
             report-path: |
@@ -44,15 +50,20 @@ jobs:
               filtering/hs_err_pid*.log
               ksvg/hs_err_pid*.log
               glide/hs_err_pid*.log
-          - host: i386
-            host32bit: "true"
-            # No test execution (see NOTE above): build the -m32 host lib
-            # (assembles + links every i386 .S kernel) and the Android x86
-            # ABI with the NDK (the actual on-device 32-bit Intel path).
-            test-tasks: ":filtering:buildHostNativeLib :filtering:assembleDebug -PfilterAbis=x86"
-            artifact: ci-test-reports-i386
+          - host: arm64
+            runs-on: ubuntu-24.04-arm
+            jdk-arch: arm64
+            cache-suffix: "-arm64"
+            # No NDK/CMake SDK packages here (their binaries are x86_64-only
+            # and nothing on this leg uses them): platform for compiling
+            # against android.jar, build-tools for AGP's pinned revision.
+            # Separate cache key: the blob contents differ by architecture.
+            test-tasks: ":filtering:testDebugUnitTest"
+            artifact: ci-test-reports-arm64
             report-path: |
               filtering/build/host-native/
+              filtering/build/test-results/testDebugUnitTest/
+              filtering/hs_err_pid*.log
     env:
       GRADLE_OPTS: -Dorg.gradle.warning.mode=none
     steps:
@@ -64,15 +75,24 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          architecture: x64
+          architecture: ${{ matrix.jdk-arch }}
           cache: gradle
 
+      # x64 only: compile/link the -m32 host lib (see NOTE above); nothing
+      # 32-bit is executed.
       - name: Install 32-bit multilib toolchain
-        if: matrix.host32bit == 'true'
+        if: matrix.host == 'x64'
         run: |
           sudo apt-get update
-          # Only needed to compile/link -m32; nothing 32-bit is executed.
           sudo apt-get install -y gcc-multilib g++-multilib
+
+      # arm64 only: the host-native build uses the system toolchain (the SDK
+      # NDK/CMake binaries are x86_64-only and unused on this leg).
+      - name: Install host build toolchain
+        if: matrix.host == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++
 
       # The SDK packages live in a workspace-local directory (NOT the
       # preinstalled $ANDROID_SDK_ROOT, which is image-provided and ephemeral)
@@ -90,7 +110,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .ci-android-sdk
-          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1-v3
+          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1-v3${{ matrix.cache-suffix }}
 
       # Lists what the restore delivered, for diagnosing cache misses.
       - name: Inspect restored SDK cache
@@ -123,8 +143,13 @@ jobs:
           printf '\n%s\n%s' d56f5187479451eabf01fb78af6dfcb131a648 84831b9409646a918e30573bab4c9c91346d8abd > "$SDK/licenses/android-sdk-preview-license"
           [ -d "$SDK/platforms/android-37.2" ] || yes | sdkmanager --sdk_root="$SDK" --install "platforms;android-37.2"
           [ -d "$SDK/build-tools/37.0.0" ] || yes | sdkmanager --sdk_root="$SDK" --install "build-tools;37.0.0"
-          [ -d "$SDK/ndk/29.0.14206865" ] || yes | sdkmanager --sdk_root="$SDK" --install "ndk;29.0.14206865"
-          [ -d "$SDK/cmake/3.22.1" ] || yes | sdkmanager --sdk_root="$SDK" --install "cmake;3.22.1"
+          # NDK/CMake live here only on x64 (their SDK binaries are x86_64-only
+          # and nothing on arm64 uses them: the host build uses the system
+          # toolchain installed above).
+          if [ "${{ matrix.host }}" != "arm64" ]; then
+            [ -d "$SDK/ndk/29.0.14206865" ] || yes | sdkmanager --sdk_root="$SDK" --install "ndk;29.0.14206865"
+            [ -d "$SDK/cmake/3.22.1" ] || yes | sdkmanager --sdk_root="$SDK" --install "cmake;3.22.1"
+          fi
 
           # Point all later steps (Gradle/AGP) at the workspace SDK. CI-only:
           # local checkouts keep using local.properties.
@@ -135,17 +160,26 @@ jobs:
         run: |
           java -version 2>&1
           grep -m1 'model name' /proc/cpuinfo
-          grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep -E 'sse|avx|fma|bmi|xsave|osxsave' | sort -u | tr '\n' ' '
+          grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep -E 'sse|avx|fma|bmi|xsave|osxsave|neon|asimd|sve' | sort -u | tr '\n' ' '
           echo
           # vsyscall mode decides whether a 32-bit JVM can start at all.
           grep -o 'vsyscall[^ ]*' /proc/cmdline 2>/dev/null || echo "no vsyscall boot param"
 
-      - name: Assemble debug (all modules)
-        if: matrix.host32bit != 'true'
+      - name: Assemble debug (all modules, all ABIs)
+        if: matrix.host == 'x64'
         run: ./gradlew :ksvg:assembleDebug :filtering:assembleDebug :glide:assembleDebug
 
+      # Verifies the i386 .S kernels assemble+link under GCC multilib (a
+      # different toolchain than the NDK above). MUST run as its own Gradle
+      # invocation BEFORE the tests below: both host-lib flavors share one
+      # output file, and the test task rebuilds the x86_64 flavor via its
+      # task dependency, so this order leaves the runnable library in place.
+      - name: Build 32-bit host native lib
+        if: matrix.host == 'x64'
+        run: ./gradlew :filtering:buildHostNativeLib -Pksvg.host32bit=true
+
       - name: Build and test (${{ matrix.host }})
-        run: ./gradlew ${{ matrix.test-tasks }} -Pksvg.host32bit=${{ matrix.host32bit }}
+        run: ./gradlew ${{ matrix.test-tasks }}
 
       - name: Upload test reports
         if: always()
