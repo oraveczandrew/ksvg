@@ -122,10 +122,12 @@ jobs:
 
       - name: Install SDK packages
         run: |
+          SDK="$GITHUB_WORKSPACE/.ci-android-sdk"
           # Locate a working sdkmanager: its image location moved across
           # generations ($ANDROID_SDK_ROOT unset or versioned dirs without a
           # `latest` link), so probe well-known roots instead of assuming one
-          # PATH. Fails loudly when nothing is found.
+          # PATH, bootstrapping cmdline-tools into the workspace SDK when the
+          # image has none (e.g. ubuntu-24.04-arm).
           SDKMGR=""
           for root in "$ANDROID_SDK_ROOT" "$ANDROID_HOME" /usr/local/lib/android/sdk /opt/android-sdk; do
             [ -n "$root" ] || continue
@@ -133,13 +135,22 @@ jobs:
               if [ -x "$ctd/bin/sdkmanager" ]; then SDKMGR="$ctd/bin/sdkmanager"; break 2; fi
             done
           done
-          if [ -z "$SDKMGR" ]; then echo "no sdkmanager found (checked image SDK locations)"; exit 1; fi
+          if [ -z "$SDKMGR" ]; then
+            # No image SDK (e.g. ubuntu-24.04-arm): fetch the
+            # architecture-independent cmdline-tools into the workspace SDK.
+            CLT_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+            curl -fSL -o /tmp/cmdtools.zip "$CLT_URL"
+            mkdir -p "$SDK/cmdline-tools"
+            unzip -q -o /tmp/cmdtools.zip -d "$SDK/cmdline-tools"
+            mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+            rm -f /tmp/cmdtools.zip
+            SDKMGR="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          fi
           export PATH="$(dirname "$SDKMGR"):$PATH"
           echo "using sdkmanager: $SDKMGR"
           # Converge to exactly the pinned set, then install what's missing.
           # Stale revisions are purged (they once lingered beside pinned
           # ones); presence — not sdkmanager's verdict — decides.
-          SDK="$GITHUB_WORKSPACE/.ci-android-sdk"
           for d in "$SDK"/platforms/* "$SDK"/build-tools/* "$SDK"/ndk/* "$SDK"/cmake/*; do
             [ -e "$d" ] || continue
             case "$d" in
