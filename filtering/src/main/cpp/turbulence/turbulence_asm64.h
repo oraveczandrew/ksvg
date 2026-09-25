@@ -19,6 +19,7 @@
 #if defined(__aarch64__)
 
 #include <cstddef>
+#include <cstdint>
 
 struct Turbulence64AsmArgs {
     const uint32_t* selector32;

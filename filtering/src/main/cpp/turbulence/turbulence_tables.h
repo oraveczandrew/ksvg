@@ -18,6 +18,9 @@
 #define KSVG_TURBULENCE_TABLES_H
 
 #include <cmath>
+#include <cstdint>
+
+#include <jni.h>
 
 constexpr int S_BSIZE = 0x100;
 constexpr int S_BM = 0xff;

@@ -19,6 +19,7 @@
 #if defined(__arm__)
 
 #include <cstddef>
+#include <cstdint>
 
 struct Turbulence32AsmArgs {
     const uint32_t* selector32;
