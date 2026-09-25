@@ -263,7 +263,7 @@
 #define TUNED_LIST1 8, 16
 .macro hconv1_8/*{{{*/
 
-.rodata
+.section .rodata
     200:    .hword -4
             .hword 101f-100f
             .hword 102f-100f
@@ -341,7 +341,7 @@
 .endm/*}}}*/
 
 .macro hconv1_16/*{{{*/
-.rodata
+.section .rodata
    200:     .hword -4
             .hword 101f-100f
             .hword 102f-100f
@@ -480,7 +480,7 @@
 .endm/*}}}*/
 
 .macro hconv1_25/*{{{*/
-.rodata
+.section .rodata
    200:     .hword -4
             .hword 101f-100f
             .hword 102f-100f
@@ -686,7 +686,7 @@
 
 #define TUNED_LIST4 6, 12, 20
 .macro hconv4_6/*{{{*/
-.rodata
+.section .rodata
    200:     .hword -4
             .hword 101f-100f
             .hword 102f-100f
@@ -744,7 +744,7 @@
 .endm/*}}}*/
 
 .macro hconv4_12/*{{{*/
-.rodata
+.section .rodata
    200:     .hword -4 //Might need to remove these...
             .hword 101f-100f
             .hword 102f-100f
@@ -838,7 +838,7 @@
 .endm/*}}}*/
 
 .macro hconv4_20/*{{{*/
-.rodata
+.section .rodata
    200:     .hword -4
             .hword 101f-100f
             .hword 102f-100f
@@ -980,7 +980,7 @@
 .endm/*}}}*/
 
 .macro hconv4_25/*{{{*/
-.rodata
+.section .rodata
    200:     .hword -4
             .hword 101f-100f
             .hword 102f-100f
