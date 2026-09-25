@@ -47,37 +47,42 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .ci-android-sdk
-          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1-v2
+          key: android-sdk-${{ runner.os }}-platform37.2-build37.0.0-ndk29.0.14206865-cmake3.22.1-v3
 
-      # The SDK cache has silently gone stale before (hit + full re-download
-      # of NDK/build-tools/platform). This lists what the restore actually
-      # delivered, so the log shows whether the blob is partial or merely
-      # unrecognized by this image's sdkmanager.
+      # Lists what the restore delivered, for diagnosing cache misses.
       - name: Inspect restored SDK cache
         run: |
           du -sh .ci-android-sdk 2>/dev/null || echo "no .ci-android-sdk directory"
           ls .ci-android-sdk 2>/dev/null || true
           du -sh .ci-android-sdk/platforms .ci-android-sdk/build-tools .ci-android-sdk/ndk .ci-android-sdk/cmake 2>/dev/null || true
+          ls .ci-android-sdk/platforms .ci-android-sdk/build-tools .ci-android-sdk/ndk .ci-android-sdk/cmake 2>/dev/null || true
 
       - name: Install SDK packages
         run: |
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          # Fast path: the cache already delivered every package. sdkmanager
-          # re-downloads them anyway when it cannot parse another image's
-          # metadata (seen: 2.5 GB restored, yet full reinstall), so directory
-          # presence — not sdkmanager's verdict — is the check. AGP, CMake and
-          # the NDK consume the files directly and never read that metadata.
+          # Converge to exactly the pinned set, then install what's missing.
+          # Stale revisions are purged (they once lingered beside pinned
+          # ones); presence — not sdkmanager's verdict — decides.
           SDK="$GITHUB_WORKSPACE/.ci-android-sdk"
-          MISSING=0
-          for p in "platforms/android-37*" "build-tools/37.0.0" "ndk/29.0.14206865" "cmake/3.22.1"; do
-            if ! compgen -G "$SDK/$p" > /dev/null; then echo "missing: $p"; MISSING=1; fi
+          for d in "$SDK"/platforms/* "$SDK"/build-tools/* "$SDK"/ndk/* "$SDK"/cmake/*; do
+            [ -e "$d" ] || continue
+            case "$d" in
+              */android-37.2|*/37.0.0|*/29.0.14206865|*/3.22.1) ;;
+              *) echo "purging stale: $d"; rm -rf "$d" ;;
+            esac
           done
-          if [ "$MISSING" = "1" ]; then
-            sdkmanager --sdk_root="$SDK" --install "platforms;android-37.2" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
-          else
-            echo "all SDK packages present, skipping sdkmanager install"
-          fi
-          yes | sdkmanager --sdk_root="$SDK" --licenses > /dev/null
+          # Install per package, so a cache miss (or a purge above) only
+          # downloads what is actually absent.
+          # License bootstrap first (both known text generations); `yes |`
+          # on the installs below accepts anything new inline.
+          mkdir -p "$SDK/licenses"
+          printf '\n%s\n%s' 8933bad161af4178b1185d1a37fbf41ea5269c 24333f8a63b6825ea9c5514f83c2829b004d1fee > "$SDK/licenses/android-sdk-license"
+          printf '\n%s\n%s' d56f5187479451eabf01fb78af6dfcb131a648 84831b9409646a918e30573bab4c9c91346d8abd > "$SDK/licenses/android-sdk-preview-license"
+          [ -d "$SDK/platforms/android-37.2" ] || yes | sdkmanager --sdk_root="$SDK" --install "platforms;android-37.2"
+          [ -d "$SDK/build-tools/37.0.0" ] || yes | sdkmanager --sdk_root="$SDK" --install "build-tools;37.0.0"
+          [ -d "$SDK/ndk/29.0.14206865" ] || yes | sdkmanager --sdk_root="$SDK" --install "ndk;29.0.14206865"
+          [ -d "$SDK/cmake/3.22.1" ] || yes | sdkmanager --sdk_root="$SDK" --install "cmake;3.22.1"
+
           # Point all later steps (Gradle/AGP) at the workspace SDK. CI-only:
           # local checkouts keep using local.properties.
           echo "ANDROID_SDK_ROOT=$GITHUB_WORKSPACE/.ci-android-sdk" >> "$GITHUB_ENV"

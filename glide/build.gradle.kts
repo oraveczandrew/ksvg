@@ -34,6 +34,12 @@ kotlin {
 android {
     namespace = "hu.oandras.ksvg.glide"
     compileSdk = 37
+    // Pinned so AGP never auto-downloads its own default revisions into the
+    // CI SDK dir (that re-poisoned the cache every run: NDK 28.2,
+    // build-tools 36.0.0). Must match the sdkmanager specs in
+    // .github/workflows/*.yml.
+    ndkVersion = "29.0.14206865"
+    buildToolsVersion = "37.0.0"
 
     defaultConfig.apply {
         minSdk = 26

@@ -40,6 +40,12 @@ kotlin {
 android {
     namespace = "hu.oandras.filtering"
     compileSdk = 37
+    // Pinned so AGP never auto-downloads its own default revisions into the
+    // CI SDK dir (that re-poisoned the cache every run: NDK 28.2,
+    // build-tools 36.0.0). Must match the sdkmanager specs in
+    // .github/workflows/*.yml.
+    ndkVersion = "29.0.14206865"
+    buildToolsVersion = "37.0.0"
 
     testFixtures {
         enable = true
@@ -121,9 +127,11 @@ android {
                 // can load, while Gradle itself stays on a 64-bit JVM
                 // (Gradle native services don't exist for i386 and the daemon
                 // won't even start there). Unset: no behavior change. NOTE: CI
-                // does not use this — 32-bit HotSpot cannot start on the
-                // hosted runners' kernels (SI_KERNEL SIGSEGV under
-                // vsyscall=none), so the i386 leg only builds, never executes.
+                // does not use this — 32-bit test execution was tried
+                // (2026-09-25, see tmp/SIGILL_FLAKY_WORKLOG.md): the JVM
+                // starts, but the hosted kernel's 32-bit signal handling is
+                // unstable (SI_KERNEL abort mid-suite), so the i386 leg only
+                // builds, never executes.
                 val testJava32: String? = project.findStringProperty("ksvg.testJava32")
                     ?.takeIf { v -> v.isNotBlank() }
                     ?: System.getenv("KSVG_TEST_JAVA32")?.takeIf { v -> v.isNotBlank() }
