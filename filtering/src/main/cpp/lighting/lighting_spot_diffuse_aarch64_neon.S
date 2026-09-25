@@ -89,6 +89,14 @@
 ksvgLightingSpotDiffuseRowNeon64:
     cbz     w4, .Ldone
 
+    /* Spill d8-d15 (AAPCS64 callee-saved); without this the caller's FP
+    state dies here and the failure surfaces rows later. */
+    sub     sp, sp, #64
+    stp     d8, d9, [sp, #0]
+    stp     d10, d11, [sp, #16]
+    stp     d12, d13, [sp, #32]
+    stp     d14, d15, [sp, #48]
+
     ldr     s16, [x5]
     ldr     s17, [x5, #4]
     ldr     s18, [x5, #8]
@@ -534,6 +542,11 @@ ksvgLightingSpotDiffuseRowNeon64:
     str     q3, [x3]
 
 .Ldone:
+    ldp     d14, d15, [sp, #48]
+    ldp     d12, d13, [sp, #32]
+    ldp     d10, d11, [sp, #16]
+    ldp     d8, d9, [sp, #0]
+    add     sp, sp, #64
     ret
 
 .size ksvgLightingSpotDiffuseRowNeon64, .-ksvgLightingSpotDiffuseRowNeon64
@@ -634,6 +647,11 @@ ksvgLightingSpotDiffuseRowNeon64:
 // cross-iteration vector state is lost.
 ksvgLightingSpotDiffuseRowNeon64Linear:
     cbz     w4, .Llin_done
+    sub     sp, sp, #64
+    stp     d8, d9, [sp, #0]
+    stp     d10, d11, [sp, #16]
+    stp     d12, d13, [sp, #32]
+    stp     d14, d15, [sp, #48]
     mov     w9, #0              // pixel index
     adr     x10, .Llane_idx
 
@@ -1061,6 +1079,11 @@ ksvgLightingSpotDiffuseRowNeon64Linear:
     str     q3, [x3]
 
 .Llin_done:
+    ldp     d14, d15, [sp, #48]
+    ldp     d12, d13, [sp, #32]
+    ldp     d10, d11, [sp, #16]
+    ldp     d8, d9, [sp, #0]
+    add     sp, sp, #64
     ret
 
 .size ksvgLightingSpotDiffuseRowNeon64Linear, .-ksvgLightingSpotDiffuseRowNeon64Linear

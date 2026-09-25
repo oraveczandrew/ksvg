@@ -30,14 +30,17 @@ import java.util.Random
 class SpotDiffuseLinearFuzzTest {
 
     @Test
-    fun ssse3LinearMatchesKotlinOnFuzz() {
+    fun vectorLinearMatchesKotlinOnFuzz() {
         assertNativeBackendAvailable()
+        // Fuzz every vector backend this host offers (SSSE3/AVX2 on x86,
+        // NEON64/NEON32 on ARM); scalar is the oracle itself, nothing to
+        // compare it against.
         val backends = getBackendsFor(LightingNative.nativeBackend())
-        assert(backends.contains(SIMD_SSSE3)) { "ssse3 not advertised on this host" }
+            .filter { it == SIMD_SSSE3 || it == SIMD_AVX2 || it == SIMD_NEON64 || it == SIMD_NEON32 }
+        assert(backends.isNotEmpty()) { "no vector backend advertised on this host" }
 
-        runFuzzFor(SIMD_SSSE3, "ssse3")
-        if (backends.contains(SIMD_AVX2)) {
-            runFuzzFor(SIMD_AVX2, "avx2")
+        for (b in backends) {
+            runFuzzFor(b, backendName(b))
         }
     }
 
