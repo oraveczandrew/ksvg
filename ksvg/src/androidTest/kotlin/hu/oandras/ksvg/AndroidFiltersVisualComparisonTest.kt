@@ -27,8 +27,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
-internal const val ANDROID_FILTERS_ROOT_PATH = "filters"
-internal const val ANDROID_FILTERS_GOLDEN_ROOT_PATH = "filters-golden"
+internal const val ANDROID_FILTERS_ROOT_PATH = "visual"
+internal const val ANDROID_FILTERS_GOLDEN_ROOT_PATH = "visual-golden"
 internal const val ANDROID_FILTERS_TARGET_SIZE = 256
 
 @RunWith(Parameterized::class)
