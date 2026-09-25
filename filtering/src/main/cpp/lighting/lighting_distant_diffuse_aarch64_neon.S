@@ -232,6 +232,7 @@ ksvgLightingDistantDiffuseRowNeon64:
 
     // Apply invLen and k/clamp to A.
     fmul    v3.4s, v3.4s, v4.4s
+    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -253,6 +254,7 @@ ksvgLightingDistantDiffuseRowNeon64:
 
     // Apply invLen and k/clamp to B.
     fmul    v3.4s, v1.4s, v5.4s
+    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -599,6 +601,7 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
 
     // Apply invLen and k/clamp to A.
     fmul    v3.4s, v3.4s, v4.4s
+    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -620,6 +623,7 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
 
     // Apply invLen and k/clamp to B.
     fmul    v3.4s, v1.4s, v5.4s
+    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)

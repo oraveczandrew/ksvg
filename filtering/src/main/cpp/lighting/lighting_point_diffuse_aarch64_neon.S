@@ -262,6 +262,7 @@ ksvgLightingPointDiffuseRowNeon64:
     fmla    v3.4s, v11.4s, v7.4s
     fsub    v3.4s, v8.4s, v3.4s
     fmul    v3.4s, v3.4s, v4.4s
+    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -323,6 +324,7 @@ ksvgLightingPointDiffuseRowNeon64:
     fmla    v3.4s, v12.4s, v7.4s
     fsub    v3.4s, v8.4s, v3.4s
     fmul    v3.4s, v3.4s, v4.4s
+    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -719,6 +721,7 @@ ksvgLightingPointDiffuseRowNeon64Linear:
     fmla    v3.4s, v11.4s, v7.4s
     fsub    v3.4s, v8.4s, v3.4s
     fmul    v3.4s, v3.4s, v4.4s
+    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
@@ -778,6 +781,7 @@ ksvgLightingPointDiffuseRowNeon64Linear:
     fmla    v3.4s, v12.4s, v7.4s
     fsub    v3.4s, v8.4s, v3.4s
     fmul    v3.4s, v3.4s, v4.4s
+    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
