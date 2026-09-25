@@ -1,5 +1,4 @@
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 // Host-architecture build of the native kernels (turbulence, blur, lighting, ...)
 // so JVM unit tests can drive the real native path bit-exactly against the Kotlin
@@ -27,10 +26,13 @@ val buildHostNativeLib = tasks.register<Exec>("buildHostNativeLib") {
     val host32bit: Boolean = (project.findProperty("ksvg.host32bit")?.toString() == "true") ||
         System.getenv("KSVG_HOST_32BIT") == "1"
     inputs.property("ksvg.host32bit", host32bit)
+    val javaHome = System.getProperty("java.home")
+    environment("JAVA_HOME", javaHome)
     commandLine(
         "sh", "-c",
         "cmake -S . -B ${configureDir.absolutePath} " +
             "-DCMAKE_BUILD_TYPE=Release " +
+            "-DJAVA_HOME=${javaHome} " +
             "-DKSVG_HOST_32BIT=" + (if (host32bit) "ON" else "OFF") + " " +
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${hostNativeOutputDir.absolutePath} " +
             "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${hostNativeOutputDir.absolutePath} " +

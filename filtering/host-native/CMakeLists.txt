@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.22.1)
 project("ksvgfilters_host" LANGUAGES C CXX ASM)
 
-set(JAVA_HOME "$ENV{JAVA_HOME}")
+if(NOT JAVA_HOME OR "${JAVA_HOME}" STREQUAL "")
+  set(JAVA_HOME "$ENV{JAVA_HOME}")
+endif()
 
 # Opt-in 32-bit Intel host build (CI: -DKSVG_HOST_32BIT=ON with -m32 multilib).
 # Uses the i386 .S kernels; otherwise the x86_64 kernels from before.
