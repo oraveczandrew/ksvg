@@ -84,6 +84,16 @@ internal fun doFeBlendFilter(
     if (mode == FeBlendMode.normal && isBitmapTransparent(in2)) {
         return inputBitmap
     }
+    // Linear-space blend (the default color-interpolation-filters="linearRGB"):
+    // the canvas xfermode path blends in gamma space (~60/255 too dark vs the
+    // reference) and has no PorterDuff mapping at all below API 29, so every
+    // non-normal mode goes through the per-pixel kernel here. Explicit sRGB
+    // keeps the old canvas path.
+    if (mode != FeBlendMode.normal &&
+        primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+    ) {
+        return blendFilterLinear(primitiveNode, inputBitmap, in2, primitiveRegion, filterRegion)
+    }
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     renderContext.canvasPool.withPooledObject { c ->
         c.setBitmap(res)
@@ -99,6 +109,46 @@ internal fun doFeBlendFilter(
             c.drawBitmap(inputBitmap, 0f, 0f, primitiveNode.paint)
         }
     }
+    return res
+}
+
+/**
+ * feBlend in the filter's working color space via [SoftwareKernels.feBlend].
+ * Pixel plumbing mirrors [applyArithmeticComposite] (pooled row buffers, zero
+ * outside the primitive clip).
+ */
+context(renderContext: RenderContext)
+internal fun blendFilterLinear(
+    primitiveNode: FeBlendRenderNode,
+    inputBitmap: Bitmap,
+    in2: Bitmap,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+): Bitmap {
+    val width = inputBitmap.width
+    val height = inputBitmap.height
+    val size = width * height
+    val inputPixels = primitiveNode.inputPixels.getWithSize(size)
+    val in2Pixels = primitiveNode.in2Pixels.getWithSize(size)
+    inputBitmap.getPixels(inputPixels, 0, width, 0, 0, width, height)
+    in2.getPixels(in2Pixels, 0, width, 0, 0, width, height)
+
+    val clipLeft = clamp(((primitiveRegion.left - filterRegion.left)).toInt(), 0, width)
+    val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
+    val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
+    val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
+
+    val outPixels = primitiveNode.outPixels.getWithSize(size)
+    outPixels.fill(0) // Clean output outside the clip region
+    SoftwareKernels.feBlend(
+        inputPixels, in2Pixels, outPixels, width,
+        clipLeft, clipTop, clipRight, clipBottom,
+        primitiveNode.mode.ordinal,
+        primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
+    )
+
+    val res = createBitmapSameAs(inputBitmap)
+    res.setPixels(outPixels, 0, width, 0, 0, width, height)
     return res
 }
 

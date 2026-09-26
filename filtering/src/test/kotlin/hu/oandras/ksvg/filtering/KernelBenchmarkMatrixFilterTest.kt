@@ -27,7 +27,7 @@ class KernelBenchmarkMatrixFilterTest {
     fun noFilterRunsEveryCase() {
         val cases = KernelBenchmarkMatrix.cases(kernels = null, sizes = sizes512)
 
-        assertEquals(24, cases.size)
+        assertEquals(29, cases.size)
         assertEquals("ArithmeticComposite (linear)", cases.first().config.name)
     }
 
@@ -35,7 +35,7 @@ class KernelBenchmarkMatrixFilterTest {
     fun emptyConfigFilterIsIgnored() {
         val cases = KernelBenchmarkMatrix.cases(kernels = null, configs = emptySet(), sizes = sizes512)
 
-        assertEquals(24, cases.size)
+        assertEquals(29, cases.size)
     }
 
     @Test
@@ -46,6 +46,11 @@ class KernelBenchmarkMatrixFilterTest {
             listOf(
                 "ArithmeticComposite (linear)",
                 "ArithmeticComposite (non-linear)",
+                "ColorMatrix (linear)",
+                "ColorMatrix (non-linear)",
+                "FeBlend (hue, linear)",
+                "FeBlend (multiply, linear)",
+                "FeBlend (multiply, non-linear)",
                 "Lighting (diffuse, distant, linear)",
                 "Lighting (diffuse, point, linear)",
                 "Lighting (diffuse, spot, linear)",

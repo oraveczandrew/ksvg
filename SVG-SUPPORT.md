@@ -224,7 +224,7 @@
 | [`vector-effect`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/vector-effect)                             | Partial | `non-scaling-stroke`, `none` on path/shape stroke; text stroke always scales with the transform |
 | [`isolation`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/isolation)                                     | Full    | `auto`, `isolate`                          |
 | [`mix-blend-mode`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/mix-blend-mode)                           | Full    | CSS compositing; known bug below API 29: HW canvas output still differs from the reference |
-| [`color-interpolation-filters`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/color-interpolation-filters) | Partial | Honored by feColorMatrix/feComposite/lighting paths; gradients always interpolate in sRGB |
+| [`color-interpolation-filters`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/color-interpolation-filters) | Partial | Honored by feColorMatrix/feBlend/feComposite/lighting paths; gradients always interpolate in sRGB |
 | [`viewport-fill`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/viewport-fill)                             | Full    | SVG2                                       |
 | [`viewport-fill-opacity`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/viewport-fill-opacity)             | Full    | SVG2                                       |
 

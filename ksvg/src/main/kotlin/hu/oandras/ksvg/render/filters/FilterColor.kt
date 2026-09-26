@@ -65,6 +65,15 @@ internal fun doFeColorMatrixFilter(
     primitiveRegion: RectF,
     filterRegion: RectF,
 ): Bitmap {
+    // Linear-space matrix (the default color-interpolation-filters="linearRGB"):
+    // the canvas ColorMatrixColorFilter path works in gamma space, which reads
+    // ~70/255 too dark vs the reference on plain matrices. Explicit sRGB keeps
+    // the old canvas path.
+    if (primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB) {
+        return colorMatrixFilterLinear(
+            primitiveNode, inputBitmap, primitiveRegion, filterRegion,
+        )
+    }
     val paint = primitiveNode.paint
         ?: createFilterPaint(
             type = primitiveNode.type,
@@ -86,36 +95,85 @@ internal fun doFeColorMatrixFilter(
     return res
 }
 
-internal fun buildColorMatrix(type: FeColorMatrixType, values: FloatArray?): ColorMatrix = when (type) {
+/**
+ * feColorMatrix in the filter's working color space via
+ * [SoftwareKernels.colorMatrix]. Pixel plumbing mirrors
+ * [applyArithmeticComposite] (pooled buffers, zero outside the clip).
+ */
+context(renderContext: RenderContext)
+internal fun colorMatrixFilterLinear(
+    primitiveNode: FeColorMatrixRenderNode,
+    inputBitmap: Bitmap,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+): Bitmap {
+    val width = inputBitmap.width
+    val height = inputBitmap.height
+    val size = width * height
+    val srcPixels = primitiveNode.srcPixels.getWithSize(size)
+    inputBitmap.getPixels(srcPixels, 0, width, 0, 0, width, height)
+
+    val clipLeft = clamp(((primitiveRegion.left - filterRegion.left)).toInt(), 0, width)
+    val clipTop = clamp(((primitiveRegion.top - filterRegion.top)).toInt(), 0, height)
+    val clipRight = clamp(((primitiveRegion.right - filterRegion.left)).toInt(), 0, width)
+    val clipBottom = clamp(((primitiveRegion.bottom - filterRegion.top)).toInt(), 0, height)
+
+    val outPixels = primitiveNode.outPixels.getWithSize(size)
+    outPixels.fill(0) // Clean output outside the clip region
+    SoftwareKernels.colorMatrix(
+        srcPixels, outPixels, width,
+        clipLeft, clipTop, clipRight, clipBottom,
+        buildColorMatrixValues(primitiveNode.type, primitiveNode.values),
+        primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
+    )
+
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
+    res.setPixels(outPixels, 0, width, 0, 0, width, height)
+    return res
+}
+
+/** 4x5 matrix in SVG semantics (channels and offsets as 0..1 fractions).
+ * android.graphics.ColorMatrix takes 0..255 offsets, so [buildColorMatrix]
+ * scales the offset column after this. */
+internal fun buildColorMatrixValues(type: FeColorMatrixType, values: FloatArray?): FloatArray = when (type) {
         FeColorMatrixType.matrix -> {
             // android.graphics.ColorMatrix requires exactly 20 elements (it throws
             // otherwise). Short lists fall back to identity (matching browsers, where
             // the malformed primitive is ignored); long lists keep the first 20.
-            val src = when {
-                values == null || values.size < 20 -> identity
+            when {
+                values == null || values.size < 20 -> identity.copyOf()
                 else -> values.copyOf(20)
             }
-            val mapped = src.copyOf()
-            mapped[4] *= 255f
-            mapped[9] *= 255f
-            mapped[14] *= 255f
-            mapped[19] *= 255f
-
-            ColorMatrix(mapped)
         }
 
-        FeColorMatrixType.saturate -> {
-            ColorMatrix().apply {
-                setSaturation(values?.get(0) ?: 1f)
-            }
-        }
+        FeColorMatrixType.saturate -> saturateMatrixValues(values?.get(0) ?: 1f)
 
-        FeColorMatrixType.hueRotate -> {
-            ColorMatrix(createHueRotateMatrix(values?.get(0) ?: 0f))
-        }
+        FeColorMatrixType.hueRotate -> createHueRotateMatrix(values?.get(0) ?: 0f)
 
-        FeColorMatrixType.luminanceToAlpha -> ColorMatrix(luminanceToAlphaFloatArray)
+        FeColorMatrixType.luminanceToAlpha -> luminanceToAlphaFloatArray.copyOf()
     }
+
+/** saturate matrix with the SVG 1.1 luminance weights — identical to what
+ * android.graphics.ColorMatrix.setSaturation computes, spelled out so the
+ * kernel path shares it. */
+internal fun saturateMatrixValues(saturation: Float): FloatArray {
+    val s = saturation
+    return floatArrayOf(
+        0.213f + 0.787f * s, 0.715f - 0.715f * s, 0.072f - 0.072f * s, 0f, 0f,
+        0.213f - 0.213f * s, 0.715f + 0.285f * s, 0.072f - 0.072f * s, 0f, 0f,
+        0.213f - 0.213f * s, 0.715f - 0.715f * s, 0.072f + 0.928f * s, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    )
+}
+
+internal fun buildColorMatrix(type: FeColorMatrixType, values: FloatArray?): ColorMatrix {
+    val mapped = buildColorMatrixValues(type, values).copyOf()
+    mapped[4] *= 255f
+    mapped[9] *= 255f
+    mapped[14] *= 255f
+    mapped[19] *= 255f
+    return ColorMatrix(mapped)
+}
 
 internal fun createFilterPaint(type: FeColorMatrixType, values: FloatArray?): Paint {
     val paint = Paint()

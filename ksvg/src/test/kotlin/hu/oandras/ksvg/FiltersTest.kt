@@ -63,9 +63,10 @@ class FiltersTest {
         val pixel = bm.getPixel(50, 50)
         assertEquals(255, pixel.alpha)
         // Red (255, 0, 0) saturated to 0 should be grayscale.
-        // Android's ColorMatrix uses 0.213R + 0.715G + 0.072B for luminance.
-        // 255 * 0.213 = 54.315 -> 54
-        assertEquals("Red channel should be grayscale", 54, pixel.red)
+        // Filters default to color-interpolation-filters="linearRGB", so the
+        // matrix runs in linear space: 0.213 * 1.0 = 0.213 -> sRGB ~127.
+        // (The old gamma-space canvas path produced 54.)
+        assertEquals("Red channel should be grayscale", 127, pixel.red)
         assertEquals("Green channel should match red", pixel.red, pixel.green)
         assertEquals("Blue channel should match red", pixel.red, pixel.blue)
     }

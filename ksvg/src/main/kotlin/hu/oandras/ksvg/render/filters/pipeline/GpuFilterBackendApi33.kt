@@ -57,10 +57,13 @@ import hu.oandras.ksvg.render.calculatePrimitiveRegion
 import hu.oandras.ksvg.render.resolvePrimitiveInputRegion
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.render.filters.buildColorMatrix
+import hu.oandras.ksvg.render.filters.buildColorMatrixValues
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.filters.pipeline.effects.createArithmeticCompositeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createColorMatrixShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearBlendShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearColorMatrixShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createComponentTransferShaderEffect
 import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveDuplicateShaderEffect
@@ -337,7 +340,6 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                         is FeColorMatrixRenderNode -> {
                             val colorMatrix = primitive.sourceElement
-                            val matrix = buildColorMatrix(colorMatrix.type, colorMatrix.values)
                             // Map to buffer space: (user - filterRegion.left) * sx + padX
                             // (the CPU kernel writes the clip only).
                             primitiveRegion.set(
@@ -347,11 +349,25 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                 (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
                             )
 
-                            val (shader, colorMatrixEffect) = createColorMatrixShaderEffect(
-                                matrix = matrix.array,
-                                primitiveRegion = primitiveRegion,
-                                inputUniformName = "uInput",
-                            )
+                            val (shader, colorMatrixEffect) = if (
+                                primitive.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
+                            ) {
+                                // Linear-light matrix runs linearized (same class as
+                                // the F9 arithmetic fix); the sRGB shader below is
+                                // gamma-space only.
+                                createLinearColorMatrixShaderEffect(
+                                    matrix = buildColorMatrixValues(colorMatrix.type, colorMatrix.values),
+                                    primitiveRegion = primitiveRegion,
+                                    inputUniformName = "uInput",
+                                )
+                            } else {
+                                val matrix = buildColorMatrix(colorMatrix.type, colorMatrix.values)
+                                createColorMatrixShaderEffect(
+                                    matrix = matrix.array,
+                                    primitiveRegion = primitiveRegion,
+                                    inputUniformName = "uInput",
+                                )
+                            }
                             trackRawShader(shader, resultName, input, previousResult, first, generative = false)
                             colorMatrixEffect.chainWith(inputEffect)
                         }
@@ -500,17 +516,54 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                         is FeBlendRenderNode -> {
                             val blend = primitive.sourceElement
-                            val in2Effect =
-                                resolveEffect(blend.in2, previousResult, first, chain, resultEffects) ?: return null
-                            val mode = primitive.mode.toBlendMode() ?: return null
-                            lastRawShader = null
-                            lastRawBound = false
+                            if (primitive.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB &&
+                                primitive.mode != FeBlendMode.normal
+                            ) {
+                                // Linear-light blend runs linearized (same class as
+                                // the F9 arithmetic fix); the BlendMode effect
+                                // below is sRGB-only. Needs the backdrop as a raw
+                                // shader: null in2 defaults to the previous result
+                                // (spec), named in2 to a bound result — decline
+                                // otherwise and let the (correct) software backend
+                                // take the filter.
+                                val in2Name = blend.in2
+                                val in2Shader = if (in2Name == null) {
+                                    if (!lastRawBound) return null
+                                    lastRawShader ?: return null
+                                } else {
+                                    if (in2Name !in boundResults) return null
+                                    resultShaders[in2Name] ?: return null
+                                }
+                                // Map to buffer space: (user - filterRegion.left) * sx + padX
+                                // (the CPU kernel writes the clip only).
+                                primitiveRegion.set(
+                                    (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
+                                    (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
+                                    (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
+                                    (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                                )
 
-                            createBlendModeRenderEffect(
-                                dst = in2Effect,
-                                src = inputEffect,
-                                blendMode = mode
-                            )
+                                val (shader, blendEffect) = createLinearBlendShaderEffect(
+                                    mode = primitive.mode.ordinal.toFloat(),
+                                    in2Shader = in2Shader,
+                                    primitiveRegion = primitiveRegion,
+                                    inputUniformName = "uInput",
+                                )
+                                trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                                blendEffect.chainWith(inputEffect)
+                            } else {
+                                val in2Effect =
+                                    resolveEffect(blend.in2, previousResult, first, chain, resultEffects) ?: return null
+                                val mode = primitive.mode.toBlendMode() ?: return null
+                                lastRawShader = null
+                                lastRawBound = false
+
+                                createBlendModeRenderEffect(
+                                    dst = in2Effect,
+                                    src = inputEffect,
+                                    blendMode = mode
+                                )
+                            }
                         }
 
                         is FeCompositeRenderNode -> {

@@ -27,6 +27,7 @@ import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.filtering.ColorLuts
+import hu.oandras.ksvg.render.createBitmap
 
 /**
  * Porter-Duff-style compositing plus `arithmetic` (`uOperator == 5`).
@@ -169,10 +170,10 @@ private const val LINEAR_COMPOSITE_SHADER: String = """
  * sRGB→linear transfer table as an opaque 256x1 gray texture (same
  * premult-safe data-texture convention as the component-transfer LUTs).
  * Fixed content ([ColorLuts.SRGB_TO_LINEAR]), built once and shared by all
- * linear-arithmetic effects.
+ * linear-light effects (arithmetic, color matrix, blend).
  */
-private val linearTransferLut: Bitmap by lazy(LazyThreadSafetyMode.PUBLICATION) {
-    Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888).also { bitmap ->
+internal val linearTransferLut: Bitmap by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    createBitmap(256, 1, Bitmap.Config.ARGB_8888).also { bitmap ->
         val table = ColorLuts.SRGB_TO_LINEAR
         val pixels = IntArray(256) { i ->
             val v = table[i]

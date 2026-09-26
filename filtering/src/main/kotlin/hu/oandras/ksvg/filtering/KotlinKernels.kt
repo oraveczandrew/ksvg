@@ -818,7 +818,387 @@ public object KotlinKernels {
         }
     }
 
-    // -------------------------------------------------------- displacement map
+    // --------------------------------------------------------------- feBlend
+
+    /**
+     * feBlend for all non-normal modes. [mode] is a [FeBlendMode] value
+     * (0=normal must not reach here). [inputPixels] is the source (`in`),
+     * [in2Pixels] the backdrop (`in2`).
+     *
+     * Implements the CSS Compositing and Blending L1 general formula
+     * (backdrop/source compositing around the per-mode blend function), so a
+     * translucent backdrop mixes the source through instead of snapping to
+     * black like raw PorterDuff MULTIPLY does. [useLinear] folds each channel
+     * through the sRGB<->linear LUTs around the blend (this is what the
+     * default `color-interpolation-filters="linearRGB"` requires; the canvas
+     * xfermode path blends in gamma space and renders ~60/255 too dark).
+     *
+     * Two loops (linear / gamma) so no working-space branch remains on the
+     * hot per-pixel path; the per-channel mode helpers below are shared.
+     */
+    context(linearToSrgb: LinearToSrgb, sRgbToLinear: SrgbToLinear)
+    private fun feBlendLinearImpl(
+        inputPixels: IntArray,
+        in2Pixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        @FeBlendMode
+        mode: Int,
+    ) {
+        for (y in clipTop until clipBottom) {
+            val rowOffset = y * width
+            for (x in clipLeft until clipRight) {
+                val i = rowOffset + x
+                val p = inputPixels[i]
+                val q = in2Pixels[i]
+                val asAlpha = (p ushr 24) / 255f
+                val abAlpha = (q ushr 24) / 255f
+                val aoAlpha = asAlpha + abAlpha - asAlpha * abAlpha
+                if (aoAlpha <= 0f) {
+                    outPixels[i] = 0
+                    continue
+                }
+                val sr = sRgbToLinear[p ushr 16 and 0xFF]
+                val sg = sRgbToLinear[p ushr 8 and 0xFF]
+                val sb = sRgbToLinear[p and 0xFF]
+                val br = sRgbToLinear[q ushr 16 and 0xFF]
+                val bg = sRgbToLinear[q ushr 8 and 0xFF]
+                val bb = sRgbToLinear[q and 0xFF]
+                val outR: Int
+                val outG: Int
+                val outB: Int
+                if (mode >= FeBlendMode.HUE) {
+                    outR = linearToSrgb[feBlendNonSeparableChannel(br, bg, bb, sr, sg, sb, mode, 0, asAlpha, abAlpha, aoAlpha)]
+                    outG = linearToSrgb[feBlendNonSeparableChannel(br, bg, bb, sr, sg, sb, mode, 1, asAlpha, abAlpha, aoAlpha)]
+                    outB = linearToSrgb[feBlendNonSeparableChannel(br, bg, bb, sr, sg, sb, mode, 2, asAlpha, abAlpha, aoAlpha)]
+                } else {
+                    outR = linearToSrgb[feBlendSeparableChannel(br, sr, mode, asAlpha, abAlpha, aoAlpha)]
+                    outG = linearToSrgb[feBlendSeparableChannel(bg, sg, mode, asAlpha, abAlpha, aoAlpha)]
+                    outB = linearToSrgb[feBlendSeparableChannel(bb, sb, mode, asAlpha, abAlpha, aoAlpha)]
+                }
+                outPixels[i] = (clamp255(aoAlpha * 255f) shl 24) or (outR shl 16) or (outG shl 8) or outB
+            }
+        }
+    }
+
+    private fun feBlendGammaImpl(
+        inputPixels: IntArray,
+        in2Pixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        @FeBlendMode
+        mode: Int,
+    ) {
+        for (y in clipTop until clipBottom) {
+            val rowOffset = y * width
+            for (x in clipLeft until clipRight) {
+                val i = rowOffset + x
+                val p = inputPixels[i]
+                val q = in2Pixels[i]
+                val asAlpha = (p ushr 24) / 255f
+                val abAlpha = (q ushr 24) / 255f
+                val aoAlpha = asAlpha + abAlpha - asAlpha * abAlpha
+                if (aoAlpha <= 0f) {
+                    outPixels[i] = 0
+                    continue
+                }
+                val sr = p ushr 16 and 0xFF
+                val sg = p ushr 8 and 0xFF
+                val sb = p and 0xFF
+                val br = q ushr 16 and 0xFF
+                val bg = q ushr 8 and 0xFF
+                val bb = q and 0xFF
+                val outR: Int
+                val outG: Int
+                val outB: Int
+                if (mode >= FeBlendMode.HUE) {
+                    outR = feBlendNonSeparableChannel(br, bg, bb, sr, sg, sb, mode, 0, asAlpha, abAlpha, aoAlpha)
+                    outG = feBlendNonSeparableChannel(br, bg, bb, sr, sg, sb, mode, 1, asAlpha, abAlpha, aoAlpha)
+                    outB = feBlendNonSeparableChannel(br, bg, bb, sr, sg, sb, mode, 2, asAlpha, abAlpha, aoAlpha)
+                } else {
+                    outR = feBlendSeparableChannel(br, sr, mode, asAlpha, abAlpha, aoAlpha)
+                    outG = feBlendSeparableChannel(bg, sg, mode, asAlpha, abAlpha, aoAlpha)
+                    outB = feBlendSeparableChannel(bb, sb, mode, asAlpha, abAlpha, aoAlpha)
+                }
+                outPixels[i] = (clamp255(aoAlpha * 255f) shl 24) or (outR shl 16) or (outG shl 8) or outB
+            }
+        }
+    }
+
+    /** Separable blend of one working-space channel (0..255): composites the
+     * mode function against a possibly translucent backdrop per the CSS
+     * general formula. */
+    private fun feBlendSeparableChannel(
+        backdrop: Int,
+        source: Int,
+        @FeBlendMode
+        mode: Int,
+        asAlpha: Float,
+        abAlpha: Float,
+        aoAlpha: Float,
+    ): Int {
+        val cb = backdrop / 255f
+        val cs = source / 255f
+        val blended = when (mode) {
+            FeBlendMode.MULTIPLY -> cb * cs
+            FeBlendMode.SCREEN -> cb + cs - cb * cs
+            FeBlendMode.OVERLAY -> if (cb <= 0.5f) 2f * cb * cs else 1f - 2f * (1f - cb) * (1f - cs)
+            FeBlendMode.DARKEN -> if (cb < cs) cb else cs
+            FeBlendMode.LIGHTEN -> if (cb > cs) cb else cs
+            FeBlendMode.COLOR_DODGE -> when {
+                cb == 0f -> 0f
+                cs >= 1f -> 1f
+                else -> (cb / (1f - cs)).coerceAtMost(1f)
+            }
+            FeBlendMode.COLOR_BURN -> when {
+                cb >= 1f -> 1f
+                cs <= 0f -> 0f
+                else -> (1f - ((1f - cb) / cs).coerceAtMost(1f))
+            }
+            FeBlendMode.HARD_LIGHT -> if (cs <= 0.5f) 2f * cs * cb else 1f - 2f * (1f - cs) * (1f - cb)
+            FeBlendMode.SOFT_LIGHT -> {
+                val d = if (cb <= 0.25f) ((16f * cb - 12f) * cb + 4f) * cb else sqrt(cb)
+                cb + (2f * cs - 1f) * (d - cb)
+            }
+            FeBlendMode.DIFFERENCE -> abs(cb - cs)
+            else -> cb + cs - 2f * cb * cs // FeBlendMode.EXCLUSION
+        }
+        val composite = (1f - abAlpha) * cs * asAlpha + (1f - asAlpha) * cb * abAlpha +
+            asAlpha * abAlpha * blended
+        return clamp255(composite / aoAlpha * 255f)
+    }
+
+    /** One channel of a non-separable blend (hue/saturation/color/luminosity):
+     * derives the full blended triple and returns [channel]. The triple is
+     * recomputed per channel (3x work, zero allocation) — these modes are rare. */
+    private fun feBlendNonSeparableChannel(
+        br: Int, bg: Int, bb: Int,
+        sr: Int, sg: Int, sb: Int,
+        mode: Int,
+        channel: Int,
+        asAlpha: Float,
+        abAlpha: Float,
+        aoAlpha: Float,
+    ): Int {
+        val cbR = br / 255f
+        val cbG = bg / 255f
+        val cbB = bb / 255f
+        val csR = sr / 255f
+        val csG = sg / 255f
+        val csB = sb / 255f
+        // Blended channel in working space.
+        val blended: Float
+        when (mode) {
+            FeBlendMode.HUE -> {
+                val sR = blendSetSatChannel(csR, csG, csB, blendSaturation(cbR, cbG, cbB), 0)
+                val sG = blendSetSatChannel(csR, csG, csB, blendSaturation(cbR, cbG, cbB), 1)
+                val sB = blendSetSatChannel(csR, csG, csB, blendSaturation(cbR, cbG, cbB), 2)
+                blended = blendSetLumChannel(sR, sG, sB, blendLuminosity(cbR, cbG, cbB), channel)
+            }
+            FeBlendMode.SATURATION -> {
+                val sR = blendSetSatChannel(cbR, cbG, cbB, blendSaturation(csR, csG, csB), 0)
+                val sG = blendSetSatChannel(cbR, cbG, cbB, blendSaturation(csR, csG, csB), 1)
+                val sB = blendSetSatChannel(cbR, cbG, cbB, blendSaturation(csR, csG, csB), 2)
+                blended = blendSetLumChannel(sR, sG, sB, blendLuminosity(cbR, cbG, cbB), channel)
+            }
+            FeBlendMode.COLOR -> {
+                blended = blendSetLumChannel(csR, csG, csB, blendLuminosity(cbR, cbG, cbB), channel)
+            }
+            else -> { // FeBlendMode.LUMINOSITY
+                blended = blendSetLumChannel(cbR, cbG, cbB, blendLuminosity(csR, csG, csB), channel)
+            }
+        }
+        val cs = if (channel == 0) csR else if (channel == 1) csG else csB
+        val cb = if (channel == 0) cbR else if (channel == 1) cbG else cbB
+        val composite = (1f - abAlpha) * cs * asAlpha + (1f - asAlpha) * cb * abAlpha +
+            asAlpha * abAlpha * blended
+        return clamp255(composite / aoAlpha * 255f)
+    }
+
+    private fun blendLuminosity(r: Float, g: Float, b: Float): Float =
+        0.3f * r + 0.59f * g + 0.11f * b
+
+    private fun blendSaturation(r: Float, g: Float, b: Float): Float =
+        maxOf(r, g, b) - minOf(r, g, b)
+
+    /** ClipColor per CSS Compositing L1, one channel at a time (scalar, no
+     * allocation; the luminance/min/max of the triple are recomputed per
+     * channel — non-separable modes only). */
+    private fun blendClipColorChannel(r: Float, g: Float, b: Float, channel: Int): Float {
+        val l = blendLuminosity(r, g, b)
+        val n = minOf(r, g, b)
+        val x = maxOf(r, g, b)
+        var c = if (channel == 0) r else if (channel == 1) g else b
+        if (n < 0f) {
+            c = l + ((c - l) * l / (l - n))
+        }
+        if (x > 1f) {
+            c = l + ((c - l) * (1f - l) / (x - l))
+        }
+        return c
+    }
+
+    private fun blendSetLumChannel(r: Float, g: Float, b: Float, l: Float, channel: Int): Float {
+        val d = l - blendLuminosity(r, g, b)
+        return blendClipColorChannel(r + d, g + d, b + d, channel)
+    }
+
+    private fun blendSetSatChannel(r: Float, g: Float, b: Float, s: Float, channel: Int): Float {
+        val cMax = maxOf(r, g, b)
+        val cMin = minOf(r, g, b)
+        if (cMax <= cMin) return 0f
+        val c = if (channel == 0) r else if (channel == 1) g else b
+        return if (c == cMax) s else if (c == cMin) 0f else (c - cMin) * s / (cMax - cMin)
+    }
+
+    public fun feBlend(
+        inputPixels: IntArray,
+        in2Pixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        @FeBlendMode
+        mode: Int,
+        useLinear: Boolean,
+    ) {
+        if (useLinear) {
+            with(ColorLuts.LINEAR_TO_SRGB) {
+                with(ColorLuts.SRGB_TO_LINEAR) {
+                    feBlendLinearImpl(
+                        inputPixels, in2Pixels, outPixels, width,
+                        clipLeft, clipTop, clipRight, clipBottom,
+                        mode,
+                    )
+                }
+            }
+        } else {
+            feBlendGammaImpl(
+                inputPixels, in2Pixels, outPixels, width,
+                clipLeft, clipTop, clipRight, clipBottom,
+                mode,
+            )
+        }
+    }
+
+    /**
+     * feColorMatrix for the matrix/saturate/hueRotate/luminanceToAlpha types,
+     * which all lower to a 4x5 matrix. [matrix] holds the 20 values in SVG
+     * semantics (channels and offsets as 0..1 fractions, row-major). [useLinear]
+     * folds each RGB channel through the sRGB<->linear LUTs around the matrix
+     * (what the default `color-interpolation-filters="linearRGB"` requires;
+     * the canvas ColorMatrixColorFilter path always works in gamma space).
+     * Alpha is never linearized.
+     */
+    context(linearToSrgb: LinearToSrgb, sRgbToLinear: SrgbToLinear)
+    private fun colorMatrixLinearImpl(
+        srcPixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        matrix: FloatArray,
+    ) {
+        val m00 = matrix[0]; val m01 = matrix[1]; val m02 = matrix[2]; val m03 = matrix[3]; val m04 = matrix[4]
+        val m10 = matrix[5]; val m11 = matrix[6]; val m12 = matrix[7]; val m13 = matrix[8]; val m14 = matrix[9]
+        val m20 = matrix[10]; val m21 = matrix[11]; val m22 = matrix[12]; val m23 = matrix[13]; val m24 = matrix[14]
+        val m30 = matrix[15]; val m31 = matrix[16]; val m32 = matrix[17]; val m33 = matrix[18]; val m34 = matrix[19]
+        for (y in clipTop until clipBottom) {
+            val rowOffset = y * width
+            for (x in clipLeft until clipRight) {
+                val i = rowOffset + x
+                val p = srcPixels[i]
+                val a = (p ushr 24) / 255f
+                val r = sRgbToLinear[p ushr 16 and 0xFF] / 255f
+                val g = sRgbToLinear[p ushr 8 and 0xFF] / 255f
+                val b = sRgbToLinear[p and 0xFF] / 255f
+                val or = m00 * r + m01 * g + m02 * b + m03 * a + m04
+                val og = m10 * r + m11 * g + m12 * b + m13 * a + m14
+                val ob = m20 * r + m21 * g + m22 * b + m23 * a + m24
+                val oa = m30 * r + m31 * g + m32 * b + m33 * a + m34
+                val outR = linearToSrgb[clamp255(or * 255f)]
+                val outG = linearToSrgb[clamp255(og * 255f)]
+                val outB = linearToSrgb[clamp255(ob * 255f)]
+                outPixels[i] = (clamp255(oa * 255f) shl 24) or (outR shl 16) or (outG shl 8) or outB
+            }
+        }
+    }
+
+    private fun colorMatrixGammaImpl(
+        srcPixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        matrix: FloatArray,
+    ) {
+        val m00 = matrix[0]; val m01 = matrix[1]; val m02 = matrix[2]; val m03 = matrix[3]; val m04 = matrix[4]
+        val m10 = matrix[5]; val m11 = matrix[6]; val m12 = matrix[7]; val m13 = matrix[8]; val m14 = matrix[9]
+        val m20 = matrix[10]; val m21 = matrix[11]; val m22 = matrix[12]; val m23 = matrix[13]; val m24 = matrix[14]
+        val m30 = matrix[15]; val m31 = matrix[16]; val m32 = matrix[17]; val m33 = matrix[18]; val m34 = matrix[19]
+        for (y in clipTop until clipBottom) {
+            val rowOffset = y * width
+            for (x in clipLeft until clipRight) {
+                val i = rowOffset + x
+                val p = srcPixels[i]
+                val a = (p ushr 24) / 255f
+                val r = (p ushr 16 and 0xFF) / 255f
+                val g = (p ushr 8 and 0xFF) / 255f
+                val b = (p and 0xFF) / 255f
+                val or = m00 * r + m01 * g + m02 * b + m03 * a + m04
+                val og = m10 * r + m11 * g + m12 * b + m13 * a + m14
+                val ob = m20 * r + m21 * g + m22 * b + m23 * a + m24
+                val oa = m30 * r + m31 * g + m32 * b + m33 * a + m34
+                outPixels[i] = (clamp255(oa * 255f) shl 24) or (clamp255(or * 255f) shl 16) or
+                    (clamp255(og * 255f) shl 8) or clamp255(ob * 255f)
+            }
+        }
+    }
+
+    public fun colorMatrix(
+        srcPixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        matrix: FloatArray,
+        useLinear: Boolean,
+    ) {
+        require(matrix.size == 20) { "colorMatrix requires exactly 20 values" }
+        if (useLinear) {
+            with(ColorLuts.LINEAR_TO_SRGB) {
+                with(ColorLuts.SRGB_TO_LINEAR) {
+                    colorMatrixLinearImpl(
+                        srcPixels, outPixels, width,
+                        clipLeft, clipTop, clipRight, clipBottom,
+                        matrix,
+                    )
+                }
+            }
+        } else {
+            colorMatrixGammaImpl(
+                srcPixels, outPixels, width,
+                clipLeft, clipTop, clipRight, clipBottom,
+                matrix,
+            )
+        }
+    }
 
     /**
      * feDisplacementMap kernel. [xChannel]/[yChannel]: 0=R, 1=G, 2=B, 3=A.

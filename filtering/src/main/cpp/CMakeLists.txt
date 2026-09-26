@@ -25,6 +25,7 @@ if (ANDROID_ABI STREQUAL "arm64-v8a")
             lighting/lighting_spot_specular_aarch64_neon.S
     )
     set(DISPLACEMENT_MAP_SOURCES displacement_map/displacement_map_arm64_neon64.S)
+    set(COLOR_MATRIX_SOURCES color_matrix/color_matrix_aarch64_neon.S)
 endif ()
 
 if (ANDROID_ABI STREQUAL "armeabi-v7a")
@@ -43,6 +44,7 @@ if (ANDROID_ABI STREQUAL "armeabi-v7a")
     set(CONVOLVE_SOURCES convolve/convolve_armv7a_neon.S)
     set(DISPLACEMENT_MAP_SOURCES displacement_map/displacement_map_arm32_neon32.S)
     set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_armv7a_neon.S)
+    set(COLOR_MATRIX_SOURCES color_matrix/color_matrix_armv7a_neon.S)
 endif ()
 
 if (ANDROID_ABI STREQUAL "x86_64")
@@ -150,7 +152,9 @@ add_library(ksvgfilters SHARED
         benchmark/cpu_affinity.cpp
         turbulence/turbulence.cpp turbulence/turbulence_arm.cpp
         arithmetic_composite/arithmetic_composite.cpp
-        ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES})
+        fe_blend/fe_blend.cpp
+        color_matrix/color_matrix.cpp
+        ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES} ${COLOR_MATRIX_SOURCES})
 
 # Include path so per-filter headers resolve (convolve.h, turbulence_tables.h, etc.)
 target_include_directories(ksvgfilters PRIVATE
@@ -163,6 +167,8 @@ target_include_directories(ksvgfilters PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/displacement_map
         ${CMAKE_CURRENT_SOURCE_DIR}/lighting
         ${CMAKE_CURRENT_SOURCE_DIR}/arithmetic_composite
+        ${CMAKE_CURRENT_SOURCE_DIR}/fe_blend
+        ${CMAKE_CURRENT_SOURCE_DIR}/color_matrix
         ${CMAKE_CURRENT_SOURCE_DIR}/turbulence)
 
 # Bit-exact float parity with the Kotlin reference loops: forbid FMA contraction.

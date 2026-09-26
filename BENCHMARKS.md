@@ -29,6 +29,14 @@ macOS 15.8, i7-7820X, 64-bit host build.
 | ComponentTransfer | scalar | 512x512 | 0.261 | 1005.67 | 8.05 | 1.00x |  |  |
 | ComponentTransfer | kotlin | 2048x2048 | 9.342 | 448.99 | 3.59 | 0.50x |  |  |
 | ComponentTransfer | scalar | 2048x2048 | 4.690 | 894.24 | 7.15 | 1.00x |  |  |
+| ColorMatrix (linear) | kotlin | 512x512 | 5.384 | 48.69 | 0.58 | 0.63x |  |  |
+| ColorMatrix (linear) | scalar | 512x512 | 3.396 | 77.18 | 0.93 | 1.00x |  |  |
+| ColorMatrix (linear) | kotlin | 2048x2048 | 85.739 | 48.92 | 0.59 | 0.63x |  |  |
+| ColorMatrix (linear) | scalar | 2048x2048 | 53.912 | 77.80 | 0.93 | 1.00x |  |  |
+| ColorMatrix (non-linear) | kotlin | 512x512 | 5.700 | 45.99 | 0.55 | 0.13x |  |  |
+| ColorMatrix (non-linear) | scalar | 512x512 | 0.741 | 353.80 | 4.25 | 1.00x |  |  |
+| ColorMatrix (non-linear) | kotlin | 2048x2048 | 91.732 | 45.72 | 0.55 | 0.13x |  |  |
+| ColorMatrix (non-linear) | scalar | 2048x2048 | 11.823 | 354.76 | 4.26 | 1.00x |  |  |
 | ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 19.212 | 13.64 | 0.11 | 1.37x | ⬆️ |  |
 | ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 26.302 | 9.97 | 0.08 | 1.00x |  |  |
 | ConvolveMatrix (duplicate, alpha) | sse2 | 512x512 | 4.655 | 56.31 | 0.45 | 5.65x | 🟢 |  |
@@ -53,6 +61,18 @@ macOS 15.8, i7-7820X, 64-bit host build.
 | DisplacementMap | scalar | 2048x2048 | 38.145 | 109.96 | 1.32 | 1.00x |  |  |
 | DisplacementMap | sse2 | 2048x2048 | 19.074 | 219.90 | 2.64 | 2.00x | 🟢 |  |
 | DisplacementMap | avx2 | 2048x2048 | 15.391 | 272.51 | 3.27 | 2.48x | 🟢 |  |
+| FeBlend (hue, linear) | kotlin | 512x512 | 24.648 | 10.64 | 0.13 | 0.42x |  |  |
+| FeBlend (hue, linear) | scalar | 512x512 | 10.445 | 25.10 | 0.30 | 1.00x |  |  |
+| FeBlend (hue, linear) | kotlin | 2048x2048 | 393.843 | 10.65 | 0.13 | 0.42x |  |  |
+| FeBlend (hue, linear) | scalar | 2048x2048 | 166.815 | 25.14 | 0.30 | 1.00x |  |  |
+| FeBlend (multiply, linear) | kotlin | 512x512 | 7.803 | 33.60 | 0.40 | 0.55x |  |  |
+| FeBlend (multiply, linear) | scalar | 512x512 | 4.300 | 60.96 | 0.73 | 1.00x |  |  |
+| FeBlend (multiply, linear) | kotlin | 2048x2048 | 125.152 | 33.51 | 0.40 | 0.53x |  |  |
+| FeBlend (multiply, linear) | scalar | 2048x2048 | 66.577 | 63.00 | 0.76 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | kotlin | 512x512 | 7.913 | 33.13 | 0.40 | 0.42x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 512x512 | 3.289 | 79.70 | 0.96 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 125.428 | 33.44 | 0.40 | 0.42x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 52.452 | 79.96 | 0.96 | 1.00x |  |  |
 | GaussianBlur | kotlin | 512x512 | 12.393 | 21.15 | 0.17 | 1.47x | ⬆️ | StackBlur (approx) vs true Gaussian (scalar) |
 | GaussianBlur | scalar | 512x512 | 18.226 | 14.38 | 0.12 | 1.00x |  |  |
 | GaussianBlur | ssse3 | 512x512 | 11.263 | 23.27 | 0.19 | 1.62x | 🟢 |  |
@@ -562,6 +582,18 @@ OnePlus 11 (Snapdragon 8 Gen 2), `arm64-v8a`.
 | ComponentTransfer | scalar | 512x512 | 1.510 | 173.63 | 1.39 | 1.00x |  |  |
 | ComponentTransfer | kotlin | 2048x2048 | 18.235 | 230.02 | 1.84 | 1.35x | ⬆️ |  |
 | ComponentTransfer | scalar | 2048x2048 | 24.614 | 170.40 | 1.36 | 1.00x |  |  |
+| ColorMatrix (linear) | kotlin | 512x512 | 36.399 | 7.20 | 0.09 | 0.30x |  |  |
+| ColorMatrix (linear) | scalar | 512x512 | 10.896 | 24.06 | 0.29 | 1.00x |  |  |
+| ColorMatrix (linear) | neon64 | 512x512 | 1.662 | 157.75 | 1.89 | 6.56x | 🟢 |  |
+| ColorMatrix (linear) | kotlin | 2048x2048 | 574.203 | 7.30 | 0.09 | 0.31x |  |  |
+| ColorMatrix (linear) | scalar | 2048x2048 | 175.521 | 23.90 | 0.29 | 1.00x |  |  |
+| ColorMatrix (linear) | neon64 | 2048x2048 | 27.164 | 154.41 | 1.85 | 6.46x | 🟢 |  |
+| ColorMatrix (non-linear) | kotlin | 512x512 | 36.467 | 7.19 | 0.09 | 0.29x |  |  |
+| ColorMatrix (non-linear) | scalar | 512x512 | 10.440 | 25.11 | 0.30 | 1.00x |  | ⚠️ UNSTABLE BENCH |
+| ColorMatrix (non-linear) | neon64 | 512x512 | 0.967 | 271.23 | 3.25 | **10.80x** | 🚀 |  |
+| ColorMatrix (non-linear) | kotlin | 2048x2048 | 584.371 | 7.18 | 0.09 | 0.29x |  |  |
+| ColorMatrix (non-linear) | scalar | 2048x2048 | 167.979 | 24.97 | 0.30 | 1.00x |  |  |
+| ColorMatrix (non-linear) | neon64 | 2048x2048 | 15.620 | 268.52 | 3.22 | **10.75x** | 🚀 | ⚠️ UNSTABLE BENCH |
 | ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 44.689 | 5.87 | 0.05 | 2.13x | ⬆️ |  |
 | ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 95.120 | 2.76 | 0.02 | 1.00x |  |  |
 | ConvolveMatrix (duplicate, alpha) | neon64 | 512x512 | 7.071 | 37.07 | 0.30 | **13.45x** | 🚀 |  |
@@ -580,6 +612,18 @@ OnePlus 11 (Snapdragon 8 Gen 2), `arm64-v8a`.
 | DisplacementMap | kotlin | 2048x2048 | 87.064 | 48.17 | 0.58 | 1.24x | ⬆️ |  |
 | DisplacementMap | scalar | 2048x2048 | 108.314 | 38.72 | 0.46 | 1.00x |  |  |
 | DisplacementMap | neon64 | 2048x2048 | 8.784 | 477.51 | 5.73 | **12.33x** | 🚀 |  |
+| FeBlend (hue, linear) | kotlin | 512x512 | 233.946 | 1.12 | 0.01 | 0.50x |  |  |
+| FeBlend (hue, linear) | scalar | 512x512 | 117.697 | 2.23 | 0.03 | 1.00x |  |  |
+| FeBlend (hue, linear) | kotlin | 2048x2048 | 3911.498 | 1.07 | 0.01 | 0.48x |  |  |
+| FeBlend (hue, linear) | scalar | 2048x2048 | 1876.588 | 2.24 | 0.03 | 1.00x |  |  |
+| FeBlend (multiply, linear) | kotlin | 512x512 | 38.457 | 6.82 | 0.08 | 0.38x |  |  |
+| FeBlend (multiply, linear) | scalar | 512x512 | 14.522 | 18.05 | 0.22 | 1.00x |  |  |
+| FeBlend (multiply, linear) | kotlin | 2048x2048 | 618.737 | 6.78 | 0.08 | 0.38x |  |  |
+| FeBlend (multiply, linear) | scalar | 2048x2048 | 233.932 | 17.93 | 0.22 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | kotlin | 512x512 | 38.434 | 6.82 | 0.08 | 0.37x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 512x512 | 14.142 | 18.54 | 0.22 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 616.784 | 6.80 | 0.08 | 0.37x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 227.322 | 18.45 | 0.22 | 1.00x |  |  |
 | GaussianBlur | kotlin | 512x512 | 12.397 | 21.15 | 0.17 | **23.52x** | ⬆️ | StackBlur (approx) |
 | GaussianBlur | scalar | 512x512 | 291.558 | 0.90 | 0.01 | 1.00x |  |  |
 | GaussianBlur | neon64 | 512x512 | 5.228 | 50.14 | 0.40 | **55.77x** | 🚀 |  |
@@ -709,6 +753,18 @@ OnePlus 11 (Snapdragon 8 Gen 2), `armeabi-v7a`.
 | ComponentTransfer | scalar | 512x512 | 1.478 | 177.33 | 1.42 | 1.00x |  |  |
 | ComponentTransfer | kotlin | 2048x2048 | 31.822 | 131.81 | 1.05 | 0.76x |  |  |
 | ComponentTransfer | scalar | 2048x2048 | 24.316 | 172.49 | 1.38 | 1.00x |  |  |
+| ColorMatrix (linear) | kotlin | 512x512 | 64.625 | 4.06 | 0.05 | 0.34x |  |  |
+| ColorMatrix (linear) | scalar | 512x512 | 21.899 | 11.97 | 0.14 | 1.00x |  |  |
+| ColorMatrix (linear) | neon32 | 512x512 | 15.577 | 16.83 | 0.20 | 1.41x | 🟢 |  |
+| ColorMatrix (linear) | kotlin | 2048x2048 | 1039.276 | 4.04 | 0.05 | 0.34x |  |  |
+| ColorMatrix (linear) | scalar | 2048x2048 | 351.139 | 11.94 | 0.14 | 1.00x |  |  |
+| ColorMatrix (linear) | neon32 | 2048x2048 | 248.983 | 16.85 | 0.20 | 1.41x | 🟢 |  |
+| ColorMatrix (non-linear) | kotlin | 512x512 | 62.975 | 4.16 | 0.05 | 0.32x |  |  |
+| ColorMatrix (non-linear) | scalar | 512x512 | 20.088 | 13.05 | 0.16 | 1.00x |  |  |
+| ColorMatrix (non-linear) | neon32 | 512x512 | 3.917 | 66.93 | 0.80 | 5.13x | 🟢 |  |
+| ColorMatrix (non-linear) | kotlin | 2048x2048 | 1010.691 | 4.15 | 0.05 | 0.32x |  |  |
+| ColorMatrix (non-linear) | scalar | 2048x2048 | 320.920 | 13.07 | 0.16 | 1.00x |  |  |
+| ColorMatrix (non-linear) | neon32 | 2048x2048 | 63.060 | 66.51 | 0.80 | 5.09x | 🟢 |  |
 | ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 97.989 | 2.68 | 0.02 | 1.94x | ⬆️ |  |
 | ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 189.851 | 1.38 | 0.01 | 1.00x |  |  |
 | ConvolveMatrix (duplicate, alpha) | neon32 | 512x512 | 16.636 | 15.76 | 0.13 | **11.41x** | 🚀 |  |

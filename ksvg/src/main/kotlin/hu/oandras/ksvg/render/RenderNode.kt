@@ -706,6 +706,12 @@ internal class FeBlendRenderNode(
     @JvmField val paint: Paint,
 ) : FilterPrimitiveRenderNode<FeBlend>(sourceElement) {
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_BLEND
+    @JvmField val inputPixels: IntArrayBucket = IntArrayBucket()
+    @JvmField val in2Pixels: IntArrayBucket = IntArrayBucket()
+    @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
+
+    override fun retainedByteCount(): Long =
+        inputPixels.retainedBytes() + in2Pixels.retainedBytes() + outPixels.retainedBytes()
 }
 
     internal class FeTileRenderNode(
@@ -769,6 +775,11 @@ internal class FeColorMatrixRenderNode(
      * Cached [Paint] used to apply the color matrix, built lazily on first use.
      */
     @JvmField var paint: Paint? = null
+    @JvmField val srcPixels: IntArrayBucket = IntArrayBucket()
+    @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
+
+    override fun retainedByteCount(): Long =
+        srcPixels.retainedBytes() + outPixels.retainedBytes()
 }
 
 internal class FeOffsetRenderNode(

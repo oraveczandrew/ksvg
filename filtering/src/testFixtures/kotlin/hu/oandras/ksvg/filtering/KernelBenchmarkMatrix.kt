@@ -92,6 +92,23 @@ public data class ArithmeticCompositeBenchmarkConfig(
     public val useLinear: Boolean
 ) : BenchmarkConfig
 
+/** Benchmark variant for the feBlend family. [mode] is a [FeBlendMode] value. */
+public data class FeBlendBenchmarkConfig(
+    override val name: String,
+    @JvmField
+    @FeBlendMode
+    public val mode: Int,
+    @JvmField
+    public val useLinear: Boolean
+) : BenchmarkConfig
+
+/** Benchmark variant for the feColorMatrix family (4x5 matrix with LUT folding). */
+public data class ColorMatrixBenchmarkConfig(
+    override val name: String,
+    @JvmField
+    public val useLinear: Boolean
+) : BenchmarkConfig
+
 /** Benchmark variant for the lighting family. */
 public data class LightingBenchmarkConfig(
     override val name: String,
@@ -179,6 +196,17 @@ public object KernelBenchmarkMatrix {
     public val arithmeticCompositeConfigs: List<ArithmeticCompositeBenchmarkConfig> = listOf(
         ArithmeticCompositeBenchmarkConfig("ArithmeticComposite (non-linear)", useLinear = false),
         ArithmeticCompositeBenchmarkConfig("ArithmeticComposite (linear)", useLinear = true),
+    )
+
+    public val feBlendConfigs: List<FeBlendBenchmarkConfig> = listOf(
+        FeBlendBenchmarkConfig("FeBlend (multiply, linear)", mode = 1, useLinear = true),
+        FeBlendBenchmarkConfig("FeBlend (multiply, non-linear)", mode = 1, useLinear = false),
+        FeBlendBenchmarkConfig("FeBlend (hue, linear)", mode = 12, useLinear = true),
+    )
+
+    public val colorMatrixConfigs: List<ColorMatrixBenchmarkConfig> = listOf(
+        ColorMatrixBenchmarkConfig("ColorMatrix (linear)", useLinear = true),
+        ColorMatrixBenchmarkConfig("ColorMatrix (non-linear)", useLinear = false),
     )
 
     public val lightingConfigs: List<LightingBenchmarkConfig> = listOf(
@@ -283,6 +311,8 @@ public object KernelBenchmarkMatrix {
             "ComponentTransfer" -> ComponentTransferNative.nativeBackend()
             "Morphology" -> MorphologyNative.nativeBackend()
             "ArithmeticComposite" -> ArithmeticCompositeNative.nativeBackend()
+            "FeBlend" -> FeBlendNative.nativeBackend()
+            "ColorMatrix" -> ColorMatrixNative.nativeBackend()
             "ConvolveMatrix" -> ConvolveNative.nativeBackend()
             "DisplacementMap" -> DisplacementMapNative.nativeBackend()
             "Lighting" -> LightingNative.nativeBackend()
@@ -294,7 +324,7 @@ public object KernelBenchmarkMatrix {
     /** ARGB buffers read/written per pixel by a kernel family (1=generate, 3=two sources). */
     private fun numBuffers(kernel: String): Int =
         when (kernel) {
-            "ArithmeticComposite", "DisplacementMap" -> 3
+            "ArithmeticComposite", "DisplacementMap", "FeBlend", "ColorMatrix" -> 3
             "Turbulence" -> 1
             "UnLinearize", "ComponentTransfer", "Morphology", "ConvolveMatrix",
             "Lighting", "GaussianBlur" -> 2
@@ -329,6 +359,12 @@ public object KernelBenchmarkMatrix {
             }
             for (config in arithmeticCompositeConfigs) {
                 add("ArithmeticComposite" to config)
+            }
+            for (config in feBlendConfigs) {
+                add("FeBlend" to config)
+            }
+            for (config in colorMatrixConfigs) {
+                add("ColorMatrix" to config)
             }
             for (config in lightingConfigs) {
                 add("Lighting" to config)

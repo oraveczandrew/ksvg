@@ -271,6 +271,72 @@ public object SoftwareKernels {
         }
     }
 
+    // --------------------------------------------------------------- feBlend
+
+    /**
+     * feBlend for non-normal [mode] (a [FeBlendMode] value).
+     */
+    @JvmStatic
+    public fun feBlend(
+        inputPixels: IntArray,
+        in2Pixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        @FeBlendMode mode: Int,
+        useLinear: Boolean,
+    ) {
+        if (FeBlendNative.isAvailable) {
+            FeBlendNative.apply(
+                inputPixels, in2Pixels, outPixels, width,
+                clipLeft, clipTop, clipRight, clipBottom,
+                mode, useLinear,
+            )
+        } else {
+            KotlinKernels.feBlend(
+                inputPixels, in2Pixels, outPixels, width,
+                clipLeft, clipTop, clipRight, clipBottom,
+                mode, useLinear,
+            )
+        }
+    }
+
+    // -------------------------------------------------------------- feColorMatrix
+
+    /**
+     * feColorMatrix (matrix/saturate/hueRotate/luminanceToAlpha as a 4x5
+     * matrix in SVG 0..1 semantics).
+     */
+    @JvmStatic
+    public fun colorMatrix(
+        srcPixels: IntArray,
+        outPixels: IntArray,
+        width: Int,
+        clipLeft: Int,
+        clipTop: Int,
+        clipRight: Int,
+        clipBottom: Int,
+        matrix: FloatArray,
+        useLinear: Boolean,
+    ) {
+        if (ColorMatrixNative.isAvailable) {
+            ColorMatrixNative.apply(
+                srcPixels, outPixels, width,
+                clipLeft, clipTop, clipRight, clipBottom,
+                matrix, useLinear,
+            )
+        } else {
+            KotlinKernels.colorMatrix(
+                srcPixels, outPixels, width,
+                clipLeft, clipTop, clipRight, clipBottom,
+                matrix, useLinear,
+            )
+        }
+    }
+
     // -------------------------------------------------------- displacement map
 
     @JvmStatic

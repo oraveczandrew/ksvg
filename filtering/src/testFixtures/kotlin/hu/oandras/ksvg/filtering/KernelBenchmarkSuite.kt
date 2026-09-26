@@ -51,6 +51,8 @@ public fun runBenchmarkCase(case: BenchmarkCase, sink: KernelBenchmarkSink): Uni
         "ComponentTransfer" -> benchmarkComponentTransfer(case, sink)
         "Morphology" -> benchmarkMorphology(case, sink)
         "ArithmeticComposite" -> benchmarkArithmeticComposite(case, sink)
+        "FeBlend" -> benchmarkFeBlend(case, sink)
+        "ColorMatrix" -> benchmarkColorMatrix(case, sink)
         "ConvolveMatrix" -> benchmarkConvolveMatrix(case, sink)
         "DisplacementMap" -> benchmarkDisplacementMap(case, sink)
         "Lighting" -> benchmarkLighting(case, sink)
@@ -210,6 +212,89 @@ private fun benchmarkArithmeticComposite(case: BenchmarkCase, sink: KernelBenchm
             k3 = 0.5f,
             k4 = 0.1f,
             useLinear = useLinear,
+            simdBackend = b
+        )
+    }
+}
+
+private fun benchmarkFeBlend(case: BenchmarkCase, sink: KernelBenchmarkSink) {
+    val cfg = case.config as FeBlendBenchmarkConfig
+    val w = case.width
+    val h = case.height
+    val src1 = IntArray(w * h) { 0xFF00FFFF.toInt() }
+    val src2 = IntArray(w * h) { 0x80FF0000.toInt() }
+    val dst = IntArray(w * h)
+
+    // Scalar-only native family.
+    sink.runKotlin(case) {
+        KotlinKernels.feBlend(
+            inputPixels = src1,
+            in2Pixels = src2,
+            outPixels = dst,
+            width = w,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = w,
+            clipBottom = h,
+            mode = cfg.mode,
+            useLinear = cfg.useLinear
+        )
+    }
+
+    sink.runNative(case) { b ->
+        FeBlendNative.applyForced(
+            src = src1,
+            dst = src2,
+            out = dst,
+            width = w,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = w,
+            clipBottom = h,
+            mode = cfg.mode,
+            useLinear = cfg.useLinear,
+            simdBackend = b
+        )
+    }
+}
+
+private fun benchmarkColorMatrix(case: BenchmarkCase, sink: KernelBenchmarkSink) {
+    val cfg = case.config as ColorMatrixBenchmarkConfig
+    val w = case.width
+    val h = case.height
+    val src = IntArray(w * h) { 0xFF0000FF.toInt() }
+    val dst = IntArray(w * h)
+    // Representative 0.33-everywhere matrix (the filter_primitives `cm` cell).
+    val matrix = FloatArray(20)
+    for (row in 0..2) for (col in 0..2) matrix[row * 5 + col] = 0.33f
+    matrix[18] = 1f
+
+    // Scalar-only native family.
+    sink.runKotlin(case) {
+        KotlinKernels.colorMatrix(
+            srcPixels = src,
+            outPixels = dst,
+            width = w,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = w,
+            clipBottom = h,
+            matrix = matrix,
+            useLinear = cfg.useLinear
+        )
+    }
+
+    sink.runNative(case) { b ->
+        ColorMatrixNative.applyForced(
+            src = src,
+            dst = dst,
+            width = w,
+            clipLeft = 0,
+            clipTop = 0,
+            clipRight = w,
+            clipBottom = h,
+            matrix = matrix,
+            useLinear = cfg.useLinear,
             simdBackend = b
         )
     }
