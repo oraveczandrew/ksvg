@@ -379,6 +379,7 @@ internal class RenderTreeBuilder(
             }
             node.hasAnimationsInSubtree = node.computeHasAnimations()
             node.hasFilterInSubtree = node.hasFilters()
+            node.subtreeContainsBlendMode = node.computeSubtreeContainsBlendMode()
         }
 
         statePop()
@@ -1109,8 +1110,13 @@ internal class RenderTreeBuilder(
             is Svg -> buildGuarded(ref) { buildSvg(ref, effectiveViewport = makeViewPort(null, null, obj.width, obj.height)) }
             else -> build(ref)
         }
-        refNode?.hasAnimationsInSubtree = refNode.computeHasAnimations()
-        refNode?.hasFilterInSubtree = refNode.hasFilters()
+
+        if (refNode != null) {
+            refNode.hasAnimationsInSubtree = refNode.computeHasAnimations()
+            refNode.hasFilterInSubtree = refNode.hasFilters()
+            refNode.subtreeContainsBlendMode = refNode.computeSubtreeContainsBlendMode()
+        }
+
         ref.boundingBox?.let { updateParentBoundingBox(ref) }
         parentPop()
 
