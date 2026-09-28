@@ -101,6 +101,7 @@ import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.withAlpha
 import java.util.Stack
 import kotlin.math.atan2
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.hypot
@@ -681,6 +682,13 @@ internal class Renderer internal constructor(
         if ((this as? GroupRenderNode<*>)?.viewportSpec != null) { content(canvas); return }
         if (disableDisplayListCache) { content(canvas); return }
         val bb = boundingBox ?: run { content(canvas); return }
+        // RenderNode replay positions the node in user-space bounds, but the HW
+        // canvas culls it against the user-space clip: a translated/rotated canvas
+        // moves the content without moving the culled bounds, so such replays
+        // vanish (e.g. only the first of several <use> panels shows). Draw directly
+        // unless the canvas matrix is scale-only. Below API 29 the Picture replay
+        // carries its own translate, so it is unaffected.
+        if (canvasTransformBreaksReplay(canvas)) { content(canvas); return }
 
         var rec = displayList
         if (rec == null) {
@@ -735,6 +743,29 @@ internal class Renderer internal constructor(
             k = k * 31 + textLayoutStyleCacheVersion(node.renderState.style)
         }
         return k
+    }
+
+    /**
+     * True when replaying a RenderNode capture on the given canvas would vanish:
+     * the node is positioned in user-space bounds but culled against the
+     * user-space clip, so any canvas translate/skew moves the content without
+     * moving the culled bounds. Scale-only matrices are safe. Reads the canvas
+     * matrix with pooled objects only (hot path).
+     */
+    private fun canvasTransformBreaksReplay(canvas: Canvas): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+        var breaks = false
+        matrixPool.withPooledObject { m ->
+            @Suppress("DEPRECATION")
+            canvas.getMatrix(m)
+            val v = getValuesFloatArray
+            m.getValues(v)
+            breaks = abs(v[Matrix.MSKEW_X]) > REPLAY_MATRIX_EPSILON ||
+                    abs(v[Matrix.MSKEW_Y]) > REPLAY_MATRIX_EPSILON ||
+                    abs(v[Matrix.MTRANS_X]) > REPLAY_MATRIX_EPSILON ||
+                    abs(v[Matrix.MTRANS_Y]) > REPLAY_MATRIX_EPSILON
+        }
+        return breaks
     }
 
     private fun drawPathContent(canvas: Canvas, node: PathRenderNode, state: RendererState) {
@@ -2657,6 +2688,13 @@ internal class Renderer internal constructor(
         const val LUMINANCE_TO_ALPHA_BLUE: Float = 0.0722f
 
         private const val DEBUG = false
+
+        /**
+         * Canvas-matrix translate/skew below this (user units) still replays a
+         * RenderNode capture instead of drawing directly (see
+         * canvasTransformBreaksReplay).
+         */
+        private const val REPLAY_MATRIX_EPSILON = 1e-3f
 
         private var nativeLoadErrorLogged = false
 
