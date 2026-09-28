@@ -149,12 +149,10 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
             first: Boolean,
             generative: Boolean,
         ) {
-            val bound = if (generative) {
-                true
-            } else when {
-                input == null && first -> false // SourceGraphic: no raw form
-                input == "SourceGraphic" || input == "SourceAlpha" -> false
-                input == null || input == previousResult -> {
+            val bound = generative || when (input) {
+                null if first -> false // SourceGraphic: no raw form
+                "SourceGraphic", "SourceAlpha" -> false
+                null, previousResult -> {
                     val prev = lastRawShader
                     if (lastRawBound && prev != null) {
                         shader.setInputShader("uInput", prev)
@@ -173,7 +171,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         false
                     }
                 }
-            }
+            } // SourceGraphic: no raw form
             lastRawShader = shader
             lastRawBound = bound
             if (resultName != null) {
@@ -724,7 +722,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                         is FeMergeRenderNode -> {
                             var mergeEffect: RenderEffect? = null
-                            primitive.mergeNodes.forEach { inputName ->
+                            primitive.mergeNodes.forEachElement { inputName ->
                                 val inputNodeEffect = resolveEffect(
                                     input = inputName ?: "SourceGraphic",
                                     previousResult = previousResult,
@@ -798,8 +796,9 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                 )
                             }
 
-                            val sigmaX = primitive.blurNode.stdDeviationX * scaleX
-                            val sigmaY = primitive.blurNode.stdDeviationY * scaleY
+                            val blurNode = primitive.blurNode
+                            val sigmaX = blurNode.stdDeviationX * scaleX
+                            val sigmaY = blurNode.stdDeviationY * scaleY
                             val blurredEffect = if (sigmaX > 0f || sigmaY > 0f) {
                                 RenderEffect.createBlurEffect(
                                     /* radiusX = */ skiaBlurRadiusForSigma(sigmaX),
@@ -875,9 +874,9 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
     }
 
     /**
-     * Computes the primitive's user-space subregion (with input-region defaulting per the SVG
+     * Computes the primitive's user-space subregion (with an input-region defaulting per the SVG
      * Filter Effects spec) into [userRegion] and records it for later reference by primitives
-     * that reference this result. The caller remaps [userRegion] to pixel space afterwards.
+     * that reference this result. The caller remaps [userRegion] to pixel space afterward.
      */
     context(renderContext: RenderContext)
     private fun computePrimitiveRegionAndRecord(
@@ -971,8 +970,9 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                 }
 
                 is FeDropShadowRenderNode -> {
-                    expandX += primitive.blurNode.stdDeviationX * scaleX * 5f
-                    expandY += primitive.blurNode.stdDeviationY * scaleY * 5f
+                    val blurNode = primitive.blurNode
+                    expandX += blurNode.stdDeviationX * scaleX * 5f
+                    expandY += blurNode.stdDeviationY * scaleY * 5f
                     offsetX += abs(
                         filterPrimitiveLengthX(
                             length = primitive.sourceElement.dx,
