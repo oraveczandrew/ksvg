@@ -90,6 +90,10 @@ if (ANDROID_ABI STREQUAL "x86_64")
             displacement_map/displacement_map_x86_64_ssse3.S
             displacement_map/displacement_map_x86_64_avx2.S
     )
+    set(COLOR_MATRIX_SOURCES
+            color_matrix/color_matrix_x86_64_ssse3.S
+            color_matrix/color_matrix_x86_64_avx2.S
+    )
 endif ()
 
 if (ANDROID_ABI STREQUAL "x86")
@@ -133,6 +137,7 @@ if (ANDROID_ABI STREQUAL "x86")
             component_transfer/unlinearize_i386_ssse3.S
             component_transfer/unlinearize_i386_avx2.S
     )
+    set(COLOR_MATRIX_SOURCES color_matrix/color_matrix_i386_ssse3.S)
     # i386 ships no SIMD arithmetic kernel: arithmetic_composite routes every
     # backend through the scalar reference there (the hand-written x86-64 .S
     # variants use 64-bit addressing and cannot be assembled for i386).

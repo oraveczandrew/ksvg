@@ -36,6 +36,30 @@ void applyColorMatrixNeon(
         const jbyte* srgbToLinear, const jbyte* linearToSrgb);
 #endif
 
+#if defined(__x86_64__) || defined(_M_X64)
+void applyColorMatrixSsse3(
+        const jint* src, jint* dst,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        const jfloat* matrix,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+void applyColorMatrixAvx2(
+        const jint* src, jint* dst,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        const jfloat* matrix,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+#endif
+
+#if defined(__i386__) || defined(_M_IX86)
+void applyColorMatrixSsse3x86(
+        const jint* src, jint* dst,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        const jfloat* matrix,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

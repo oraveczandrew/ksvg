@@ -20,8 +20,8 @@ package hu.oandras.ksvg.filtering
  * feColorMatrix kernel over unpremultiplied ARGB_8888 ([matrix] holds 20
  * values in SVG 0..1 semantics, row-major; see `KotlinKernels.colorMatrix`).
  *
- * Scalar-only family on every ABI: [nativeBackend] always reports just the
- * scalar backend.
+ * SIMD backends per ABI: NEON64 on arm64, SSSE3 on x86_64/i386, AVX2 on
+ * x86_64; scalar everywhere as the fallback.
  *
  * Stateless and availability follows `libksvgfilters` ([NativeBackend.isAvailable]).
  */

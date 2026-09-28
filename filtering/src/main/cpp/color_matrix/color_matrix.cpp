@@ -91,6 +91,21 @@ jint nativeBackendForAbi() {
     backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     backends |= SIMD_BACKEND_NEON32;
+#elif defined(__x86_64__) || defined(_M_X64)
+    // Baseline x86-64 is SSE2, not SSSE3: advertise SSSE3 only when the CPU
+    // has it (parity tests force every advertised backend; executing SSSE3
+    // rows without SSSE3 is SIGILL). AVX2 needs its own gate (YMM state).
+    if (detectSimdLevel() >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
+    if (detectSimdLevel() >= SIMD_AVX2) {
+        backends |= SIMD_BACKEND_AVX2;
+    }
+#elif defined(__i386__) || defined(_M_IX86)
+    // i386 baseline is SSE2: SSSE3 only when the CPU has it.
+    if (detectSimdLevel() >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
 #endif
     return backends;
 }
@@ -108,6 +123,36 @@ void runForced(const jint* src, jint* dst,
     } else {
         applyColorMatrixNeon(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                              matrix, useLinear, srgbToLinear, linearToSrgb);
+    }
+#elif defined(__x86_64__) || defined(_M_X64)
+    switch (backend) {
+        case SIMD_BACKEND_SCALAR:
+            applyColorMatrixScalar(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                   matrix, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        case SIMD_BACKEND_SSSE3:
+            applyColorMatrixSsse3(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                  matrix, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        case SIMD_BACKEND_AVX2:
+            applyColorMatrixAvx2(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                 matrix, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        default:
+            assert(false && "unsupported forced color_matrix backend on x86_64");
+    }
+#elif defined(__i386__) || defined(_M_IX86)
+    switch (backend) {
+        case SIMD_BACKEND_SCALAR:
+            applyColorMatrixScalar(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                   matrix, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        case SIMD_BACKEND_SSSE3:
+            applyColorMatrixSsse3x86(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                     matrix, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        default:
+            assert(false && "unsupported forced color_matrix backend on x86");
     }
 #else
     (void)backend;
@@ -161,6 +206,31 @@ Java_hu_oandras_ksvg_filtering_ColorMatrixNative_applyNative(
 #if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
         applyColorMatrixNeon(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                              matrix, useLinear, srgbToLinear, linearToSrgb);
+#elif defined(__x86_64__) || defined(_M_X64)
+        // Without SSSE3 stay scalar instead of faulting (baseline x86-64 is
+        // SSE2, not SSSE3). AVX2 serves both paths when present (measured
+        // ~2x over SSSE3 on linear too, so unlike arithmetic there is no
+        // reason to keep linear on SSSE3).
+        const SimdLevel level = detectSimdLevel();
+        if (level >= SIMD_AVX2) {
+            applyColorMatrixAvx2(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                 matrix, useLinear, srgbToLinear, linearToSrgb);
+        } else if (level >= SIMD_SSSE3) {
+            applyColorMatrixSsse3(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                  matrix, useLinear, srgbToLinear, linearToSrgb);
+        } else {
+            applyColorMatrixScalar(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                   matrix, useLinear, srgbToLinear, linearToSrgb);
+        }
+#elif defined(__i386__) || defined(_M_IX86)
+        // i386 baseline is SSE2: SSSE3 only when the CPU has it.
+        if (detectSimdLevel() >= SIMD_SSSE3) {
+            applyColorMatrixSsse3x86(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                     matrix, useLinear, srgbToLinear, linearToSrgb);
+        } else {
+            applyColorMatrixScalar(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
+                                   matrix, useLinear, srgbToLinear, linearToSrgb);
+        }
 #else
         applyColorMatrixScalar(src, dst, width, clipLeft, clipTop, clipRight, clipBottom,
                                matrix, useLinear, srgbToLinear, linearToSrgb);

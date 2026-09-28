@@ -240,6 +240,18 @@ x86_64 emulator (API 29), thermal gating off. Missing backend = not advertised o
 | ComponentTransfer | scalar | 512x512 | 1.27 | 207.14 | 1.66 | 1.00x |  | ⚠️ UNSTABLE BENCH |
 | ComponentTransfer | kotlin | 2048x2048 | 15.93 | 263.37 | 2.11 | 1.21x | ⬆️ | ⚠️ UNSTABLE BENCH |
 | ComponentTransfer | scalar | 2048x2048 | 19.34 | 216.84 | 1.73 | 1.00x |  | ⚠️ UNSTABLE BENCH |
+| ColorMatrix (linear) | kotlin | 512x512 | 73.902 | 3.55 | 0.04 | 0.30x |  |  |
+| ColorMatrix (linear) | scalar | 512x512 | 22.349 | 11.73 | 0.14 | 1.00x |  |  |
+| ColorMatrix (linear) | ssse3 | 512x512 | 6.154 | 42.60 | 0.51 | 3.63x | 🟢 |  |
+| ColorMatrix (linear) | kotlin | 2048x2048 | 1433.335 | 2.93 | 0.04 | 0.16x |  |  |
+| ColorMatrix (linear) | scalar | 2048x2048 | 224.935 | 18.65 | 0.22 | 1.00x |  |  |
+| ColorMatrix (linear) | ssse3 | 2048x2048 | 73.899 | 56.76 | 0.68 | 3.04x | 🟢 |  |
+| ColorMatrix (non-linear) | kotlin | 512x512 | 58.283 | 4.50 | 0.05 | 0.27x |  |  |
+| ColorMatrix (non-linear) | scalar | 512x512 | 15.759 | 16.63 | 0.20 | 1.00x |  |  |
+| ColorMatrix (non-linear) | ssse3 | 512x512 | 1.546 | 169.51 | 2.03 | **10.19x** | 🚀 |  |
+| ColorMatrix (non-linear) | kotlin | 2048x2048 | 561.699 | 7.47 | 0.09 | 0.34x |  |  |
+| ColorMatrix (non-linear) | scalar | 2048x2048 | 190.239 | 22.05 | 0.26 | 1.00x |  |  |
+| ColorMatrix (non-linear) | ssse3 | 2048x2048 | 21.282 | 197.08 | 2.36 | 8.94x | 🟢 |  |
 | ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 62.30 | 4.21 | 0.03 | 2.04x | ⬆️ | ⚠️ UNSTABLE BENCH |
 | ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 127.02 | 2.06 | 0.02 | 1.00x |  | ⚠️ UNSTABLE BENCH |
 | ConvolveMatrix (duplicate, alpha) | sse2 | 512x512 | 8.71 | 30.09 | 0.24 | **14.58x** | 🚀 | ⚠️ UNSTABLE BENCH |
@@ -409,6 +421,18 @@ x86 emulator (API 30). Missing backend = not advertised on this ABI.
 | ComponentTransfer | scalar | 512x512 | 0.95 | 276.06 | 2.21 | 1.00x |  |  |
 | ComponentTransfer | kotlin | 2048x2048 | 17.98 | 233.30 | 1.87 | 0.94x |  |  |
 | ComponentTransfer | scalar | 2048x2048 | 16.85 | 248.89 | 1.99 | 1.00x |  |  |
+| ColorMatrix (linear) | kotlin | 512x512 | 12.514 | 20.95 | 0.25 | 1.42x | ⬆️ |  |
+| ColorMatrix (linear) | scalar | 512x512 | 17.758 | 14.76 | 0.18 | 1.00x |  |  |
+| ColorMatrix (linear) | ssse3 | 512x512 | 2.613 | 100.32 | 1.20 | 6.80x | 🟢 |  |
+| ColorMatrix (linear) | kotlin | 2048x2048 | 188.164 | 22.29 | 0.27 | 1.50x | ⬆️ |  |
+| ColorMatrix (linear) | scalar | 2048x2048 | 283.118 | 14.81 | 0.18 | 1.00x |  |  |
+| ColorMatrix (linear) | ssse3 | 2048x2048 | 42.112 | 99.60 | 1.20 | 6.72x | 🟢 |  |
+| ColorMatrix (non-linear) | kotlin | 512x512 | 11.492 | 22.81 | 0.27 | 1.48x | ⬆️ |  |
+| ColorMatrix (non-linear) | scalar | 512x512 | 17.029 | 15.39 | 0.18 | 1.00x |  |  |
+| ColorMatrix (non-linear) | ssse3 | 512x512 | 1.105 | 237.29 | 2.85 | **15.42x** | 🚀 |  |
+| ColorMatrix (non-linear) | kotlin | 2048x2048 | 180.277 | 23.27 | 0.28 | 1.49x | ⬆️ |  |
+| ColorMatrix (non-linear) | scalar | 2048x2048 | 269.104 | 15.59 | 0.19 | 1.00x |  |  |
+| ColorMatrix (non-linear) | ssse3 | 2048x2048 | 18.417 | 227.75 | 2.73 | **14.61x** | 🚀 |  |
 | ConvolveMatrix (duplicate, alpha) | kotlin | 512x512 | 36.37 | 7.21 | 0.06 | 2.84x | ⬆️ |  |
 | ConvolveMatrix (duplicate, alpha) | scalar | 512x512 | 103.23 | 2.54 | 0.02 | 1.00x |  |  |
 | ConvolveMatrix (duplicate, alpha) | sse2 | 512x512 | 4.98 | 52.65 | 0.42 | **20.73x** | 🚀 |  |

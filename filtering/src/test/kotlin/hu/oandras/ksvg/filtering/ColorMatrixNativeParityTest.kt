@@ -21,11 +21,11 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Byte-exact parity between the native `color_matrix.cpp` scalar kernel
+ * Byte-exact parity between the native `color_matrix.cpp` kernels
  * ([ColorMatrixNative.applyForced]) and the pure-Kotlin reference
  * ([KotlinKernels.colorMatrix]). For every configuration in the shared
  * [ColorMatrixValidationCorpus], every SIMD backend this host advertises
- * is forced and compared byte-for-byte (scalar-only family: just scalar).
+ * is forced and compared byte-for-byte.
  */
 @RunWith(Parameterized::class)
 class ColorMatrixNativeParityTest(
