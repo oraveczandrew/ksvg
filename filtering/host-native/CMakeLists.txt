@@ -71,6 +71,7 @@ add_library(ksvgfilters SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/fe_blend/fe_blend.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/color_matrix/color_matrix.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/color_matrix/color_matrix_i386_ssse3.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/fe_blend/fe_blend_i386_ssse3.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology.cpp
@@ -113,6 +114,8 @@ add_library(ksvgfilters SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/color_matrix/color_matrix.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/color_matrix/color_matrix_x86_64_ssse3.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/color_matrix/color_matrix_x86_64_avx2.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/fe_blend/fe_blend_x86_64_ssse3.S
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/fe_blend/fe_blend_x86_64_avx2.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/displacement_map/displacement_map.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/convolve/convolve_matrix.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/morphology/morphology.cpp

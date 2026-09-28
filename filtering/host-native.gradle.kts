@@ -4,7 +4,7 @@ import java.io.File
 // so JVM unit tests can drive the real native path bit-exactly against the Kotlin
 // reference (TurbulenceNativeParityTest). Output lands in this module's build dir.
 val hostNativeCpp: FileTree = fileTree("src/main/cpp") {
-    include("**/*.cpp", "**/*.h", "**/*.S")
+    include("**/*.cpp", "**/*.h", "**/*.S", "**/*.inc")
 }
 val hostNativeOutputDir: File = layout.buildDirectory.dir("host-native").get().asFile
 val hostLibName: String = when {

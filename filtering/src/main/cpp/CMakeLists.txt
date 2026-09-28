@@ -26,6 +26,9 @@ if (ANDROID_ABI STREQUAL "arm64-v8a")
     )
     set(DISPLACEMENT_MAP_SOURCES displacement_map/displacement_map_arm64_neon64.S)
     set(COLOR_MATRIX_SOURCES color_matrix/color_matrix_aarch64_neon.S)
+    # feBlend NEON64 separable rows, device-verified (FeBlendNativeParityTest
+    # 246/246 on arm64; group E stays scalar, see fe_blend.cpp).
+    set(FE_BLEND_SOURCES fe_blend/fe_blend_aarch64_neon.S)
 endif ()
 
 if (ANDROID_ABI STREQUAL "armeabi-v7a")
@@ -45,6 +48,9 @@ if (ANDROID_ABI STREQUAL "armeabi-v7a")
     set(DISPLACEMENT_MAP_SOURCES displacement_map/displacement_map_arm32_neon32.S)
     set(ARITHMETIC_COMPOSITE_SOURCES arithmetic_composite/arithmetic_composite_armv7a_neon.S)
     set(COLOR_MATRIX_SOURCES color_matrix/color_matrix_armv7a_neon.S)
+    # feBlend NEON32 separable rows (fe_blend_arm32_neon.S); group E
+    # (hue/saturation/color/luminosity) stays scalar, see fe_blend.cpp.
+    set(FE_BLEND_SOURCES fe_blend/fe_blend_arm32_neon.S)
 endif ()
 
 if (ANDROID_ABI STREQUAL "x86_64")
@@ -94,6 +100,10 @@ if (ANDROID_ABI STREQUAL "x86_64")
             color_matrix/color_matrix_x86_64_ssse3.S
             color_matrix/color_matrix_x86_64_avx2.S
     )
+    set(FE_BLEND_SOURCES
+            fe_blend/fe_blend_x86_64_ssse3.S
+            fe_blend/fe_blend_x86_64_avx2.S
+    )
 endif ()
 
 if (ANDROID_ABI STREQUAL "x86")
@@ -138,6 +148,7 @@ if (ANDROID_ABI STREQUAL "x86")
             component_transfer/unlinearize_i386_avx2.S
     )
     set(COLOR_MATRIX_SOURCES color_matrix/color_matrix_i386_ssse3.S)
+    set(FE_BLEND_SOURCES fe_blend/fe_blend_i386_ssse3.S)
     # i386 ships no SIMD arithmetic kernel: arithmetic_composite routes every
     # backend through the scalar reference there (the hand-written x86-64 .S
     # variants use 64-bit addressing and cannot be assembled for i386).
@@ -159,7 +170,7 @@ add_library(ksvgfilters SHARED
         arithmetic_composite/arithmetic_composite.cpp
         fe_blend/fe_blend.cpp
         color_matrix/color_matrix.cpp
-        ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES} ${COLOR_MATRIX_SOURCES})
+        ${BLUR_SOURCES} ${CONVOLVE_SOURCES} ${ARITHMETIC_COMPOSITE_SOURCES} ${TURBULENCE_SOURCES} ${MORPHOLOGY_SOURCES} ${LIGHTING_SOURCES} ${UNLINEARIZE_SOURCES} ${DISPLACEMENT_MAP_SOURCES} ${COLOR_MATRIX_SOURCES} ${FE_BLEND_SOURCES})
 
 # Include path so per-filter headers resolve (convolve.h, turbulence_tables.h, etc.)
 target_include_directories(ksvgfilters PRIVATE

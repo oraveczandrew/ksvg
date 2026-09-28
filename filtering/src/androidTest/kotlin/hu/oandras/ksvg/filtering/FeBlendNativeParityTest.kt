@@ -21,11 +21,19 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Byte-exact parity between the native `fe_blend.cpp` kernels
+ * Parity between the native `fe_blend.cpp` kernels
  * ([FeBlendNative.applyForced]) and the pure-Kotlin reference
  * ([KotlinKernels.feBlend]). For every configuration in the shared
  * [FeBlendValidationCorpus], every SIMD backend this host advertises
- * is forced and compared byte-for-byte.
+ * is forced and compared.
+ *
+ * Tolerance (device-PROVEN): the ARM32 NEON kernel hoists `1/255`
+ * and Newton-Raphson reciprocals and multiplies per pixel, and uses
+ * single-precision `sqrt`, while the reference divides per pixel and
+ * uses double `sqrt`. The x86 SSSE3/AVX2 kernels use the same recipes.
+ * These round differently in rare cases, so exact .5 ties can differ
+ * by ±1 LSB. NEON32/SSSE3/AVX2 therefore allow `maxDelta=1`; scalar
+ * stays byte-exact.
  */
 @NativeParityTest
 @RunWith(Parameterized::class)
@@ -48,6 +56,9 @@ class FeBlendNativeParityTest(
                 }
             }
         }
+
+        private fun tolerance(backend: Int): Int =
+            if (backend == SIMD_NEON32 || backend == SIMD_SSSE3 || backend == SIMD_AVX2) 1 else 0
     }
 
     @Test
@@ -65,7 +76,7 @@ class FeBlendNativeParityTest(
 
         assertColorArrayEquals(
             "feBlend mismatch on [$name] backend ${backendName(backend)}",
-            ref, out,
+            ref, out, maxDelta = tolerance(backend),
         )
     }
 }

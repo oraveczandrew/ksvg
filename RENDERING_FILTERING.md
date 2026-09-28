@@ -62,8 +62,10 @@ canvas type/API level:
 
 The two must agree **closely, not bit-exactly**. The software path and its
 native kernels are compared byte-for-byte by default (parity gate, see §6.3 —
-with documented per-kernel tolerances: ±1 LSB SIMD-tail tolerance of the RIR
-Toolkit Gaussian blur port, `maxDelta = 1` for specular lighting). The GPU path instead goes through Skia
+ with documented per-kernel tolerances: ±1 LSB SIMD-tail tolerance of the RIR
+ Toolkit Gaussian blur port, `maxDelta = 1` for specular lighting and for the
+ feBlend SIMD kernels (NEON32 on ARM, SSSE3/AVX2 on x86: reciprocal-multiply,
+ Newton-Raphson reciprocal, single-precision sqrt)). The GPU path instead goes through Skia
 `RenderEffect` implementations and AGSL `float` (fp32) shaders with different
 rounding/fused-math, premultiplied intermediates and dithering, so ±1-2 LSB
 per-channel differences are expected and normal. GPU parity is therefore a

@@ -99,6 +99,21 @@ public object FeBlendValidationCorpus {
                 add(Case("$name $space subclip 32x32", 32, 32, 4, 4, 28, 28, mode, useLinear,
                     UnLinearizeValidationCorpus.fixedSeedRandom(32 * 32),
                     UnLinearizeValidationCorpus.fixedSeedRandom(32 * 32).reversedArray()))
+                // Odd widths exercise the vector tail + scalar tail.
+                add(Case("$name $space odd 10x10", 10, 10, 0, 0, 10, 10, mode, useLinear,
+                    UnLinearizeValidationCorpus.fixedSeedRandom(10 * 10),
+                    UnLinearizeValidationCorpus.fixedSeedRandom(10 * 10).reversedArray()))
+                add(Case("$name $space odd-subclip 30x30", 30, 30, 3, 5, 26, 27, mode, useLinear,
+                    UnLinearizeValidationCorpus.fixedSeedRandom(30 * 30),
+                    UnLinearizeValidationCorpus.fixedSeedRandom(30 * 30).reversedArray()))
+                // Fuzz shapes: tail-heavy 7x7 (1 block + 3 tail) and 12x12
+                // (3 blocks, no tail) — novel block/tail alignments.
+                add(Case("$name $space fuzz 7x7", 7, 7, 0, 0, 7, 7, mode, useLinear,
+                    UnLinearizeValidationCorpus.fixedSeedRandom(7 * 7),
+                    UnLinearizeValidationCorpus.fixedSeedRandom(7 * 7).reversedArray()))
+                add(Case("$name $space fuzz 12x12", 12, 12, 0, 0, 12, 12, mode, useLinear,
+                    UnLinearizeValidationCorpus.fixedSeedRandom(12 * 12),
+                    UnLinearizeValidationCorpus.fixedSeedRandom(12 * 12).reversedArray()))
             }
         }
         // Alpha edges: fully transparent pair, opaque pair, transparent backdrop.

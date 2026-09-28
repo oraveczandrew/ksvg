@@ -47,6 +47,42 @@ void applyFeBlendScalar(
         jboolean useLinear,
         const jbyte* srgbToLinear, const jbyte* linearToSrgb);
 
+#if defined(__aarch64__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
+// feBlend NEON separable rows (fe_blend_aarch64_neon.S on arm64,
+// fe_blend_arm32_neon.S on armv7). Group E
+// (hue/saturation/color/luminosity) stays scalar on every backend.
+void applyFeBlendNeon(
+        const jint* src, const jint* dst, jint* out,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jint mode,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+#endif
+
+#if defined(__x86_64__) || defined(_M_X64)
+void applyFeBlendSsse3(
+        const jint* src, const jint* dst, jint* out,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jint mode,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+void applyFeBlendAvx2(
+        const jint* src, const jint* dst, jint* out,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jint mode,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+#endif
+
+#if defined(__i386__) || defined(_M_IX86)
+void applyFeBlendSsse3x86(
+        const jint* src, const jint* dst, jint* out,
+        jint width, jint clipLeft, jint clipTop, jint clipRight, jint clipBottom,
+        jint mode,
+        jboolean useLinear,
+        const jbyte* srgbToLinear, const jbyte* linearToSrgb);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

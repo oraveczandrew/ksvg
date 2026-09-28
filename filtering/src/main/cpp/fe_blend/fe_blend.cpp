@@ -68,13 +68,14 @@ inline float blendSaturation(const float r, const float g, const float b) {
     return cMax - cMin;
 }
 
-inline float blendClipColorChannel(const float r, const float g, const float b, const int channel) {
+template <int kChannel>
+inline float blendClipColorChannel(const float r, const float g, const float b) {
     const float l = blendLuminosity(r, g, b);
-    const float n = r < g ? (r < b ? r : b) : (g < b ? g : b);
-    const float x = r > g ? (r > b ? r : b) : (g > b ? g : b);
-    float c = channel == 0 ? r : channel == 1 ? g : b;
+    const float n = r < g ? (r < b ? r : b) : g < b ? g : b;
+    const float x = r > g ? (r > b ? r : b) : g > b ? g : b;
+    float c = kChannel == 0 ? r : kChannel == 1 ? g : b;
     if (n < 0.f) {
-        c = l + ((c - l) * l / (l - n));
+        c = l + (c - l) * l / (l - n);
     }
     if (x > 1.f) {
         c = l + ((c - l) * (1.f - l) / (x - l));
@@ -82,46 +83,49 @@ inline float blendClipColorChannel(const float r, const float g, const float b, 
     return c;
 }
 
-inline float blendSetLumChannel(const float r, const float g, const float b, const float l, const int channel) {
+template <int kChannel>
+inline float blendSetLumChannel(const float r, const float g, const float b, const float l) {
     const float d = l - blendLuminosity(r, g, b);
-    return blendClipColorChannel(r + d, g + d, b + d, channel);
+    return blendClipColorChannel<kChannel>(r + d, g + d, b + d);
 }
 
-inline float blendSetSatChannel(const float r, const float g, const float b, const float s, const int channel) {
+template <int kChannel>
+inline float blendSetSatChannel(const float r, const float g, const float b, const float s) {
     const float cMax = r > g ? (r > b ? r : b) : (g > b ? g : b);
     const float cMin = r < g ? (r < b ? r : b) : (g < b ? g : b);
     if (cMax <= cMin) return 0.f;
-    const float c = channel == 0 ? r : channel == 1 ? g : b;
+    const float c = kChannel == 0 ? r : kChannel == 1 ? g : b;
     if (c == cMax) return s;
     if (c == cMin) return 0.f;
     return (c - cMin) * s / (cMax - cMin);
 }
 
+template <int kChannel>
 inline float nonSeparableBlendChannel(
         const float br, const float bg, const float bb,
         const float sr, const float sg, const float sb,
-        const jint mode, const int channel) {
+        const jint mode) {
     float blended;
     switch (mode) {
         case FE_BLEND_HUE: {
-            const float sR = blendSetSatChannel(sr, sg, sb, blendSaturation(br, bg, bb), 0);
-            const float sG = blendSetSatChannel(sr, sg, sb, blendSaturation(br, bg, bb), 1);
-            const float sB = blendSetSatChannel(sr, sg, sb, blendSaturation(br, bg, bb), 2);
-            blended = blendSetLumChannel(sR, sG, sB, blendLuminosity(br, bg, bb), channel);
+            const float sR = blendSetSatChannel<0>(sr, sg, sb, blendSaturation(br, bg, bb));
+            const float sG = blendSetSatChannel<1>(sr, sg, sb, blendSaturation(br, bg, bb));
+            const float sB = blendSetSatChannel<2>(sr, sg, sb, blendSaturation(br, bg, bb));
+            blended = blendSetLumChannel<kChannel>(sR, sG, sB, blendLuminosity(br, bg, bb));
             break;
         }
         case FE_BLEND_SATURATION: {
-            const float sR = blendSetSatChannel(br, bg, bb, blendSaturation(sr, sg, sb), 0);
-            const float sG = blendSetSatChannel(br, bg, bb, blendSaturation(sr, sg, sb), 1);
-            const float sB = blendSetSatChannel(br, bg, bb, blendSaturation(sr, sg, sb), 2);
-            blended = blendSetLumChannel(sR, sG, sB, blendLuminosity(br, bg, bb), channel);
+            const float sR = blendSetSatChannel<0>(br, bg, bb, blendSaturation(sr, sg, sb));
+            const float sG = blendSetSatChannel<1>(br, bg, bb, blendSaturation(sr, sg, sb));
+            const float sB = blendSetSatChannel<2>(br, bg, bb, blendSaturation(sr, sg, sb));
+            blended = blendSetLumChannel<kChannel>(sR, sG, sB, blendLuminosity(br, bg, bb));
             break;
         }
         case FE_BLEND_COLOR:
-            blended = blendSetLumChannel(sr, sg, sb, blendLuminosity(br, bg, bb), channel);
+            blended = blendSetLumChannel<kChannel>(sr, sg, sb, blendLuminosity(br, bg, bb));
             break;
         default: // FE_BLEND_LUMINOSITY
-            blended = blendSetLumChannel(br, bg, bb, blendLuminosity(sr, sg, sb), channel);
+            blended = blendSetLumChannel<kChannel>(br, bg, bb, blendLuminosity(sr, sg, sb));
             break;
     }
     return blended;
@@ -163,9 +167,9 @@ void applyFeBlendScalarImpl(
             }
             float tr, tg, tb;
             if (mode >= FE_BLEND_HUE) {
-                tr = nonSeparableBlendChannel(br, bg, bb, sr, sg, sb, mode, 0);
-                tg = nonSeparableBlendChannel(br, bg, bb, sr, sg, sb, mode, 1);
-                tb = nonSeparableBlendChannel(br, bg, bb, sr, sg, sb, mode, 2);
+                tr = nonSeparableBlendChannel<0>(br, bg, bb, sr, sg, sb, mode);
+                tg = nonSeparableBlendChannel<1>(br, bg, bb, sr, sg, sb, mode);
+                tb = nonSeparableBlendChannel<2>(br, bg, bb, sr, sg, sb, mode);
             } else {
                 tr = separableBlend(br, sr, mode);
                 tg = separableBlend(bg, sg, mode);
@@ -216,8 +220,41 @@ void applyFeBlendScalar(
 namespace {
 
 jint nativeBackendForAbi() {
-    // Scalar-only family on every ABI.
+#if defined(__aarch64__)
+    // NEON64 separable rows are device-verified (see tmp/FEBLEND_WORKLOG.md).
+    // Group E stays scalar per-mode (see runForced), but the backend bit is
+    // per-kernel, not per-mode.
+    return SIMD_BACKEND_SCALAR | SIMD_BACKEND_NEON64;
+#elif defined(__x86_64__) || defined(_M_X64)
+    // Baseline x86-64 is SSE2, not SSSE3: advertise SSSE3 only when the CPU
+    // has it (parity tests force every advertised backend; executing SSSE3
+    // rows without SSSE3 is SIGILL). Non-separable modes (12..15) stay
+    // scalar (see runForced), but the backend bit is per-kernel, not
+    // per-mode, so SSSE3 is advertised whenever the separable rows can run.
+    jint backends = SIMD_BACKEND_SCALAR;
+    if (detectSimdLevel() >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
+    if (detectSimdLevel() >= SIMD_AVX2) {
+        backends |= SIMD_BACKEND_AVX2;
+    }
+    return backends;
+#elif defined(__i386__) || defined(_M_IX86)
+    // i386 baseline is SSE2: SSSE3 only when the CPU has it.
+    jint backends = SIMD_BACKEND_SCALAR;
+    if (detectSimdLevel() >= SIMD_SSSE3) {
+        backends |= SIMD_BACKEND_SSSE3;
+    }
+    return backends;
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    // armeabi-v7a builds with -mfpu=neon (same as the other NEON32
+    // kernels); group E stays scalar per-mode (see runForced), but the
+    // backend bit is per-kernel, not per-mode.
+    return SIMD_BACKEND_SCALAR | SIMD_BACKEND_NEON32;
+#else
+    // Scalar-only family on the remaining ABIs.
     return SIMD_BACKEND_SCALAR;
+#endif
 }
 
 void runForced(const jint* src, const jint* dst, jint* out,
@@ -226,12 +263,92 @@ void runForced(const jint* src, const jint* dst, jint* out,
                const jint backend) {
     const auto* srgbToLinear = reinterpret_cast<const jbyte*>(ksvg_srgb_to_linear_lut);
     const auto* linearToSrgb = reinterpret_cast<const jbyte*>(ksvg_linear_to_srgb_lut);
+#if defined(__aarch64__)
+    // Group E (hue/saturation/color/luminosity) has no SIMD row yet:
+    // always scalar, on every backend including forced.
+    if (mode >= FE_BLEND_HUE) {
+        applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                           mode, useLinear, srgbToLinear, linearToSrgb);
+        return;
+    }
+    if (backend == SIMD_BACKEND_SCALAR) {
+        applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                           mode, useLinear, srgbToLinear, linearToSrgb);
+    } else if (backend == SIMD_BACKEND_NEON64) {
+        applyFeBlendNeon(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                         mode, useLinear, srgbToLinear, linearToSrgb);
+    } else {
+        assert(false && "unsupported forced fe_blend backend on arm64");
+    }
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+    // Group E (hue/saturation/color/luminosity) has no SIMD row yet:
+    // always scalar, on every backend including forced.
+    if (mode >= FE_BLEND_HUE) {
+        applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                           mode, useLinear, srgbToLinear, linearToSrgb);
+        return;
+    }
+    if (backend == SIMD_BACKEND_SCALAR) {
+        applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                           mode, useLinear, srgbToLinear, linearToSrgb);
+    } else if (backend == SIMD_BACKEND_NEON32) {
+        applyFeBlendNeon(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                         mode, useLinear, srgbToLinear, linearToSrgb);
+    } else {
+        assert(false && "unsupported forced fe_blend backend on arm32");
+    }
+#elif defined(__x86_64__) || defined(_M_X64)
+    // Group E (hue/saturation/color/luminosity) has no SIMD row yet:
+    // always scalar, on every backend including forced.
+    if (mode >= FE_BLEND_HUE) {
+        applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                           mode, useLinear, srgbToLinear, linearToSrgb);
+        return;
+    }
+    switch (backend) {
+        case SIMD_BACKEND_SCALAR:
+            applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                               mode, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        case SIMD_BACKEND_SSSE3:
+            applyFeBlendSsse3(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                              mode, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        case SIMD_BACKEND_AVX2:
+            applyFeBlendAvx2(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                             mode, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        default:
+            assert(false && "unsupported forced fe_blend backend on x86_64");
+    }
+#elif defined(__i386__) || defined(_M_IX86)
+    // Group E (hue/saturation/color/luminosity) has no SIMD row yet:
+    // always scalar, on every backend including forced.
+    if (mode >= FE_BLEND_HUE) {
+        applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                           mode, useLinear, srgbToLinear, linearToSrgb);
+        return;
+    }
+    switch (backend) {
+        case SIMD_BACKEND_SCALAR:
+            applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                               mode, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        case SIMD_BACKEND_SSSE3:
+            applyFeBlendSsse3x86(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                                 mode, useLinear, srgbToLinear, linearToSrgb);
+            break;
+        default:
+            assert(false && "unsupported forced fe_blend backend on x86");
+    }
+#else
     if (backend == SIMD_BACKEND_SCALAR) {
         applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
                            mode, useLinear, srgbToLinear, linearToSrgb);
     } else {
         assert(false && "unsupported forced fe_blend backend (scalar-only family)");
     }
+#endif
 }
 
 } // namespace
@@ -276,8 +393,52 @@ Java_hu_oandras_ksvg_filtering_FeBlendNative_applyNative(
     jint* out = static_cast<jint*>(env->GetPrimitiveArrayCritical(jOut, nullptr));
 
     if (src && dst && out) {
+#if defined(__aarch64__)
+        // Group E stays scalar until it gets a SIMD row.
+        if (mode >= FE_BLEND_HUE) {
+            applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                               mode, useLinear, srgbToLinear, linearToSrgb);
+        } else {
+            applyFeBlendNeon(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                             mode, useLinear, srgbToLinear, linearToSrgb);
+        }
+#elif defined(__ARM_NEON__) || defined(__ARM_NEON)
+        // Group E stays scalar until it gets a SIMD row.
+        if (mode >= FE_BLEND_HUE) {
+            applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                               mode, useLinear, srgbToLinear, linearToSrgb);
+        } else {
+            applyFeBlendNeon(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                             mode, useLinear, srgbToLinear, linearToSrgb);
+        }
+#elif defined(__x86_64__) || defined(_M_X64)
+        // Without SSSE3 stay scalar instead of faulting (baseline x86-64 is
+        // SSE2, not SSSE3). AVX2 serves both paths when present. Group E
+        // stays scalar until it gets a SIMD row.
+        if (mode >= FE_BLEND_HUE || detectSimdLevel() < SIMD_SSSE3) {
+            applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                               mode, useLinear, srgbToLinear, linearToSrgb);
+        } else if (detectSimdLevel() >= SIMD_AVX2) {
+            applyFeBlendAvx2(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                              mode, useLinear, srgbToLinear, linearToSrgb);
+        } else {
+            applyFeBlendSsse3(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                              mode, useLinear, srgbToLinear, linearToSrgb);
+        }
+#elif defined(__i386__) || defined(_M_IX86)
+        // i386 baseline is SSE2: SSSE3 only when the CPU has it. Group E
+        // stays scalar until it gets a SIMD row.
+        if (mode >= FE_BLEND_HUE || detectSimdLevel() < SIMD_SSSE3) {
+            applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                               mode, useLinear, srgbToLinear, linearToSrgb);
+        } else {
+            applyFeBlendSsse3x86(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
+                                 mode, useLinear, srgbToLinear, linearToSrgb);
+        }
+#else
         applyFeBlendScalar(src, dst, out, width, clipLeft, clipTop, clipRight, clipBottom,
                            mode, useLinear, srgbToLinear, linearToSrgb);
+#endif
     }
 
     if (out) env->ReleasePrimitiveArrayCritical(jOut, out, 0);

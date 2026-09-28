@@ -61,18 +61,26 @@ macOS 15.8, i7-7820X, 64-bit host build.
 | DisplacementMap | scalar | 2048x2048 | 38.145 | 109.96 | 1.32 | 1.00x |  |  |
 | DisplacementMap | sse2 | 2048x2048 | 19.074 | 219.90 | 2.64 | 2.00x | 🟢 |  |
 | DisplacementMap | avx2 | 2048x2048 | 15.391 | 272.51 | 3.27 | 2.48x | 🟢 |  |
-| FeBlend (hue, linear) | kotlin | 512x512 | 24.648 | 10.64 | 0.13 | 0.42x |  |  |
-| FeBlend (hue, linear) | scalar | 512x512 | 10.445 | 25.10 | 0.30 | 1.00x |  |  |
-| FeBlend (hue, linear) | kotlin | 2048x2048 | 393.843 | 10.65 | 0.13 | 0.42x |  |  |
-| FeBlend (hue, linear) | scalar | 2048x2048 | 166.815 | 25.14 | 0.30 | 1.00x |  |  |
-| FeBlend (multiply, linear) | kotlin | 512x512 | 7.803 | 33.60 | 0.40 | 0.55x |  |  |
-| FeBlend (multiply, linear) | scalar | 512x512 | 4.300 | 60.96 | 0.73 | 1.00x |  |  |
-| FeBlend (multiply, linear) | kotlin | 2048x2048 | 125.152 | 33.51 | 0.40 | 0.53x |  |  |
-| FeBlend (multiply, linear) | scalar | 2048x2048 | 66.577 | 63.00 | 0.76 | 1.00x |  |  |
-| FeBlend (multiply, non-linear) | kotlin | 512x512 | 7.913 | 33.13 | 0.40 | 0.42x |  |  |
-| FeBlend (multiply, non-linear) | scalar | 512x512 | 3.289 | 79.70 | 0.96 | 1.00x |  |  |
-| FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 125.428 | 33.44 | 0.40 | 0.42x |  |  |
-| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 52.452 | 79.96 | 0.96 | 1.00x |  |  |
+| FeBlend (hue, linear) | kotlin | 512x512 | 23.978 | 10.49 | 0.13 | 0.39x |  |  |
+| FeBlend (hue, linear) | scalar | 512x512 | 9.840 | 26.64 | 0.32 | 1.00x |  |  |
+| FeBlend (hue, linear) | kotlin | 2048x2048 | 382.568 | 10.96 | 0.13 | 0.41x |  |  |
+| FeBlend (hue, linear) | scalar | 2048x2048 | 158.171 | 26.52 | 0.32 | 1.00x |  |  |
+| FeBlend (multiply, linear) | kotlin | 512x512 | 7.468 | 35.10 | 0.42 | 0.53x |  |  |
+| FeBlend (multiply, linear) | scalar | 512x512 | 3.993 | 65.66 | 0.79 | 1.00x |  |  |
+| FeBlend (multiply, linear) | ssse3 | 512x512 | 3.503 | 74.83 | 0.90 | 1.14x | 🟢 |  |
+| FeBlend (multiply, linear) | avx2 | 512x512 | 2.511 | 103.95 | 1.25 | 1.58x | 🟢 |  |
+| FeBlend (multiply, linear) | kotlin | 2048x2048 | 119.290 | 35.16 | 0.42 | 0.53x |  |  |
+| FeBlend (multiply, linear) | scalar | 2048x2048 | 63.649 | 65.90 | 0.79 | 1.00x |  |  |
+| FeBlend (multiply, linear) | ssse3 | 2048x2048 | 55.887 | 75.05 | 0.90 | 1.14x | 🟢 |  |
+| FeBlend (multiply, linear) | avx2 | 2048x2048 | 40.125 | 104.53 | 1.25 | 1.59x | 🟢 |  |
+| FeBlend (multiply, non-linear) | kotlin | 512x512 | 7.471 | 35.09 | 0.42 | 0.42x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 512x512 | 3.163 | 82.88 | 0.99 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | ssse3 | 512x512 | 2.140 | 122.51 | 1.47 | 1.48x | 🟢 |  |
+| FeBlend (multiply, non-linear) | avx2 | 512x512 | 1.759 | 149.06 | 1.79 | 1.80x | 🟢 |  |
+| FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 120.373 | 34.84 | 0.42 | 0.42x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 50.896 | 82.41 | 0.99 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | ssse3 | 2048x2048 | 34.231 | 122.53 | 1.47 | 1.49x | 🟢 |  |
+| FeBlend (multiply, non-linear) | avx2 | 2048x2048 | 28.029 | 149.64 | 1.80 | 1.82x | 🟢 |  |
 | GaussianBlur | kotlin | 512x512 | 12.393 | 21.15 | 0.17 | 1.47x | ⬆️ | StackBlur (approx) vs true Gaussian (scalar) |
 | GaussianBlur | scalar | 512x512 | 18.226 | 14.38 | 0.12 | 1.00x |  |  |
 | GaussianBlur | ssse3 | 512x512 | 11.263 | 23.27 | 0.19 | 1.62x | 🟢 |  |
@@ -270,6 +278,22 @@ x86_64 emulator (API 29), thermal gating off. Missing backend = not advertised o
 | DisplacementMap | kotlin | 2048x2048 | 89.63 | 46.80 | 0.56 | 1.25x | ⬆️ | ⚠️ UNSTABLE BENCH |
 | DisplacementMap | scalar | 2048x2048 | 112.23 | 37.37 | 0.45 | 1.00x |  |  |
 | DisplacementMap | sse2 | 2048x2048 | 9.19 | 456.30 | 5.48 | **12.21x** | 🚀 | ⚠️ UNSTABLE BENCH |
+| FeBlend (hue, linear) | kotlin | 512x512 | 60.183 | 4.36 | 0.05 | 1.08x | ⬆️ |  |
+| FeBlend (hue, linear) | scalar | 512x512 | 65.163 | 4.02 | 0.05 | 1.00x |  |  |
+| FeBlend (hue, linear) | kotlin | 2048x2048 | 777.657 | 5.39 | 0.06 | 1.20x | ⬆️ |  |
+| FeBlend (hue, linear) | scalar | 2048x2048 | 932.569 | 4.50 | 0.05 | 1.00x |  |  |
+| FeBlend (multiply, linear) | kotlin | 512x512 | 17.005 | 15.42 | 0.18 | 0.96x |  |  |
+| FeBlend (multiply, linear) | scalar | 512x512 | 16.291 | 16.09 | 0.19 | 1.00x |  |  |
+| FeBlend (multiply, linear) | ssse3 | 512x512 | 3.996 | 65.61 | 0.79 | 4.08x | 🟢 |  |
+| FeBlend (multiply, linear) | kotlin | 2048x2048 | 276.150 | 15.19 | 0.18 | 0.83x |  |  |
+| FeBlend (multiply, linear) | scalar | 2048x2048 | 228.966 | 18.32 | 0.22 | 1.00x |  |  |
+| FeBlend (multiply, linear) | ssse3 | 2048x2048 | 68.668 | 61.08 | 0.73 | 3.33x | 🟢 |  |
+| FeBlend (multiply, non-linear) | kotlin | 512x512 | 17.061 | 15.36 | 0.18 | 0.86x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 512x512 | 14.675 | 17.86 | 0.21 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | ssse3 | 512x512 | 2.481 | 105.64 | 1.27 | 5.91x | 🟢 |  |
+| FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 263.513 | 15.92 | 0.19 | 0.84x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 222.190 | 18.88 | 0.23 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | ssse3 | 2048x2048 | 39.556 | 106.03 | 1.27 | 5.62x | 🟢 |  |
 | GaussianBlur | kotlin | 512x512 | 22.33 | 11.74 | 0.09 | 10.18x | ⬆️ |  |
 | GaussianBlur | scalar | 512x512 | 227.29 | 1.15 | 0.01 | 1.00x |  | ⚠️ UNSTABLE BENCH |
 | GaussianBlur | ssse3 | 512x512 | 17.52 | 14.97 | 0.12 | **12.98x** | 🚀 | ⚠️ UNSTABLE BENCH |
@@ -451,6 +475,22 @@ x86 emulator (API 30). Missing backend = not advertised on this ABI.
 | DisplacementMap | kotlin | 2048x2048 | 65.65 | 63.89 | 0.77 | 1.84x | ⬆️ |  |
 | DisplacementMap | scalar | 2048x2048 | 120.75 | 34.73 | 0.42 | 1.00x |  |  |
 | DisplacementMap | ssse3 | 2048x2048 | 7.85 | 534.26 | 6.41 | **15.38x** | 🚀 |  |
+| FeBlend (hue, linear) | kotlin | 512x512 | 48.86 | 5.37 | 0.06 | 1.69x | ⬆️ |  |
+| FeBlend (hue, linear) | scalar | 512x512 | 82.57 | 3.17 | 0.04 | 1.00x |  |  |
+| FeBlend (hue, linear) | kotlin | 2048x2048 | 777.56 | 5.39 | 0.06 | 1.75x | ⬆️ |  |
+| FeBlend (hue, linear) | scalar | 2048x2048 | 1362.27 | 3.08 | 0.04 | 1.00x |  | ⚠️ UNSTABLE |
+| FeBlend (multiply, linear) | kotlin | 512x512 | 15.55 | 16.85 | 0.20 | 1.31x | ⬆️ |  |
+| FeBlend (multiply, linear) | scalar | 512x512 | 20.43 | 12.83 | 0.15 | 1.00x |  |  |
+| FeBlend (multiply, linear) | ssse3 | 512x512 | 3.75 | 69.86 | 0.84 | 5.44x | 🟢 |  |
+| FeBlend (multiply, linear) | kotlin | 2048x2048 | 251.74 | 16.66 | 0.20 | 1.31x | ⬆️ |  |
+| FeBlend (multiply, linear) | scalar | 2048x2048 | 328.82 | 12.76 | 0.15 | 1.00x |  |  |
+| FeBlend (multiply, linear) | ssse3 | 2048x2048 | 60.63 | 69.18 | 0.83 | 5.42x | 🟢 |  |
+| FeBlend (multiply, non-linear) | kotlin | 512x512 | 14.89 | 17.60 | 0.21 | 1.35x | ⬆️ |  |
+| FeBlend (multiply, non-linear) | scalar | 512x512 | 20.14 | 13.01 | 0.16 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | ssse3 | 512x512 | 2.64 | 99.41 | 1.19 | 7.64x | 🟢 |  |
+| FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 234.50 | 17.89 | 0.21 | 1.35x | ⬆️ |  |
+| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 316.99 | 13.23 | 0.16 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | ssse3 | 2048x2048 | 44.50 | 94.25 | 1.13 | 7.12x | 🟢 |  |
 | GaussianBlur | kotlin | 512x512 | 18.84 | 13.91 | 0.11 | 13.40x | ⬆️ | ⚠️ UNSTABLE BENCH |
 | GaussianBlur | scalar | 512x512 | 252.55 | 1.04 | 0.01 | 1.00x |  |  |
 | GaussianBlur | ssse3 | 512x512 | 12.46 | 21.03 | 0.17 | **20.26x** | 🚀 |  |
@@ -642,12 +682,16 @@ OnePlus 11 (Snapdragon 8 Gen 2), `arm64-v8a`.
 | FeBlend (hue, linear) | scalar | 2048x2048 | 1876.588 | 2.24 | 0.03 | 1.00x |  |  |
 | FeBlend (multiply, linear) | kotlin | 512x512 | 38.457 | 6.82 | 0.08 | 0.38x |  |  |
 | FeBlend (multiply, linear) | scalar | 512x512 | 14.522 | 18.05 | 0.22 | 1.00x |  |  |
+| FeBlend (multiply, linear) | neon64 | 512x512 | 3.955 | 66.28 | 0.80 | 3.66x | 🟢 |  |
 | FeBlend (multiply, linear) | kotlin | 2048x2048 | 618.737 | 6.78 | 0.08 | 0.38x |  |  |
 | FeBlend (multiply, linear) | scalar | 2048x2048 | 233.932 | 17.93 | 0.22 | 1.00x |  |  |
+| FeBlend (multiply, linear) | neon64 | 2048x2048 | 63.517 | 66.03 | 0.79 | 3.67x | 🟢 |  |
 | FeBlend (multiply, non-linear) | kotlin | 512x512 | 38.434 | 6.82 | 0.08 | 0.37x |  |  |
 | FeBlend (multiply, non-linear) | scalar | 512x512 | 14.142 | 18.54 | 0.22 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | neon64 | 512x512 | 2.858 | 91.72 | 1.10 | 4.94x | 🟢 |  |
 | FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 616.784 | 6.80 | 0.08 | 0.37x |  |  |
-| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 227.322 | 18.45 | 0.22 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 227.322 | 18.45 | 0.19 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | neon64 | 2048x2048 | 46.433 | 90.33 | 1.08 | 4.90x | 🟢 |  |
 | GaussianBlur | kotlin | 512x512 | 12.397 | 21.15 | 0.17 | **23.52x** | ⬆️ | StackBlur (approx) |
 | GaussianBlur | scalar | 512x512 | 291.558 | 0.90 | 0.01 | 1.00x |  |  |
 | GaussianBlur | neon64 | 512x512 | 5.228 | 50.14 | 0.40 | **55.77x** | 🚀 |  |
@@ -807,6 +851,22 @@ OnePlus 11 (Snapdragon 8 Gen 2), `armeabi-v7a`.
 | DisplacementMap | kotlin | 2048x2048 | 180.692 | 23.21 | 0.28 | 1.03x | ⬆️ |  |
 | DisplacementMap | scalar | 2048x2048 | 186.921 | 22.44 | 0.27 | 1.00x |  |  |
 | DisplacementMap | neon32 | 2048x2048 | 23.084 | 181.70 | 2.18 | 8.10x | 🟢 |  |
+| FeBlend (hue, linear) | kotlin | 512x512 | 516.577 | 0.51 | 0.01 | 0.32x |  |  |
+| FeBlend (hue, linear) | scalar | 512x512 | 163.856 | 1.60 | 0.02 | 1.00x |  |  |
+| FeBlend (hue, linear) | kotlin | 2048x2048 | 8249.922 | 0.51 | 0.01 | 0.32x |  |  |
+| FeBlend (hue, linear) | scalar | 2048x2048 | 2628.567 | 1.60 | 0.02 | 1.00x |  |  |
+| FeBlend (multiply, linear) | kotlin | 512x512 | 78.940 | 3.32 | 0.04 | 0.35x |  |  |
+| FeBlend (multiply, linear) | scalar | 512x512 | 27.698 | 9.46 | 0.11 | 1.00x |  |  |
+| FeBlend (multiply, linear) | neon32 | 512x512 | 17.588 | 14.90 | 0.18 | 1.57x | 🟢 |  |
+| FeBlend (multiply, linear) | kotlin | 2048x2048 | 1268.076 | 3.31 | 0.04 | 0.35x |  |  |
+| FeBlend (multiply, linear) | scalar | 2048x2048 | 444.962 | 9.43 | 0.11 | 1.00x |  |  |
+| FeBlend (multiply, linear) | neon32 | 2048x2048 | 281.423 | 14.90 | 0.18 | 1.58x | 🟢 |  |
+| FeBlend (multiply, non-linear) | kotlin | 512x512 | 78.856 | 3.32 | 0.04 | 0.33x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 512x512 | 26.413 | 9.92 | 0.12 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | neon32 | 512x512 | 5.265 | 49.79 | 0.60 | 5.02x | 🟢 |  |
+| FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 1263.039 | 3.32 | 0.04 | 0.33x |  |  |
+| FeBlend (multiply, non-linear) | scalar | 2048x2048 | 422.286 | 9.93 | 0.12 | 1.00x |  |  |
+| FeBlend (multiply, non-linear) | neon32 | 2048x2048 | 84.465 | 49.66 | 0.60 | 5.00x | 🟢 |  |
 | GaussianBlur | kotlin | 512x512 | 27.400 | 9.57 | 0.08 | 13.63x | ⬆️ | StackBlur (approx) |
 | GaussianBlur | scalar | 512x512 | 373.322 | 0.70 | 0.01 | 1.00x |  |  |
 | GaussianBlur | neon32 | 512x512 | 8.751 | 29.96 | 0.24 | **42.66x** | 🚀 |  |
