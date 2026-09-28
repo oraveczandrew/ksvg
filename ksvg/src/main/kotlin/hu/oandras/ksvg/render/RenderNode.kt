@@ -547,6 +547,13 @@ internal class PatternRenderNode(
 ) : RenderNode<Pattern>(sourceElement) {
     @JvmField var hasOverflow: Boolean = true
     @JvmField var hasAnimations: Boolean = false
+    /**
+     * True when the subtree contains directly rendered text. Glyph runs cannot
+     * take the baked-path fast path in [hu.oandras.ksvg.render.Renderer.fillWithPattern]
+     * (their positions live in runs, not in a transformable path), so such
+     * patterns keep the legacy canvas-scaled content transform.
+     */
+    @JvmField var hasTextContent: Boolean = false
 
     override fun hasMarkers(): Boolean {
         return super.hasMarkers() || children.anyElement { it.hasMarkers() }

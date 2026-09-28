@@ -146,6 +146,19 @@ internal class Renderer internal constructor(
     // acceleration / API level (set from RenderOptions.softwareFiltering()).
     private var forceSoftwareFiltering: Boolean = false
 
+    /**
+     * Content-space to user-space scale for pattern tiles without a viewBox
+     * whose `patternContentUnits` is `objectBoundingBox`, baked into a pooled
+     * path per draw instead of living on the canvas: sub-1-unit pattern
+     * geometry would otherwise vanish on GPU canvases (rect fast-path cull),
+     * while the baked super-unit copy draws everywhere. Same geometry as the
+     * legacy canvas scale, so software output is unchanged. Set only around
+     * the tile loop in [fillWithPattern] (saved/restored for nesting); null
+     * everywhere else, including text-containing patterns which keep the
+     * legacy canvas-scaled transform (glyph runs have no transformable path).
+     */
+    private var patternBakeMatrix: Matrix? = null
+
     // Reused across text renders to avoid per-element allocation in the render loop.
     private val plainTextDrawer = PlainTextDrawer(state)
 
@@ -807,6 +820,14 @@ internal class Renderer internal constructor(
         }
 
         // Otherwise do a normal fill
+        val bake = patternBakeMatrix
+        if (bake != null) {
+            pathPool.withPooledObject { tmp ->
+                path.transform(bake, tmp)
+                canvas.drawPath(tmp, s.fillPaint)
+            }
+            return
+        }
         canvas.drawPath(path, s.fillPaint)
     }
 
@@ -822,6 +843,18 @@ internal class Renderer internal constructor(
             return
         }
 
+        val bake = patternBakeMatrix
+        if (bake != null) {
+            pathPool.withPooledObject { tmp ->
+                path.transform(bake, tmp)
+                doStrokePathContent(tmp, canvas)
+            }
+            return
+        }
+        doStrokePathContent(path, canvas)
+    }
+
+    private fun doStrokePathContent(path: Path, canvas: Canvas) {
         if (state.style.vectorEffect == VectorEffect.NonScalingStroke) {
             // For non-scaling-stroke, the stroke width is not transformed along with the path.
             // It will be rendered at the same width no matter how the document contents are transformed.
@@ -2428,61 +2461,84 @@ internal class Renderer internal constructor(
                 val right = areaMaxX
                 val bottom = areaMaxY
 
-                withNewRenderLayer(
-                    canvas = canvas,
-                    node = patternNode,
-                    opacityAdjustment = objFillOpacity
-                ) { canvas, _ ->
-                    var stepY = originY
-                    while (stepY < bottom) {
-                        var stepX = originX
-                        while (stepX < right) {
-                            val minX = stepX
-                            val minY = stepY
+                // Baked-path fast path (see patternBakeMatrix): without a viewBox and
+                // with bbox content units, the tile content scale is baked into pooled
+                // paths per draw instead of living on the canvas, so sub-1-unit
+                // content stays drawable on GPU canvases. The canvas keeps only the
+                // per-tile translate (+ seam overlap). Text-containing patterns keep
+                // the legacy canvas-scaled transform.
+                val usePathBake = pattern.viewBox == null &&
+                        pattern.patternContentUnitsAreUser == false &&
+                        !patternNode.hasTextContent
+                matrixPool.withPooledObject { bake ->
+                    if (usePathBake) {
+                        bake.reset()
+                        bake.preScale(bb.width, bb.height)
+                    }
+                    val prevBake = patternBakeMatrix
+                    patternBakeMatrix = if (usePathBake) bake else null
+                    try {
+                        withNewRenderLayer(
+                            canvas = canvas,
+                            node = patternNode,
+                            opacityAdjustment = objFillOpacity
+                        ) { canvas, _ ->
+                            var stepY = originY
+                            while (stepY < bottom) {
+                                var stepX = originX
+                                while (stepX < right) {
+                                    val minX = stepX
+                                    val minY = stepY
 
-                            withNewState(canvas) { st6 ->
-                                // Set pattern clip rectangle if appropriate
-                                if (st6.style.overflow == false && patternNode.hasOverflow) {
-                                    setClipRect(canvas, minX, minY, w, h)
-                                }
-                                // Calculate and set the viewport for each instance of the pattern
-                                val viewBox = pattern.viewBox
-                                if (viewBox != null) {
-                                    matrixPool.withPooledObject { m ->
-                                        calculateViewBoxTransform(
-                                            viewPortMinX = minX,
-                                            viewPortMinY = minY,
-                                            viewPortWidth = w,
-                                            viewPortHeight = h,
-                                            viewBox = viewBox,
-                                            positioning = positioning,
-                                            outMatrix = m
-                                        )
-                                        canvas.concat(m)
+                                    withNewState(canvas) { st6 ->
+                                        // Set pattern clip rectangle if appropriate
+                                        if (st6.style.overflow == false && patternNode.hasOverflow) {
+                                            setClipRect(canvas, minX, minY, w, h)
+                                        }
+                                        // Calculate and set the viewport for each instance of the pattern
+                                        val viewBox = pattern.viewBox
+                                        if (viewBox != null) {
+                                            matrixPool.withPooledObject { m ->
+                                                calculateViewBoxTransform(
+                                                    viewPortMinX = minX,
+                                                    viewPortMinY = minY,
+                                                    viewPortWidth = w,
+                                                    viewPortHeight = h,
+                                                    viewBox = viewBox,
+                                                    positioning = positioning,
+                                                    outMatrix = m
+                                                )
+                                                canvas.concat(m)
+                                            }
+                                        } else {
+                                            val patternContentUnitsAreUser =
+                                                pattern.patternContentUnitsAreUser != false
+                                            // Simple translate of pattern to step position
+                                            canvas.translate(stepX, stepY)
+                                            // Add a tiny overlap to avoid anti-aliasing seams between tiles
+                                            canvas.scale(1.01f, 1.01f, w / 2f, h / 2f)
+                                            if (!patternContentUnitsAreUser && !usePathBake) {
+                                                val boundingBox = obj.boundingBox!!
+                                                canvas.scale(boundingBox.width, boundingBox.height)
+                                            }
+                                            if (!patternContentUnitsAreUser) {
+                                                // Set the viewport to 1x1 so that percentages are resolved correctly
+                                                st6.viewPort = Box._1X1
+                                                st6.viewBox = null
+                                            }
+                                        }
+
+                                        // Render the pattern node content
+                                        patternNode.children.forEachElement { it.render(this@Renderer, canvas) }
                                     }
-                                } else {
-                                    val patternContentUnitsAreUser = pattern.patternContentUnitsAreUser != false
-                                    // Simple translate of pattern to step position
-                                    canvas.translate(stepX, stepY)
-                                    // Add a tiny overlap to avoid anti-aliasing seams between tiles
-                                    canvas.scale(1.01f, 1.01f, w / 2f, h / 2f)
-                                    if (!patternContentUnitsAreUser) {
-                                        val boundingBox = obj.boundingBox!!
-                                        canvas.scale(boundingBox.width, boundingBox.height)
 
-                                        // Set the viewport to 1x1 so that percentages are resolved correctly
-                                        st6.viewPort = Box._1X1
-                                        st6.viewBox = null
-                                    }
+                                    stepX += w
                                 }
-
-                                // Render the pattern node content
-                                patternNode.children.forEachElement { it.render(this@Renderer, canvas) }
+                                stepY += h
                             }
-
-                            stepX += w
                         }
-                        stepY += h
+                    } finally {
+                        patternBakeMatrix = prevBake
                     }
                 }
             } finally {

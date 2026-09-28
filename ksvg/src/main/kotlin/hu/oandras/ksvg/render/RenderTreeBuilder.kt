@@ -1652,6 +1652,16 @@ internal class RenderTreeBuilder(
         node.hasAnimations = pattern.animations?.isNotEmpty() == true ||
                 children.anyElement { it.hasAnimations() }
 
+        node.hasTextContent = children.anyElement { it.containsText() }
+
+        // Pattern tile content is stamped once per tile under a different canvas
+        // transform, but the display-list cache key (contentVersion + paints) knows
+        // nothing about the tile position, so per-tile captures would be unsound.
+        // Disable caching for the whole pattern subtree; direct drawing is always
+        // correct. Note this also touches nodes shared with non-pattern uses
+        // (markers, <use> targets) — those only lose caching, never correctness.
+        children.forEachElement { it.disableSubtreeDisplayListCache() }
+
         patternNodeCache[pattern] = node
 
         state = oldState
@@ -1659,6 +1669,26 @@ internal class RenderTreeBuilder(
         stateStack.addAll(oldStateStack)
 
         return node
+    }
+
+    private fun RenderNode<*>.containsText(): Boolean = when (this) {
+        is KSVGTextContainerRenderNode<*> -> true
+        is GroupRenderNode<*> -> children.anyElement { it.containsText() }
+        is PatternRenderNode -> children.anyElement { it.containsText() }
+        is SwitchRenderNode -> selectedChild?.containsText() == true
+        else -> false
+    }
+
+    private fun RenderNode<*>.disableSubtreeDisplayListCache() {
+        disableDisplayListCache = true
+        when (this) {
+            is GroupRenderNode<*> -> children.forEachElement { it.disableSubtreeDisplayListCache() }
+            is PatternRenderNode -> children.forEachElement { it.disableSubtreeDisplayListCache() }
+            is SwitchRenderNode -> selectedChild?.disableSubtreeDisplayListCache()
+            is KSVGTextContainerRenderNode<*> ->
+                children.forEachElement { (it as? RenderNode<*>)?.disableSubtreeDisplayListCache() }
+            else -> {}
+        }
     }
 
     private fun fillInChainedPatternFields(pattern: Pattern, href: String) {
