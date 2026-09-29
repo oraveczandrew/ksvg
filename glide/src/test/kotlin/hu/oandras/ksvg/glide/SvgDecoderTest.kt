@@ -23,12 +23,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayInputStream
+import java.io.FilterInputStream
+import java.io.IOException
+import java.io.InputStream
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -90,5 +94,91 @@ class SvgDecoderTest {
         val bitmap = decoder.decode(stream, Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL, Options()).get()
         assertEquals(SvgDecoder.MAX_DECODE_DIMENSION, bitmap.width)
         assertEquals(41, bitmap.height)
+    }
+
+    @Test
+    fun testDecodeSizeOriginalUsesIntrinsicSize() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50">""" +
+            """<rect width="100" height="50"/></svg>"""
+        val bitmap = decoder.decode(
+            ByteArrayInputStream(svg.toByteArray()),
+            Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL, Options(),
+        ).get()
+        assertEquals(100, bitmap.width)
+        assertEquals(50, bitmap.height)
+    }
+
+    @Test
+    fun testDecodeViewBoxOnlyFallsBackToTargetSize() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20">""" +
+            """<rect width="40" height="20"/></svg>"""
+        val bitmap = decoder.decode(
+            ByteArrayInputStream(svg.toByteArray()), 200, 100, Options(),
+        ).get()
+        assertEquals(200, bitmap.width)
+        assertEquals(100, bitmap.height)
+    }
+
+    @Test
+    fun testDecodeViewBoxOnlySizeOriginalFallsBackTo192() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg">""" +
+            """<rect width="40" height="20"/></svg>"""
+        val bitmap = decoder.decode(
+            ByteArrayInputStream(svg.toByteArray()),
+            Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL, Options(),
+        ).get()
+        assertEquals(192, bitmap.width)
+        assertEquals(192, bitmap.height)
+    }
+
+    @Test
+    fun testDecodeSingleFixedDimensionKeepsAspect() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50">""" +
+            """<rect width="100" height="50"/></svg>"""
+        val onlyHeight = decoder.decode(
+            ByteArrayInputStream(svg.toByteArray()),
+            Target.SIZE_ORIGINAL, 100, Options(),
+        ).get()
+        assertEquals(200, onlyHeight.width)
+        assertEquals(100, onlyHeight.height)
+
+        val onlyWidth = decoder.decode(
+            ByteArrayInputStream(svg.toByteArray()),
+            200, Target.SIZE_ORIGINAL, Options(),
+        ).get()
+        assertEquals(200, onlyWidth.width)
+        assertEquals(100, onlyWidth.height)
+    }
+
+    @Test
+    fun testDecodeUsesMaxScaleToFill() {
+        // 100x50 intrinsic into a 200x200 target: max scale (4x) wins over min (2x).
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50">""" +
+            """<rect width="100" height="50"/></svg>"""
+        val bitmap = decoder.decode(
+            ByteArrayInputStream(svg.toByteArray()), 200, 200, Options(),
+        ).get()
+        assertEquals(400, bitmap.width)
+        assertEquals(200, bitmap.height)
+    }
+
+    @Test
+    fun testDecodeInvalidSvgThrowsIOException() {
+        val stream = ByteArrayInputStream("this is not xml {{{".toByteArray())
+        try {
+            decoder.decode(stream, 100, 100, Options())
+            fail("Expected IOException")
+        } catch (_: IOException) {
+            // expected: KSVGParseException is wrapped
+        }
+    }
+
+    @Test
+    fun testHandlesStreamWithoutMarkSupport() {
+        val raw = ByteArrayInputStream("<svg/>".toByteArray())
+        val noMark: InputStream = object : FilterInputStream(raw) {
+            override fun markSupported(): Boolean = false
+        }
+        assertFalse(decoder.handles(noMark, Options()))
     }
 }
