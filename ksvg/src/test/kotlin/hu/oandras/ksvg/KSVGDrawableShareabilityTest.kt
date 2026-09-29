@@ -54,7 +54,7 @@ class KSVGDrawableShareabilityTest {
         val first = svg.toDrawable()
         first.setBounds(0, 0, 50, 50)
 
-        val second = first.constantState!!.newDrawable() as KSVGDrawable
+        val second = first.constantState.newDrawable() as KSVGDrawable
         assertNotSame(first, second)
         // The copy starts without bounds; sizing one must not affect the other.
         assertTrue(second.bounds.isEmpty)
