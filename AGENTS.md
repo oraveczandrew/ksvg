@@ -114,6 +114,7 @@ If the user asks for a report, make it in the tmp folder as a Markdown file.
 - Record important findings, attempted approaches, failures, decisions, and next steps. Read it before starting or resuming work, and do not repeat failed approaches unless new evidence justifies them.
 - Update the log after each major investigation step or milestone, so the current state can be recovered after interruption.
 - Work-log/audit identifiers ("#45", "D10", "R7") live ONLY in `tmp/` logs and commit messages — never in code, KDoc, logs, or docs (`tmp/` is git-ignored, so such a reference points nowhere). Write the self-contained reason instead.
+- Committable files must never reference `tmp/` paths (incl. screenshots), device serials (`adbca122`), or emulator names (`emulator-5554`): say "API-26 emulator" / "API-36 phone" instead.
 
 ## Quick Commands
 - Always use the Gradle daemon (omit `--no-daemon`).
