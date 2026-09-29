@@ -723,8 +723,13 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         is FeMergeRenderNode -> {
                             var mergeEffect: RenderEffect? = null
                             primitive.mergeNodes.forEachElement { inputName ->
+                                // A null node must reach `resolveEffect` as
+                                // null (previous result, or SourceGraphic when
+                                // the merge is first) — stringifying it to
+                                // "SourceGraphic" here misroutes every null
+                                // node of a non-first merge to the source.
                                 val inputNodeEffect = resolveEffect(
-                                    input = inputName ?: "SourceGraphic",
+                                    input = inputName,
                                     previousResult = previousResult,
                                     first = first,
                                     currentChain = chain,

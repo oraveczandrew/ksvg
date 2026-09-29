@@ -206,21 +206,21 @@ internal fun doFeMergeFilter(
     )
     renderContext.canvasPool.withPooledObject { c ->
         c.setBitmap(res)
-        var isFirst = true
+        // A node without `in` resolves to the previous primitive's result
+        // (`lastResult`) — `SourceGraphic` only when the merge itself is the
+        // first primitive, in which case `lastResult` already is the source.
+        // There is no first-node special case: a lone null node of a
+        // non-first merge renders as the previous result, not the source
+        // (matches rsvg; the SVG default input is the previous result).
         merge.mergeNodes.forEachElement { inputId ->
             val input = if (inputId == null) {
-                if (isFirst) {
-                    results.get("SourceGraphic")
-                } else {
-                    lastResult
-                }
+                lastResult
             } else {
                 results.get(inputId)
             }
             if (input != null) {
                 c.drawBitmap(input, 0f, 0f, null)
             }
-            isFirst = false
         }
     }
     return res

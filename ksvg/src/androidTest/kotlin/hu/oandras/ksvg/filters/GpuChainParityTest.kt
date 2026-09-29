@@ -434,6 +434,27 @@ class GpuChainParityTest {
         )
     }
 
+    @Test
+    fun feMergeNullInputs() {
+        // feMergeNode without `in` defaults to the previous primitive's
+        // result (SourceGraphic only when feMerge is first). Both null nodes
+        // must resolve to the flood here (blue over red); the GPU33 call site
+        // used to stringify every null to "SourceGraphic" (red). rsvg 2.63.2
+        // agrees (blue).
+        checkParity(
+            name = "chainFeMergeNull",
+            svg = chainSvg(
+                """
+                <feFlood flood-color="#2020c0" result="f"/>
+                <feMerge>
+                  <feMergeNode/>
+                  <feMergeNode/>
+                </feMerge>
+                """.trimIndent(),
+            ),
+        )
+    }
+
     private fun checkParity(
         name: String,
         svg: String,
