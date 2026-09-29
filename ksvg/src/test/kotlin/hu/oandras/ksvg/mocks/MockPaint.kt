@@ -202,7 +202,7 @@ class MockPaint: ShadowPaint() {
     }
 
     @Implementation
-    fun setFontVariationSettings(variation: String?): Boolean {
+    override fun setFontVariationSettings(variation: String?): Boolean {
         settings.remove(FONTVARIATION)
         settings[FONTVARIATION] = "fv:$variation"
         return true

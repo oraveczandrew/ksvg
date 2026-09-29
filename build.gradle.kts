@@ -16,9 +16,10 @@
 
 // Top-level build file where you can add configuration options common to all subprojects/modules.
 plugins {
-    id("com.android.library") apply false
-    id("org.jetbrains.kotlin.android") apply false
-    id("com.google.devtools.ksp") version "2.3.11" apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.ksp) apply false
 }
 
 subprojects {

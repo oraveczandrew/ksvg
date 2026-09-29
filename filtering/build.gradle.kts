@@ -26,11 +26,11 @@ import ksvg.gradle.findStringProperty
  */
 
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
     id("maven-publish")
     id("signing")
-    id("org.jetbrains.dokka")
-    id("org.jetbrains.dokka-javadoc")
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.dokka.javadoc)
 }
 
 kotlin {
@@ -39,20 +39,16 @@ kotlin {
 
 android {
     namespace = "hu.oandras.filtering"
-    compileSdk = 37
-    // Pinned so AGP never auto-downloads its own default revisions into the
-    // CI SDK dir (that re-poisoned the cache every run: NDK 28.2,
-    // build-tools 36.0.0). Must match the sdkmanager specs in
-    // .github/workflows/*.yml.
-    ndkVersion = "29.0.14206865"
-    buildToolsVersion = "37.0.0"
+    compileSdk = libs.versions.compileSdk.get().toInt()
+    ndkVersion = libs.versions.ndk.get()
+    buildToolsVersion = libs.versions.buildTools.get()
 
     testFixtures {
         enable = true
     }
 
     defaultConfig.apply {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -415,23 +411,22 @@ val exportBenchmarkTable = tasks.register("exportBenchmarkTable") {
     }
 }
 
-//noinspection UseTomlInstead
 dependencies {
-    implementation("androidx.annotation:annotation:1.11.0")
+    implementation(libs.annotation)
 
-    testFixturesImplementation("junit:junit:4.13.2")
-    testFixturesImplementation("androidx.test:monitor:1.8.0")
+    testFixturesImplementation(libs.junit)
+    testFixturesImplementation(libs.monitor)
 
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
     testImplementation(testFixtures(project(":filtering")))
 
-    androidTestImplementation("androidx.test:runner:1.7.0")
-    androidTestImplementation("androidx.test.ext:junit:1.3.0")
-    androidTestImplementation("androidx.activity:activity-ktx:1.13.0")
-    androidTestImplementation("androidx.core:core-ktx:1.19.1")
-    androidTestImplementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
-    androidTestImplementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    androidTestImplementation(libs.runner)
+    androidTestImplementation(libs.ext.junit)
+    androidTestImplementation(libs.activity.ktx)
+    androidTestImplementation(libs.core.ktx)
+    androidTestImplementation(libs.lifecycle.runtime.ktx)
+    androidTestImplementation(libs.lifecycle.viewmodel.ktx)
+    androidTestImplementation(libs.coroutines.android)
     androidTestImplementation(testFixtures(project(":filtering")))
 }
 

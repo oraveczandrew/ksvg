@@ -15,22 +15,18 @@
  */
 
 plugins {
-    id("com.android.application")
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "hu.oandras.ksvg.showcase"
-    compileSdk = 37
-    // Pinned so AGP never auto-downloads its own default revisions into the
-    // CI SDK dir (that re-poisoned the cache every run: NDK 28.2,
-    // build-tools 36.0.0). Must match the sdkmanager specs in
-    // .github/workflows/*.yml.
-    ndkVersion = "29.0.14206865"
-    buildToolsVersion = "37.0.0"
+    compileSdk = libs.versions.compileSdk.get().toInt()
+    ndkVersion = libs.versions.ndk.get()
+    buildToolsVersion = libs.versions.buildTools.get()
 
     defaultConfig.apply {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -78,21 +74,20 @@ android {
     }
 }
 
-//noinspection UseTomlInstead
 dependencies {
     implementation(project(":ksvg"))
     implementation(project(":glide"))
 
-    implementation("androidx.appcompat:appcompat:1.8.0")
-    implementation("androidx.activity:activity-ktx:1.13.0")
-    implementation("com.google.android.material:material:1.14.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.2.2")
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
+    implementation(libs.appcompat)
+    implementation(libs.activity.ktx)
+    implementation(libs.material)
+    implementation(libs.constraintlayout)
+    implementation(libs.recyclerview)
+    implementation(libs.lifecycle.viewmodel.ktx)
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.coroutines.android)
 
-    implementation("com.github.bumptech.glide:glide:5.0.9")
+    implementation(libs.glide)
 
-    ksp("com.github.bumptech.glide:ksp:5.0.9")
+    ksp(libs.glide.ksp)
 }

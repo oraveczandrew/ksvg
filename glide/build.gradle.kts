@@ -19,12 +19,12 @@ import ksvg.gradle.configureKsvgRepositories
 import ksvg.gradle.configureKsvgSigning
 
 plugins {
-    id("com.android.library")
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
     id("maven-publish")
     id("signing")
-    id("org.jetbrains.dokka")
-    id("org.jetbrains.dokka-javadoc")
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.dokka.javadoc)
 }
 
 kotlin {
@@ -33,16 +33,12 @@ kotlin {
 
 android {
     namespace = "hu.oandras.ksvg.glide"
-    compileSdk = 37
-    // Pinned so AGP never auto-downloads its own default revisions into the
-    // CI SDK dir (that re-poisoned the cache every run: NDK 28.2,
-    // build-tools 36.0.0). Must match the sdkmanager specs in
-    // .github/workflows/*.yml.
-    ndkVersion = "29.0.14206865"
-    buildToolsVersion = "37.0.0"
+    compileSdk = libs.versions.compileSdk.get().toInt()
+    ndkVersion = libs.versions.ndk.get()
+    buildToolsVersion = libs.versions.buildTools.get()
 
     defaultConfig.apply {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -88,10 +84,9 @@ android {
     }
 }
 
-//noinspection UseTomlInstead
 dependencies {
-    implementation("com.github.bumptech.glide:glide:5.0.9")
-    ksp("com.github.bumptech.glide:ksp:5.0.9")
+    implementation(libs.glide)
+    ksp(libs.glide.ksp)
 
     val ksvgProject = rootProject.findProject(":ksvg:ksvg")
         ?: rootProject.findProject(":ksvg")
@@ -99,8 +94,8 @@ dependencies {
 
     implementation(ksvgProject)
 
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }
 
 // PUBLISHING (coordinates live in root gradle.properties: ksvg.group / ksvg.version)

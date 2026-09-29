@@ -20,11 +20,11 @@ import ksvg.gradle.configureKsvgSigning
 import ksvg.gradle.findStringProperty
 
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
     id("maven-publish")
     id("signing")
-    id("org.jetbrains.dokka")
-    id("org.jetbrains.dokka-javadoc")
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.dokka.javadoc)
     id("jacoco")
 }
 
@@ -38,16 +38,12 @@ jacoco {
 
 android.apply {
     namespace = "hu.oandras.ksvg"
-    compileSdk = 37
-    // Pinned so AGP never auto-downloads its own default revisions into the
-    // CI SDK dir (that re-poisoned the cache every run: NDK 28.2,
-    // build-tools 36.0.0). Must match the sdkmanager specs in
-    // .github/workflows/*.yml.
-    ndkVersion = "29.0.14206865"
-    buildToolsVersion = "37.0.0"
+    compileSdk = libs.versions.compileSdk.get().toInt()
+    ndkVersion = libs.versions.ndk.get()
+    buildToolsVersion = libs.versions.buildTools.get()
 
     defaultConfig.apply {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -140,24 +136,21 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-Xlint:deprecation")
 }
 
-//noinspection UseTomlInstead
 dependencies.apply {
-    implementation("androidx.annotation:annotation:1.11.0")
-    implementation("androidx.lifecycle:lifecycle-common:2.11.0")
-    implementation("com.google.guava:guava:33.7.1-android")
-    implementation("androidx.collection:collection:1.6.0")
+    implementation(libs.annotation)
+    implementation(libs.lifecycle.common)
+    implementation(libs.guava)
+    implementation(libs.collection)
 
     implementation(project(":filtering"))
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.coroutines.android)
 
-    androidTestImplementation("androidx.test:runner:1.7.0")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.16.1")
+    androidTestImplementation(libs.runner)
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 
-    androidTestImplementation("androidx.test.ext:junit:1.3.0")
-    // Round-B corpus parity runners reuse the :filtering validation corpora
-    // and the pure-Kotlin parity SVG builders (tmp/GPU_PARITY_PLAN_B.md §3).
+    androidTestImplementation(libs.ext.junit)
     androidTestImplementation(testFixtures(project(":filtering")))
 }
 
