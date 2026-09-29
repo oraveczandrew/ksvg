@@ -618,6 +618,9 @@ These are implementation invariants, not benchmark-specific optimizations:
   tables must initialize the mirrored tail used by indexed lattice lookups,
   and native random-seed normalization must match the Kotlin reference for
   zero and negative seeds.
+- Diffuse lighting implements the raw FE §9.10 formula (`kd * N.L`, final
+  clamp only) with no dot pre-clamp on any backend, so negative
+  `diffuseConstant` lights back-facing slopes on all of them identically.
 
 ---
 
