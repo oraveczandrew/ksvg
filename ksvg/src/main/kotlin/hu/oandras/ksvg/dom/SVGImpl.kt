@@ -40,7 +40,6 @@ import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CSSRule
 import hu.oandras.ksvg.css.CSSRuleset
 import hu.oandras.ksvg.css.CssUnit
-import hu.oandras.ksvg.css.Source
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.ElementBase
@@ -193,20 +192,10 @@ internal class SVGImpl internal constructor(
 
     /**
      * The DPI (dots-per-inch) value to use when rendering.
-     * 
-     * The DPI setting is used in the conversion of "physical" units - such a "pt" or "cm" - to pixel values.
-     * The default DPI is 96.
-     * 
-     * You should not normally need to alter the DPI from the default of 96 as recommended by the SVG
-     * and CSS specifications.
+     *
+     * Fixed at parse time (default 96); the document is immutable afterwards.
      */
-    override var renderDPI: Float = 96f // default is 96
-        set(value) {
-            if (field != value) {
-                field = value
-                notifyModification()
-            }
-        }
+    override val renderDPI: Float = 96f // default is 96
 
     // CSS rules
     private val cssRules = CSSRuleset()
@@ -223,6 +212,53 @@ internal class SVGImpl internal constructor(
 
     private val iriToElementCache: ArrayMap<String, SvgObject> = ArrayMap()
     private val idToElementCache: ArrayMap<String, SvgObject> = ArrayMap()
+
+    /**
+     * Parse-end seal: precomputes the id/IRI lookup caches and the intrinsic
+     * dimensions, so post-parse rendering never mutates the document for
+     * lookups. Id indexing replicates [getElementById] first-match order
+     * (document order, first occurrence wins); existing entries (filled by
+     * during-parse lookups) are never overwritten.
+     *
+     * Iterative walk: adversarial deep trees must not overflow the parse
+     * thread's stack (see deep-nesting truncation tests).
+     */
+    internal fun sealAfterParse() {
+        val root = rootElement ?: return
+        indexElementIds(root)
+        if (cachedDocumentDimensions == null) {
+            cachedDocumentDimensions = getDocumentDimensions(renderDPI)
+            cachedDocumentDimensionsMod = modificationCount
+        }
+    }
+
+    private fun indexElementIds(root: SvgObject) {
+        val stack = ArrayDeque<SvgObject>()
+        stack.addLast(root)
+        while (stack.isNotEmpty()) {
+            val obj = stack.removeLast()
+            // Mirrors getElementById: non-element nodes (and their subtrees)
+            // are invisible to id lookup.
+            if (obj !is ElementBase) {
+                continue
+            }
+            obj.id?.let { id ->
+                if (!idToElementCache.containsKey(id)) {
+                    idToElementCache[id] = obj
+                    val iriKey = "#$id"
+                    if (!iriToElementCache.containsKey(iriKey)) {
+                        iriToElementCache[iriKey] = obj
+                    }
+                }
+            }
+            if (obj is Container) {
+                val children = obj.getChildren()
+                for (i in children.indices.reversed()) {
+                    stack.addLast(children[i])
+                }
+            }
+        }
+    }
 
     override fun toDrawable(): KSVGDrawable {
         return toDrawable(renderOptions = null)
@@ -456,25 +492,8 @@ internal class SVGImpl internal constructor(
      * 
      * @throws IllegalArgumentException if there is no current SVG document loaded.
      */
-    override var documentWidth: Float
+    override val documentWidth: Float
         get() = getDocumentDimensions(renderDPI).width
-        set(pixels) {
-            rootElement = requireRootElement().copy(width = CSSLength(pixels))
-            notifyModification()
-        }
-
-    /**
-     * Change the width of the document by altering the "width" attribute
-     * of the root `<svg>` element.
-     * 
-     * @param value A valid SVG 'length' attribute, such as "100px" or "10cm".
-     * @throws KSVGParseException if `value` cannot be parsed successfully.
-     * @throws IllegalArgumentException if there is no current SVG document loaded.
-     */
-    override fun setDocumentWidth(value: String) {
-        rootElement = requireRootElement().copy(width = parseLength(value))
-        notifyModification()
-    }
 
     /**
      * The height of the document as specified in the SVG file.
@@ -490,77 +509,20 @@ internal class SVGImpl internal constructor(
      * 
      * @throws IllegalArgumentException if there is no current SVG document loaded.
      */
-    override var documentHeight: Float
+    override val documentHeight: Float
         get() {
             requireRootElement()
             return getDocumentDimensions(renderDPI).height
         }
-        set(pixels) {
-            rootElement = requireRootElement().copy(height = CSSLength(pixels))
-            notifyModification()
-        }
-
-    /**
-     * Change the height of the document by altering the "height" attribute
-     * of the root `<svg>` element.
-     * 
-     * @param value A valid SVG 'length' attribute, such as "100px" or "10cm".
-     * @throws KSVGParseException if `value` cannot be parsed successfully.
-     * @throws IllegalArgumentException if there is no current SVG document loaded.
-     */
-    override fun setDocumentHeight(value: String) {
-        rootElement = requireRootElement().copy(height = parseLength(value))
-        notifyModification()
-    }
-
-
-    /**
-     * Change the document view box by altering the "viewBox" attribute
-     * of the root `<svg>` element.
-     * 
-     * 
-     * The viewBox generally describes the bounding box dimensions of the
-     * document contents.  A valid viewBox is necessary if you want the
-     * document scaled to fit the canvas or viewport the document is to be
-     * rendered into.
-     * 
-     * 
-     * By setting a viewBox that describes only a portion of the document,
-     * you can reproduce the effect of image sprites.
-     * 
-     * @param minX the left coordinate of the viewBox in pixels
-     * @param minY the top coordinate of the viewBox in pixels.
-     * @param width the width of the viewBox in pixels
-     * @param height the height of the viewBox in pixels
-     * @throws IllegalArgumentException if there is no current SVG document loaded.
-     */
-    override fun setDocumentViewBox(minX: Float, minY: Float, width: Float, height: Float) {
-        rootElement = requireRootElement().copy(viewBox = Box(minX, minY, width, height))
-        notifyModification()
-    }
 
 
     /**
      * The viewBox attribute of the current SVG document.
-     * 
+     *
      * @throws IllegalArgumentException if there is no current SVG document loaded.
      */
     override val documentViewBox: RectF?
         get() = requireRootElement().viewBox?.toRectF()
-
-    /**
-     * The "preserveAspectRatio" attribute of the root `<svg>` element.
-     * 
-     * Positioning works according to the documentation for [PreserveAspectRatio].
-     * 
-     * @throws IllegalArgumentException if there is no current SVG document loaded.
-     */
-    override var documentPreserveAspectRatio: PreserveAspectRatio?
-        get() = requireRootElement().preserveAspectRatio
-        set(preserveAspectRatio) {
-            rootElement = requireRootElement().copy(preserveAspectRatio = preserveAspectRatio)
-            notifyModification()
-        }
 
     /**
      * The aspect ratio of the document as a width/height fraction.
@@ -693,11 +655,6 @@ internal class SVGImpl internal constructor(
     internal val cSSRules: List<CSSRule>
         get() = cssRules.rules
 
-    fun clearRenderCSSRules() {
-        cssRules.removeFromSource(Source.RenderOptions)
-        notifyModification()
-    }
-
     //===============================================================================
     // Protected setters for internal use
     internal fun setTitle(title: String?) {
@@ -822,7 +779,7 @@ internal class SVGImpl internal constructor(
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error parsing the document.
-     
+
          */
         @Throws(KSVGParseException::class)
         fun getFromResource(
@@ -878,16 +835,16 @@ internal class SVGImpl internal constructor(
             }
         }
 
-         /**
-          * Parse an SVG path definition from the given `String`.
-          *
-          * Note that this method does not throw any exceptions or return any errors. Per the SVG
-          * specification, if there are any errors in the path definition, the valid portion of the
-          * path up until the first error is returned.
-          *
-          * @param pathDefinition an SVG path element definition string
-          * @return an Android `Path`
-          */
+        /**
+         * Parse an SVG path definition from the given `String`.
+         *
+         * Note that this method does not throw any exceptions or return any errors. Per the SVG
+         * specification, if there are any errors in the path definition, the valid portion of the
+         * path up until the first error is returned.
+         *
+         * @param pathDefinition an SVG path element definition string
+         * @return an Android `Path`
+         */
         fun parsePath(pathDefinition: String, logger: LoggerContext): Path {
             val pathDef = with(logger) {
                 hu.oandras.ksvg.parser.parsePath(pathDefinition)

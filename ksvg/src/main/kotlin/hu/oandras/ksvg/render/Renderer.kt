@@ -47,6 +47,8 @@ import hu.oandras.ksvg.compat.toBlendModeCompat
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.CSSParser.RuleMatchContext
+import hu.oandras.ksvg.css.CSSRule
+import hu.oandras.ksvg.css.mergeRulesInCascadeOrder
 import hu.oandras.ksvg.dom.COLOR_BLACK
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Box
@@ -208,8 +210,14 @@ internal class Renderer internal constructor(
         }
     }
 
-    override val animationTimeMs: Long
-        get() = document.animationTimeMs
+    override var animationTimeMs: Long = document.animationTimeMs
+
+    /**
+     * Effective CSS cascade for the current render: document rules merged with
+     * the `RenderOptions` overlay in specificity order. Never mutates the
+     * shared document; the overlay lives only in this render.
+     */
+    private var effectiveRules: List<CSSRule> = emptyList()
 
     override val effectiveViewPortInUserUnits: Box
         /*
@@ -270,8 +278,12 @@ internal class Renderer internal constructor(
         forceSoftwareFiltering = renderOptions.hasSoftwareFiltering()
 
         val css = renderOptions.css
-        if (css != null) {
-            document.addCSSRules(css.cssRuleSet)
+        effectiveRules = if (css != null) {
+            ArrayList<CSSRule>(document.cSSRules.size + css.cssRuleSet.rules.size).also { merged ->
+                mergeRulesInCascadeOrder(merged, document.cSSRules, css.cssRuleSet.rules)
+            }
+        } else {
+            document.cSSRules
         }
 
         if (renderOptions.hasTarget()) {
@@ -284,7 +296,7 @@ internal class Renderer internal constructor(
         resetState(canvas)
 
         if (document.animationsEnabled) {
-            rootNode.updateAnimations(document.animationTimeMs)
+            rootNode.updateAnimations(animationTimeMs)
         }
 
         withNewRootContextState(canvas, rootNode.subtreeContainsBlendMode) { canvas, _ ->
@@ -293,10 +305,6 @@ internal class Renderer internal constructor(
                 setClipRect(canvas, viewPort)
             }
             rootNode.render(this@Renderer, canvas)
-        }
-
-        if (renderOptions.hasCss()) {
-            document.clearRenderCSSRules()
         }
     }
 
@@ -812,7 +820,7 @@ internal class Renderer internal constructor(
 
         // Pass 1: resolve CSS-wide keyword winners (see RenderTreeBuilder).
         matchingRules.clear()
-        document.cSSRules.forEachElement { rule ->
+        effectiveRules.forEachElement { rule ->
             if (CSSParser.ruleMatch(ruleMatchContext, rule.selector, obj)) {
                 matchingRules.add(rule.style)
             }

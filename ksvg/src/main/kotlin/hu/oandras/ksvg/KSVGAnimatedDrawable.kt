@@ -18,7 +18,7 @@ package hu.oandras.ksvg
 import android.graphics.drawable.Animatable2
 import android.graphics.drawable.Drawable
 import android.os.SystemClock
-import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.utils.forEachElement
 
 private const val FRAME_DELAY_MS: Long = 16L
@@ -46,10 +46,15 @@ public open class KSVGAnimatedDrawable @JvmOverloads public constructor(
         scheduleNextFrame()
     }
 
+    override fun getConstantState(): ConstantState {
+        return KSVGConstantState(svg, RenderOptionsImpl(baseOptions), animated = true)
+    }
+
+    override val ownsAnimationClock: Boolean = true
+
     override fun draw(canvas: android.graphics.Canvas) {
-        val svgImpl = svg as? SVGImpl
-        if (svgImpl != null && running) {
-            svgImpl.animationTimeMs = SystemClock.uptimeMillis() - startedAtMs
+        if (running) {
+            setAnimationClock(SystemClock.uptimeMillis() - startedAtMs)
         }
         super.draw(canvas)
     }

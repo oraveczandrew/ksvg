@@ -59,14 +59,13 @@ public interface SVG {
 
     /**
      * The DPI (dots-per-inch) value to use when rendering.
-     * 
+     *
      * The DPI setting is used in the conversion of "physical" units - such a "pt" or "cm" - to pixel values.
      * The default DPI is 96.
-     * 
-     * You should not normally need to alter the DPI from the default of 96 as recommended by the SVG
-     * and CSS specifications.
+     *
+     * The document is immutable after parsing: the DPI is fixed at parse time.
      */
-    public var renderDPI: Float
+    public val renderDPI: Float
 
     /**
      * Returns this SVG document as a [Drawable].
@@ -104,9 +103,14 @@ public interface SVG {
     /**
      * Renders this SVG document to a Canvas object.  The full width and height of the canvas
      * will be used as the viewport into which the document will be rendered.
-     * 
+     *
+     * Note: the hit-test state derived from a direct render (`getHitRegions()`,
+     * `hitTest()`) lives on the document itself, so concurrent direct renders of
+     * one document interleave. Prefer one document per concurrent user, or the
+     * per-view drawables from [toDrawable].
+     *
      * @param canvas the canvas to which the document should be rendered.
-
+     *
      */
     public fun renderToCanvas(canvas: Canvas)
 
@@ -234,100 +238,38 @@ public interface SVG {
 
     /**
      * The width of the document as specified in the SVG file.
-     * 
+     *
      * If the width in the document is specified in pixels, that value will be returned.
      * If the value is listed with a physical unit such as "cm", then the current
      * `RenderDPI` value will be used to convert that value to pixels. If the width
      * is missing, or in a form which can't be converted to pixels, such as "100%" for
      * example, -1 will be returned.
-     * 
-     * Setting this property changes the width of the document by altering the "width" attribute
-     * of the root `<svg>` element.
-     * 
+     *
      * @throws IllegalArgumentException if there is no current SVG document loaded.
      */
-    public var documentWidth: Float
+    public val documentWidth: Float
 
-
-    /**
-     * Change the width of the document by altering the "width" attribute
-     * of the root `<svg>` element.
-     * 
-     * @param value A valid SVG 'length' attribute, such as "100px" or "10cm".
-     * @throws KSVGParseException if `value` cannot be parsed successfully.
-     * @throws IllegalArgumentException if there is no current SVG document loaded.
-     */
-    @Throws(KSVGParseException::class)
-    public fun setDocumentWidth(value: String)
 
     /**
      * The height of the document as specified in the SVG file.
-     * 
+     *
      * If the height in the document is specified in pixels, that value will be returned.
      * If the value is listed with a physical unit such as "cm", then the current
      * `RenderDPI` value will be used to convert that value to pixels. If the height
      * is missing, or in a form which can't be converted to pixels, such as "100%" for
      * example, -1 will be returned.
-     * 
-     * Setting this property changes the height of the document by altering the "height" attribute
-     * of the root `<svg>` element.
-     * 
+     *
      * @throws IllegalArgumentException if there is no current SVG document loaded.
      */
-    public var documentHeight: Float
-
-
-    /**
-     * Change the height of the document by altering the "height" attribute
-     * of the root `<svg>` element.
-     * 
-     * @param value A valid SVG 'length' attribute, such as "100px" or "10cm".
-     * @throws KSVGParseException if `value` cannot be parsed successfully.
-     * @throws IllegalArgumentException if there is no current SVG document loaded.
-     */
-    @Throws(KSVGParseException::class)
-    public fun setDocumentHeight(value: String)
-
-
-    /**
-     * Change the document view box by altering the "viewBox" attribute
-     * of the root `<svg>` element.
-     * 
-     * 
-     * The viewBox generally describes the bounding box dimensions of the
-     * document contents.  A valid viewBox is necessary if you want the
-     * document scaled to fit the canvas or viewport the document is to be
-     * rendered into.
-     * 
-     * 
-     * By setting a viewBox that describes only a portion of the document,
-     * you can reproduce the effect of image sprites.
-     * 
-     * @param minX the left coordinate of the viewBox in pixels
-     * @param minY the top coordinate of the viewBox in pixels.
-     * @param width the width of the viewBox in pixels
-     * @param height the height of the viewBox in pixels
-     * @throws IllegalArgumentException if there is no current SVG document loaded.
-     */
-    public fun setDocumentViewBox(minX: Float, minY: Float, width: Float, height: Float)
+    public val documentHeight: Float
 
 
     /**
      * The viewBox attribute of the current SVG document.
-     * 
+     *
      * @throws IllegalArgumentException if there is no current SVG document loaded.
      */
     public val documentViewBox: RectF?
-
-
-    /**
-     * The "preserveAspectRatio" attribute of the root `<svg>` element.
-     * 
-     * Positioning works according to the documentation for [PreserveAspectRatio].
-     * 
-     * @throws IllegalArgumentException if there is no current SVG document loaded.
-     */
-    public var documentPreserveAspectRatio: PreserveAspectRatio?
 
 
     /**
@@ -373,7 +315,13 @@ public interface SVG {
             externalFileResolver: ExternalFileResolver? = null,
             enableInternalEntities: Boolean = true,
         ): SVG {
-            return SVGImpl.getFromInputStream(inputStream, parseAnimations, logger, externalFileResolver, enableInternalEntities)
+            return SVGImpl.getFromInputStream(
+                inputStream,
+                parseAnimations,
+                logger,
+                externalFileResolver,
+                enableInternalEntities
+            )
         }
 
 
@@ -423,7 +371,14 @@ public interface SVG {
             externalFileResolver: ExternalFileResolver? = null,
             enableInternalEntities: Boolean = true,
         ): SVG {
-            return getFromResource(context.resources, resourceId, parseAnimations, logger, externalFileResolver, enableInternalEntities)
+            return getFromResource(
+                context.resources,
+                resourceId,
+                parseAnimations,
+                logger,
+                externalFileResolver,
+                enableInternalEntities
+            )
         }
 
 
@@ -435,7 +390,7 @@ public interface SVG {
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error parsing the document.
-     
+
          */
         @JvmStatic
         @JvmOverloads
@@ -448,7 +403,14 @@ public interface SVG {
             externalFileResolver: ExternalFileResolver? = null,
             enableInternalEntities: Boolean = true,
         ): SVG {
-            return SVGImpl.getFromResource(resources, resourceId, parseAnimations, logger, externalFileResolver, enableInternalEntities)
+            return SVGImpl.getFromResource(
+                resources,
+                resourceId,
+                parseAnimations,
+                logger,
+                externalFileResolver,
+                enableInternalEntities
+            )
         }
 
 
@@ -473,23 +435,30 @@ public interface SVG {
             externalFileResolver: ExternalFileResolver? = null,
             enableInternalEntities: Boolean = true,
         ): SVG {
-            return SVGImpl.getFromAsset(assetManager, filename, parseAnimations, logger, externalFileResolver, enableInternalEntities)
+            return SVGImpl.getFromAsset(
+                assetManager,
+                filename,
+                parseAnimations,
+                logger,
+                externalFileResolver,
+                enableInternalEntities
+            )
         }
 
 
-         /**
-          * Parse an SVG path definition from the given `String`.
-          *
-          * Note that this method does not throw any exceptions or return any errors. Per the SVG
-          * specification, if there are any errors in the path definition, the valid portion of the
-          * path up until the first error is returned.
-          *
-          * @param pathDefinition an SVG path element definition string
-          * @return an Android `Path`
-          */
+        /**
+         * Parse an SVG path definition from the given `String`.
+         *
+         * Note that this method does not throw any exceptions or return any errors. Per the SVG
+         * specification, if there are any errors in the path definition, the valid portion of the
+         * path up until the first error is returned.
+         *
+         * @param pathDefinition an SVG path element definition string
+         * @return an Android `Path`
+         */
         @JvmStatic
         public fun parsePath(pathDefinition: String, logger: LoggerContext = AndroidLoggerContext): Path {
-             return SVGImpl.parsePath(pathDefinition, logger)
+            return SVGImpl.parsePath(pathDefinition, logger)
         }
 
 

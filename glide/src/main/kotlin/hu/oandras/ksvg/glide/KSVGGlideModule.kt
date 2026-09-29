@@ -23,14 +23,17 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.Registry
 import com.bumptech.glide.annotation.GlideModule
 import com.bumptech.glide.module.LibraryGlideModule
+import hu.oandras.ksvg.SVG
 import java.io.InputStream
 
 /**
  * Glide integration entry point. Auto-registered as a [LibraryGlideModule]:
  * adding the `hu.oandras.ksvg:glide` artifact is enough, no manual setup needed.
  *
- * Registers [SvgDecoder] (`InputStream` to `Bitmap`) and [KSVGDrawableDecoder]
- * (`InputStream` to `Drawable`, animated when [KSVGOptions.PARSE_ANIMATIONS] is set).
+ * Registers [SvgDecoder] (`InputStream` to `Bitmap`), plus the drawable path:
+ * [KSVGSvgDecoder] (`InputStream` to `SVG`, the cached document) with
+ * [KSVGSvgDrawableTranscoder] (`SVG` to `Drawable`, a fresh drawable per
+ * request — animated when [KSVGOptions.PARSE_ANIMATIONS] is set).
  */
 @GlideModule
 public class KSVGGlideModule : LibraryGlideModule() {
@@ -42,8 +45,13 @@ public class KSVGGlideModule : LibraryGlideModule() {
         )
         registry.prepend(
             /* dataClass = */ InputStream::class.java,
-            /* resourceClass = */ Drawable::class.java,
-            /* decoder = */ KSVGDrawableDecoder()
+            /* resourceClass = */ SVG::class.java,
+            /* decoder = */ KSVGSvgDecoder()
+        )
+        registry.register(
+            /* resourceClass = */ SVG::class.java,
+            /* transcodeClass = */ Drawable::class.java,
+            /* transcoder = */ KSVGSvgDrawableTranscoder()
         )
     }
 }

@@ -21,6 +21,7 @@ import android.graphics.Matrix
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.content.res.Resources
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.render.RenderScene
@@ -58,6 +59,14 @@ public open class KSVGDrawable @JvmOverloads public constructor(
     } else {
         RenderOptionsImpl(renderOptions)
     }
+
+    /**
+     * Construction-time snapshot of the render options, untouched by per-draw
+     * viewport updates. Backs [getConstantState]: every `newDrawable()` copy
+     * starts from these options, never from another instance's last-draw state.
+     */
+    @JvmField
+    internal val baseOptions: RenderOptionsImpl = RenderOptionsImpl(this.renderOptions)
 
     private var alpha: Int = 0xFF
 
@@ -98,12 +107,18 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         val width = intrinsicWidth
         val height = intrinsicHeight
         if (width <= 0 || height <= 0) return
-        
+
         val bounds = Rect(0, 0, width, height)
         drawIntoBounds(canvas, bounds)
     }
 
     private fun drawIntoBounds(canvas: Canvas, bounds: Rect) {
+        if (!ownsAnimationClock) {
+            // Legacy/test seam: follow direct document-clock manipulation.
+            // Drawables that own their clock (animated) never read the shared
+            // document clock here.
+            (svg as? SVGImpl)?.let { renderer.animationTimeMs = it.animationTimeMs }
+        }
         val saveCount = saveForAlpha(
             canvas = canvas,
             left = bounds.left.toFloat(),
@@ -152,8 +167,26 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         if (node != null) {
             renderer.renderDocument(canvas, node, options)
         }
-        
+
         canvas.restoreToCount(saveCount)
+    }
+
+    /**
+     * Whether this drawable owns the animation clock (pushed per draw) instead
+     * of following the document clock. The base drawable follows the document
+     * clock so direct clock manipulation keeps working; the animated drawable
+     * owns its clock so sharers never see each other's animation time.
+     */
+    protected open val ownsAnimationClock: Boolean = false
+
+    /**
+     * Pushes this drawable's animation clock into its renderer. The clock is
+     * per-drawable state: drawables sharing one document never see each
+     * other's animation time. Takes ownership of the clock; see
+     * [ownsAnimationClock].
+     */
+    protected fun setAnimationClock(timeMs: Long) {
+        renderer.animationTimeMs = timeMs
     }
 
     protected open fun getRenderOptions(
@@ -200,6 +233,24 @@ public open class KSVGDrawable @JvmOverloads public constructor(
     }
 
     override fun getAlpha(): Int = alpha
+
+    /**
+     * Shares the parsed document (`svg`) and the construction-time options, so
+     * each `newDrawable()` is a fresh instance with its own scene, pools and
+     * bounds. Never shares viewport geometry or render caches.
+     */
+    override fun getConstantState(): Drawable.ConstantState {
+        return KSVGConstantState(svg, RenderOptionsImpl(baseOptions), animated = false)
+    }
+
+    /**
+     * This drawable already owns all of its mutable state (scene, pools,
+     * bounds); nothing is shared with siblings from the same constant state,
+     * so `mutate()` is a no-op returning this.
+     */
+    override fun mutate(): Drawable {
+        return this
+    }
 
     override fun setColorFilter(colorFilter: ColorFilter?) {
         // Rendering is delegated to the SVG renderer. Color filtering the complete result requires
@@ -301,5 +352,35 @@ public open class KSVGDrawable @JvmOverloads public constructor(
      */
     public fun getMemorySizeBytes(): Long {
         return pools.bitmapPool.retainedBytes() + (scene?.retainedByteCount() ?: 0L)
+    }
+}
+
+/**
+ * Shared state behind [KSVGDrawable.getConstantState]. Holds the parsed
+ * document by reference (read-only after handoff) plus a snapshot of the
+ * construction-time render options. Every [newDrawable] copies the options
+ * again, so instances never share viewport geometry or render caches.
+ */
+internal class KSVGConstantState internal constructor(
+    private val svg: SVG,
+    private val renderOptions: RenderOptions,
+    private val animated: Boolean,
+) : Drawable.ConstantState() {
+
+    override fun newDrawable(): Drawable {
+        val options = RenderOptionsImpl(renderOptions)
+        return if (animated) {
+            svg.toAnimatedDrawable(options)
+        } else {
+            svg.toDrawable(options)
+        }
+    }
+
+    override fun newDrawable(res: Resources?): Drawable {
+        return newDrawable()
+    }
+
+    override fun getChangingConfigurations(): Int {
+        return 0
     }
 }

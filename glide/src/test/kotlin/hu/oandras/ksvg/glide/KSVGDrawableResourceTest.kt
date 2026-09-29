@@ -18,7 +18,6 @@ package hu.oandras.ksvg.glide
 
 import com.bumptech.glide.load.Options
 import hu.oandras.ksvg.KSVGDrawable
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,21 +29,26 @@ import org.robolectric.annotation.GraphicsMode
 class KSVGDrawableResourceTest {
 
     @Test
-    fun getSizeDelegatesToDrawable() {
+    fun getSizeCoversRetainedMemory() {
         val resource = resourceAsInputStream("example.svg").use {
-            KSVGDrawableDecoder().decode(it, 192, 192, Options())
+            val svg = KSVGSvgDecoder().decode(it, 192, 192, Options())
+            KSVGSvgDrawableTranscoder().transcode(svg, Options())
         }
         val drawable = resource.get() as KSVGDrawable
-        assertEquals(
-            drawable.getMemorySizeBytes().coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-            resource.size
+        // Retained bitmaps when present, otherwise a positive intrinsic-based
+        // estimate — never weightless in the memory cache.
+        assertTrue(resource.size > 0)
+        assertTrue(
+            resource.size >= drawable.getMemorySizeBytes()
+                .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         )
     }
 
     @Test
     fun getSizeIsNonNegative() {
         resourceAsInputStream("example.svg").use {
-            assertTrue(KSVGDrawableDecoder().decode(it, 192, 192, Options()).size >= 0)
+            val svg = KSVGSvgDecoder().decode(it, 192, 192, Options())
+            assertTrue(KSVGSvgDrawableTranscoder().transcode(svg, Options()).size >= 0)
         }
     }
 }

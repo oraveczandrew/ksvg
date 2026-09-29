@@ -207,18 +207,21 @@ internal class SVGParserImpl(
                     }
                     parseUsingSAX(input)
                     return checkNotNull(svgDocument) { "svgDocument is null after SAX parse" }
+                        .also { it.sealAfterParse() }
                 }
             }
 
             // Use the (faster) XmlPullParser
             parseUsingXmlPullParser(input)
             return checkNotNull(svgDocument) { "svgDocument is null after XmlPullParser parse" }
+                .also { it.sealAfterParse() }
         } catch (e: IOException) {
             logger.logE(TAG) {
                 "Error occurred while performing check for entities.  File may not be parsed correctly if it contains entity definitions.\n" + e.stackTraceToString()
             }
             parseUsingXmlPullParser(input)
             return checkNotNull(svgDocument) { "svgDocument is null after fallback parse" }
+                .also { it.sealAfterParse() }
         } finally {
             try {
                 input.close()
@@ -428,7 +431,7 @@ internal class SVGParserImpl(
                 if (expandedChars > ENTITY_EXPANSION_LIMIT) {
                     throw KSVGParseException(
                         "Entity expansion limit exceeded " +
-                            "($ENTITY_EXPANSION_LIMIT chars); possible Billion Laughs attack"
+                                "($ENTITY_EXPANSION_LIMIT chars); possible Billion Laughs attack"
                     )
                 }
             }
@@ -436,7 +439,7 @@ internal class SVGParserImpl(
             if (saxChars > SAX_CHAR_LIMIT) {
                 throw KSVGParseException(
                     "SAX character limit exceeded " +
-                        "($SAX_CHAR_LIMIT chars); possible Billion Laughs attack"
+                            "($SAX_CHAR_LIMIT chars); possible Billion Laughs attack"
                 )
             }
             this@SVGParserImpl.text(ch = ch, start = start, length = length)
@@ -1126,7 +1129,6 @@ internal class SVGParserImpl(
     }
 
 
-
     //=========================================================================
     @Throws(KSVGParseException::class)
     private fun path(attributes: Attributes) {
@@ -1254,7 +1256,7 @@ internal class SVGParserImpl(
         val builder = TSpan.Builder(requireSvgDocument(), currentElement)
         builder.parseAttributes(attributes)
         val obj = builder.build()
-        
+
         currentElement.addChild(obj)
         this.currentElement = obj
         obj.textRoot = if (currentElement is TextRoot) {

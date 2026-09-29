@@ -5,7 +5,7 @@
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *        https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,21 +16,21 @@
 
 package hu.oandras.ksvg.glide
 
-import android.graphics.drawable.Drawable
 import com.bumptech.glide.load.Options
 import com.bumptech.glide.load.ResourceDecoder
 import com.bumptech.glide.load.engine.Resource
-import hu.oandras.ksvg.KSVGDrawable
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.SVG
 import java.io.IOException
 import java.io.InputStream
 
 /**
- * Decodes an SVG into a [Drawable]. If animations are enabled via [KSVGOptions.PARSE_ANIMATIONS],
- * it returns a [hu.oandras.ksvg.KSVGAnimatedDrawable].
+ * Decodes an SVG into its parsed [SVG] document form. Per-target drawables are
+ * created from the cached document by [KSVGSvgDrawableTranscoder], so the
+ * requested `width`/`height` do not affect decoding and no bounds are assigned
+ * here.
  */
-public class KSVGDrawableDecoder : ResourceDecoder<InputStream, Drawable> {
+public class KSVGSvgDecoder : ResourceDecoder<InputStream, SVG> {
 
     override fun handles(source: InputStream, options: Options): Boolean {
         return isSvg(source)
@@ -42,23 +42,16 @@ public class KSVGDrawableDecoder : ResourceDecoder<InputStream, Drawable> {
         width: Int,
         height: Int,
         options: Options
-    ): Resource<Drawable> {
+    ): Resource<SVG> {
         try {
-            val parseAnimations = options.get(KSVGOptions.PARSE_ANIMATIONS) ?: false
             val svg = SVG.getFromInputStream(
                 source,
-                parseAnimations,
+                options.get(KSVGOptions.PARSE_ANIMATIONS) ?: false,
                 externalFileResolver = options.get(KSVGOptions.EXTERNAL_FILE_RESOLVER),
                 enableInternalEntities = options.get(KSVGOptions.ENABLE_INTERNAL_ENTITIES) ?: true,
             )
 
-            val drawable: KSVGDrawable = if (parseAnimations) {
-                svg.toAnimatedDrawable()
-            } else {
-                svg.toDrawable()
-            }
-
-            return KSVGDrawableResource(drawable)
+            return KSVGSvgResource(svg)
         } catch (e: KSVGParseException) {
             throw IOException("Cannot load SVG from stream", e)
         }

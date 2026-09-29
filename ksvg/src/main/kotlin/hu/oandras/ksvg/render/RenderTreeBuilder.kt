@@ -32,7 +32,9 @@ import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CSSParser
+import hu.oandras.ksvg.css.CSSRule
 import hu.oandras.ksvg.css.CssUnit
+import hu.oandras.ksvg.css.mergeRulesInCascadeOrder
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.animation.AnimateColor
 import hu.oandras.ksvg.dom.animation.AnimateDashArray
@@ -189,6 +191,13 @@ internal class RenderTreeBuilder(
 
     private var ruleMatchContext: CSSParser.RuleMatchContext? = null
 
+    /**
+     * Effective CSS cascade for the current build: document rules merged with
+     * the `RenderOptions` overlay in specificity order. Never mutates the
+     * shared document; the overlay lives only in this build.
+     */
+    private var effectiveRules: List<CSSRule> = emptyList()
+
     override val currentFontSize: Float
         get() = state.fillConfig.textSize
 
@@ -225,8 +234,12 @@ internal class RenderTreeBuilder(
         buildDepth = 0
 
         val css = renderOptions.css
-        if (css != null) {
-            document.addCSSRules(css.cssRuleSet)
+        effectiveRules = if (css != null) {
+            ArrayList<CSSRule>(document.cSSRules.size + css.cssRuleSet.rules.size).also { merged ->
+                mergeRulesInCascadeOrder(merged, document.cSSRules, css.cssRuleSet.rules)
+            }
+        } else {
+            document.cSSRules
         }
 
         if (renderOptions.hasTarget()) {
@@ -243,7 +256,7 @@ internal class RenderTreeBuilder(
             state.style = builder.build()
         }
 
-        val node = try {
+        val node = run {
             val overrides = resolveRootViewOverrides(document, renderOptions as RenderOptionsImpl) ?: return null
             val viewBox: Box? = overrides.viewBoxOverride
             val preserveAspectRatio: PreserveAspectRatio? = overrides.parOverride
@@ -280,10 +293,6 @@ internal class RenderTreeBuilder(
             }
             statePop()
             n
-        } finally {
-            if (renderOptions.hasCss()) {
-                document.clearRenderCSSRules()
-            }
         }
 
         return node
@@ -2059,7 +2068,7 @@ internal class RenderTreeBuilder(
         // Pass 1: resolve which properties' winning declaration is a CSS-wide keyword
         // (inherit/unset/initial/revert) so lower-priority concrete values lose to them.
         val matchingRules = ArrayList<Style>()
-        document.cSSRules.forEachElement { rule ->
+        effectiveRules.forEachElement { rule ->
             if (CSSParser.ruleMatch(ruleMatchContext, rule.selector, obj)) {
                 matchingRules.add(rule.style)
             }

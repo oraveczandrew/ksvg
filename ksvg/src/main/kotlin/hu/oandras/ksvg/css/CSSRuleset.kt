@@ -18,7 +18,6 @@
 package hu.oandras.ksvg.css
 
 import hu.oandras.ksvg.utils.forEachElement
-import java.util.*
 
 internal class CSSRuleset {
 
@@ -29,7 +28,7 @@ internal class CSSRuleset {
 
     // Add a rule to the ruleset. The position at which it is inserted is determined by its specificity value.
     fun add(rule: CSSRule) {
-        val rules = _rules ?: LinkedList<CSSRule>().also {
+        val rules = _rules ?: ArrayList<CSSRule>().also {
             this._rules = it
         }
 
@@ -51,19 +50,46 @@ internal class CSSRuleset {
         }
     }
 
-    /**
-     * Remove all rules that were added from a given Source.
-     */
-    fun removeFromSource(sourceToBeRemoved: Source?) {
-        val rules = _rules ?: return
-        for (i in rules.indices.reversed()) {
-            if (rules[i].source == sourceToBeRemoved) {
-                rules.removeAt(i)
-            }
-        }
-    }
-
     override fun toString(): String {
         return _rules?.joinToString("\n").orEmpty()
+    }
+}
+
+/**
+ * Merges document rules with per-render overlay rules (e.g. from `RenderOptions`)
+ * into [into], ordered exactly as [CSSRuleset.add] would insert them: ascending
+ * specificity, document rules preceding equal-specificity overlay rules.
+ * Both inputs must already be specificity-ordered (which `add` maintains).
+ * Reuses [into]'s backing array, so steady-state rendering stays allocation-free.
+ */
+internal fun mergeRulesInCascadeOrder(
+    into: ArrayList<CSSRule>,
+    documentRules: List<CSSRule>,
+    overlayRules: List<CSSRule>,
+) {
+    into.clear()
+    into.ensureCapacity(documentRules.size + overlayRules.size)
+    var i = 0
+    var j = 0
+    val n = documentRules.size
+    val m = overlayRules.size
+    while (i < n && j < m) {
+        val docRule = documentRules[i]
+        val overlayRule = overlayRules[j]
+        if (docRule.selector.specificity <= overlayRule.selector.specificity) {
+            into.add(docRule)
+            i++
+        } else {
+            into.add(overlayRule)
+            j++
+        }
+    }
+    while (i < n) {
+        into.add(documentRules[i])
+        i++
+    }
+    while (j < m) {
+        into.add(overlayRules[j])
+        j++
     }
 }

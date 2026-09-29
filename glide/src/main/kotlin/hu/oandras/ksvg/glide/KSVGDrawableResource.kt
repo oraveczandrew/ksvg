@@ -26,9 +26,25 @@ import hu.oandras.ksvg.KSVGDrawable
  */
 public class KSVGDrawableResource(private val drawable: KSVGDrawable) : DrawableResource<Drawable>(drawable) {
     override fun getResourceClass(): Class<Drawable> = Drawable::class.java
-    override fun getSize(): Int =
-        drawable.getMemorySizeBytes().coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    override fun getSize(): Int {
+        val retained = drawable.getMemorySizeBytes()
+        if (retained > 0L) {
+            return retained.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        }
+        // Fresh drawable (nothing rendered yet): estimate one intrinsic-sized
+        // frame so zero-size entries never sit weightless in the memory cache.
+        val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: FALLBACK_DIMENSION_PX
+        val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: FALLBACK_DIMENSION_PX
+        return (width.toLong() * height.toLong() * BYTES_PER_PIXEL)
+            .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    }
+
     override fun recycle() {
         drawable.trimMemory()
+    }
+
+    private companion object {
+        const val FALLBACK_DIMENSION_PX: Int = 192
+        const val BYTES_PER_PIXEL: Long = 4L
     }
 }

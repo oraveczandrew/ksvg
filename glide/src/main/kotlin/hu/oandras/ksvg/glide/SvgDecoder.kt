@@ -68,18 +68,25 @@ public class SvgDecoder(
                 enableInternalEntities = options.get(KSVGOptions.ENABLE_INTERNAL_ENTITIES) ?: true,
             )
 
-            if (svg.documentWidth == -1f || svg.documentHeight == -1f) {
+            // Intrinsic size fallback (same values the old code wrote into the
+            // document, now kept local: the shared document is never mutated).
+            // Missing intrinsics (e.g. viewBox-only) fall back to the target
+            // size, or 192px for SIZE_ORIGINAL.
+            val missingIntrinsics = svg.documentWidth == -1f || svg.documentHeight == -1f
+            val documentWidth: Float
+            val documentHeight: Float
+            if (missingIntrinsics) {
                 if (width != Target.SIZE_ORIGINAL && height != Target.SIZE_ORIGINAL) {
-                    svg.documentWidth = width.toFloat()
-                    svg.documentHeight = height.toFloat()
+                    documentWidth = width.toFloat()
+                    documentHeight = height.toFloat()
                 } else {
-                    svg.documentWidth = 192f
-                    svg.documentHeight = 192f
+                    documentWidth = 192f
+                    documentHeight = 192f
                 }
+            } else {
+                documentWidth = svg.documentWidth
+                documentHeight = svg.documentHeight
             }
-
-            val documentWidth = svg.documentWidth
-            val documentHeight = svg.documentHeight
 
             val scaleX: Float
             val scaleY: Float
@@ -89,14 +96,17 @@ public class SvgDecoder(
                     scaleX = width / documentWidth
                     scaleY = height / documentHeight
                 }
+
                 width == Target.SIZE_ORIGINAL && height == Target.SIZE_ORIGINAL -> {
                     scaleX = 1f
                     scaleY = 1f
                 }
+
                 width == Target.SIZE_ORIGINAL -> {
                     scaleX = 1f
                     scaleY = height / documentHeight
                 }
+
                 else -> {
                     scaleX = width / documentWidth
                     scaleY = 1f

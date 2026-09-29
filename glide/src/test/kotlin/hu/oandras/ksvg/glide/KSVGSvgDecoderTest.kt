@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.glide
 
 import com.bumptech.glide.load.Options
+import hu.oandras.ksvg.SVG
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -29,19 +30,21 @@ import java.io.IOException
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-class KSVGDrawableDecoderTest {
+class KSVGSvgDecoderTest {
 
-    private val decoder = KSVGDrawableDecoder()
+    private val decoder = KSVGSvgDecoder()
 
     @Test
     fun testDecodeValid() {
         resourceAsInputStream("example.svg").use {
-            assertNotNull(decoder.decode(it, 192, 192, Options()))
+            val resource = decoder.decode(it, 192, 192, Options())
+            assertNotNull(resource)
+            assertTrue(resource.get() is SVG)
         }
     }
 
     // Parse failures must surface as IOException (Glide's decode
-    // contract, mirroring SvgDecoder), never as RuntimeException.
+    // contract), never as RuntimeException.
     @Test
     fun testDecodeInvalidThrowsIOException() {
         ByteArrayInputStream("<<<not xml>>>".toByteArray()).use {
