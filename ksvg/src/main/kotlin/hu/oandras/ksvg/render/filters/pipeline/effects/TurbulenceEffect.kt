@@ -198,15 +198,16 @@ private const val TURBULENCE_SHADER: String = """
                 }
                 float4 finalVal = (uIsFractal != 0) ? (sums + 1.0) * 0.5 : sums;
                 finalVal = clamp(finalVal, 0.0, 1.0);
-                // Straight (non-premultiplied) terminal output: the CPU kernel
-                // writes straight bytes into the result bitmap, and parity (plus
-                // the golden references pinning the CPU side) requires the same
-                // convention here.
+                // Premultiplied terminal output: downstream chained effects
+                // unpremultiply their uInput (colormatrix/blend/composite do
+                // `c.rgb / alpha`), and hwui composites effect output as
+                // premultiplied. (The RAW shader registered for displacement
+                // sampling stays straight, matching CPU getPixels.)
                 float3 outRgb = finalVal.rgb;
                 if (uUnlinearize != 0) {
                     outRgb = srgbEotf(floor(outRgb * 255.0 + 0.5) / 255.0);
                 }
-                return half4(outRgb, finalVal.a);
+                return half4(outRgb * finalVal.a, finalVal.a);
             }
         """
 
