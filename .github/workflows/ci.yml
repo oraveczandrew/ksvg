@@ -185,6 +185,7 @@ jobs:
           profile: Nexus 6
           avd-name: ci-x86
           force-avd-creation: false
+          emulator-options: -no-metrics
           script: ./gradlew :filtering:connectedDebugAndroidTest -PfilterAbis=x86 -Pandroid.testInstrumentationRunnerArguments.annotation=hu.oandras.ksvg.filtering.NativeParityTest
 
       - name: Upload emulator test reports
