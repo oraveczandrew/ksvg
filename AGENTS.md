@@ -118,7 +118,7 @@ If the user asks for a report, make it in the tmp folder as a Markdown file.
 
 ## Quick Commands
 - Always use the Gradle daemon (omit `--no-daemon`).
-- Create commits without agent commit signing.
+- Create commits without agent attribution footers (no "Created with ...", Co-authored-by, or similar trailers). Do not touch commit.gpgsign — PGP signing follows the repo config.
 - Build: `./gradlew :ksvg:compileDebugKotlin -Dorg.gradle.warning.mode=none`
 - Tests: `./gradlew :ksvg:testDebugUnitTest -Dorg.gradle.warning.mode=none`
 - Coverage: `./gradlew :ksvg:jacocoTestReport -Dorg.gradle.warning.mode=none`
