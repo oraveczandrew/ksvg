@@ -24,6 +24,11 @@
  *   x9  = src cursor, x10 = dst cursor, x7 = matrix base (read-only)
  *   x12 = row stride bytes, x13 = row byte count, w14 = rows left
  *   x0  = srgbToLinear base, x1 = linearToSrgb base, w15 = useLinear
+ *   w11 = 8px block counter, w2 = tail pixel counter (width is consumed
+ *     in the prologue, so w2 is free), w3 = tail packed-pixel accumulator
+ *     (clipLeft is consumed in the prologue, so w3 is free)
+ *   GPR rule: only caller-saved regs (x0-x15) are touched; x19-x28 are
+ *   never written (the JNI caller keeps live handles in x21/x25).
  *   v0-v3: pixel bytes B,G,R,A (ld4 order) / widened A-high lives in v0
  *   v4,v5: R floats lo/hi, v6,v7: G floats lo/hi
  *   v9,v10: B floats lo/hi, v11: A floats lo (A-high in v0 after widening)
@@ -190,11 +195,11 @@ SYM(applyColorMatrixNeon):
 
 .Lrow_start_nonlin:
     lsr     w17, w13, #2
-    lsr     w24, w17, #3
-    and     w25, w17, #7
+    lsr     w11, w17, #3
+    and     w2, w17, #7
 
 .Lnonlin_8:
-    cbz     w24, .Lnonlin_tail
+    cbz     w11, .Lnonlin_tail
     ld4     {v0.8b-v3.8b}, [x9], #32
 
     // Constants once per block: WIDEN8 divides by v8; rows/narrow only read
@@ -226,11 +231,11 @@ SYM(applyColorMatrixNeon):
 
     // Pack B,G,R,A (st4 needs consecutive regs; dests already ordered).
     st4     {v24.8b-v27.8b}, [x10], #32
-    subs    w24, w24, #1
+    subs    w11, w11, #1
     b.ne    .Lnonlin_8
 
 .Lnonlin_tail:
-    cbz     w25, .Lrow_nonlin_next
+    cbz     w2, .Lrow_nonlin_next
     b       .Ltail_scalar_nonlin
 
 .Lrow_nonlin_next:
@@ -250,11 +255,11 @@ SYM(applyColorMatrixNeon):
 
 .Lrow_start_linear:
     lsr     w17, w13, #2
-    lsr     w24, w17, #3
-    and     w25, w17, #7
+    lsr     w11, w17, #3
+    and     w2, w17, #7
 
 .Llinear_8:
-    cbz     w24, .Llinear_tail
+    cbz     w11, .Llinear_tail
     ld4     {v0.8b-v3.8b}, [x9], #32
 
     // Load sRGB->linear tables into v16..v31.
@@ -319,11 +324,11 @@ SYM(applyColorMatrixNeon):
 
     // Pack B,G,R,A directly (st4 needs consecutive regs).
     st4     {v24.8b-v27.8b}, [x10], #32
-    subs    w24, w24, #1
+    subs    w11, w11, #1
     b.ne    .Llinear_8
 
 .Llinear_tail:
-    cbz     w25, .Lrow_linear_next
+    cbz     w2, .Lrow_linear_next
     b       .Ltail_scalar_linear
 
 .Lrow_linear_next:
@@ -337,7 +342,7 @@ SYM(applyColorMatrixNeon):
 // s1..s4 (linearized except alpha). Each output row evaluates
 // m0*R + m1*G + m2*B + m3*A + m4 left-to-right like the reference, then the
 // shared clamp/round/pack. Coeff offsets are all literal (no macro arithmetic
-// on immediates). Clobbers s0, s5, s6, w16-w21.
+// on immediates). Clobbers s0, s5, s6, w16, w17, w3.
 .macro TAIL_ROW o0, o1, o2, o3, o4, shift, enc
     ldr     s5, [x7, #\o0]
     fmul    s6, s3, s5
@@ -361,7 +366,7 @@ SYM(applyColorMatrixNeon):
     ldrb    w17, [x1, w17, uxtw]
     .endif
     and     w17, w17, #0xff
-    orr     w21, w21, w17, lsl #\shift
+    orr     w3, w3, w17, lsl #\shift
 .endm
 
 .macro TAIL_INPUTS linear
@@ -410,27 +415,27 @@ SYM(applyColorMatrixNeon):
 
 .Ltail_nonlin_loop:
     ldr     w16, [x9], #4
-    mov     w21, #0
+    mov     w3, #0
     TAIL_INPUTS 0
     TAIL_ROW 0, 4, 8, 12, 16, 16, 0
     TAIL_ROW 20, 24, 28, 32, 36, 8, 0
     TAIL_ROW 40, 44, 48, 52, 56, 0, 0
     TAIL_ROW 60, 64, 68, 72, 76, 24, 0
-    str     w21, [x10], #4
-    subs    w25, w25, #1
+    str     w3, [x10], #4
+    subs    w2, w2, #1
     b.ne    .Ltail_nonlin_loop
     b       .Lrow_nonlin_next
 
 .Ltail_linear_loop:
     ldr     w16, [x9], #4
-    mov     w21, #0
+    mov     w3, #0
     TAIL_INPUTS 1
     TAIL_ROW 0, 4, 8, 12, 16, 16, 1
     TAIL_ROW 20, 24, 28, 32, 36, 8, 1
     TAIL_ROW 40, 44, 48, 52, 56, 0, 1
     TAIL_ROW 60, 64, 68, 72, 76, 24, 0
-    str     w21, [x10], #4
-    subs    w25, w25, #1
+    str     w3, [x10], #4
+    subs    w2, w2, #1
     b.ne    .Ltail_linear_loop
     b       .Lrow_linear_next
 
