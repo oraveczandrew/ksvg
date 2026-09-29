@@ -159,6 +159,7 @@ internal fun createConvolveNoneShaderEffect(
     return createConvolveShaderEffect(node, 2, filterRegion, scaleX, scaleY, padX, padY, inputUniformName)
 }
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 private fun createConvolveShaderEffect(
     node: FeConvolveMatrixRenderNode,
     edgeMode: Int,

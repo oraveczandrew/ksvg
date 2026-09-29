@@ -293,6 +293,7 @@ internal fun createSpecularLightingShaderEffect(
     return shader to RenderEffect.createRuntimeShaderEffect(shader, inputUniformName)
 }
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 private fun createLightingShader(
     node: FilterPrimitiveRenderNode<*>,
     light: Lighting?,

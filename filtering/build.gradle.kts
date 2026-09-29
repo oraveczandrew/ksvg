@@ -149,7 +149,7 @@ android {
     }
 }
 
-apply(from = "host-native.gradle.kts")
+apply(from = file("host-native.gradle.kts"))
 
 val uninstallBenchmarkApk = tasks.register("uninstallBenchmarkApk") {
     group = "verification"
