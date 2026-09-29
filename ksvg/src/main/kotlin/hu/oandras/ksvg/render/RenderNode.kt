@@ -57,6 +57,7 @@ import hu.oandras.ksvg.dom.filter.FeTile
 import hu.oandras.ksvg.dom.filter.FeTurbulence
 import hu.oandras.ksvg.dom.filter.Filter
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
+import hu.oandras.ksvg.dom.style.BasicShape
 import hu.oandras.ksvg.dom.gradient.Stop
 import hu.oandras.ksvg.dom.shapes.Shape
 import hu.oandras.ksvg.dom.style.CSSBlendMode
@@ -110,6 +111,14 @@ internal sealed class RenderNode<T: SvgObject>(
     @JvmField var filterNode: FilterRenderNode? = null
     @JvmField var maskNode: MaskRenderNode? = null
     @JvmField var clipPathNode: ClipPathRenderNode? = null
+    @JvmField var clipShape: ResolvedShapeClip? = null
+    /**
+     * True while a `clip-path` property animation discretely holds `none`:
+     * suppresses the (url) [clipPathNode] for this frame. Reset to the base
+     * (false) on every animation frame before the animation writes it, so a
+     * finished `fill="remove"` animation reverts to the base clip.
+     */
+    @JvmField var clipPathNodeSuppressed: Boolean = false
     @JvmField var markerStartNode: MarkerRenderNode? = null
     @JvmField var markerMidNode: MarkerRenderNode? = null
     @JvmField var markerEndNode: MarkerRenderNode? = null
@@ -195,6 +204,10 @@ internal sealed class RenderNode<T: SvgObject>(
 
     internal open fun computeHasAnimations(): Boolean {
         if (animationNodes?.isNotEmpty() == true) return true
+        // <animate> inside <clipPath> animates the referencing node.
+        if (clipPathNode?.hasAnimations() == true) return true
+        // <animate> inside <mask> animates the referencing node.
+        if (maskNode?.hasAnimations() == true) return true
         // Filter primitives carry their own <animate> children; without this
         // the updateAnimations early-return skips the whole subtree even
         // though FilterRenderNode.updateAnimations would apply them.
@@ -243,6 +256,7 @@ internal sealed class RenderNode<T: SvgObject>(
         total += filterNode?.retainedByteCount() ?: 0L
         total += maskNode?.retainedByteCount() ?: 0L
         total += clipPathNode?.retainedByteCount() ?: 0L
+        total += clipShape?.retainedByteCount() ?: 0L
         total += markerStartNode?.retainedByteCount() ?: 0L
         total += markerMidNode?.retainedByteCount() ?: 0L
         total += markerEndNode?.retainedByteCount() ?: 0L
@@ -250,8 +264,30 @@ internal sealed class RenderNode<T: SvgObject>(
     }
 
     override fun toString(): String {
-        return "RenderNode(sourceElement=$sourceElement, transform=$transform, viewBoxTransform=$viewBoxTransform, opacity=$opacity, filterNode=$filterNode, maskNode=$maskNode, clipPathNode=$clipPathNode, markerStartNode=$markerStartNode, markerMidNode=$markerMidNode, markerEndNode=$markerEndNode, fillPatternNode=$fillPatternNode, strokePatternNode=$strokePatternNode, fillPaintRef=$fillPaintRef, strokePaintRef=$strokePaintRef, animationNodes=$animationNodes, renderState=$renderState, boundingBox=$boundingBox, version=$version, contentVersion=$contentVersion, cachedFilterOutput=$cachedFilterOutput, cachedSourceContent=$cachedSourceContent, lastSourceVersion=$lastSourceVersion, lastFilterVersion=$lastFilterVersion, lastScaleX=$lastScaleX, lastScaleY=$lastScaleY)"
+        return "RenderNode(sourceElement=$sourceElement, transform=$transform, viewBoxTransform=$viewBoxTransform, opacity=$opacity, filterNode=$filterNode, maskNode=$maskNode, clipPathNode=$clipPathNode, clipShape=$clipShape, markerStartNode=$markerStartNode, markerMidNode=$markerMidNode, markerEndNode=$markerEndNode, fillPatternNode=$fillPatternNode, strokePatternNode=$strokePatternNode, fillPaintRef=$fillPaintRef, strokePaintRef=$strokePaintRef, animationNodes=$animationNodes, renderState=$renderState, boundingBox=$boundingBox, version=$version, contentVersion=$contentVersion, cachedFilterOutput=$cachedFilterOutput, cachedSourceContent=$cachedSourceContent, lastSourceVersion=$lastSourceVersion, lastFilterVersion=$lastFilterVersion, lastScaleX=$lastScaleX, lastScaleY=$lastScaleY)"
     }
+}
+
+/**
+ * CSS basic-shape `clip-path` with its reference box snapshotted at build time.
+ * Percentages inside [shape] resolve against [refBox] at render time.
+ */
+internal class ResolvedShapeClip(
+    @JvmField val shape: BasicShape,
+    @JvmField val refBox: Box,
+    /**
+     * Prebuilt clip geometry for [BasicShape.Path], converted from path data at
+     * build time so the render loop stays allocation-free. Null for other shapes.
+     * Read-only after construction; never mutated by the renderer.
+     */
+    @JvmField val clipPath: Path?,
+) {
+    internal fun retainedByteCount(): Long {
+        val points = (shape as? BasicShape.Polygon)?.points?.size ?: 0
+        return (16 + points * 8).toLong()
+    }
+
+    override fun toString(): String = "ResolvedShapeClip(shape=$shape, refBox=$refBox)"
 }
 
 internal sealed interface TextNode {

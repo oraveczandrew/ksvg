@@ -45,6 +45,16 @@ private val EXCLUDED_FROM_ENDPOINT_VERIFICATION = setOf(
     // rsvg <= 2.63.2 ignores the marker="" shorthand: golden has no markers.
     // Pinned by MarkerShorthandTest instead.
     "marker_shorthand_strokeWidth.svg",
+    // rsvg (verified up to 2.63.2) ignores CSS basic-shape `clip-path` (every
+    // shape renders unclipped): no valid rsvg golden exists. Phase 1
+    // (circle/ellipse/inset/polygon) and phase 2 (rect/xywh/path, side
+    // keywords) samples; geometry is pinned by BasicShapeClipTest pixel areas.
+    // The animated samples cannot have rsvg goldens either; frames are pinned
+    // by ClipPathAnimationTest / ClipPathPropertyAnimationTest.
+    "clip_basic_shapes.svg",
+    "clip_basic_shapes_phase2.svg",
+    "clip_basic_shapes_animated.svg",
+    "clip_path_animated_content.svg",
 )
 
 // Below API 29 blends fall back to PorterDuff layer compositing and flood
@@ -57,8 +67,8 @@ private val EXCLUDED_BELOW_API_29 = setOf(
 
 // Mirrors ACCEPTED_SIMILARITY_EXCEPTIONS (same values, same reasons), except
 // the two device-font entries below: phones/Emulators ship different
-// sans-serif fonts (OnePlus vs Roboto vs Pango), so glyph coverage noise runs
-// slightly hotter on device than under Robolectric Roboto (measured
+// sans-serif fonts (OnePlus vs. Roboto vs. Pango), so glyph coverage noise runs
+// slightly hotter on the device than under Robolectric Roboto (measured
 // 2026-09-29 on OnePlus: text_anchor 6.26%, text_fonts 12.23%). The lowered
 // gates still trip on any real regression (deltas are stable per file).
 private val ACCEPTED_ENDPOINT_SIMILARITY_EXCEPTIONS: Map<String, Double> = mapOf(

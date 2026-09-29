@@ -180,6 +180,39 @@ internal open class TextScanner(input: String) {
         return found
     }
 
+    internal fun getPosition(): Int = position
+
+    internal fun setPosition(p: Int) {
+        position = p.coerceIn(0, inputLength)
+    }
+
+    internal fun peekChar(): Char? = if (position < inputLength) input[position] else null
+
+    internal fun substring(start: Int, end: Int): String =
+        input.substring(start.coerceIn(0, inputLength), end.coerceIn(0, inputLength))
+
+    internal fun peekKeyword(word: String): Boolean {
+        skipWhitespace()
+        if (!input.regionMatches(position, word, 0, word.length, ignoreCase = true)) return false
+        val after = position + word.length
+        if (after < inputLength && (input[after].isLetterOrDigit() || input[after] == '-')) return false
+        return true
+    }
+
+    internal fun consumeKeyword(word: String): Boolean {
+        if (!peekKeyword(word)) return false
+        position += word.length
+        skipWhitespace()
+        return true
+    }
+
+    internal fun nextIdent(): String? {
+        skipWhitespace()
+        val start = position
+        while (position < inputLength && (input[position].isLetter() || input[position] == '-')) position++
+        if (start == position) return null
+        return input.substring(start, position)
+    }
 
     fun consume(str: String): Boolean {
         val found = input.startsWith(str, position)

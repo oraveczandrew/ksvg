@@ -37,6 +37,7 @@ import hu.oandras.ksvg.css.CssUnit
 import hu.oandras.ksvg.css.mergeRulesInCascadeOrder
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.animation.AnimateColor
+import hu.oandras.ksvg.dom.animation.AnimateClipPath
 import hu.oandras.ksvg.dom.animation.AnimateDashArray
 import hu.oandras.ksvg.dom.animation.AnimateFloat
 import hu.oandras.ksvg.dom.animation.AnimateMotion
@@ -97,7 +98,10 @@ import hu.oandras.ksvg.dom.shapes.PolygonShape
 import hu.oandras.ksvg.dom.shapes.PolyLineShape
 import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.dom.shapes.Shape
+import hu.oandras.ksvg.dom.style.BasicShape
+import hu.oandras.ksvg.dom.style.CSSClipPath
 import hu.oandras.ksvg.dom.style.FontStyle
+import hu.oandras.ksvg.dom.style.GeometryBox
 import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.SvgPaint
@@ -110,6 +114,7 @@ import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.dom.text.TextSequence
 import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.render.animation.AnimateColorNode
+import hu.oandras.ksvg.render.animation.AnimateClipPathNode
 import hu.oandras.ksvg.render.animation.AnimateDashArrayNode
 import hu.oandras.ksvg.render.animation.AnimateFloatNode
 import hu.oandras.ksvg.render.animation.AnimateMotionNode
@@ -348,12 +353,20 @@ internal class RenderTreeBuilder(
                 }
             }
             state.style.clipPath?.let {
-                val clipPath = document.resolveIRI(it) as? ClipPath
-                if (clipPath != null) {
-                    node.clipPathNode = buildClipPath(clipPath)
-                } else {
-                    logW("KSVG") { "Clip-path reference '$it' is missing or invalid; hiding element" }
-                    hideInvalidReference = true
+                when (it) {
+                    is CSSClipPath.UrlClip -> {
+                        val clipPath = document.resolveIRI(it.iri) as? ClipPath
+                        if (clipPath != null) {
+                            node.clipPathNode = buildClipPath(clipPath)
+                        } else {
+                            logW("KSVG") { "Clip-path reference '${it.iri}' is missing or invalid; hiding element" }
+                            hideInvalidReference = true
+                        }
+                    }
+                    is CSSClipPath.ShapeClip -> {
+                        node.clipShape = resolveShapeClip(it.shape, resolveGeometryBox(it.refBox, node))
+                    }
+                    is CSSClipPath.NoClip -> {}
                 }
             }
             state.style.mask?.let {
@@ -712,6 +725,33 @@ internal class RenderTreeBuilder(
                 } ?: return null
 
                 AnimatePathNode(
+                    sourceElement = animation,
+                    effectiveValues = effectiveValues,
+                    parsedKeySplines = if (animation.calcMode == CalcMode.spline) parseKeySplines(animation.keySplines) else null,
+                    baseRelative = baseRelative,
+                )
+            }
+
+            is AnimateClipPath -> {
+                var baseRelative = false
+                val effectiveValues = animation.values ?: run {
+                    val fromVal = animation.from
+                    val toVal = animation.to
+                    when {
+                        fromVal != null && toVal != null -> listOf(fromVal, toVal)
+                        // to-only interpolates base→to at apply time (the
+                        // path baseRelative pattern); discrete freezes
+                        // at `to`. AnimateClipPath has no `by` by design.
+                        toVal != null && animation.calcMode != CalcMode.discrete -> {
+                            baseRelative = true
+                            listOf(toVal, toVal)
+                        }
+                        toVal != null -> listOf(toVal, toVal)
+                        else -> null
+                    }
+                } ?: return null
+
+                AnimateClipPathNode(
                     sourceElement = animation,
                     effectiveValues = effectiveValues,
                     parsedKeySplines = if (animation.calcMode == CalcMode.spline) parseKeySplines(animation.keySplines) else null,
@@ -1486,6 +1526,43 @@ internal class RenderTreeBuilder(
         parentStack.pop()
     }
 
+    /**
+     * Snapshots the reference box for a CSS basic-shape `clip-path`.
+     * `FILL_BOX` is the node's own bounding box; `VIEW_BOX` (and the
+     * `border-box` mapping) is the current viewport; `STROKE_BOX` falls back
+     * to the fill box when no stroke extent is available (documented
+     * approximation).
+     */
+    private fun resolveGeometryBox(refBox: GeometryBox, node: RenderNode<*>): Box {
+        val fillBox = node.boundingBox
+        return when (refBox) {
+            GeometryBox.FILL_BOX -> fillBox ?: state.viewPort ?: Box._1X1
+            GeometryBox.STROKE_BOX -> fillBox ?: state.viewPort ?: Box._1X1
+            GeometryBox.VIEW_BOX -> state.viewPort ?: fillBox ?: Box._1X1
+        }
+    }
+
+    /**
+     * Builds the render-time form of a CSS basic-shape `clip-path`. `path()`
+     * data is converted to an immutable android [Path] once here so the render
+     * loop (and animated rebuilds) stay allocation-free.
+     */
+    private fun resolveShapeClip(shape: BasicShape, refBox: Box): ResolvedShapeClip {
+        val clipPath = (shape as? BasicShape.Path)?.let { pathShape ->
+            val path = PathConverter(pathShape.path).path
+            // `path()` data is written in the referencing element's own user
+            // space, whose origin is the reference box corner - the same
+            // origin every other basic shape resolves against.
+            if (refBox.minX != 0f || refBox.minY != 0f) {
+                val translate = Matrix()
+                translate.setTranslate(refBox.minX, refBox.minY)
+                path.transform(translate)
+            }
+            path
+        }
+        return ResolvedShapeClip(shape, refBox, clipPath)
+    }
+
     private fun buildClipPath(clipPath: ClipPath): ClipPathRenderNode? {
         val id = clipPath.id
         if (id != null && !buildingIds.add(id)) {
@@ -1510,7 +1587,8 @@ internal class RenderTreeBuilder(
         node.renderState.apply(state)
 
         state.style.clipPath?.let {
-            val nestedClipPath = document.resolveIRI(it) as? ClipPath
+            val nestedIri = (it as? CSSClipPath.UrlClip)?.iri
+            val nestedClipPath = nestedIri?.let { iri -> document.resolveIRI(iri) as? ClipPath }
             if (nestedClipPath != null && nestedClipPath !== clipPath) {
                 node.clipPathNode = buildClipPath(nestedClipPath)
             }

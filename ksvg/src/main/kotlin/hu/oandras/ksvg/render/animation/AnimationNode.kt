@@ -20,6 +20,7 @@ import android.graphics.Path
 import android.graphics.PathMeasure
 import androidx.collection.FloatList
 import androidx.collection.IntList
+import hu.oandras.ksvg.dom.animation.AnimateClipPath
 import hu.oandras.ksvg.dom.animation.AnimateColor
 import hu.oandras.ksvg.dom.animation.AnimateDashArray
 import hu.oandras.ksvg.dom.animation.AnimateFloat
@@ -29,9 +30,13 @@ import hu.oandras.ksvg.dom.animation.AnimateTransform
 import hu.oandras.ksvg.dom.animation.Animation
 import hu.oandras.ksvg.dom.animation.CalcMode
 import hu.oandras.ksvg.dom.animation.TransformType
+import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.PathDefinition
 import hu.oandras.ksvg.dom.core.SVGAttr
+import hu.oandras.ksvg.dom.style.CSSClipPath
 import hu.oandras.ksvg.render.PathAppender
+import hu.oandras.ksvg.render.PathConverter
+import hu.oandras.ksvg.render.ResolvedShapeClip
 import hu.oandras.ksvg.utils.CubicBezier
 
 internal sealed class AnimationNode(
@@ -247,3 +252,64 @@ internal class AnimateDashArrayNode(
         return baseBuffer
     }
 }
+
+internal class AnimateClipPathNode(
+    sourceElement: AnimateClipPath,
+    @JvmField
+    val effectiveValues: List<CSSClipPath>,
+    @JvmField
+    val parsedKeySplines: List<CubicBezier>? = null,
+    /**
+     * True for SMIL `to`-only animation (non-discrete): `effectiveValues`
+     * holds `[to, to]` and the ramp resolves against the base `clip-path` at
+     * apply time (see `clipAt`), mirroring the path `baseRelative` pattern.
+     * Discrete `to`-only stays frozen at `to`. There is no `by` form for
+     * shapes by design.
+     */
+    @JvmField
+    val baseRelative: Boolean = false,
+) : AnimationNode(sourceElement) {
+    /** Build-time resolved shape (reference-box snapshot); captured lazily on
+     * the first animation frame (see `applyClipPathAnimation`). Box objects
+     * are immutable, so retaining the reference is safe. */
+    @JvmField
+    var baseClipShape: ResolvedShapeClip? = null
+
+    /** Reference box all animated shapes resolve against (see `baseClipShape`). */
+    @JvmField
+    var baseBox: Box? = null
+
+    @JvmField
+    var clipBaseReady: Boolean = false
+
+    @JvmField
+    var pathEntries: ArrayList<ClipPathEntry>? = null
+
+    /**
+     * Converted + reference-box-translated geometry for a `path()` animation
+     * endpoint, built once per endpoint and reused every frame (mirrors
+     * `resolveShapeClip`, whose build-time translation this replays at
+     * animation time).
+     */
+    internal fun pathFor(def: PathDefinition, box: Box): Path {
+        var list = pathEntries
+        if (list == null) {
+            list = ArrayList(2)
+            pathEntries = list
+        }
+        for (entry in list) {
+            if (entry.def === def) return entry.path
+        }
+        val path = PathConverter(def).path
+        if (box.minX != 0f || box.minY != 0f) {
+            path.offset(box.minX, box.minY)
+        }
+        list.add(ClipPathEntry(def, path))
+        return path
+    }
+}
+
+internal data class ClipPathEntry(
+    @JvmField val def: PathDefinition,
+    @JvmField val path: Path,
+)

@@ -1,0 +1,25 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5252"/>
+      <stop offset="0.25" stop-color="#ffb300"/>
+      <stop offset="0.5" stop-color="#00c853"/>
+      <stop offset="0.75" stop-color="#448aff"/>
+      <stop offset="1" stop-color="#d500f9"/>
+    </linearGradient>
+    <pattern id="checker" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#fff8e1"/>
+      <rect width="8" height="8" fill="#ff8f00"/>
+      <rect x="8" y="8" width="8" height="8" fill="#ff8f00"/>
+    </pattern>
+  </defs>
+  <rect width="256" height="256" fill="#263238"/>
+  <!-- circle() -->
+  <rect x="8" y="8" width="112" height="112" fill="url(#rainbow)" clip-path="circle(38% at center center)"/>
+  <!-- ellipse() -->
+  <rect x="136" y="8" width="112" height="112" fill="url(#checker)" clip-path="ellipse(46% 30% at center center)"/>
+  <!-- inset() with round -->
+  <rect x="8" y="136" width="112" height="112" fill="url(#rainbow)" clip-path="inset(8% 6% round 18px)"/>
+  <!-- polygon() star, evenodd -->
+  <rect x="136" y="136" width="112" height="112" fill="url(#checker)" clip-path="polygon(evenodd, 56px 4px, 69px 42px, 109px 42px, 77px 66px, 89px 104px, 56px 80px, 23px 104px, 35px 66px, 3px 42px, 43px 42px) fill-box"/>
+</svg>

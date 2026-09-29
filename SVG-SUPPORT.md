@@ -133,7 +133,7 @@
 
 | Property                                                                                                    | Support | Link                                                |
 |-------------------------------------------------------------------------------------------------------------|---------|-----------------------------------------------------|
-| [`clip-path`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/clip-path)               | Full    | References `<clipPath>` element                     |
+| [`clip-path`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/clip-path)               | Full    | `<clipPath>` refs + `circle()`, `ellipse()`, `inset()`, `rect()`, `xywh()`, `polygon()`, `path()` (`closest-side`/`farthest-side`; `round` takes one radius per axis, not per-corner lists; reference box `fill-box` (default, the SVG analog of `border-box`), `view-box`, `stroke-box` approximated by `fill-box`; animatable: geometry animation inside `<clipPath>` + `<animate attributeName="clip-path">` (same-kind shapes interpolate, `url()`/`none`/mismatched stay discrete, `path()` discrete, non-base `url()` targets hold) |
 | [`clip-rule`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/clip-rule)               | Full    | `nonzero`, `evenodd`                                |
 | [`clipPathUnits`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/clipPathUnits)       | Full    | `userSpaceOnUse`, `objectBoundingBox`               |
 | [`clip`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/clip)                         | Full    | Only applies to elements which establish a viewport |

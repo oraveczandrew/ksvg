@@ -311,7 +311,6 @@ internal class CSSParser internal constructor(
         }
     }
 
-
     // Parse a list of CSS declarations
     @Throws(CSSParseException::class)
     private fun parseDeclarations(scan: CSSTextScanner): Style {
@@ -335,7 +334,9 @@ internal class CSSParser internal constructor(
             scan.consume(';')
             // 'inherit', 'unset' and 'initial' are handled in Style.processStyleProperty.
             styleBuilder.lastTouchedFlag = 0L
-            Style.processStyleProperty(styleBuilder, propertyName, propertyValue, false)
+            with(logger) {
+                Style.processStyleProperty(styleBuilder, propertyName, propertyValue, false)
+            }
             if (important && styleBuilder.lastTouchedFlag != 0L) {
                 styleBuilder.markImportant(styleBuilder.lastTouchedFlag)
             }

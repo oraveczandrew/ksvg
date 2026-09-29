@@ -46,6 +46,17 @@ private val EXCLUDED_FROM_VISUAL_VERIFICATION = setOf(
     // at all. Shorthand expansion is pinned by MarkerShorthandTest instead
     // (shorthand vs explicit pixel-identical, markers proven to paint).
     "marker_shorthand_strokeWidth.svg",
+    // rsvg (verified up to 2.63.2) ignores CSS basic-shape `clip-path`
+    // (every shape renders unclipped): no valid rsvg golden exists. Phase 1
+    // (circle/ellipse/inset/polygon) and phase 2 (rect/xywh/path, side
+    // keywords) samples; geometry is pinned by BasicShapeClipTest pixel areas.
+    // The animated samples (property animation + animation inside <clipPath>)
+    // cannot have rsvg goldens either; frames are pinned by
+    // ClipPathAnimationTest / ClipPathPropertyAnimationTest.
+    "clip_basic_shapes.svg",
+    "clip_basic_shapes_phase2.svg",
+    "clip_basic_shapes_animated.svg",
+    "clip_path_animated_content.svg",
 )
 
 // Per-SVG similarity thresholds below the default 0.95, with a documented reason.

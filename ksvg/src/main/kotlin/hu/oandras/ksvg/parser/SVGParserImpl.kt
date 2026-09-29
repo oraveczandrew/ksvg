@@ -31,6 +31,7 @@ import hu.oandras.ksvg.css.MediaType
 import hu.oandras.ksvg.css.Source
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.animation.AnimateColor
+import hu.oandras.ksvg.dom.animation.AnimateClipPath
 import hu.oandras.ksvg.dom.animation.AnimateDashArray
 import hu.oandras.ksvg.dom.animation.AnimateFloat
 import hu.oandras.ksvg.dom.animation.AnimateMotion
@@ -1084,6 +1085,10 @@ internal class SVGParserImpl(
 
             attributeName == SVGAttr.d || attributeName == SVGAttr.points -> {
                 AnimatePath.Builder(requireSvgDocument(), target.parent)
+            }
+
+            attributeName == SVGAttr.clip_path -> {
+                AnimateClipPath.Builder(requireSvgDocument(), target.parent)
             }
 
             else -> {

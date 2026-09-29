@@ -20,6 +20,7 @@ package hu.oandras.ksvg.dom.style
 
 import androidx.annotation.LongDef
 import hu.oandras.ksvg.KSVGParseException
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.css.CSSLength
@@ -124,7 +125,7 @@ internal class Style internal constructor(
     @JvmField val stopColor: SvgColor?,
     @JvmField val stopOpacity: Float,
 
-    @JvmField val clipPath: String?,
+    @JvmField val clipPath: CSSClipPath?,
     @JvmField
     @FillRule
     val clipRule: Int,
@@ -359,7 +360,7 @@ internal class Style internal constructor(
         @JvmField
         var stopOpacity: Float = Float.NaN
         @JvmField
-        var clipPath: String? = null
+        var clipPath: CSSClipPath? = null
         @JvmField
         @FillRule
         var clipRule: Int = FillRule.UNSPECIFIED
@@ -912,7 +913,7 @@ internal class Style internal constructor(
         visibility: Boolean? = this.visibility,
         stopColor: SvgColor? = this.stopColor,
         stopOpacity: Float = this.stopOpacity,
-        clipPath: String? = this.clipPath,
+        clipPath: CSSClipPath? = this.clipPath,
         @FillRule
         clipRule: Int = this.clipRule,
         mask: String? = this.mask,
@@ -1321,6 +1322,7 @@ internal class Style internal constructor(
 
         fun getDefaultStyle(): Style = DEFAULT_STYLE
 
+        context(loggerContext: LoggerContext)
         fun processStyleProperty(
             builder: Builder,
             localName: String?,
@@ -1328,8 +1330,8 @@ internal class Style internal constructor(
             isFromAttribute: Boolean
         ) {
             if (value.isEmpty()) return
-            // CSS-wide keywords: inherit/unset/initial/revert must override any lower-
-            // priority declaration (presentation attribute or earlier source), taking
+            // CSS-wide keywords: inherit/unset/initial/revert must override any lower-priority
+            // declaration (presentation attribute or earlier source), taking
             // the parent's computed value (or the initial one). We record the property
             // in cssWideKeywordFlags so updateStyle skips it and the value inherited
             // from the parent state survives. Note: 'initial' is only correct for
@@ -1609,7 +1611,7 @@ internal class Style internal constructor(
                 }
 
                 SVGAttr.clip_path -> {
-                    val clipPath = parseFunctionalIRI(value)
+                    val clipPath = parseClipPath(value)
                     builder.clipPath = clipPath
                     if (clipPath != null) builder.addSpecifiedFlag(SPECIFIED_CLIP_PATH)
                 }

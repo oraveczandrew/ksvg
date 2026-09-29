@@ -25,6 +25,7 @@ import hu.oandras.ksvg.dom.animation.CalcMode
 import hu.oandras.ksvg.dom.animation.TransformType
 import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.HasTransform
+import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.PathDefinition
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.dom.shapes.CircleShape
@@ -35,8 +36,11 @@ import hu.oandras.ksvg.dom.shapes.PolyLineShape
 import hu.oandras.ksvg.dom.shapes.PolygonShape
 import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.dom.style.ColorValue
+import hu.oandras.ksvg.dom.style.BasicShape
+import hu.oandras.ksvg.dom.style.CSSClipPath
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.logW
+import hu.oandras.ksvg.render.ClipPathRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.FilterPrimitiveRenderNode
@@ -46,6 +50,7 @@ import hu.oandras.ksvg.render.PathRenderNode
 import hu.oandras.ksvg.render.PatternRenderNode
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RendererState
+import hu.oandras.ksvg.render.ResolvedShapeClip
 import hu.oandras.ksvg.render.calculatePathBounds
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.updatePathAndBoundingBox
@@ -133,6 +138,7 @@ internal fun RenderNode<*>.updateAnimations(animationTimeMs: Long): Boolean {
         }
     }
 
+    if (clipPathNode?.updateAnimations(animationTimeMs) == true) contentChanged = true
     if (maskNode?.updateAnimations(animationTimeMs) == true) contentChanged = true
     if (markerStartNode?.updateAnimations(animationTimeMs) == true) contentChanged = true
     if (markerMidNode?.updateAnimations(animationTimeMs) == true) contentChanged = true
@@ -154,6 +160,10 @@ internal fun RenderNode<*>.updateAnimations(animationTimeMs: Long): Boolean {
     }
 
     if (this is GroupRenderNode) {
+        children.forEachElement {
+            if (it.updateAnimations(animationTimeMs)) contentChanged = true
+        }
+    } else if (this is ClipPathRenderNode) {
         children.forEachElement {
             if (it.updateAnimations(animationTimeMs)) contentChanged = true
         }
@@ -312,8 +322,101 @@ internal fun applyAnimatedStyle(
     node: RenderNode<*>,
 ): Boolean {
     val sourceElement = node.sourceElement
-    return sourceElement is ElementBase
-            && applyAnimatedStyle(state, builder, node.animationNodes)
+    if (sourceElement !is ElementBase) return false
+    var changed = applyAnimatedStyle(state, builder, node.animationNodes)
+    // `clip-path` property animation writes node fields (clipShape, url-clip
+    // suppression), not just the style: node fields are not part of the
+    // per-frame base revert, so they are handled (reset + written) here.
+    node.animationNodes?.forEachElement { animation ->
+        if (animation is AnimateClipPathNode) {
+            if (applyClipPathAnimation(builder, node, animation)) changed = true
+        }
+    }
+    return changed
+}
+
+/**
+ * Applies one frame of a `clip-path` property animation. Node clip fields are
+ * reset to the animation base every frame first (mirroring the `renderState`
+ * base revert in `updateAnimations`, which does not cover node fields), so a
+ * finished `fill="remove"` animation reverts to the base clip instead of
+ * leaving the last animated shape behind.
+ *
+ * Shape results resolve percentages against the reference box snapshotted
+ * from the base clip (or the element box when the base had no shape clip).
+ * `none` clears the shape and suppresses the url clip for the frame; a `url()`
+ * target only applies when it is the base url itself (url clips cannot be
+ * rebuilt at animation time), otherwise the last frame is held.
+ */
+context(renderContext: AnimationContext)
+private fun applyClipPathAnimation(
+    builder: Style.Builder,
+    node: RenderNode<*>,
+    animation: AnimateClipPathNode,
+): Boolean {
+    var changed = false
+    if (!animation.clipBaseReady) {
+        animation.baseClipShape = node.clipShape
+        animation.baseBox = node.clipShape?.refBox ?: node.boundingBox ?: Box._1X1
+        animation.clipBaseReady = true
+    }
+    if (node.clipShape !== animation.baseClipShape) {
+        node.clipShape = animation.baseClipShape
+        changed = true
+    }
+    if (node.clipPathNodeSuppressed) {
+        node.clipPathNodeSuppressed = false
+        changed = true
+    }
+    val clip = animation.clipAt(renderContext.animationTimeMs, builder.clipPath) ?: return changed
+    val base = builder.clipPath
+    when (clip) {
+        is CSSClipPath.ShapeClip -> {
+            val box = animation.baseBox ?: return changed
+            if (builder.clipPath != clip) {
+                builder.clipPath = clip
+                builder.addSpecifiedFlag(Style.SPECIFIED_CLIP_PATH)
+                changed = true
+            }
+            val path = (clip.shape as? BasicShape.Path)?.let { animation.pathFor(it.path, box) }
+            val current = node.clipShape
+            if (current?.shape != clip.shape || current.refBox !== box ||
+                (path != null && current.clipPath !== path)
+            ) {
+                node.clipShape = ResolvedShapeClip(clip.shape, box, path)
+                changed = true
+            }
+        }
+
+        is CSSClipPath.NoClip -> {
+            if (builder.clipPath != clip) {
+                builder.clipPath = clip
+                builder.addSpecifiedFlag(Style.SPECIFIED_CLIP_PATH)
+                changed = true
+            }
+            if (node.clipShape != null) {
+                node.clipShape = null
+                changed = true
+            }
+            if (!node.clipPathNodeSuppressed) {
+                node.clipPathNodeSuppressed = true
+                changed = true
+            }
+        }
+
+        is CSSClipPath.UrlClip -> {
+            if ((base as? CSSClipPath.UrlClip)?.iri == clip.iri) {
+                if (builder.clipPath != clip) {
+                    builder.clipPath = clip
+                    builder.addSpecifiedFlag(Style.SPECIFIED_CLIP_PATH)
+                    changed = true
+                }
+            }
+            // Otherwise the last frame is held entirely (not even the style
+            // is updated, keeping it truthful to what is rendered).
+        }
+    }
+    return changed
 }
 
 context(renderContext: AnimationContext)
@@ -403,6 +506,9 @@ internal fun applyAnimatedStyle(
             is AnimateTransformNode -> {}
             is AnimateMotionNode -> {}
             is AnimatePathNode -> {}
+            // Clip writes node fields as well as the style; it is applied in
+            // the node overload (applyClipPathAnimation), not here.
+            is AnimateClipPathNode -> {}
         }
     }
 

@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg.dom.style
 
+import hu.oandras.ksvg.NoopLoggerContext
 import hu.oandras.ksvg.assertIs
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.text.TextAnchor
@@ -33,7 +34,9 @@ class StylePropertyParsingTest {
     private fun process(attr: String, value: String, isFromAttribute: Boolean = false): Style.Builder {
         val builder = Style.Builder()
         builder.reset(Style())
-        Style.processStyleProperty(builder, attr, value, isFromAttribute)
+        with(NoopLoggerContext) {
+            Style.processStyleProperty(builder, attr, value, isFromAttribute)
+        }
         return builder
     }
 
@@ -591,7 +594,239 @@ class StylePropertyParsingTest {
     fun testClipPath() {
         val s = process("clip-path", "url(#clip1)").buildAndGet()
         assertTrue(specified(s.specifiedFlags, Style.SPECIFIED_CLIP_PATH))
-        assertEquals("#clip1", s.clipPath)
+        assertEquals(CSSClipPath.UrlClip("#clip1"), s.clipPath)
+    }
+
+    @Test
+    fun testClipPathNone() {
+        val s = process("clip-path", "none").buildAndGet()
+        assertFalse(specified(s.specifiedFlags, Style.SPECIFIED_CLIP_PATH))
+        assertNull(s.clipPath)
+    }
+
+    @Test
+    fun testClipPathCircle() {
+        val s = process("clip-path", "circle(50px at center center)").buildAndGet()
+        assertTrue(specified(s.specifiedFlags, Style.SPECIFIED_CLIP_PATH))
+        val cp = s.clipPath as CSSClipPath.ShapeClip
+        assertEquals(GeometryBox.FILL_BOX, cp.refBox)
+        val c = cp.shape as BasicShape.Circle
+        assertEquals(ClipRadius.Len(CSSLength(50f)), c.r)
+        assertEquals(ClipPosition.Center, c.cx)
+        assertEquals(ClipPosition.Center, c.cy)
+    }
+
+    @Test
+    fun testClipPathCirclePercentAt() {
+        val s = process("clip-path", "circle(25% at left top)").buildAndGet()
+        val cp = s.clipPath as CSSClipPath.ShapeClip
+        val c = cp.shape as BasicShape.Circle
+        assertEquals(ClipRadius.Len(CSSLength(25f, hu.oandras.ksvg.css.CssUnit.percent)), c.r)
+        assertEquals(ClipPosition.Left, c.cx)
+        assertEquals(ClipPosition.Top, c.cy)
+    }
+
+    @Test
+    fun testClipPathCircleClosestSide() {
+        val s = process("clip-path", "circle(closest-side at center)").buildAndGet()
+        val c = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Circle
+        assertEquals(ClipRadius.ClosestSide, c.r)
+    }
+
+    @Test
+    fun testClipPathEllipseFarthestSide() {
+        val s = process("clip-path", "ellipse(farthest-side closest-side at 10px 20px)").buildAndGet()
+        val e = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Ellipse
+        assertEquals(ClipRadius.FarthestSide, e.rx)
+        assertEquals(ClipRadius.ClosestSide, e.ry)
+        assertEquals(ClipPosition.Len(CSSLength(10f)), e.cx)
+        assertEquals(ClipPosition.Len(CSSLength(20f)), e.cy)
+    }
+
+    @Test
+    fun testClipPathEllipse() {
+        val s = process("clip-path", "ellipse(30px 20px at 10px 15px)").buildAndGet()
+        val cp = s.clipPath as CSSClipPath.ShapeClip
+        val e = cp.shape as BasicShape.Ellipse
+        assertEquals(ClipRadius.Len(CSSLength(30f)), e.rx)
+        assertEquals(ClipRadius.Len(CSSLength(20f)), e.ry)
+        assertEquals(ClipPosition.Len(CSSLength(10f)), e.cx)
+        assertEquals(ClipPosition.Len(CSSLength(15f)), e.cy)
+    }
+
+    @Test
+    fun testClipPathInset() {
+        val s = process("clip-path", "inset(10px 20px round 5px)").buildAndGet()
+        val cp = s.clipPath as CSSClipPath.ShapeClip
+        val i = cp.shape as BasicShape.Inset
+        assertEquals(10f, i.top.value)
+        assertEquals(20f, i.right.value)
+        assertEquals(10f, i.bottom.value)
+        assertEquals(20f, i.left.value)
+        assertEquals(5f, i.roundX?.value)
+    }
+
+    @Test
+    fun testClipPathInsetFourValues() {
+        val s = process("clip-path", "inset(1px 2px 3px 4px)").buildAndGet()
+        val i = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Inset
+        assertEquals(1f, i.top.value)
+        assertEquals(2f, i.right.value)
+        assertEquals(3f, i.bottom.value)
+        assertEquals(4f, i.left.value)
+        assertNull(i.roundX)
+    }
+
+    @Test
+    fun testClipPathInsetOneAndThreeValues() {
+        val one = (process("clip-path", "inset(7px)").buildAndGet().clipPath as CSSClipPath.ShapeClip).shape
+        val i1 = one as BasicShape.Inset
+        assertEquals(7f, i1.top.value)
+        assertEquals(7f, i1.right.value)
+        assertEquals(7f, i1.bottom.value)
+        assertEquals(7f, i1.left.value)
+        assertNull(i1.roundX)
+
+        val three = (process("clip-path", "inset(1px 2px 3px)").buildAndGet().clipPath as CSSClipPath.ShapeClip).shape
+        val i3 = three as BasicShape.Inset
+        assertEquals(1f, i3.top.value)
+        assertEquals(2f, i3.right.value)
+        assertEquals(3f, i3.bottom.value)
+        assertEquals(2f, i3.left.value)
+    }
+
+    @Test
+    fun testClipPathPolygon() {
+        val s = process("clip-path", "polygon(0px 0px, 100px 0px, 50px 100px)").buildAndGet()
+        val cp = s.clipPath as CSSClipPath.ShapeClip
+        val p = cp.shape as BasicShape.Polygon
+        assertEquals(6, p.points.size)
+        assertEquals(FillRule.UNSPECIFIED, p.fillRule)
+    }
+
+    @Test
+    fun testClipPathPolygonFillRule() {
+        val s = process("clip-path", "polygon(evenodd, 0px 0px, 100px 0px, 50px 100px)").buildAndGet()
+        val p = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Polygon
+        assertEquals(FillRule.EVEN_ODD, p.fillRule)
+    }
+
+    @Test
+    fun testClipPathGeometryBox() {
+        val s = process("clip-path", "circle(50% at center) fill-box").buildAndGet()
+        val cp = s.clipPath as CSSClipPath.ShapeClip
+        assertEquals(GeometryBox.FILL_BOX, cp.refBox)
+    }
+
+    @Test
+    fun testClipPathRect() {
+        val s = process("clip-path", "rect(10px 90px 80px 20px round 5px)").buildAndGet()
+        val r = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Rect
+        assertEquals(10f, r.top.value)
+        assertEquals(90f, r.right.value)
+        assertEquals(80f, r.bottom.value)
+        assertEquals(20f, r.left.value)
+        assertEquals(5f, r.roundX?.value)
+    }
+
+    @Test
+    fun testClipPathXywh() {
+        val s = process("clip-path", "xywh(10px 20px 100px 50px round 8px / 4px)").buildAndGet()
+        val r = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Xywh
+        assertEquals(10f, r.x.value)
+        assertEquals(20f, r.y.value)
+        assertEquals(100f, r.w.value)
+        assertEquals(50f, r.h.value)
+        assertEquals(8f, r.roundX?.value)
+        assertEquals(4f, r.roundY?.value)
+    }
+
+    @Test
+    fun testClipPathPath() {
+        val s = process("clip-path", "path(evenodd, \"M0 0H100V100H0Z\")").buildAndGet()
+        val p = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Path
+        assertEquals(FillRule.EVEN_ODD, p.fillRule)
+        assertFalse(p.path.isEmpty)
+    }
+
+    @Test
+    fun testClipPathPathSingleQuotes() {
+        val s = process("clip-path", "path('M0 0L100 0L50 100Z')").buildAndGet()
+        val p = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Path
+        assertEquals(FillRule.UNSPECIFIED, p.fillRule)
+        assertFalse(p.path.isEmpty)
+    }
+
+    @Test
+    fun testClipPathOffsetPosition() {
+        val s = process("clip-path", "circle(40px at left 10px top 20px)").buildAndGet()
+        val c = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Circle
+        assertEquals(
+            ClipPosition.Offset(ClipPosition.Left, CSSLength(10f)),
+            c.cx,
+        )
+        assertEquals(
+            ClipPosition.Offset(ClipPosition.Top, CSSLength(20f)),
+            c.cy,
+        )
+    }
+
+    @Test
+    fun testClipPathOffsetPositionThreeValues() {
+        val s = process("clip-path", "circle(40px at right 10px bottom)").buildAndGet()
+        val c = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Circle
+        assertEquals(
+            ClipPosition.Offset(ClipPosition.Right, CSSLength(10f)),
+            c.cx,
+        )
+        assertEquals(ClipPosition.Bottom, c.cy)
+    }
+
+    @Test
+    fun testClipPathPositionVerticalFirst() {
+        val s = process("clip-path", "circle(40px at top left)").buildAndGet()
+        val c = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Circle
+        assertEquals(ClipPosition.Left, c.cx)
+        assertEquals(ClipPosition.Top, c.cy)
+    }
+
+    @Test
+    fun testClipPathOffsetPositionOtherOrder() {
+        val s = process("clip-path", "circle(40px at left bottom 20px)").buildAndGet()
+        val c = (s.clipPath as CSSClipPath.ShapeClip).shape as BasicShape.Circle
+        assertEquals(ClipPosition.Left, c.cx)
+        assertEquals(ClipPosition.Offset(ClipPosition.Bottom, CSSLength(20f)), c.cy)
+    }
+
+    @Test
+    fun testClipPathInvalid() {
+        assertNull(process("clip-path", "circle(foo)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "rect(0 0 10)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "xywh(0 0 10)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "xywh(0 0 -10 10)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "path(\"\")").buildAndGet().clipPath)
+        assertNull(process("clip-path", "path(not-a-path!!!)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "circle(-5px)").buildAndGet().clipPath)
+        // A lone keyword+offset pair is the 3-4 value syntax without its
+        // second axis, not a two-value position.
+        assertNull(process("clip-path", "circle(40px at left 10px)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "circle(40px at center 10px)").buildAndGet().clipPath)
+        // Both keywords of a two-value position must sit on different axes.
+        assertNull(process("clip-path", "circle(40px at top top)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "circle(40px at left left)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "circle(40px at 10px left)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "circle(near-side)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "polygon(0px 0px, 1px)").buildAndGet().clipPath)
+        // Per-corner radius lists (CSS Borders 4) are not supported: rejected
+        // instead of being read as a single elliptical radius pair.
+        assertNull(process("clip-path", "inset(10px round 5px 3px)").buildAndGet().clipPath)
+        assertNull(process("clip-path", "rect(0 0 10 10 round 1px 2px 3px 4px)").buildAndGet().clipPath)
+    }
+
+    @Test
+    fun testClipPathUrlRegression() {
+        val s = process("clip-path", "URL(#clip1)").buildAndGet()
+        assertEquals(CSSClipPath.UrlClip("#clip1"), s.clipPath)
     }
 
     @Test

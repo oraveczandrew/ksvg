@@ -110,14 +110,12 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
-
 
 private val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean  = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S // Android 12
 
 /**
  * Bake raster cap (long side, px) for the API < 31 focal-gradient fallback.
- * Bounds one-time memory (~1 MB worst case) and bake cost; larger rects
+ * Bounds one-time memory (~1 MB the worst case) and bake cost; larger rects
  * upscale bilinearly, still far closer to the reference than the centered
  * fallback.
  */
@@ -154,7 +152,7 @@ internal class Renderer internal constructor(
      * whose `patternContentUnits` is `objectBoundingBox`, baked into a pooled
      * path per draw instead of living on the canvas: sub-1-unit pattern
      * geometry would otherwise vanish on GPU canvases (rect fast-path cull),
-     * while the baked super-unit copy draws everywhere. Same geometry as the
+     * while the baked super-unit copy draws everywhere. The same geometry as the
      * legacy canvas scale, so software output is unchanged. Set only around
      * the tile loop in [fillWithPattern] (saved/restored for nesting); null
      * everywhere else, including text-containing patterns which keep the
@@ -250,10 +248,10 @@ internal class Renderer internal constructor(
 
         state.spacePreserve = false
 
-        // Push a copy of the state with 'default' style, so that inherit works for top level objects
+        // Push a copy of the state with 'default' style so that inherit works for top level objects
         stateStack.push(newSavedRendererState(state , canvas.saveCount)) // Manual push here - don't use statePush();
 
-        // Keep track of element stack while rendering.
+        // Keep track of the element stack while rendering.
         // The 'render parent' for some elements (e.g. <use> references) is different from its DOM parent.
         matrixPool.releaseAll(matrixStack)
         parentStack.clear()
@@ -312,7 +310,7 @@ internal class Renderer internal constructor(
     internal fun renderGroupNode(canvas: Canvas, node: GroupRenderNode<*>) {
         withNewNodeState(canvas, node, saveCanvas = true) { canvas, _ ->
             val sourceElement = node.sourceElement
-            // Viewport-establishing elements clip to their viewport unless overflow
+            // Viewport-establishing elements clip to their viewport unless the overflow
             // is explicitly visible (SVG 1.1: initial overflow is hidden here).
             // <symbol> was missing: oversized symbol content bled out.
             if ((sourceElement is Svg || sourceElement is Symbol) && node.renderState.style.overflow == false) {
@@ -682,7 +680,7 @@ internal class Renderer internal constructor(
         if (!canvas.isHardwareAccelerated) { content(canvas); return }
         // Animated subtrees change every frame; caching would be pure overhead.
         if (hasAnimationsInSubtree) { content(canvas); return }
-        // Nodes that establish their own viewport (<symbol>/nested <svg>, i.e. a
+        // Nodes that establish their own viewport (<symbol>/nested <svg>, i.e., a
         // viewBoxTransform) cannot be naively cached: their transform is baked
         // into a nested RenderNode and breaks when replayed inside a parent's
         // display list. Draw them directly so the (correct) content is captured
@@ -693,7 +691,7 @@ internal class Renderer internal constructor(
         // RenderNode replay positions the node in user-space bounds, but the HW
         // canvas culls it against the user-space clip: a translated/rotated canvas
         // moves the content without moving the culled bounds, so such replays
-        // vanish (e.g. only the first of several <use> panels shows). Draw directly
+        // vanish (e.g., only the first of several <use> panels shows). Draw directly
         // unless the canvas matrix is scale-only. Below API 29 the Picture replay
         // carries its own translate, so it is unaffected.
         if (canvasTransformBreaksReplay(canvas)) { content(canvas); return }
@@ -754,7 +752,7 @@ internal class Renderer internal constructor(
     }
 
     /**
-     * True when replaying a RenderNode capture on the given canvas would vanish:
+     * True, when replaying a RenderNode capture on the given canvas would vanish:
      * the node is positioned in user-space bounds but culled against the
      * user-space clip, so any canvas translate/skew moves the content without
      * moving the culled bounds. Scale-only matrices are safe. Reads the canvas
@@ -1093,7 +1091,7 @@ internal class Renderer internal constructor(
             calculateRegion(filter, boundingBox, region)
             // The filter effects region is clipped to the viewport in the filter's
             // coordinate space (the user-space viewBox), matching librsvg/browser
-            // behaviour. Without this the region can extend past the canvas (e.g.
+            // behavior. Without this the region can extend past the canvas (e.g.,
             // the default 1.2x object-bounding-box supersampling), and primitives
             // like feTurbulence would size their tile/lattice to the off-canvas
             // region instead of the visible subregion.
@@ -1232,7 +1230,7 @@ internal class Renderer internal constructor(
                     // Optimization: if the bounding box is significantly smaller than the clip,
                     // use it to reduce saveLayer memory/time.
                     if (right > left && bottom > top) {
-                        // Safety: Truly tighten only if NO filter is present and it's not a container.
+                        // Safety: Truly tighten only if NO filter is present, and it's not a container.
                         // Filter effects often extend beyond the bounding box.
                         if (node !is GroupRenderNode<*> && node !is KSVGTextContainerRenderNode<*> && !node.hasFilters()) {
                             clipBoundsF.set(left, top, right, bottom)
@@ -1445,8 +1443,8 @@ internal class Renderer internal constructor(
 
         val clip = state.style.clip
         // CSS `clip` is ignored when `overflow` is not `visible` (used value
-        // `auto` — F3: Chrome and rsvg agree; applying both over-clips
-        // nested viewports, e.g. clip_overflow.svg's circle → sliver).
+        // `auto` — Chrome and rsvg agree; applying both over-clips
+        // nested viewports, e.g., clip_overflow.svg's circle → sliver).
         if (clip != null && state.style.overflow != false) {
             val clipL = clip.left.floatValueXInContext()
             val clipT = clip.top.floatValueYInContext()
@@ -1621,7 +1619,7 @@ internal class Renderer internal constructor(
                     m.preTranslate(-_refX * xScale, -_refY * yScale)
                     canvas.concat(m)
 
-                    // Now we need to take account of alignment setting, because it affects the
+                    // Now we need to take account of alignment setting because it affects the
                     // size and position of the clip rectangle.
                     val imageW = viewBox.width * xScale
                     val imageH = viewBox.height * yScale
@@ -1973,7 +1971,7 @@ internal class Renderer internal constructor(
         val _cy: Float
         val _r: Float
         // Focal point is always resolved (it keys updateGeometry); only its
-        // USE is version-gated (platform two-point constructor vs bake below).
+        // USE is version-gated (platform two-point constructor vs. bake below).
         val _fx: Float
         val _fy: Float
         val _fr: Float
@@ -2070,7 +2068,7 @@ internal class Renderer internal constructor(
                             st5.style = style
                             val col = style.stopColor as ColorValue? ?: ColorValue.BLACK
                             val stopColor = col.value.colorWithOpacity(style.stopOpacity)
-                            colors.set(i, stopColor)
+                            colors[i] = stopColor
                             straightColors[i] = stopColor
                         }
                     }
@@ -2109,7 +2107,7 @@ internal class Renderer internal constructor(
                         resolved.denseInts, resolved.densePositions,
                     )
                     for (i in 0 until m) {
-                        dense.set(i, resolved.denseInts[i])
+                        dense[i] = resolved.denseInts[i]
                     }
                     effColors = dense
                     effPositions = resolved.densePositions
@@ -2300,12 +2298,31 @@ internal class Renderer internal constructor(
      * Returns true if the drawing operation is not fully clipped out
      */
     private fun checkForClipPath(node: RenderNode<*>, canvas: Canvas): Boolean {
-        return node.clipPathNode == null || pathPool.withPooledObject { combinedPath ->
-            if (calculateClipPath(node, combinedPath)) {
+        // A `clip-path` property animation discretely holding `none`
+        // suppresses the url clip for the frame (see applyClipPathAnimation).
+        val urlClipNode = if (node.clipPathNodeSuppressed) null else node.clipPathNode
+        return urlClipNode == null && node.clipShape == null || pathPool.withPooledObject { combinedPath ->
+            var hasClip = false
+            if (urlClipNode != null && calculateClipPath(node, combinedPath)) {
+                hasClip = true
+            }
+            node.clipShape?.let { shapeClip ->
+                if (hasClip) {
+                    // Defensive: both clip forms set — intersect.
+                    pathPool.withPooledObject { shapePath ->
+                        if (shapeClipToPath(shapeClip, node, shapePath)) {
+                            combinedPath.op(shapePath, Path.Op.INTERSECT)
+                        }
+                    }
+                } else if (shapeClipToPath(shapeClip, node, combinedPath)) {
+                    hasClip = true
+                }
+            }
+            if (!hasClip) {
+                true
+            } else {
                 canvas.clipPath(combinedPath)
                 !combinedPath.isEmpty
-            } else {
-                true
             }
         }
     }
@@ -2554,7 +2571,7 @@ internal class Renderer internal constructor(
                                                 pattern.patternContentUnitsAreUser != false
                                             // Simple translate of pattern to step position
                                             canvas.translate(stepX, stepY)
-                                            // Add a tiny overlap to avoid anti-aliasing seams between tiles
+                                            // Add a tiny overlap to avoid antialiasing seams between tiles
                                             canvas.scale(1.01f, 1.01f, w / 2f, h / 2f)
                                             if (!patternContentUnitsAreUser && !usePathBake) {
                                                 val boundingBox = obj.boundingBox!!
