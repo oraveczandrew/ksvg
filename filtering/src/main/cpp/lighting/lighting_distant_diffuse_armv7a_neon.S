@@ -40,7 +40,7 @@
 //   r0 = srcT, r1 = srcM, r2 = srcB, r3 = dst
 //   [sp, #0] = count, [sp, #4] = params
 //
-// LightingParams layout (lighting.cpp, hard contract):
+// LightingParams layout (lighting/lighting_params.h, hard contract):
 //   +0 invDx  +4 invDy  +8 k  +12 lx  +16 ly  +20 lz
 //   +24 lr    +28 lg    +32 lb +36 ss
 //

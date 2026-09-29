@@ -17,6 +17,7 @@
 #include <cassert>
 #include <algorithm>
 #include "cpu_dispatch.h"
+#include "lighting/lighting_params.h"
 #include "shared/math_utils.h"
 #include "color_luts.h"
 

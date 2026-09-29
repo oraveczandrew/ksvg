@@ -18,7 +18,7 @@
 #define KSVG_SIMD_X86_H
 
 #include <jni.h>
-#include "cpu_dispatch.h"
+#include "lighting/lighting_params.h"
 
 // Entry points implemented in wide-ISA translation units.
 // Those translation units are compiled with -mavx2 so

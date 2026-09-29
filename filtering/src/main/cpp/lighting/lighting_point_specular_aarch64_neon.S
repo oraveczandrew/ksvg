@@ -33,7 +33,7 @@
 // AAPCS64: x0 = srcT, x1 = srcM, x2 = srcB, x3 = dst,
 //          w4 = count, x5 = params, s0 = exponent (7th arg, float).
 //
-// PointLightingParams layout (cpu_dispatch.h, hard contract):
+// PointLightingParams layout (lighting/lighting_params.h, hard contract):
 //   +0 invDx  +4 invDy  +8 k  +12 lx  +16 ly  +20 lz
 //   +24 lr    +28 lg    +32 lb +36 ss +40 ux0 +44 uy +48 dux
 //   (lx/ly/lz = light position; ux0 = user-space x of output pixel 0,
