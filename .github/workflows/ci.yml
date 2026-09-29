@@ -171,7 +171,8 @@ jobs:
         uses: ./.github/actions/setup-android-sdk
 
       # Cache the emulator binary, system image and AVD state: together they
-      # are GBs of downloads on a cold runner. Key pins api/arch/profile.
+      # are GBs of downloads on a cold runner. Key pins api/arch/profile and
+      # the pinned emulator build below.
       - name: Cache emulator and AVD
         uses: actions/cache@v5
         with:
@@ -179,7 +180,7 @@ jobs:
             .ci-android-sdk/emulator
             .ci-android-sdk/system-images
             ~/.android/avd
-          key: android-emu-${{ runner.os }}-api29-x86-v1
+          key: android-emu-${{ runner.os }}-api29-x86-15917651-v1
 
       - name: Run parity tests on x86 emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -190,6 +191,7 @@ jobs:
           profile: Nexus 6
           avd-name: ci-x86
           force-avd-creation: false
+          emulator-build: 15917651
           emulator-options: -no-metrics
           script: ./gradlew :filtering:connectedDebugAndroidTest -PfilterAbis=x86 -Pandroid.testInstrumentationRunnerArguments.annotation=hu.oandras.ksvg.filtering.NativeParityTest
 
