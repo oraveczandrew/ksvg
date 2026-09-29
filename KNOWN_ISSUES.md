@@ -3,7 +3,7 @@
 Confirmed divergences with NO code fix. Feature support: `SVG-SUPPORT.md`.
 Investigation trail: `tmp/RENDER_FIDELITY_PLAN.md`.
 
-## 1. `mix-blend-mode` below API 29 — black flood (OPEN)
+## 1. `mix-blend-mode` below API 29 — black flood
 
 `blend_mode.svg` (leaf `multiply`/`screen`) renders circles on BLACK on the
 API-26 emulator; white + correct on the API-36 phone. Below API 29 blends fall
@@ -36,5 +36,15 @@ rect draws nothing on emulator GPU canvases (bisected: 0.5-unit rect absent at
 any canvas scale, 1.5-unit rect and same-size circles draw; host SW draws
 everything; API-26 SwiftShader additionally culls sub-unit curves).
 `fillWithPattern` bakes bbox-unit content into super-unit paths, so patterns
-are immune. Plain-group sub-unit geometry under huge zoom is still affected —
-negligible in practice (sub-pixel at normal zoom). See `tmp/PATTERN_WORKLOG.md`.
+ are immune. Plain-group sub-unit geometry under huge zoom is still affected —
+ negligible in practice (sub-pixel at normal zoom). See `tmp/PATTERN_WORKLOG.md`.
+
+## 4. Mask-region edge strip on API-26 emulator HW mid-pulse (emulator-only)
+
+ `alert-avalanche-danger.svg` (blue line) and `alert-falling-rocks.svg`
+ (green line) show a thin vertical strip hugging the mask region edge on the
+ API-26 emulator, only mid-pulse (animated scale 1 → 1.1). Host software
+ canvas renders zero outside-content pixels at both t=0 and t=1500 on all
+ variants (`aihelpers/MaskStripPhaseProbeTest`), and the API-36 phone is
+ clean. Verdict: API-26 SwiftShader transient (saveLayer DST_IN + per-frame
+ re-record); no library bug, nothing to fix.
