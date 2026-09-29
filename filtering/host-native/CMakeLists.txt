@@ -35,6 +35,7 @@ add_library(ksvgfilters SHARED
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/component_transfer/unlinearize.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/fe_blend/fe_blend.cpp
+  ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/fe_blend/fe_blend_aarch64_neon.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/color_matrix/color_matrix.cpp
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/color_matrix/color_matrix_aarch64_neon.S
   ${CMAKE_SOURCE_DIR}/../../filtering/src/main/cpp/arithmetic_composite/arithmetic_composite_aarch64_neon.S
