@@ -371,8 +371,9 @@ internal class RenderTreeBuilder(
             }
             state.style.mask?.let {
                 val mask = document.resolveIRI(it) as? Mask
-                if (mask != null) {
-                    node.maskNode = buildMask(mask)
+                val maskNode = mask?.let { buildMask(it) }
+                if (maskNode != null) {
+                    node.maskNode = maskNode
                 } else {
                     logW("KSVG") { "Mask reference '$it' is missing or invalid; hiding element" }
                     hideInvalidReference = true
@@ -1605,7 +1606,13 @@ internal class RenderTreeBuilder(
         }
     }
 
-    private fun buildMask(mask: Mask): MaskRenderNode {
+    private fun buildMask(mask: Mask): MaskRenderNode? {
+        val id = mask.id
+        if (id != null && !buildingIds.add(id)) {
+            logW("KSVG") { "Cyclic mask reference detected for id '$id'; treating as empty" }
+            return null
+        }
+        try {
         maskNodeCache[mask]?.let { return it }
 
         val oldState = state
@@ -1630,6 +1637,9 @@ internal class RenderTreeBuilder(
         stateStack.addAll(oldStateStack)
 
         return node
+        } finally {
+            if (id != null) buildingIds.remove(id)
+        }
     }
 
     private val tempAncestors = ArrayList<ElementBase>()
@@ -1779,12 +1789,18 @@ internal class RenderTreeBuilder(
     }
 
     private fun fillInChainedPatternFields(pattern: Pattern, href: String) {
+        fillInChainedPatternFields(pattern, href, ArraySet<Pattern>().also { it.add(pattern) })
+    }
+
+    private fun fillInChainedPatternFields(pattern: Pattern, href: String, visited: ArraySet<Pattern>) {
         // Locate the referenced object
         val ref = pattern.document.resolveIRI(href) ?: return
         if (ref !is Pattern) {
             return
         }
-        if (ref === pattern) {
+        // Only self-references were guarded; longer chains (A→B→C→B) recursed
+        // forever since `pattern` stays fixed. Any revisit ends the chain.
+        if (!visited.add(ref)) {
             return
         }
 
@@ -1833,7 +1849,7 @@ internal class RenderTreeBuilder(
 
         val nextHref = pRef.href
         if (nextHref != null) {
-            fillInChainedPatternFields(pattern, nextHref)
+            fillInChainedPatternFields(pattern, nextHref, visited)
         }
     }
 

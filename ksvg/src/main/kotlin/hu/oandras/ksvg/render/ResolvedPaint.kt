@@ -20,6 +20,7 @@ import android.graphics.LinearGradient
 import android.graphics.Bitmap
 import android.graphics.Shader
 import android.graphics.Shader.TileMode
+import androidx.collection.ArraySet
 import hu.oandras.ksvg.LoggerContext
 
 import hu.oandras.ksvg.dom.SVGImpl
@@ -260,6 +261,11 @@ internal fun resolvePaintReference(document: SVGImpl, paint: SvgPaint?): Resolve
  */
 context(loggerContext: LoggerContext)
 internal fun fillInChainedGradientFields(gradient: Gradient, href: String) {
+    fillInChainedGradientFields(gradient, href, ArraySet<Gradient>().also { it.add(gradient) })
+}
+
+context(loggerContext: LoggerContext)
+private fun fillInChainedGradientFields(gradient: Gradient, href: String, visited: ArraySet<Gradient>) {
     // Locate the referenced object
     val ref = gradient.document.resolveIRI(href)
     if (ref == null) {
@@ -270,8 +276,10 @@ internal fun fillInChainedGradientFields(gradient: Gradient, href: String) {
         loggerContext.logE(TAG) { "Gradient href attributes must point to other gradient elements" }
         return
     }
-    if (ref === gradient) {
-        loggerContext.logE(TAG) { String.format("Circular reference in gradient href attribute '%s'", href) }
+    // Only self-references were guarded; longer chains (A→B→C→B) recursed
+    // forever since `gradient` stays fixed. Any revisit ends the chain.
+    if (!visited.add(ref)) {
+        loggerContext.logE(TAG) { String.format("Circular reference in gradient href chain '%s'", href) }
         return
     }
 
@@ -300,7 +308,7 @@ internal fun fillInChainedGradientFields(gradient: Gradient, href: String) {
         }
     }
 
-    gradientRef.href?.let { fillInChainedGradientFields(gradient, it) }
+    gradientRef.href?.let { fillInChainedGradientFields(gradient, it, visited) }
 }
 
 private fun fillInChainedGradientFields(gradient: GradientLinear, grRef: GradientLinear) {
