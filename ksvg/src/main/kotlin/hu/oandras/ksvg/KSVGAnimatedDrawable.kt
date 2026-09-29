@@ -102,6 +102,9 @@ public open class KSVGAnimatedDrawable @JvmOverloads public constructor(
         val changed = super.setVisible(visible, restart)
         if (visible) {
             if (running) {
+                if (restart) {
+                    startedAtMs = SystemClock.uptimeMillis()
+                }
                 invalidateSelf()
                 scheduleNextFrame()
             }

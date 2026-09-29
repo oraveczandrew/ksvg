@@ -15,13 +15,23 @@
  */
 package hu.oandras.ksvg
 
+import android.content.pm.ActivityInfo
+import android.content.res.ColorStateList
+import android.content.res.Resources
+import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Matrix
+import android.graphics.Outline
+import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
-import android.content.res.Resources
+import android.os.Build
+import android.util.LayoutDirection
+import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.render.RenderScene
@@ -40,7 +50,7 @@ import hu.oandras.ksvg.render.pool.PoolOwner
  *
  * Scene ownership: the cached [scene] (plus renderer and pools) belongs to this
  * drawable instance alone and is rebuilt when bounds, DPI or options change. Do
- * not share one drawable between concurrently-drawn views; create a drawable per
+ * not share one drawable between concurrently drawn views; create a drawable per
  * view instead (they can share the same parsed [SVG] document, which is read-only
  * after parsing).
  *
@@ -69,6 +79,16 @@ public open class KSVGDrawable @JvmOverloads public constructor(
     internal val baseOptions: RenderOptionsImpl = RenderOptionsImpl(this.renderOptions)
 
     private var alpha: Int = 0xFF
+    private var colorFilter: ColorFilter? = null
+    private var tintList: ColorStateList? = null
+    private var tintMode: PorterDuff.Mode = PorterDuff.Mode.SRC_IN
+    private val layerPaint = Paint()
+    // Cached tint-derived filter: rebuilt only when the resolved (color, mode)
+    // pair changes, so steady-state draws never allocate (hot-path rule).
+    private var tintFilterCache: PorterDuffColorFilter? = null
+    private var tintFilterColor: Int = 0
+    private var tintFilterCacheMode: PorterDuff.Mode = PorterDuff.Mode.SRC_IN
+    private var autoMirrored: Boolean = false
 
     private val pools = PoolOwner()
 
@@ -119,13 +139,18 @@ public open class KSVGDrawable @JvmOverloads public constructor(
             // document clock here.
             (svg as? SVGImpl)?.let { renderer.animationTimeMs = it.animationTimeMs }
         }
-        val saveCount = saveForAlpha(
+        val saveCount = saveForAlphaAndFilter(
             canvas = canvas,
             left = bounds.left.toFloat(),
             top = bounds.top.toFloat(),
             right = bounds.right.toFloat(),
             bottom = bounds.bottom.toFloat()
         )
+        val mirrored = autoMirrored && layoutDirection == LayoutDirection.RTL
+        if (mirrored) {
+            canvas.translate(bounds.left.toFloat() + bounds.right.toFloat(), 0f)
+            canvas.scale(-1f, 1f)
+        }
         val options = getRenderOptions(
             left = bounds.left.toFloat(),
             top = bounds.top.toFloat(),
@@ -205,25 +230,41 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         return options
     }
 
-    private fun saveForAlpha(
+    private fun saveForAlphaAndFilter(
         canvas: Canvas,
         left: Float,
         top: Float,
         right: Float,
         bottom: Float
     ): Int {
-        val alpha = alpha
-        return if (alpha == 0xFF) {
+        val filter = effectiveFilter()
+        return if (alpha == 0xFF && filter == null) {
             canvas.save()
         } else {
-            canvas.saveLayerAlpha(
-                left,
-                top,
-                right,
-                bottom,
-                alpha
-            )
+            layerPaint.alpha = alpha
+            layerPaint.colorFilter = filter
+            canvas.saveLayer(left, top, right, bottom, layerPaint)
         }
+    }
+
+    private fun effectiveFilter(): ColorFilter? {
+        colorFilter?.let { return it }
+        val list = tintList ?: return null
+        val color = list.getColorForState(state, list.defaultColor)
+        val mode = tintMode
+        val cached = tintFilterCache
+        if (cached != null && tintFilterColor == color && tintFilterCacheMode == mode) {
+            return cached
+        }
+        return PorterDuffColorFilter(color, mode).also {
+            tintFilterCache = it
+            tintFilterColor = color
+            tintFilterCacheMode = mode
+        }
+    }
+
+    private fun invalidateTintFilter() {
+        tintFilterCache = null
     }
 
     override fun setAlpha(alpha: Int) {
@@ -239,7 +280,7 @@ public open class KSVGDrawable @JvmOverloads public constructor(
      * each `newDrawable()` is a fresh instance with its own scene, pools and
      * bounds. Never shares viewport geometry or render caches.
      */
-    override fun getConstantState(): Drawable.ConstantState {
+    override fun getConstantState(): ConstantState {
         return KSVGConstantState(svg, RenderOptionsImpl(baseOptions), animated = false)
     }
 
@@ -252,16 +293,125 @@ public open class KSVGDrawable @JvmOverloads public constructor(
         return this
     }
 
+    /**
+     * Post-filters the fully rendered document via one `saveLayer` with a
+     * reused per-drawable [Paint] holding [alpha] and the effective filter
+     * (explicit [colorFilter], else the tint-derived filter — the base
+     * `Drawable` tint plumbing never calls [setColorFilter], so tint is
+     * resolved explicitly here). The tint-derived filter is cached and rebuilt
+     * only when the resolved (color, mode) pair changes, so steady-state
+     * tinted draws allocate nothing and [getColorFilter] returns a stable
+     * instance. Filtered draws cost one extra fullscreen blend; the
+     * unfiltered path is a plain `save()` and is unaffected. Per-drawable
+     * state like [alpha]: a `ConstantState` copy starts with a clean (null)
+     * filter and no tint.
+     */
     override fun setColorFilter(colorFilter: ColorFilter?) {
-        // Rendering is delegated to the SVG renderer. Color filtering the complete result requires
-        // an intermediate layer paint, which is intentionally left unsupported for now.
+        if (this.colorFilter === colorFilter) return
+        this.colorFilter = colorFilter
+        invalidateSelf()
     }
 
+    override fun getColorFilter(): ColorFilter? = effectiveFilter()
+
+    override fun setTintList(tint: ColorStateList?) {
+        if (tintList === tint) return
+        tintList = tint
+        invalidateTintFilter()
+        invalidateSelf()
+    }
+
+    override fun setTintMode(tintMode: PorterDuff.Mode?) {
+        val mode = tintMode ?: PorterDuff.Mode.SRC_IN
+        if (this.tintMode == mode) return
+        this.tintMode = mode
+        invalidateTintFilter()
+        invalidateSelf()
+    }
+
+    /**
+     * API 29+ entry point; funnels into the same [tintMode]. Modes without a
+     * `PorterDuff` equivalent (`COLOR_DODGE`, `COLOR_BURN`, `HARD_LIGHT`,
+     * `SOFT_LIGHT`, `DIFFERENCE`, `EXCLUSION`, `HUE`, `SATURATION`, `COLOR`,
+     * `LUMINOSITY`) fall back to `SRC_IN`: a documented approximation, not a
+     * silent drop — the tint still applies.
+     */
+    @RequiresApi(Build.VERSION_CODES.Q)
+    override fun setTintBlendMode(blendMode: BlendMode?) {
+        setTintMode(blendMode?.toPorterDuffMode() ?: PorterDuff.Mode.SRC_IN)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun BlendMode.toPorterDuffMode(): PorterDuff.Mode = when (this) {
+        BlendMode.CLEAR -> PorterDuff.Mode.CLEAR
+        BlendMode.SRC -> PorterDuff.Mode.SRC
+        BlendMode.DST -> PorterDuff.Mode.DST
+        BlendMode.SRC_OVER -> PorterDuff.Mode.SRC_OVER
+        BlendMode.DST_OVER -> PorterDuff.Mode.DST_OVER
+        BlendMode.SRC_IN -> PorterDuff.Mode.SRC_IN
+        BlendMode.DST_IN -> PorterDuff.Mode.DST_IN
+        BlendMode.SRC_OUT -> PorterDuff.Mode.SRC_OUT
+        BlendMode.DST_OUT -> PorterDuff.Mode.DST_OUT
+        BlendMode.SRC_ATOP -> PorterDuff.Mode.SRC_ATOP
+        BlendMode.DST_ATOP -> PorterDuff.Mode.DST_ATOP
+        BlendMode.XOR -> PorterDuff.Mode.XOR
+        BlendMode.PLUS -> PorterDuff.Mode.ADD
+        BlendMode.MODULATE -> PorterDuff.Mode.MULTIPLY
+        BlendMode.SCREEN -> PorterDuff.Mode.SCREEN
+        BlendMode.OVERLAY -> PorterDuff.Mode.OVERLAY
+        BlendMode.DARKEN -> PorterDuff.Mode.DARKEN
+        BlendMode.LIGHTEN -> PorterDuff.Mode.LIGHTEN
+        else -> PorterDuff.Mode.SRC_IN
+    }
+
+    /**
+     * Conservative default: always `TRANSLUCENT`. A provably opaque document
+     * would allow `OPAQUE`, but that needs a scene-level transparency signal
+     * (alpha < 255 anywhere, `fill="none"`, transparent background, filter
+     * output) that is not reliably computed today. A wrong `OPAQUE` is a
+     * visual bug; a wrong `TRANSLUCENT` is only slower — so this stays.
+     */
     @Deprecated(
         message = "Deprecated in Android platform API",
         replaceWith = ReplaceWith("PixelFormat.TRANSLUCENT")
     )
     override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+
+    /**
+     * No content-based padding: like `VectorDrawable`, padding stays empty
+     * (returns `false`). There is no meaningful content-bounds → padding
+     * mapping for a scaled SVG viewport.
+     */
+    override fun getPadding(padding: Rect): Boolean {
+        padding.set(0, 0, 0, 0)
+        return false
+    }
+
+    override fun getOutline(outline: Outline) {
+        if (bounds.isEmpty) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                outline.setEmpty()
+            } else {
+                @Suppress("DEPRECATION")
+                super.getOutline(outline)
+            }
+            return
+        }
+        outline.setRect(bounds)
+    }
+
+    override fun isAutoMirrored(): Boolean = autoMirrored
+
+    override fun setAutoMirrored(mirrored: Boolean) {
+        if (autoMirrored == mirrored) return
+        autoMirrored = mirrored
+        invalidateSelf()
+    }
+
+    override fun onLayoutDirectionChanged(layoutDirection: Int): Boolean {
+        invalidateSelf()
+        return super.onLayoutDirectionChanged(layoutDirection)
+    }
 
     override fun getIntrinsicWidth(): Int = validatedDocumentSize(svg.documentWidth)
 
@@ -274,15 +424,21 @@ public open class KSVGDrawable @JvmOverloads public constructor(
     public fun hitTest(x: Float, y: Float): String? {
         ensureHitRegions()
         val transform = screenToSvgTransform ?: return null
-        val pts = floatArrayOf(x, y)
+        var px = x
+        if (autoMirrored && layoutDirection == LayoutDirection.RTL) {
+            val bounds = bounds
+            px = (bounds.left + bounds.right).toFloat() - x
+        }
+        val pts = floatArrayOf(px, y)
         transform.mapPoints(pts)
         val svgX = pts[0]
         val svgY = pts[1]
 
         val regions = hitRegions ?: return null
         for (i in regions.indices.reversed()) {
-            if (regions[i].bounds.contains(svgX, svgY)) {
-                return regions[i].href
+            val region = regions[i]
+            if (region.bounds.contains(svgX, svgY)) {
+                return region.href
             }
         }
         return null
@@ -348,7 +504,7 @@ public open class KSVGDrawable @JvmOverloads public constructor(
      * pixel buckets). Excludes the DOM, geometry, paints and GPU display
      * lists (not measurable via public APIs, and small next to bitmaps).
      * Best-effort under concurrency; intended for cache weighing
-     * (e.g. Glide's `Resource.getSize`).
+     * (e.g., Glide's `Resource.getSize`).
      */
     public fun getMemorySizeBytes(): Long {
         return pools.bitmapPool.retainedBytes() + (scene?.retainedByteCount() ?: 0L)
@@ -377,10 +533,13 @@ internal class KSVGConstantState internal constructor(
     }
 
     override fun newDrawable(res: Resources?): Drawable {
+        // `res` is intentionally unused: the scene is density-aware via
+        // `svg.renderDPI`, not via the host Resources. Density changes are
+        // signaled through `getChangingConfigurations` instead.
         return newDrawable()
     }
 
     override fun getChangingConfigurations(): Int {
-        return 0
+        return ActivityInfo.CONFIG_DENSITY
     }
 }

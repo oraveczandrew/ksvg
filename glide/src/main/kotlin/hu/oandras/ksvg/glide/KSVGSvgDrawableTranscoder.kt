@@ -26,7 +26,7 @@ import hu.oandras.ksvg.SVG
 /**
  * Creates a fresh [Drawable] from a cached [SVG] document on every call.
  *
- * Drawables own per-view mutable state (scene, pools, bounds, animation
+ * Drawables own a per-view mutable state (scene, pools, bounds, animation
  * clock), so sharing one instance across targets is unsafe. Transcoding runs
  * per request — including per memory-cache key (Glide keys include the target
  * size), which is what gives each target its own drawable.
