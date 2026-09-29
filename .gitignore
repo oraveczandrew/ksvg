@@ -18,5 +18,6 @@ build
 **/test-data/ai-helper/
 **/test-data/focal-diff/
 tmp/
+dist/
 # Generated Dokka site (built by CI in static.yml, deployed to GitHub Pages)
 doc/
