@@ -2215,7 +2215,7 @@ internal class Renderer internal constructor(
      * applied per texel).
      *
      * Runs only on shader rebuild (geometry/colors/bake-size change), never
-     * per frame: [bitmap][row] storage is reused via [ResolvedPaint.Radial].
+     * per frame: `bitmap[row]` storage is reused via [ResolvedPaint.Radial].
      * Only the returned `BitmapShader` is fresh per rebuild — the same alloc
      * profile as the platform `RadialGradient` path.
      */
