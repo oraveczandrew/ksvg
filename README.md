@@ -76,6 +76,8 @@ dependencies {
 }
 ```
 
+Requires Kotlin 2.4+ on the consumer side (the library ships 2.4 metadata).
+
 ## Basic Usage
 
 Rendering an SVG to a Canvas:
