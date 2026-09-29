@@ -31,13 +31,13 @@ import androidx.annotation.IntDef
     ColorInterpolation.LINEAR_RGB,
     ColorInterpolation.UNSPECIFIED,
 )
-public annotation class ColorInterpolation {
+internal annotation class ColorInterpolation {
     public companion object {
-        public const val UNSPECIFIED: Int = -1
+        internal const val UNSPECIFIED: Int = -1
 
-        public const val AUTO: Int = 0
-        public const val SRGB: Int = 1
-        public const val LINEAR_RGB: Int = 2
+        internal const val AUTO: Int = 0
+        internal const val SRGB: Int = 1
+        internal const val LINEAR_RGB: Int = 2
 
         /** Parses a `color-interpolation[-filters]` value; returns [UNSPECIFIED] when invalid. */
         internal fun parse(value: String): Int {
