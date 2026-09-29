@@ -1042,10 +1042,12 @@ internal class Renderer internal constructor(
         node: RenderNode<*>,
         opacityAdjustment: Float = 1f,
         isMaskContent: Boolean = false,
+        ignoreOpacity: Boolean = false,
+        skipFilter: Boolean = false,
         r: (Canvas, RendererState) -> Unit,
     ) {
         val filterNode = node.filterNode
-        if (filterNode != null) {
+        if (filterNode != null && !skipFilter && node.maskNode == null) {
             renderWithFilter(canvas, node, filterNode, r)
             return
         }
@@ -1055,9 +1057,17 @@ internal class Renderer internal constructor(
         } else {
             0
         }
-        val pushed = pushLayer(canvas, node, opacityAdjustment)
+        val pushed = pushLayer(canvas, node, opacityAdjustment, ignoreOpacity)
         try {
-            r(canvas, state)
+            if (filterNode != null && !skipFilter) {
+                // Filter + mask: the filter output is drawn bare into the
+                // compositing layer (drawResult skips its opacity/blend paint
+                // when a mask is present) so popLayer can mask it before the
+                // layer applies opacity/blend exactly once.
+                renderWithFilter(canvas, node, filterNode, r)
+            } else {
+                r(canvas, state)
+            }
         } finally {
             if (pushed) {
                 popLayer(canvas, node, isMaskContent)
@@ -1175,18 +1185,22 @@ internal class Renderer internal constructor(
         canvas: Canvas,
         node: RenderNode<*>,
         opacityAdjustment: Float = 1f,
+        ignoreOpacity: Boolean = false,
     ): Boolean {
         // opacityAdjustment is used by fillWithPattern() to apply the fillOpacity for the
         // pattern
 
         val oldState = state
-        if (!requiresCompositing(node) && opacityAdjustment == 1f) {
+        if (!requiresCompositing(node) && opacityAdjustment == 1f && !ignoreOpacity) {
             return false
         }
 
         val nodeState = node.renderState
         val nodeStyle = nodeState.style
-        saveLayerPaint.alpha = clamp255(nodeStyle.opacity * opacityAdjustment * 255f)
+        // Mask content must render at full strength: the element's own opacity
+        // applies once, after masking, when the outer layer is restored.
+        // Without this it leaks into the mask bitmap and applies twice.
+        saveLayerPaint.alpha = if (ignoreOpacity) 255 else clamp255(nodeStyle.opacity * opacityAdjustment * 255f)
 
         // Always resolve the blend mode: `saveLayerPaint` is a shared instance, so leaving
         // it unset would leak the previous node's mode onto a node with a normal blend.
@@ -2624,7 +2638,12 @@ internal class Renderer internal constructor(
                     canvas.withSave {
                         canvas.clipRect(maskRegion)
 
-                        withNewRenderLayer(canvas,node, isMaskContent = true) { canvas, _ ->
+                        // Mask content must never run through the *referenced*
+                        // element's own filter (it would reuse that filter's
+                        // source/output cache and paint filtered element
+                        // content as the mask); a filter owned by the mask
+                        // content itself still applies via its own nodes.
+                        withNewRenderLayer(canvas,node, isMaskContent = true, ignoreOpacity = true, skipFilter = true) { canvas, _ ->
                             canvas.withSave {
                                 val maskContentUnitsAreUser = mask.maskContentUnitsAreUser != false
                                 if (!maskContentUnitsAreUser) {

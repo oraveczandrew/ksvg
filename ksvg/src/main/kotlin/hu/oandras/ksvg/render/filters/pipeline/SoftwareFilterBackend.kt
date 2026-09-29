@@ -192,7 +192,7 @@ internal class SoftwareFilterBackend internal constructor(
             cachedFilterOutput.height == height
         ) {
             GpuChainEvents.record(filterNode, GpuChainEvents.SW)
-            drawResult(canvas, deviceRegion, cachedFilterOutput, state)
+            drawResult(canvas, node, deviceRegion, cachedFilterOutput, state)
             return
         }
 
@@ -224,7 +224,7 @@ internal class SoftwareFilterBackend internal constructor(
 
         if (filteredBitmap != null) {
             GpuChainEvents.record(filterNode, GpuChainEvents.SW)
-            drawResult(canvas, deviceRegion, filteredBitmap, state)
+            drawResult(canvas, node, deviceRegion, filteredBitmap, state)
         }
     }
 
@@ -233,7 +233,7 @@ internal class SoftwareFilterBackend internal constructor(
         recordCanvas.setBitmap(null)
     }
 
-    private fun drawResult(canvas: Canvas, deviceRegion: RectF, bitmap: Bitmap, state: RendererState) {
+    private fun drawResult(canvas: Canvas, node: RenderNode<*>, deviceRegion: RectF, bitmap: Bitmap, state: RendererState) {
         canvas.withSave {
             renderContext.matrixPool.withPooledObject { matrix ->
                 @Suppress("DEPRECATION")
@@ -245,7 +245,7 @@ internal class SoftwareFilterBackend internal constructor(
                     @Suppress("DEPRECATION")
                     canvas.setMatrix(null)
                 }
-                canvas.drawBitmap(bitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(state))
+                canvas.drawBitmap(bitmap, deviceRegion.left, deviceRegion.top, configureFilterCompositePaint(node, state))
             }
         }
     }
@@ -257,8 +257,13 @@ internal class SoftwareFilterBackend internal constructor(
      *
      * When neither applies (fully opaque, normal blend) we return `null` so the bitmap is
      * drawn exactly as before, preserving existing rendering/compositing behavior.
+     *
+     * When the element also has a mask, the paint stays `null`: the output is drawn bare
+     * into the compositing layer opened by `withNewRenderLayer`, which masks it first and
+     * applies opacity/blend exactly once on restore.
      */
-    private fun configureFilterCompositePaint(state: RendererState): Paint? {
+    private fun configureFilterCompositePaint(node: RenderNode<*>, state: RendererState): Paint? {
+        if (node.maskNode != null) return null
         val opacity = if (state.style.opacity.isNaN()) 1f else state.style.opacity
         val alpha = (opacity * 255f).toInt().coerceIn(0, 255)
         val blendMode = state.style.mixBlendMode
