@@ -66,10 +66,10 @@
  *   llvm-objdump after the soft-light/linear hi-half failures). All
  *   hi-half extracts here are therefore `ext Vd.16b, Vn.16b, Vm.16b,
  *   #8` (range 0-15); only the low 8 bytes are consumed downstream.
- *   (The `fcmle Vd.4s, Vn.4s, Vm.4s` register form is in contrast a
- *   legal alias — clang canonicalizes it to `fcmge` with swapped
- *   operands — but GNU as rejects it, so QEMU guests must spell the
- *   `fcmge` form.)
+ *   (The `fcmle Vd.4s, Vn.4s, Vm.4s` register form is only a clang
+ *   alias — clang canonicalizes it to `fcmge` with swapped operands —
+ *   but GNU as rejects it, so this file spells the `fcmge` form
+ *   everywhere for host (GCC) + NDK (clang) + QEMU-guest compatibility.)
  *
  * Stack frame: sub sp, sp, #256 (AArch64 SP stays 16B-aligned).
  * Stack args (8B PCS slots — NOT packed: the C++ caller stores mode
@@ -828,7 +828,7 @@ SYM(applyFeBlendNeon):
     fmov    v5.4s, #0.5
     ldr     q0, [sp, #80]
     ldr     q1, [sp, #16]
-    fcmle   v4.4s, v0.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v0.4s
     fmov    v5.4s, #2.0
     fmul    v2.4s, v0.4s, v5.4s
     fmul    v2.4s, v2.4s, v1.4s
@@ -844,7 +844,7 @@ SYM(applyFeBlendNeon):
     ldr     q0, [sp, #96]
     ldr     q1, [sp, #32]
     fmov    v5.4s, #0.5
-    fcmle   v4.4s, v0.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v0.4s
     fmov    v5.4s, #2.0
     fmul    v2.4s, v0.4s, v5.4s
     fmul    v2.4s, v2.4s, v1.4s
@@ -860,7 +860,7 @@ SYM(applyFeBlendNeon):
     ldr     q0, [sp, #112]
     ldr     q1, [sp, #48]
     fmov    v5.4s, #0.5
-    fcmle   v4.4s, v0.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v0.4s
     fmov    v5.4s, #2.0
     fmul    v2.4s, v0.4s, v5.4s
     fmul    v2.4s, v2.4s, v1.4s
@@ -1027,7 +1027,7 @@ SYM(applyFeBlendNeon):
     fmov    v3.4s, #2.0
     ldr     q0, [sp, #80]
     ldr     q1, [sp, #16]
-    fcmle   v4.4s, v1.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v1.4s
     fmul    v2.4s, v1.4s, v3.4s
     fmul    v2.4s, v2.4s, v0.4s
     ldr     q0, [sp, #80]
@@ -1043,7 +1043,7 @@ SYM(applyFeBlendNeon):
     str     q2, [sp, #176]
     ldr     q0, [sp, #96]
     ldr     q1, [sp, #32]
-    fcmle   v4.4s, v1.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v1.4s
     fmul    v2.4s, v1.4s, v3.4s
     fmul    v2.4s, v2.4s, v0.4s
     ldr     q0, [sp, #96]
@@ -1059,7 +1059,7 @@ SYM(applyFeBlendNeon):
     str     q2, [sp, #192]
     ldr     q0, [sp, #112]
     ldr     q1, [sp, #48]
-    fcmle   v4.4s, v1.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v1.4s
     fmul    v2.4s, v1.4s, v3.4s
     fmul    v2.4s, v2.4s, v0.4s
     ldr     q0, [sp, #112]
@@ -1084,7 +1084,7 @@ SYM(applyFeBlendNeon):
     fmov    v5.4s, #0.25
     ldr     q0, [sp, #80]
     ldr     q1, [sp, #16]
-    fcmle   v4.4s, v0.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v0.4s
     movz    w13, #0x0000
     movk    w13, #0x4180, lsl #16
     fmov    s5, w13
@@ -1121,7 +1121,7 @@ SYM(applyFeBlendNeon):
     ldr     q0, [sp, #96]
     ldr     q1, [sp, #32]
     fmov    v5.4s, #0.25
-    fcmle   v4.4s, v0.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v0.4s
     movz    w13, #0x0000
     movk    w13, #0x4180, lsl #16
     fmov    s5, w13
@@ -1158,7 +1158,7 @@ SYM(applyFeBlendNeon):
     ldr     q0, [sp, #112]
     ldr     q1, [sp, #48]
     fmov    v5.4s, #0.25
-    fcmle   v4.4s, v0.4s, v5.4s
+    fcmge   v4.4s, v5.4s, v0.4s
     movz    w13, #0x0000
     movk    w13, #0x4180, lsl #16
     fmov    s5, w13
