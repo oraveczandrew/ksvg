@@ -19,6 +19,11 @@
 
 #include <cstdint>
 
+#if defined(__x86_64__) || defined(__i386__)
+#include <csetjmp>
+#include <csignal>
+#endif
+
 // One-time x86 SIMD level detection shared by the filter kernels.
 //
 // The kernels ship multiple code paths compiled with `target(...)` attributes;
@@ -42,12 +47,14 @@ enum SimdLevel {
 // Raw-CPUID AVX2+FMA gate.
 //
 // __builtin_cpu_supports("avx2") additionally relies on CPUID.1:ECX.OSXSAVE,
-// which the Android emulator's HVF CPUID mask may clear even though the guest
-// kernel has enabled CR4.OSXSAVE and XCR0.YMM, and the AVX2 kernels provably
-// execute correctly there. So the OSXSAVE *report* is not used as evidence
-// of AVX2: the actual XCR0 state is read directly instead. It IS still used
-// as an execution gate: XGETBV faults with #UD when CR4.OSXSAVE is clear, so
-// without the OSXSAVE report the raw path declines instead of faulting.
+// which the Android emulator's HVF CPUID mask clears even though the guest
+// kernel has enabled CR4.OSXSAVE and XCR0.YMM (device-verified 2026-09-29:
+// leaf1 ECX bit 27 = 0 while XGETBV returns XCR0 = 0x7 and YMM ops execute
+// fine on both an API-26 x86 and an API-29 x86_64 emulator). So the OSXSAVE
+// *report* is used neither as evidence of AVX2 nor as an execution gate:
+// the actual XCR0 state is read directly instead, with XGETBV executed under
+// a one-shot SIGILL guard, because XGETBV faults with #UD when CR4.OSXSAVE
+// is really clear and the CPUID report cannot be trusted to tell beforehand.
 //
 // XCR0.YMM proves the OS saves/restores the YMM register state AVX requires;
 // on real silicon this produces the same result as normal AVX2 detection, it
@@ -55,32 +62,68 @@ enum SimdLevel {
 //
 // FMA (CPUID.1:ECX bit 12) is required alongside AVX2 because the x86_64
 // lighting pow rows execute vfmadd213ps, which AVX2 alone does not guarantee.
+namespace ksvg_cpu_dispatch {
+
+inline sigjmp_buf* xgetbvJumpTarget() {
+    static sigjmp_buf buf;
+    return &buf;
+}
+
+inline void xgetbvSigillHandler(int) {
+    siglongjmp(*xgetbvJumpTarget(), 1);
+}
+
+// Reads XCR0 under a SIGILL guard; returns false when XGETBV itself faults
+// (CR4.OSXSAVE genuinely clear), in which case xcr0 is left untouched.
+inline bool readXcr0Guarded(uint64_t& xcr0) {
+    struct sigaction oldAct {};
+    struct sigaction newAct {};
+    newAct.sa_handler = xgetbvSigillHandler;
+    sigemptyset(&newAct.sa_mask);
+    newAct.sa_flags = 0;
+    if (sigaction(SIGILL, &newAct, &oldAct) != 0) {
+        return false;
+    }
+    bool ok = false;
+    if (sigsetjmp(*xgetbvJumpTarget(), 1) == 0) {
+        uint32_t xlo = 0;
+        uint32_t xhi = 0;
+        __asm__ volatile(
+            "xgetbv"
+            : "=a"(xlo), "=d"(xhi)
+            : "c"(0));
+        xcr0 = (static_cast<uint64_t>(xhi) << 32) | xlo;
+        ok = true;
+    }
+    sigaction(SIGILL, &oldAct, nullptr);
+    return ok;
+}
+
+} // namespace ksvg_cpu_dispatch
+
 inline bool cpuHasAvx2AndFmaRaw() {
     uint32_t a, b, c, d;
 
-    // CPUID.1:ECX.XSAVE (bit 26) is the hardware precondition, but XGETBV
-    // itself faults with #UD (SIGILL) unless the OS enabled it via
-    // CR4.OSXSAVE, reported as CPUID.1:ECX.OSXSAVE (bit 27). Gate on both:
-    // without OSXSAVE there is no YMM state for the OS to report, AVX2 is
-    // unusable, and XGETBV must not execute. Bit 12 in the same leaf reports
-    // FMA, which the lighting AVX2 pow rows require.
+    // CPUID.1:ECX bit 12 reports FMA, which the lighting AVX2 pow rows
+    // require. The XSAVE (bit 26) / OSXSAVE (bit 27) reports are deliberately
+    // NOT consulted: the emulator masks bit 27 while XCR0.YMM is really
+    // enabled, so they are evidence of nothing either way.
     __asm__ volatile(
         "mov $1, %%eax; cpuid"
         : "=a"(a), "=b"(b), "=c"(c), "=d"(d)
         :
         : "cc");
-    if ((c & (1u << 26)) == 0 || (c & (1u << 27)) == 0) {
+    const bool hasFma = (c & (1u << 12)) != 0;
+    if (!hasFma) {
         return false;
     }
-    const bool hasFma = (c & (1u << 12)) != 0;
 
-    // XCR0[2] = YMM state enabled by the OS.
-    uint32_t xlo, xhi;
-    __asm__ volatile(
-        "xgetbv"
-        : "=a"(xlo), "=d"(xhi)
-        : "c"(0));
-    const uint64_t xcr0 = (static_cast<uint64_t>(xhi) << 32) | xlo;
+    // XCR0[2] = YMM state enabled by the OS. Guarded: faults with #UD only
+    // when CR4.OSXSAVE is genuinely clear, in which case AVX2 is unusable.
+    uint64_t xcr0 = 0;
+    if (!ksvg_cpu_dispatch::readXcr0Guarded(xcr0)) {
+        return false;
+    }
     if ((xcr0 & (1ull << 2)) == 0) {
         return false;
     }

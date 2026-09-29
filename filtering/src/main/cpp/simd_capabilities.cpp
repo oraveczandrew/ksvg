@@ -30,7 +30,7 @@ jint supportedBackendsForDevice() {
     backends |= SIMD_BACKEND_NEON64;
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
     backends |= SIMD_BACKEND_NEON32;
-#elif defined(__x86_64__) || defined(_M_X64)
+#elif defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
     if (detectSimdLevel() >= SIMD_SSSE3) {
         backends |= SIMD_BACKEND_SSSE3;
     }
