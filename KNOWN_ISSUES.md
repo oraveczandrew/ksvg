@@ -1,7 +1,6 @@
 # Known Issues (hardware / platform-specific)
 
 Confirmed divergences with NO code fix. Feature support: `SVG-SUPPORT.md`.
-Investigation trail: `tmp/RENDER_FIDELITY_PLAN.md`.
 
 ## 1. `mix-blend-mode` below API 29 — black flood
 
@@ -14,9 +13,10 @@ comes from the leaf layer, not from under the SVG backdrop).
 
 A leaf direct-draw path matched the golden exactly on the sdk26 **host** — but
 host Skia is not the device GPU, so it proves nothing; reverted. Policy: no
-host-test iteration on this; on-device proof required (`SvgTestActivity` +
-screenshots, `emulator-5554` vs phone). Group-level blend
-(`rendering_properties.svg`) is fine on the emulator. Non-PorterDuff modes
+ host-test iteration on this; on-device proof required (`SvgTestActivity` +
+ screenshots, API-26 emulator vs API-36 phone). Group-level blend
+ (`rendering_properties.svg`) is a separate symptom on the emulator (item 5).
+ Non-PorterDuff modes
 (hue/saturation/color/…, difference) fall back to SrcOver below 29 by design.
 
 ## 2. Soft vector edges on API-26 emulator HW — device rasterizer (NO BUG)
@@ -25,9 +25,8 @@ screenshots, `emulator-5554` vs phone). Group-level blend
 API-26 HW. Not marker-specific: plain ellipses blur identically; the same
 device with `LAYER_TYPE_SOFTWARE` is pixel-sharp and the API-29 emulator HW is
 crisp (max pixel step 27 vs 250). The API-26 SwiftShader path softens ALL HW
-vector edges ~1 user px; `markerUnits=strokeWidth` just magnifies it (31 device
-px at sw=10). KSVG emits correct vectors — nothing to fix. Evidence:
-`tmp/screenshots/marker_*.png`, `ellipse_emu_hw.png`.
+ vector edges ~1 user px; `markerUnits=strokeWidth` just magnifies it (31 device
+ px at sw=10). KSVG emits correct vectors — nothing to fix.
 
 ## 3. Sub-1-unit rects vanish on HW canvases (documented, narrow fix in patterns)
 
@@ -37,7 +36,7 @@ any canvas scale, 1.5-unit rect and same-size circles draw; host SW draws
 everything; API-26 SwiftShader additionally culls sub-unit curves).
 `fillWithPattern` bakes bbox-unit content into super-unit paths, so patterns
  are immune. Plain-group sub-unit geometry under huge zoom is still affected —
- negligible in practice (sub-pixel at normal zoom). See `tmp/PATTERN_WORKLOG.md`.
+ negligible in practice (sub-pixel at normal zoom).
 
 ## 4. Mask-region edge strip on API-26 emulator HW mid-pulse (emulator-only)
 
@@ -48,3 +47,12 @@ everything; API-26 SwiftShader additionally culls sub-unit curves).
  variants (`aihelpers/MaskStripPhaseProbeTest`), and the API-36 phone is
  clean. Verdict: API-26 SwiftShader transient (saveLayer DST_IN + per-frame
  re-record); no library bug, nothing to fix.
+
+## 5. Group `mix-blend-mode` below API 29 — content vanishes (emulator-only)
+
+ `rendering_properties.svg` (group-level `multiply`): on API-26 emulator HW
+ the blended group renders nothing (white bg, no flood); API-29 shows both
+ circles per the golden. The API-26 GPU drops this offscreen composite
+ (same `saveLayer` + PorterDuff mechanism as item 1, transparent backdrop).
+ Fix would need software compositing or API 29+ — disproportionate for a
+ legacy level, so documented-only.
