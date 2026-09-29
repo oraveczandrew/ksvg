@@ -32,7 +32,7 @@ import kotlin.math.abs
  * tolerance is allowed (matching the device test): scalar is bit-exact
  * (tolerance 0), the SIMD tails allow 1. The ±1 LSB comes from the x86
  * `cvtps2dq` tie-to-even rounding vs the Kotlin reference `trunc(x + 0.5)`;
- * exact .5 ties can differ by 1, never more (F3-characterization).
+ * exact .5 ties can differ by 1, never more.
  *
  * For every configuration in the shared corpus, every SIMD backend this host
  * advertises for that radius is forced via [NativeGaussianBlur.applyForced].

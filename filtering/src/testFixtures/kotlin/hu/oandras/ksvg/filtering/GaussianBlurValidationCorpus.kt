@@ -19,10 +19,20 @@ package hu.oandras.ksvg.filtering
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.sqrt
 
 /**
  * Deterministic validation corpus for feGaussianBlur.
+ *
+ * Tie-sweep: the x86 SIMD kernels convert with
+ * `cvtps2dq` (round-half-to-even) while the reference below quantizes with
+ * `trunc(x + 0.5)` (round-half-up), so .5 ties differ by exactly 1; the ARM
+ * kernels additionally quantize weights to uint16. [findNearTieImpulses]
+ * picks impulse levels whose reference float output lands within
+ * [NEAR_TIE_WINDOW] of a tie, so the sweep deterministically covers the only
+ * inputs where backends may legally diverge. The parity tests already allow
+ * 1 LSB on SIMD backends (scalar stays exact).
  */
 public object GaussianBlurValidationCorpus {
 
@@ -66,6 +76,31 @@ public object GaussianBlurValidationCorpus {
     }
 
     private fun referenceGaussian(pixels: IntArray, w: Int, h: Int, sx: Float, sy: Float): IntArray {
+        val floats = referenceGaussianFloats(pixels, w, h, sx, sy)
+        val n = w * h
+        val out = IntArray(n)
+        for (i in 0 until n) {
+            fun cl(v: Float): Int {
+                val x = (v + 0.5f).toInt()
+                return x.coerceIn(0, 255)
+            }
+            out[i] = (cl(floats[0][i]) shl 24) or (cl(floats[1][i]) shl 16) or (cl(floats[2][i]) shl 8) or cl(floats[3][i])
+        }
+        return out
+    }
+
+    /**
+     * Separable two-pass blur in float, pre-quantization. Index 0..3 = A/R/G/B.
+     * Extracted verbatim from [referenceGaussian] so the quantized reference
+     * is unchanged; the tie search inspects these floats for near-tie fractions.
+     */
+    private fun referenceGaussianFloats(
+        pixels: IntArray,
+        w: Int,
+        h: Int,
+        sx: Float,
+        sy: Float,
+    ): Array<FloatArray> {
         val (wx, rx) = computeWeights(sx)
         val (wy, ry) = computeWeights(sy)
         val n = w * h
@@ -101,15 +136,50 @@ public object GaussianBlurValidationCorpus {
         ra = conv(ra, wy, ry, false); rr = conv(rr, wy, ry, false)
         rg = conv(rg, wy, ry, false); rb = conv(rb, wy, ry, false)
 
-        val out = IntArray(n)
-        for (i in 0 until n) {
-            fun cl(v: Float): Int {
-                val x = (v + 0.5f).toInt()
-                return x.coerceIn(0, 255)
+        return arrayOf(ra, rr, rg, rb)
+    }
+
+    /**
+     * Half-width of the tie-neighborhood window used by the sweep below: the
+     * search below keeps impulse levels with a reference float output this
+     * close to a tie on any channel.
+     */
+    public const val NEAR_TIE_WINDOW: Float = 0.005f
+
+    private fun tieDistance(f: Float): Float {
+        if (!f.isFinite()) return Float.MAX_VALUE
+        val frac = f - floor(f)
+        return kotlin.math.abs(frac - 0.5f)
+    }
+
+    /**
+     * Tie-sweep: for each sigma, the first two impulse levels (1..255,
+     * single center pixel on black, 16x16) with a reference float output
+     * within [NEAR_TIE_WINDOW] of a tie on any channel. Impulse outputs
+     * cover the fractional range densely (level x tap-weight), so near-ties
+     * are found within a few levels; the search is pure IEEE-float math,
+     * hence deterministic per JDK.
+     */
+    private fun findNearTieImpulses(): List<Triple<Float, Float, Int>> {
+        val found = mutableListOf<Triple<Float, Float, Int>>()
+        for (s in floatArrayOf(0.5f, 1.0f, 1.5f, 2.0f, 2.6f)) {
+            var taken = 0
+            for (v in 1..255) {
+                val input = IntArray(16 * 16)
+                val px = (v shl 24) or (v shl 16) or (v shl 8) or v
+                input[8 * 16 + 8] = px
+                val floats = referenceGaussianFloats(input, 16, 16, s, s)
+                if (floats.any { ch -> ch.any { f -> tieDistance(f) < NEAR_TIE_WINDOW } }) {
+                    found.add(Triple(s, s, v))
+                    if (++taken == 2) break
+                }
             }
-            out[i] = (cl(ra[i]) shl 24) or (cl(rr[i]) shl 16) or (cl(rg[i]) shl 8) or cl(rb[i])
         }
-        return out
+        require(found.size >= 8) {
+            "Tie-sweep covered only ${found.size} (sigma, level) pairs; " +
+                "the rounding-path coverage would be vacuous."
+        }
+        return found
     }
 
     @JvmField
@@ -142,7 +212,7 @@ public object GaussianBlurValidationCorpus {
         add(Case("tiny 2x2 1.0", 2, 2, 1f, 1f,
             UnLinearizeValidationCorpus.fixedSeedRandom(2 * 2)))
 
-        // R4-narrow: widths below the NEON 4-wide fetch granularity (pw<4).
+        // Narrow widths below the NEON 4-wide fetch granularity (pw<4).
         // The AOSP-derived NEON kernels fetch 4/16 halfwords per load, so
         // 1px- and 3px-wide rows exercise the clamp/tail path that the
         // overread suspicion targets; parity against the Kotlin reference
@@ -151,5 +221,15 @@ public object GaussianBlurValidationCorpus {
             UnLinearizeValidationCorpus.fixedSeedRandom(1 * 1)))
         add(Case("narrow 3x3 1.0", 3, 3, 1f, 1f,
             UnLinearizeValidationCorpus.fixedSeedRandom(3 * 3)))
+
+        // Tie-sweep: near-tie-carrying impulse cases from the search above.
+        // The require() inside fails loudly (instead of passing vacuously)
+        // if float behavior ever stops producing near-ties.
+        for ((sx, sy, v) in findNearTieImpulses()) {
+            val input = IntArray(16 * 16)
+            val px = (v shl 24) or (v shl 16) or (v shl 8) or v
+            input[8 * 16 + 8] = px
+            add(Case("near-tie impulse s=$sx v=$v 16x16", 16, 16, sx, sy, input))
+        }
     }
 }

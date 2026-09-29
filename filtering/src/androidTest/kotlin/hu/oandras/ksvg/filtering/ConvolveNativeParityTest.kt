@@ -28,13 +28,17 @@ import org.junit.runners.Parameterized
  * and compared, covering kernel orders, anchors, divisors,
  * preserveAlpha, and the duplicate/wrap/none edge modes.
  *
- * Tolerance (F4-characterization, device-PROVEN 2026-09-23): the AArch64/ARM32
+ * Tolerance: the AArch64/ARM32
  * NEON kernels hoist `1/divisor` (single `fdiv`) and multiply per pixel, while
  * the reference and the x86 kernels divide per pixel. For non-power-of-two
  * divisors the reciprocal is inexact, so exact .5 ties can differ by ±1 LSB
  * (observed: 1 alpha pixel +1 on `divisor 3.0 5x5 [neon64]`). NEON backends
  * therefore allow `maxDelta=1` when the divisor is not an exact power of two;
  * every other combination stays byte-exact.
+ *
+ * Tie-sweep (`tieSweep` cases): exact .5 ties by construction, so every
+ * non-scalar backend allows `maxDelta=1` there (x86 SIMD truncates where the
+ * half-up reference rounds up); scalar stays byte-exact.
  */
 @NativeParityTest
 @RunWith(Parameterized::class)
@@ -64,7 +68,10 @@ class ConvolveNativeParityTest(
         }
 
         private fun tolerance(case: ConvolveValidationCorpus.Case, backend: Int): Int =
-            if ((backend == SIMD_NEON64 || backend == SIMD_NEON32) && !isExactPowerOfTwo(case.divisor)) 1 else 0
+            if (backend == SIMD_SCALAR) 0
+            else if (case.tieSweep) 1
+            else if ((backend == SIMD_NEON64 || backend == SIMD_NEON32) && !isExactPowerOfTwo(case.divisor)) 1
+            else 0
     }
 
     @Test

@@ -35,6 +35,11 @@ import org.junit.runners.Parameterized
  * differ by ±1 LSB (observed: 1 alpha pixel +1 on `divisor 3.0 5x5
  * [neon64]`). NEON backends therefore allow `maxDelta=1` when the divisor is
  * not an exact power of two; every other combination stays byte-exact.
+ *
+ * Tie-sweep (`tieSweep` cases): the x86 SIMD kernels truncate
+ * (`cvttps2dq`) where the half-up reference rounds up, so every exact tie
+ * differs by exactly 1 there by construction. All non-scalar backends allow
+ * `maxDelta=1` on those cases; scalar stays byte-exact.
  */
 @RunWith(Parameterized::class)
 class ConvolveNativeParityTest(
@@ -63,7 +68,10 @@ class ConvolveNativeParityTest(
         }
 
         private fun tolerance(case: ConvolveValidationCorpus.Case, backend: Int): Int =
-            if ((backend == SIMD_NEON64 || backend == SIMD_NEON32) && !isExactPowerOfTwo(case.divisor)) 1 else 0
+            if (backend == SIMD_SCALAR) 0
+            else if (case.tieSweep) 1
+            else if ((backend == SIMD_NEON64 || backend == SIMD_NEON32) && !isExactPowerOfTwo(case.divisor)) 1
+            else 0
     }
 
     @Test

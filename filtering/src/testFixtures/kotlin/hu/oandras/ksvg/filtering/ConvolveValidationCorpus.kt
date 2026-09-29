@@ -48,6 +48,18 @@ public object ConvolveValidationCorpus {
         public val edgeMode: Int,
         @JvmField
         public val input: IntArray,
+        /**
+         * True for the tie-sweep cases below: every interior pixel is an
+         * exact .5 tie by construction (small-int taps, exact divisors), so
+         * the rounding-mode gap between the SIMD converters (`cvttps2dq`
+         * truncate on x86, `1/divisor` reciprocal multiply on NEON) and the
+         * half-up reference is exercised deterministically instead of by
+         * chance. The parity tests therefore allow `maxDelta=1` on every
+         * non-scalar backend for these cases — proving the deviation is at
+         * most 1 LSB, never more.
+         */
+        @JvmField
+        public val tieSweep: Boolean = false,
     ) {
         public val size: Int get() = width * height
 
@@ -110,7 +122,7 @@ public object ConvolveValidationCorpus {
         add(Case("asm 5x5 preserve 20x20", 20, 20, blur5x5, 5, 5, 2, 2, 1f, 0f, true, 0,
             UnLinearizeValidationCorpus.fixedSeedRandom(20 * 20)))
 
-        // F4-sweep: non-power-of-two divisor (3.0) stresses the AArch64 NEON
+        // Non-power-of-two divisor (3.0) stresses the AArch64 NEON
         // rcp-approximation path (device-only) while the host x86 path uses
         // true division; both must stay within the byte-exact gate here.
         add(Case("divisor 3.0 3x3 16x16", 16, 16, sharpen, 3, 3, 1, 1, 3f, 0f, true, 0,
@@ -126,5 +138,26 @@ public object ConvolveValidationCorpus {
             UnLinearizeValidationCorpus.fixedSeedRandom(2 * 2)))
         add(Case("tiny 3x3 3x3", 3, 3, sharpen, 3, 3, 1, 1, 1f, 0f, true, 0,
             UnLinearizeValidationCorpus.fixedSeedRandom(3 * 3)))
+
+        // Tie-sweep: exact .5 ties by construction (ramp inputs make every
+        // interior tap-sum odd, see above).
+        // Ramp inputs make every interior tap-sum odd (avg2) or an odd
+        // multiple of 3 (avg3), so the exact quotient is k+.5 in exact
+        // arithmetic AND in float (small ints, exact divisors): x86 SIMD
+        // truncates (`cvttps2dq`) where the half-up reference rounds up
+        // (diff exactly 1), and NEON multiplies by the inexact reciprocal.
+        // Scalar stays byte-exact (same half-up rounding as the reference).
+        val ramp16 = IntArray(16 * 16) { i ->
+            val v = i % 16
+            (v shl 24) or (v shl 16) or (v shl 8) or v
+        }
+        val avg2 = floatArrayOf(1f, 1f)
+        add(Case("tie avg2 ramp 16x16", 16, 16, avg2, 2, 1, 0, 0, 2f, 0f, false, 0,
+            ramp16, tieSweep = true))
+        add(Case("tie avg2 ramp preserve 16x16", 16, 16, avg2, 2, 1, 0, 0, 2f, 0f, true, 0,
+            ramp16, tieSweep = true))
+        val avg3 = floatArrayOf(1f, 1f, 1f)
+        add(Case("tie avg3 ramp divisor6 16x16", 16, 16, avg3, 3, 1, 0, 0, 6f, 0f, false, 0,
+            ramp16, tieSweep = true))
     }
 }
