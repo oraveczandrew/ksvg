@@ -64,9 +64,14 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # NOTE: test-fixtures AARs are inter-module test reuse only
+          # (testFixtures(project(":filtering"))) — AGP attaches them to the
+          # release publication automatically; they must not ship. Central
+          # upload (D-track) needs the same exclusion at publish time.
           files: |
             dist/*.apk
             dist/repo/**/*.aar
+            !dist/repo/**/*-test-fixtures.aar
             dist/repo/**/*-sources.jar
             dist/repo/**/*-javadoc.jar
             dist/repo/**/*.pom
