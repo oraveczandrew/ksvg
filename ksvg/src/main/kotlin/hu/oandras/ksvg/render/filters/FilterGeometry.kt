@@ -101,6 +101,31 @@ internal fun doFeConvolveMatrixFilter(
 internal val bilinearPaint: Paint = Paint().apply { isFilterBitmap = true }
 
 /**
+ * Whether `Bitmap.getPixels` returns straight (unassociated) channels.
+ *
+ * Real Android stores ARGB_8888 premultiplied and unpremultiplies on read, so
+ * the native blur backend (premultiplied math) must re-premultiply its input
+ * (item 11). Robolectric shadows behave the same way here. Probed once at
+ * runtime rather than assumed: a semi-transparent straight orange reads back
+ * bright green only under straight semantics. Guards exotic platforms where
+ * reads pass premultiplied values through (re-premultiplying there would
+ * double-apply).
+ */
+internal val bitmapReadsAreStraight: Boolean by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    probeBitmapReadsAreStraight()
+}
+
+@SuppressLint("UseKtx")
+private fun probeBitmapReadsAreStraight(): Boolean {
+    val probe = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    val straight = (128 shl 24) or (255 shl 16) or (165 shl 8)
+    probe.setPixels(intArrayOf(straight), 0, 1, 0, 0, 1, 1)
+    val back = IntArray(1)
+    probe.getPixels(back, 0, 1, 0, 0, 1, 1)
+    return ((back[0] shr 8) and 0xff) > 128
+}
+
+/**
  * Downscales [src] by 1/[stepX], 1/[stepY] (bilinear) into a pooled bitmap.
  * The caller owns the result and must release it. Mirrors the reference
  * downscale step for `kernelUnitLength` (rsvg).
@@ -202,14 +227,25 @@ internal fun doFeGaussianBlurFilter(
     val pixels = primitiveNode.pixels.getWithSize(size)
     inputBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
+    // `getPixels` returns straight (unassociated) channels, but the native blur
+    // backend does premultiplied math: straight fringe (AA coverage) pixels
+    // would read as super-bright taps (r_p > a) and the unpremultiply below
+    // would amplify them into a bright halo (item 11: 0x090C0800-style kernel
+    // output, final green 198 vs 165). Premultiply first so the kernel sees
+    // true premultiplied input; uniform regions are unaffected (a==0/255
+    // fast paths). Skipped for the Kotlin fallback (premultiplies straight
+    // input internally) and where `getPixels` already yields premultiplied
+    // values (exotic platforms, see `bitmapReadsAreStraight`). In place, no
+    // allocation.
+    if (bitmapReadsAreStraight && primitiveNode.blurScratch.requiresPremultipliedInput) {
+        premultiplyInPlace(pixels)
+    }
+
     primitiveNode.blurScratch.blur(pixels, width, height, stdDeviationX, stdDeviationY)
 
-    // The blur backends emit premultiplied (Kotlin stack-blur fallback) or
-    // straight (native true-Gaussian) channels; `setPixels` below stores
-    // straight. Unpremultiplying normalizes uniform regions exactly on both
+    // Unpremultiplying normalizes uniform regions exactly on both
     // backends (halo chroma stays full while alpha fades — F1, rsvg
-    // reference); native straight edges stay approximate (premult-native is
-    // a separate :filtering tétel). In place, no allocation.
+    // reference). In place, no allocation.
     unpremultiplyInPlace(pixels)
 
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
@@ -239,11 +275,32 @@ internal fun doFeGaussianBlurFilter(
 }
 
 /**
+ * In-place premultiplication for blur input: maps straight `getPixels`
+ * channels to premultiplied (`c = c*a/255`, half-up) so the premultiplied-math
+ * blur kernels see true taps. Identity for uniform regions (a==0 zeroes rgb,
+ * a==255 untouched). No allocation.
+ */
+private fun premultiplyInPlace(pixels: IntArray) {
+    for (i in pixels.indices) {
+        val p = pixels[i]
+        val a = p ushr 24
+        if (a == 0) {
+            pixels[i] = 0
+            continue
+        }
+        if (a == 255) continue
+        val r = ((p shr 16 and 0xff) * a + 127) / 255
+        val g = ((p shr 8 and 0xff) * a + 127) / 255
+        val b = ((p and 0xff) * a + 127) / 255
+        pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
+    }
+}
+
+/**
  * In-place straight-normalization for blur output (F1): maps premultiplied
  * channels back to straight (`c = c*255/a`, half-up) so halo chroma survives
  * `setPixels` (straight-in store). Exact for uniform regions on both blur
- * backends (premult-out fallback; straight-out native, where uniform
- * r/a ratios restore full chroma); alpha untouched; a==0 stays 0, a==255
+ * backends (both emit premultiplied); alpha untouched; a==0 stays 0, a==255
  * is identity. No allocation.
  */
 private fun unpremultiplyInPlace(pixels: IntArray) {

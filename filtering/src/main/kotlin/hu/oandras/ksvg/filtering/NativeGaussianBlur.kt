@@ -31,15 +31,17 @@ import kotlin.math.max
 public sealed interface StackBlurScratch {
 
     /**
-     * Blurs [pixels] (straight ARGB, length [width] * [height]) in place.
+     * Blurs [pixels] in place ([width] * [height] ARGB ints).
      * Pixels outside the bitmap are treated as transparent black, matching
      * the SVG spec for filter-region edges (stdDeviation == Gaussian sigma).
      *
-     * Backend output convention differs: the native true-Gaussian path
-     * emits straight channels, the Kotlin stack-blur fallback emits
-     * premultiplied channels. The render boundary (`doFeGaussianBlurFilter`)
-     * unpremultiplies before straight storage, which is exact for uniform
-     * regions on both backends (F1).
+     * Backend input convention differs: the native true-Gaussian path does
+     * premultiplied math and requires premultiplied input, while the Kotlin
+     * stack-blur fallback takes straight input and premultiplies internally
+     * (exactly once across both separable passes). See
+     * [requiresPremultipliedInput]. Both backends emit premultiplied
+     * channels; the render boundary (`doFeGaussianBlurFilter`) unpremultiplies
+     * before straight storage (F1).
      */
     public fun blur(
         pixels: IntArray,
@@ -49,12 +51,20 @@ public sealed interface StackBlurScratch {
         stdDeviationY: Float,
     )
 
+    /**
+     * True when [blur] requires premultiplied input (native path). False for
+     * the Kotlin fallback, which premultiplies straight input internally.
+     */
+    public val requiresPremultipliedInput: Boolean
+
     /** Releases any native resources. No-op for the Kotlin fallback. */
     public fun close() {}
 }
 
 private class NativeScratch : StackBlurScratch {
     private var handle: Long = 0
+
+    override val requiresPremultipliedInput: Boolean = true
 
     private fun ensure(): Long {
         if (handle == 0L) handle = NativeGaussianBlur.createScratch()
@@ -82,6 +92,8 @@ private class NativeScratch : StackBlurScratch {
 private class FallbackScratch : StackBlurScratch {
     private val scratchX = StackBlurAxisScratch()
     private val scratchY = StackBlurAxisScratch()
+
+    override val requiresPremultipliedInput: Boolean = false
 
     override fun blur(
         pixels: IntArray,
