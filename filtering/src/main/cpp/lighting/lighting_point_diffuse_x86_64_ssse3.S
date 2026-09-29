@@ -223,7 +223,6 @@ CFI_START
     andps          %xmm11, %xmm4
     mulps          %xmm6, %xmm4
     addps          %xmm5, %xmm4
-    maxps          %xmm1, %xmm4
     mulps          -32(%rsp), %xmm4
     maxps          %xmm1, %xmm4
     minps          %xmm15, %xmm4
@@ -486,7 +485,6 @@ CFI_START
     andps          %xmm10, %xmm4
     mulps          %xmm2, %xmm4
     addps          %xmm5, %xmm4
-    maxps          %xmm1, %xmm4
     mulps          -32(%rsp), %xmm4
     maxps          %xmm1, %xmm4
     minps          %xmm15, %xmm4

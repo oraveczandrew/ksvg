@@ -143,7 +143,7 @@ private const val LIGHTING_SHADER: String = """
                     l = normalize(uLightPosDir - p);
                 }
 
-            float dotNL = max(dot(n, l), 0.0);
+            float dotNL = dot(n, l);
             // Spot cone factor (mirrors the CPU kernel: unshaped dot gated
             // by the cone cosine; factor 1 for point lights, degenerate
             // targets, and NaN cone angles — all encoded host-side).

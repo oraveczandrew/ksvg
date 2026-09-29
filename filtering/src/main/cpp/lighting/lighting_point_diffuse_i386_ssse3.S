@@ -183,15 +183,15 @@ SYM(ksvgLightingPointDiffuseRowSsse3Linear):
     xorps         %xmm5, %xmm5
 .Lpd_l_done:
 
-    # intensity = k * max(0, N . L)
+    # Raw FE 9.10: intensity = clamp01(dot * k); no max(dot, 0) pre-clamp.
     mulss         -124(%ebp), %xmm3
     mulss         -128(%ebp), %xmm4
     addss         %xmm4, %xmm3
     mulss         -132(%ebp), %xmm5
     addss         %xmm5, %xmm3
+    mulss         8(%eax), %xmm3  # k * dot (raw FE 9.10: no max(dot,0) pre-clamp)
     xorps         %xmm0, %xmm0
     maxss         %xmm0, %xmm3
-    mulss         8(%eax), %xmm3  # k * dot
     minss         .Lpd_one@GOTOFF(%ebx), %xmm3
     movaps        %xmm3, %xmm0
 

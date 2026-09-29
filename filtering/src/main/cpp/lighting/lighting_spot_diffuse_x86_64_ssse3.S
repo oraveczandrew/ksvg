@@ -272,7 +272,7 @@ LSPOTSSSE3_LOOP:
     shufps         $0, %xmm10, %xmm10  // xmm10 = xmm10[0,0,0,0]
     mulps          %xmm7, %xmm10
     movss          8(%r9), %xmm7  // xmm7 = mem[0],zero,zero,zero
-    maxps          %xmm1, %xmm8
+    // Raw FE 9.10: no max(dot,0) pre-clamp; final clamp01 after k*factor mul.
     addps          %xmm9, %xmm10
     xorps          %xmm9, %xmm9
     subps          %xmm10, %xmm9
@@ -284,6 +284,7 @@ LSPOTSSSE3_LOOP:
     shufps         $0, %xmm7, %xmm7  // xmm7 = xmm7[0,0,0,0]
     mulps          %xmm8, %xmm7
     mulps          %xmm10, %xmm7
+    maxps          %xmm1, %xmm7   // final lower clamp01 (raw dot*k*cutoff)
     minps          %xmm2, %xmm7
     movss          24(%r9), %xmm8  // xmm8 = mem[0],zero,zero,zero
     shufps         $0, %xmm8, %xmm8  // xmm8 = xmm8[0,0,0,0]
@@ -489,7 +490,7 @@ SYM(ksvgLightingSpotDiffuseRowSsse3Linear):
     shufps         $0, %xmm10, %xmm10  // xmm10 = xmm10[0,0,0,0]
     mulps          %xmm7, %xmm10
     movss          8(%r9), %xmm7  // xmm7 = mem[0],zero,zero,zero
-    maxps          %xmm1, %xmm8
+    // Raw FE 9.10: no max(dot,0) pre-clamp; final clamp01 after k*factor mul.
     addps          %xmm9, %xmm10
     xorps          %xmm9, %xmm9
     subps          %xmm10, %xmm9

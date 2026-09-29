@@ -131,7 +131,7 @@ SYM(ksvgLightingDistantDiffuseRowSsse3Linear):
     mulss         %xmm0, %xmm2
     mulss         %xmm0, %xmm3  # nx, ny
 
-    # intensity = k * max(0, N . L)
+    # Raw FE 9.10: intensity = clamp01(dot * k); no max(dot, 0) pre-clamp.
     # L = (lx, ly, lz) normalized.
     movl          -16(%ebp), %eax
     mulss         12(%eax), %xmm2  # nx*lx
@@ -139,9 +139,9 @@ SYM(ksvgLightingDistantDiffuseRowSsse3Linear):
     addss         %xmm3, %xmm2
     mulss         20(%eax), %xmm0
     addss         %xmm0, %xmm2  # nz=invLen, + nz*lz
+    mulss         8(%eax), %xmm2
     xorps         %xmm0, %xmm0
     maxss         %xmm0, %xmm2
-    mulss         8(%eax), %xmm2
     minss         .Ldd_one@GOTOFF(%ebx), %xmm2
     movaps        %xmm2, %xmm0
 

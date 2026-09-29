@@ -173,8 +173,8 @@
 /*
  * Description:
  *   Three-term dot product of the surface normal (nx, ny, nz) with the light
- *   direction (lx, ly, lz), clamped to [0, 1] with the k scale applied between
- *   the clamps: i = min(max(nx*lx + ny*ly + nz*lz, 0) * k, 1). The clamp
+ *   direction (lx, ly, lz), raw formula with final clamp01 only:
+ *   i = clamp01((nx*lx + ny*ly + nz*lz) * k). The clamp
  *   bounds come from memory operands (\zero/\one are literal symbols).
  *   Legacy SSE mnemonics. FP operation order matches the pre-existing
  *   distant-diffuse kernels bit-for-bit (nx accumulates).
@@ -199,8 +199,8 @@
     addps     \ny, \nx
     mulps     \lz, \nz
     addps     \nz, \nx
-    maxps     \zero(%rip), \nx
     mulps     \k, \nx
+    maxps     \zero(%rip), \nx
     minps     \one(%rip), \nx
 .endm
 
@@ -286,7 +286,7 @@ SYM(ksvgLightingDistantDiffuseRowSsse3):
     // n = (-dx, -dy, 1) / |(-dx,-dy,1)|.
     NORM_NEGXY_DIV %xmm4, %xmm5, .Lone, %xmm0, %xmm1, %xmm5, %xmm2, %xmm3
 
-    // Scalar equivalent: intensity = min(k * max(nx*lx + ny*ly + nz*lz, 0), 1)
+    // Raw FE 9.10: intensity = clamp01(dot * k); no max(dot, 0) pre-clamp.
     DOT3_K_CLAMP %xmm0, %xmm1, %xmm5, %xmm9, %xmm10, %xmm11, %xmm8, .Lzero, .Lone
 
     // Pack
@@ -350,7 +350,7 @@ SYM(ksvgLightingDistantDiffuseRowSsse3Linear):
     // n = (-dx, -dy, 1) / |(-dx,-dy,1)|.
     NORM_NEGXY_DIV %xmm4, %xmm5, .Lone, %xmm0, %xmm1, %xmm5, %xmm2, %xmm3
 
-    // Scalar equivalent: intensity = min(k * max(nx*lx + ny*ly + nz*lz, 0), 1)
+    // Raw FE 9.10: intensity = clamp01(dot * k); no max(dot, 0) pre-clamp.
     DOT3_K_CLAMP %xmm0, %xmm1, %xmm5, %xmm9, %xmm10, %xmm11, %xmm8, .Lzero, .Lone
 
     // Pack

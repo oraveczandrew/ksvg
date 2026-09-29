@@ -60,7 +60,7 @@
 //   len = sqrt(Lx^2+Ly^2+Lz^2); Lhat = (len==0) ? 0 : L/len
 //   (len==0 matches the scalar factor=0 path: L=0 -> dot=0 -> intensity 0)
 //   dot = nx*Lhatx + ny*Lhaty + nz*Lhatz  (Kotlin op order)
-//   intensity = clamp(clamp(dot,0)*k, 0, 1)
+//   intensity = clamp(dot*k, 0, 1)
 //   out = (round(lr*intensity)<<16) | (round(lg*intensity)<<8)
 //         | round(lb*intensity) | 0xFF000000
 //
@@ -435,10 +435,10 @@ ksvgLightingPointDiffuseRowNeon32:
     vld1.32 {d6}, [r12]          // d6 = [lb, ss]
     vdup.32 q14, d6[0]           // q14 = lb
 
-    // ---- intensity = min(max(dot, 0)*k, 1) ----
+    // ---- intensity = min(max(dot*k, 0), 1) ----
     veor    q15, q15, q15         // zero (transient scratch)
-    vmax.f32 q2, q2, q15
     vmul.f32 q2, q2, q8          // * k
+    vmax.f32 q2, q2, q15
     vmin.f32 q2, q2, q7          // q2 = intensity (clamp <= true 1.0)
 
     // ---- Pack ARGB ----
@@ -866,10 +866,10 @@ ksvgLightingPointDiffuseRowNeon32Linear:
     vld1.32 {d6}, [r12]          // d6 = [lb, ss]
     vdup.32 q14, d6[0]           // q14 = lb
 
-    // ---- intensity = min(max(dot, 0)*k, 1) ----
+    // ---- intensity = min(max(dot*k, 0), 1) ----
     veor    q15, q15, q15         // zero (transient scratch)
-    vmax.f32 q2, q2, q15
     vmul.f32 q2, q2, q8          // * k
+    vmax.f32 q2, q2, q15
     vmin.f32 q2, q2, q7          // q2 = intensity (clamp <= true 1.0)
 
     // ---- Pack ARGB (linear-light bytes, alpha = 0xFF) ----

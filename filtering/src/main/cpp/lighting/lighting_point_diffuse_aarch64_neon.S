@@ -61,7 +61,7 @@
 //   Lhat = L*invLen
 //   dot = (Lhatz - (dx*Lhatx + dy*Lhaty)) * rec   (negation folded, same
 //         shape as the distant kernel: dot = (N.L) with N=(-dx,-dy,1)*rec)
-//   intensity = clamp(clamp(dot,0)*k, 0, 1)
+//   intensity = clamp(dot*k, 0, 1)
 //   out = (round(lr*intensity)<<16) | (round(lg*intensity)<<8)
 //         | round(lb*intensity) | 0xFF000000
 //   round(x) for non-negative x is floor(x + 0.5) (v27 bias + fcvtzu).
@@ -262,7 +262,6 @@ ksvgLightingPointDiffuseRowNeon64:
     fmla    v3.4s, v11.4s, v7.4s
     fsub    v3.4s, v8.4s, v3.4s
     fmul    v3.4s, v3.4s, v4.4s
-    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -324,7 +323,6 @@ ksvgLightingPointDiffuseRowNeon64:
     fmla    v3.4s, v12.4s, v7.4s
     fsub    v3.4s, v8.4s, v3.4s
     fmul    v3.4s, v3.4s, v4.4s
-    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -721,7 +719,6 @@ ksvgLightingPointDiffuseRowNeon64Linear:
     fmla    v3.4s, v11.4s, v7.4s
     fsub    v3.4s, v8.4s, v3.4s
     fmul    v3.4s, v3.4s, v4.4s
-    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s
@@ -781,7 +778,6 @@ ksvgLightingPointDiffuseRowNeon64Linear:
     fmla    v3.4s, v12.4s, v7.4s
     fsub    v3.4s, v8.4s, v3.4s
     fmul    v3.4s, v3.4s, v4.4s
-    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s
     fmin    v3.4s, v3.4s, v26.4s

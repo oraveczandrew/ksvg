@@ -226,7 +226,7 @@ LSPOTAVX2_LOOP:
     vmulps       %ymm12, %ymm9, %ymm9
     vbroadcastss 56(%r9), %ymm10
     vmulps       %ymm13, %ymm10, %ymm10
-    vmaxps       %ymm2, %ymm8, %ymm8
+    // Raw FE 9.10: no max(dot,0) pre-clamp; final clamp01 after k*factor mul.
     vaddps       %ymm10, %ymm9, %ymm9
     vbroadcastss 60(%r9), %ymm10
     vmulps       %ymm11, %ymm10, %ymm10
@@ -239,6 +239,7 @@ LSPOTAVX2_LOOP:
     vbroadcastss 8(%r9), %ymm10
     vmulps       %ymm10, %ymm8, %ymm8
     vmulps       %ymm9, %ymm8, %ymm8
+    vmaxps       %ymm2, %ymm8, %ymm8  // final lower clamp01 (raw dot*k*cutoff)
     vminps       %ymm1, %ymm8, %ymm8
     vbroadcastss 24(%r9), %ymm9
     vmulps       %ymm9, %ymm8, %ymm9
@@ -406,7 +407,7 @@ SYM(ksvgLightingSpotDiffuseRowAvx2Linear):
     vmulps       %ymm12, %ymm9, %ymm9
     vbroadcastss 56(%r9), %ymm10
     vmulps       %ymm13, %ymm10, %ymm10
-    vmaxps       %ymm2, %ymm8, %ymm8
+    // Raw FE 9.10: no max(dot,0) pre-clamp; final clamp01 after k*factor mul.
     vaddps       %ymm10, %ymm9, %ymm9
     vbroadcastss 60(%r9), %ymm10
     vmulps       %ymm11, %ymm10, %ymm10

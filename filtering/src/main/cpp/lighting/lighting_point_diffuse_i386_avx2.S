@@ -260,9 +260,8 @@ CFI_START
     vandps       %ymm5, %ymm2, %ymm2
     vmulps       %ymm2, %ymm0, %ymm0
     vaddps       %ymm3, %ymm0, %ymm0
-    vxorps       %xmm4, %xmm4, %xmm4
-    vmaxps       %ymm4, %ymm0, %ymm0
     vmulps       320(%esp), %ymm0, %ymm0
+    vxorps       %xmm4, %xmm4, %xmm4
     vmaxps       %ymm4, %ymm0, %ymm0
     vminps       %ymm1, %ymm0, %ymm0
     vmulps       288(%esp), %ymm0, %ymm2
@@ -533,7 +532,6 @@ CFI_START
     vandps       32(%esp), %ymm6, %ymm3
     vmulps       %ymm3, %ymm0, %ymm0
     vaddps       %ymm2, %ymm0, %ymm0
-    vmaxps       %ymm4, %ymm0, %ymm0
     vmulps       288(%esp), %ymm0, %ymm0
     vmaxps       %ymm4, %ymm0, %ymm0
     vminps       %ymm1, %ymm0, %ymm0

@@ -202,17 +202,17 @@ SYM(ksvgLightingSpotDiffuseRowSsse3Linear):
     xorps         %xmm5, %xmm5
 .Lspd_cutDone:
 
-    # intensity = k * factor * max(0, N . L)
+    # Raw FE 9.10: intensity = clamp01(dot * k * factor); no max(dot,0) pre-clamp.
     mulss         %xmm6, %xmm1  # nx * lx
     movss         -124(%ebp), %xmm2
     mulss         %xmm7, %xmm2
     addss         %xmm2, %xmm1  # + ny * ly
     mulss         %xmm0, %xmm3
     addss         %xmm3, %xmm1  # + nz * lz (nz = invLen = xmm0)
+    mulss         8(%eax), %xmm1  # k * dot (raw: no pre-clamp)
+    mulss         %xmm5, %xmm1  # * factor
     xorps         %xmm0, %xmm0
     maxss         %xmm0, %xmm1
-    mulss         8(%eax), %xmm1  # k * dot
-    mulss         %xmm5, %xmm1  # * factor
     minss         .Lspd_one@GOTOFF(%ebx), %xmm1
     movaps        %xmm1, %xmm0
 

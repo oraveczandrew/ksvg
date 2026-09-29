@@ -260,8 +260,8 @@ inline void applyScalarPixel_full(
 
     float intensity;
     if (!isSpecular) {
-        float dot = nx * lx + ny * ly + nz * lz;
-        if (dot < 0.f) dot = 0.f;
+        // Raw FE 9.10: D = kd*N.L*L + final clamp01; no max(dot,0) pre-clamp.
+        const float dot = nx * lx + ny * ly + nz * lz;
         intensity = clamp01(dot * k * factor);
     } else {
         float hx = lx, hy = ly, hz = lz + 1.f;
@@ -342,7 +342,7 @@ inline void applyScalarDistantDiffuse(
             const float nLen = std::sqrt(nx0 * nx0 + ny0 * ny0 + 1.f);
             const float invLen = nLen != 0.f ? 1.f / nLen : 1.f;
             const float dot = (nx0 * lx + ny0 * ly + lz) * invLen;
-            const float intensity = clamp01((dot > 0.f ? dot : 0.f) * k);
+            const float intensity = clamp01(dot * k);
 
             dst[x] = packPixel(255,
                                ksvg::clamp255(lr * intensity),
@@ -371,7 +371,7 @@ inline void applyScalarDistantDiffuse(
             const float ny0 = -dzdy;
             const float invLen = 1.f / std::sqrt(nx0 * nx0 + ny0 * ny0 + 1.f);
             const float dot = (nx0 * lx + ny0 * ly + lz) * invLen;
-            const float intensity = clamp01((dot > 0.f ? dot : 0.f) * k);
+            const float intensity = clamp01(dot * k);
 
             dst[x] = packPixel(255,
                                ksvg::clamp255(lr * intensity),
@@ -400,7 +400,7 @@ inline void applyScalarDistantDiffuse(
             const float nLen = std::sqrt(nx0 * nx0 + ny0 * ny0 + 1.f);
             const float invLen = nLen != 0.f ? 1.f / nLen : 1.f;
             const float dot = (nx0 * lx + ny0 * ly + lz) * invLen;
-            const float intensity = clamp01((dot > 0.f ? dot : 0.f) * k);
+            const float intensity = clamp01(dot * k);
 
             dst[x] = packPixel(255,
                                ksvg::clamp255(lr * intensity),

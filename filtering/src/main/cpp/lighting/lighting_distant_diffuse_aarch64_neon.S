@@ -55,7 +55,7 @@
 //   nx = -dxRel*ss/invDx, ny = -dyRel*ss/invDy, nz = 1
 //   rec = rsqrt(nx^2+ny^2+1) with 2 Newton-Raphson refinements
 //   dot = lz - (dxRel*sx*lx + dyRel*sy*ly)   (negation folded into the dot)
-//   intensity = clamp(clamp(dot,0)*k, 0, 1)
+//   intensity = clamp(dot*k, 0, 1)
 //   out = (round(lr*intensity)<<16) | (round(lg*intensity)<<8)
 //         | round(lb*intensity) | 0xFF000000
 //   round(x) for non-negative x is floor(x + 0.5) (v27 bias + fcvtzu).
@@ -232,7 +232,6 @@ ksvgLightingDistantDiffuseRowNeon64:
 
     // Apply invLen and k/clamp to A.
     fmul    v3.4s, v3.4s, v4.4s
-    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -254,7 +253,6 @@ ksvgLightingDistantDiffuseRowNeon64:
 
     // Apply invLen and k/clamp to B.
     fmul    v3.4s, v1.4s, v5.4s
-    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -601,7 +599,6 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
 
     // Apply invLen and k/clamp to A.
     fmul    v3.4s, v3.4s, v4.4s
-    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)
@@ -623,7 +620,6 @@ ksvgLightingDistantDiffuseRowNeon64Linear:
 
     // Apply invLen and k/clamp to B.
     fmul    v3.4s, v1.4s, v5.4s
-    fmax    v3.4s, v3.4s, v28.4s    // clamp(dot) >= 0 before k (k may be < 0)
     fmul    v3.4s, v3.4s, v18.4s
     fmax    v3.4s, v3.4s, v28.4s      // clamp(dot*k) >= 0
     fmin    v3.4s, v3.4s, v26.4s      // clamp <= 1 (intensity)

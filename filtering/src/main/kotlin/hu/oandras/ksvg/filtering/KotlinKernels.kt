@@ -589,7 +589,7 @@ public object KotlinKernels {
                 nx /= nLen; ny /= nLen; nz /= nLen
 
                 val intensity: Float = if (!specular) {
-                    clamp((nx * lx + ny * ly + nz * lz).coerceAtLeast(0f) * k * factor, 0f, 1f)
+                    clamp((nx * lx + ny * ly + nz * lz) * k * factor, 0f, 1f)
                 } else {
                     var hx = lx
                     var hy = ly

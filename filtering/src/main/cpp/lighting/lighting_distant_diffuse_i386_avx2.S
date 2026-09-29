@@ -132,7 +132,7 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vmulps       320(%esp), %ymm0, %ymm0
     vpxor        %xmm5, %xmm5, %xmm5
     # Surface normal n = (-dx, -dy, 1) / |..|, dotted with the light
-    # direction and clamped: intensity = min(k * max(dot, 0), 1).
+    # direction, raw FE 9.10: intensity = clamp01(dot * k).
     vsubps       %ymm1, %ymm5, %ymm1
     vsubps       %ymm0, %ymm5, %ymm0
     vmulps       %ymm1, %ymm1, %ymm2
@@ -149,8 +149,8 @@ SYM(ksvgLightingDistantDiffuseRowAvx2):
     vdivps       %ymm2, %ymm3, %ymm1
     vmulps       224(%esp), %ymm1, %ymm1
     vaddps       %ymm1, %ymm0, %ymm0
-    vmaxps       %ymm0, %ymm5, %ymm0
     vmulps       192(%esp), %ymm0, %ymm0
+    vmaxps       %ymm0, %ymm5, %ymm0
     vminps       %ymm0, %ymm3, %ymm6
     vmulps       128(%esp), %ymm6, %ymm0
     vmovups      32(%esp), %ymm2
@@ -346,9 +346,9 @@ SYM(ksvgLightingDistantDiffuseRowAvx2Linear):
     vaddss       %xmm4, %xmm3, %xmm3
     vmulss       352(%esp,%edi,4), %xmm5, %xmm4
     vaddss       %xmm4, %xmm3, %xmm3
+    vmulss       28(%esp), %xmm3, %xmm3
     vxorps       %xmm4, %xmm4, %xmm4
     vmaxss       %xmm3, %xmm4, %xmm3
-    vmulss       28(%esp), %xmm3, %xmm3
     vminss       %xmm3, %xmm1, %xmm3
     vmulss       %xmm3, %xmm6, %xmm4
     vaddss       %xmm2, %xmm4, %xmm4

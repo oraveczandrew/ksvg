@@ -96,18 +96,11 @@ class SpotDiffuseLinearFuzzTest {
                         SIMD_SCALAR,
                     )
                     assertColorArrayEquals("scalar-vs-kotlin case $caseNo (w=$w k=$k rgb=${lrgb.toList()} linear=$linear)", ref, outScalar)
-                    // k<0 in sRGB mode diverges in the SHIPPED kernel (missing late
-                    // lower clamp; pre-existing, degenerate surfaceScale): skip the
-                    // vector comparisons there, the linear path clamps correctly.
-                    // NEON exception (open, documented): the NEON linear rows
-                    // still light a few scattered pixels for k<0 (dot-clamp fixed
-                    // the batch paths; the residual needs execution-level tracing,
-                    // see worklog). Skip NEON+k<0 until then.
-                    val neon = backend == SIMD_NEON64 || backend == SIMD_NEON32
-                    if (k >= 0f || (linear && !neon)) {
-                        assertColorArrayEquals("$name-vs-scalar case $caseNo (w=$w k=$k rgb=${lrgb.toList()} linear=$linear)", outScalar, out)
-                        assertColorArrayEquals("$name fuzz case $caseNo (w=$w k=$k rgb=${lrgb.toList()} linear=$linear)", ref, out)
-                    }
+                    // Raw FE 9.10: D = kd*N.L*L + final clamp01, so k<0 lights
+                    // back-faces on every backend (rsvg oracle: 378/384 px lit).
+                    // No skip: all backends implement the raw formula now.
+                    assertColorArrayEquals("$name-vs-scalar case $caseNo (w=$w k=$k rgb=${lrgb.toList()} linear=$linear)", outScalar, out)
+                    assertColorArrayEquals("$name fuzz case $caseNo (w=$w k=$k rgb=${lrgb.toList()} linear=$linear)", ref, out)
                     caseNo++
                     }
                 }

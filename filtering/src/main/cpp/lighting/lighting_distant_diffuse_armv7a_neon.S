@@ -55,7 +55,7 @@
 //   nx = -dxRel*scaleX, ny = -dyRel*scaleY, nz = 1
 //   rec = rsqrt(nx^2+ny^2+1) with 2 Newton-Raphson refinements
 //   dot = nx*rec*lx + ny*rec*ly + rec*lz
-//   intensity = clamp(clamp(dot,0)*k, 0, 1)
+//   intensity = clamp(dot*k, 0, 1)
 //   out = (round(lr*intensity)<<16) | (round(lg*intensity)<<8)
 //         | round(lb*intensity) | 0xFF000000
 //
@@ -240,10 +240,10 @@ ksvgLightingDistantDiffuseRowNeon32:
     vadd.f32 q2, q2, q15
     vmov.f32 q14, #1.0           // restore one
 
-    // ---- intensity = min(max(dot, 0)*k, 1) ----
+    // ---- intensity = min(max(dot*k, 0), 1) ----
     veor    q15, q15, q15         // zero (transient scratch)
-    vmax.f32 q2, q2, q15
     vmul.f32 q2, q2, q7
+    vmax.f32 q2, q2, q15
     vmin.f32 q2, q2, q14          // q2 = intensity
 
     // ---- Pack ARGB ----
@@ -508,10 +508,10 @@ ksvgLightingDistantDiffuseRowNeon32Linear:
     vadd.f32 q2, q2, q15
     vmov.f32 q14, #1.0           // restore one
 
-    // ---- intensity = min(max(dot, 0)*k, 1) ----
+    // ---- intensity = min(max(dot*k, 0), 1) ----
     veor    q15, q15, q15         // zero (transient scratch)
-    vmax.f32 q2, q2, q15
     vmul.f32 q2, q2, q7
+    vmax.f32 q2, q2, q15
     vmin.f32 q2, q2, q14          // q2 = intensity
 
     // ---- Pack ARGB (linear-light bytes, alpha = 0xFF) ----
