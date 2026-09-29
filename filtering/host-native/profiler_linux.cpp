@@ -118,7 +118,9 @@ Java_hu_oandras_ksvg_filtering_LinuxHardwareProfiler_nativeStop(JNIEnv *env, job
     uint64_t cycles = 0, instructions = 0;
     if (read(group->fd_cycles, &cycles, sizeof(uint64_t)) != sizeof(uint64_t)) return nullptr;
     if (group->fd_instructions != -1) {
-        read(group->fd_instructions, &instructions, sizeof(uint64_t));
+        if (read(group->fd_instructions, &instructions, sizeof(uint64_t)) != sizeof(uint64_t)) {
+            instructions = 0;
+        }
     }
 
     jlongArray result = env->NewLongArray(2);
