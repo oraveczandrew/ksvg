@@ -26,6 +26,7 @@ import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Pattern
 import hu.oandras.ksvg.dom.core.SolidColor
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.gradient.Gradient
 import hu.oandras.ksvg.dom.gradient.GradientLinear
 import hu.oandras.ksvg.dom.gradient.GradientRadial
@@ -66,6 +67,15 @@ internal sealed class ResolvedPaint {
         var densePositions: FloatArray = FloatArray(0)
         @JvmField
         var shader: LinearGradient? = null
+
+        /**
+         * Effective `color-interpolation` the dense stops / shader were
+         * last built for. Gates the linearRGB densify and the shader
+         * rebuild on mode change (stop colors alone would not notice it).
+         */
+        @JvmField
+        @ColorInterpolation
+        var lastInterpolation: Int = ColorInterpolation.UNSPECIFIED
 
         private var colorsHash = 0
         private var positionsHash = 0
@@ -143,6 +153,13 @@ internal sealed class ResolvedPaint {
          */
         @JvmField
         var shader: Shader? = null
+        /**
+         * Effective `color-interpolation` the dense stops / shader were
+         * last built for (same gate role as [Linear.lastInterpolation]).
+         */
+        @JvmField
+        @ColorInterpolation
+        var lastInterpolation: Int = ColorInterpolation.UNSPECIFIED
         /**
          * Focal-bake raster (API < 31 only): the gradient rasterized by
          * [focalGradientT] over the referencing element's bounding box

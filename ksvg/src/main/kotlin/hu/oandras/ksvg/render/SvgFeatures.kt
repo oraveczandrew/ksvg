@@ -57,7 +57,7 @@ internal fun isSupportedFeature(feature: String): Boolean {
         "ViewportAttribute", // YES
         "Shape", // YES
         "BasicText", // YES
-        "PaintAttribute", // YES (except color-interpolation and color-rendering)
+        "PaintAttribute", // YES (except color-rendering; color-interpolation honored for gradients)
         "BasicPaintAttribute", // YES (except color-rendering)
         "OpacityAttribute", // YES
         "GraphicsAttribute", // YES

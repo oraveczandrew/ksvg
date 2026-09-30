@@ -16,6 +16,12 @@
 
 package hu.oandras.ksvg.render
 
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
+import kotlin.math.pow
+
 /**
  * Straight-space gradient stop densification (F2).
  *
@@ -37,9 +43,9 @@ internal const val GRADIENT_DENSE_SUBDIVISIONS: Int = 16
  */
 internal fun needsDensify(colors: IntArray, count: Int): Boolean {
     if (count < 2) return false
-    val a0 = colors[0] ushr 24
+    val a0 = colors[0].alpha
     for (i in 1 until count) {
-        if ((colors[i] ushr 24) != a0) return true
+        if (colors[i].alpha != a0) return true
     }
     return false
 }
@@ -68,14 +74,14 @@ internal fun densifyStops(
         val c1 = srcColors[i + 1]
         val p0 = srcPos[i]
         val p1 = srcPos[i + 1]
-        val a0 = c0 ushr 24
-        val r0 = c0 shr 16 and 0xff
-        val g0 = c0 shr 8 and 0xff
-        val b0 = c0 and 0xff
-        val a1 = c1 ushr 24
-        val r1 = c1 shr 16 and 0xff
-        val g1 = c1 shr 8 and 0xff
-        val b1 = c1 and 0xff
+        val a0 = c0.alpha
+        val r0 = c0.red
+        val g0 = c0.green
+        val b0 = c0.blue
+        val a1 = c1.alpha
+        val r1 = c1.red
+        val g1 = c1.green
+        val b1 = c1.blue
         for (j in 0 until k) {
             val w1 = j
             val w0 = k - j
@@ -89,4 +95,81 @@ internal fun densifyStops(
     }
     dstColors[d] = srcColors[count - 1]
     dstPos[d] = srcPos[count - 1]
+}
+
+/**
+ * Linear-RGB densification for `color-interpolation="linearRGB"` gradients.
+ *
+ * Same structural trick as [densifyStops] (subdivide so the platform's
+ * encoded-space lerp approximates the spec interpolation with O(1/N²)
+ * error), but the subdivision lerp runs in linearized space: endpoints are
+ * linearized once per segment, sub-stops are lerped in linear + straight
+ * alpha, then encoded back to sRGB. Alpha is not gamma-encoded, so it
+ * lerps straight like in [densifyStops].
+ *
+ * Unlike [needsDensify], linearRGB always densifies (even uniform-alpha):
+ * gamma-lerp and linear-lerp differ for opaque stops too.
+ *
+ * Float (not LUT) math: 8-bit linear steps are far too coarse in dark
+ * tones. Callers gate on color/mode change (see `lastInterpolation` in
+ * `ResolvedPaint`), so the `pow` cost lands on shader rebuilds, never on
+ * steady-state frames. No allocation.
+ */
+internal fun densifyStopsLinear(
+    srcColors: IntArray,
+    srcPos: FloatArray,
+    count: Int,
+    dstColors: IntArray,
+    dstPos: FloatArray,
+) {
+    val k = GRADIENT_DENSE_SUBDIVISIONS
+    var d = 0
+    for (i in 0 until count - 1) {
+        val c0 = srcColors[i]
+        val c1 = srcColors[i + 1]
+        val p0 = srcPos[i]
+        val p1 = srcPos[i + 1]
+        val a0 = c0.alpha.toFloat()
+        val r0 = srgbToLinear(c0.red)
+        val g0 = srgbToLinear(c0.green)
+        val b0 = srgbToLinear(c0.blue)
+        val a1 = c1.alpha.toFloat()
+        val r1 = srgbToLinear(c1.red)
+        val g1 = srgbToLinear(c1.green)
+        val b1 = srgbToLinear(c1.blue)
+        val pStep = (p1 - p0) / k
+        for (j in 0 until k) {
+            val t = j.toFloat() / k
+            val a = (a0 + (a1 - a0) * t + 0.5f).toInt()
+            dstColors[d] = (a shl 24) or
+                (linearToSrgb(r0 + (r1 - r0) * t) shl 16) or
+                (linearToSrgb(g0 + (g1 - g0) * t) shl 8) or
+                linearToSrgb(b0 + (b1 - b0) * t)
+            dstPos[d] = p0 + pStep * j
+            d++
+        }
+    }
+    dstColors[d] = srcColors[count - 1]
+    dstPos[d] = srcPos[count - 1]
+}
+
+/** sRGB 0..255 channel to linear 0..1 (exact transfer, not the 8-bit LUT). */
+internal fun srgbToLinear(c: Int): Float {
+    val v = c / 255.0
+    return if (v <= 0.04045) {
+        (v / 12.92).toFloat()
+    } else {
+        ((v + 0.055) / 1.055).pow(2.4).toFloat()
+    }
+}
+
+/** Linear 0..1 to sRGB 0..255 (exact transfer, half-up rounded, clamped). */
+internal fun linearToSrgb(l: Float): Int {
+    val v = l.toDouble().coerceIn(0.0, 1.0)
+    val s = if (v <= 0.0031308) {
+        12.92 * v
+    } else {
+        1.055 * v.pow(1.0 / 2.4) - 0.055
+    }
+    return (s * 255.0 + 0.5).toInt().coerceIn(0, 255)
 }

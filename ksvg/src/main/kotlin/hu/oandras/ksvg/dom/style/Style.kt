@@ -176,6 +176,9 @@ internal class Style internal constructor(
     @JvmField
     @ColorInterpolation
     val colorInterpolationFilters: Int,
+    @JvmField
+    @ColorInterpolation
+    val colorInterpolation: Int,
     @JvmField val letterSpacing: CSSLength?,
     @JvmField val wordSpacing: CSSLength?,
 
@@ -265,6 +268,7 @@ internal class Style internal constructor(
         glyphOrientationVertical = null,
         textOrientation = null,
         colorInterpolationFilters = ColorInterpolation.UNSPECIFIED,
+        colorInterpolation = ColorInterpolation.UNSPECIFIED,
         letterSpacing = null,
         wordSpacing = null,
         paintOrder = PaintOrder.FILL_STROKE_MARKERS,
@@ -457,6 +461,9 @@ internal class Style internal constructor(
         @ColorInterpolation
         var colorInterpolationFilters: Int = ColorInterpolation.UNSPECIFIED
         @JvmField
+        @ColorInterpolation
+        var colorInterpolation: Int = ColorInterpolation.UNSPECIFIED
+        @JvmField
         var letterSpacing: CSSLength? = null
         @JvmField
         var wordSpacing: CSSLength? = null
@@ -598,6 +605,7 @@ internal class Style internal constructor(
             this.glyphOrientationVertical = original.glyphOrientationVertical
             this.textOrientation = original.textOrientation
             this.colorInterpolationFilters = original.colorInterpolationFilters
+            this.colorInterpolation = original.colorInterpolation
             this.letterSpacing = original.letterSpacing
             this.wordSpacing = original.wordSpacing
             this.paintOrder = original.paintOrder
@@ -688,6 +696,7 @@ internal class Style internal constructor(
                 glyphOrientationVertical = glyphOrientationVertical,
                 textOrientation = textOrientation,
                 colorInterpolationFilters = colorInterpolationFilters,
+                colorInterpolation = colorInterpolation,
                 letterSpacing = letterSpacing,
                 wordSpacing = wordSpacing,
                 paintOrder = paintOrder,
@@ -775,6 +784,7 @@ internal class Style internal constructor(
                     glyphOrientationVertical == original.glyphOrientationVertical &&
                     textOrientation == original.textOrientation &&
                     colorInterpolationFilters == original.colorInterpolationFilters &&
+                    colorInterpolation == original.colorInterpolation &&
                     letterSpacing == original.letterSpacing &&
                     wordSpacing == original.wordSpacing
         }
@@ -857,7 +867,8 @@ internal class Style internal constructor(
         flag = true,
         value = [
             SPECIFIED_PAINT_ORDER,
-            SPECIFIED_ENABLE_BACKGROUND
+            SPECIFIED_ENABLE_BACKGROUND,
+            SPECIFIED_COLOR_INTERPOLATION
         ]
     )
     annotation class SpecifiedFlags2
@@ -953,6 +964,8 @@ internal class Style internal constructor(
         textOrientation: TextOrientation? = this.textOrientation,
         @ColorInterpolation
         colorInterpolationFilters: Int = this.colorInterpolationFilters,
+        @ColorInterpolation
+        colorInterpolation: Int = this.colorInterpolation,
         letterSpacing: CSSLength? = this.letterSpacing,
         wordSpacing: CSSLength? = this.wordSpacing,
     ): Style {
@@ -1026,6 +1039,7 @@ internal class Style internal constructor(
             glyphOrientationVertical = glyphOrientationVertical,
             textOrientation = textOrientation,
             colorInterpolationFilters = colorInterpolationFilters,
+            colorInterpolation = colorInterpolation,
             letterSpacing = letterSpacing,
             wordSpacing = wordSpacing,
             paintOrder = paintOrder,
@@ -1166,6 +1180,8 @@ internal class Style internal constructor(
             append(textOrientation)
             append(", colorInterpolationFilters=")
             append(colorInterpolationFilters)
+            append(", colorInterpolation=")
+            append(colorInterpolation)
             append(", letterSpacing=")
             append(letterSpacing)
             append(", wordSpacing=")
@@ -1256,6 +1272,7 @@ internal class Style internal constructor(
         // Second flag group (specifiedFlags2) — the first 64 bits are exhausted.
         const val SPECIFIED_PAINT_ORDER: Long = 1L shl 0
         const val SPECIFIED_ENABLE_BACKGROUND: Long = 1L shl 1
+        const val SPECIFIED_COLOR_INTERPOLATION: Long = 1L shl 2
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1659,6 +1676,15 @@ internal class Style internal constructor(
                     }
                 }
 
+                SVGAttr.color_interpolation -> {
+                    // Inherited; a presentation attribute (SVG 1.1), so both paths parse it.
+                    val mode = ColorInterpolation.parse(value)
+                    if (mode != ColorInterpolation.UNSPECIFIED) {
+                        builder.colorInterpolation = mode
+                        builder.addSpecifiedFlag2(SPECIFIED_COLOR_INTERPOLATION)
+                    }
+                }
+
                 SVGAttr.filter -> {
                     val filter = parseFunctionalIRI(value)
                     builder.filter = filter
@@ -1858,6 +1884,7 @@ internal class Style internal constructor(
             SVGAttr.clip_path -> SPECIFIED_CLIP_PATH
             SVGAttr.clip_rule -> SPECIFIED_CLIP_RULE
             SVGAttr.color -> SPECIFIED_COLOR
+            SVGAttr.color_interpolation -> SPECIFIED_COLOR_INTERPOLATION
             SVGAttr.color_interpolation_filters -> SPECIFIED_COLOR_INTERPOLATION_FILTERS
             SVGAttr.direction -> SPECIFIED_DIRECTION
             SVGAttr.display -> SPECIFIED_DISPLAY

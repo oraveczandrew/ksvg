@@ -60,6 +60,7 @@ import hu.oandras.ksvg.dom.core.SolidColor
 import hu.oandras.ksvg.dom.core.Svg
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.core.Symbol
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.gradient.GradientSpread
 import hu.oandras.ksvg.dom.shapes.LineShape
 import hu.oandras.ksvg.dom.shapes.PathShape
@@ -1915,6 +1916,13 @@ internal class Renderer internal constructor(
             // Set the style for the gradient (inherits from its own ancestors, not from callee's state)
             switchState(findInheritFromAncestorState(gradient, resolved.ancestorAnimationNodes))
 
+            // Effective color-interpolation for this gradient: own
+            // declarations win over inherited ones via the state above.
+            // AUTO/unspecified behave as sRGB (spec initial); LINEAR_RGB
+            // densifies in linearized space below.
+            val interpolation = state.style.colorInterpolation
+            val linearStops = interpolation == ColorInterpolation.LINEAR_RGB
+
             matrixPool.withPooledObject { m ->
                 // Calculate the gradient transform matrix
                 if (!userUnits) {
@@ -1986,9 +1994,26 @@ internal class Renderer internal constructor(
                 // straight-lerped stops; uniform-alpha gradients keep the
                 // exact existing arrays (colorsChanged() still hashes the
                 // straight stops, so shader caching is untouched).
+                // linearRGB always densifies (gamma-lerp differs even when
+                // opaque): the subdivision lerp runs linearized, encoded
+                // back to sRGB, so the platform lerp approximates it with
+                // O(1/N²) error. The pow math runs only when stops or mode
+                // changed (lastInterpolation gate); steady frames reuse it.
                 val effColors: IntArray
                 val effPositions: FloatArray
-                if (needsDensify(colors, numStops)) {
+                val interpolationChanged = resolved.lastInterpolation != interpolation
+                if (linearStops) {
+                    val m = denseCount(numStops)
+                    if (resolved.denseColors.size != m) {
+                        resolved.denseColors = IntArray(m)
+                        resolved.densePositions = FloatArray(m)
+                    }
+                    if (resolved.colorsChanged() || interpolationChanged) {
+                        densifyStopsLinear(colors, positions, numStops, resolved.denseColors, resolved.densePositions)
+                    }
+                    effColors = resolved.denseColors
+                    effPositions = resolved.densePositions
+                } else if (needsDensify(colors, numStops)) {
                     val m = denseCount(numStops)
                     if (resolved.denseColors.size != m) {
                         resolved.denseColors = IntArray(m)
@@ -2014,7 +2039,8 @@ internal class Renderer internal constructor(
                 val gr = if (
                     resolved.updateGeometry(_x1, _y1, _x2, _y2, tileMode) ||
                     prevGradient == null ||
-                    resolved.colorsChanged()
+                    resolved.colorsChanged() ||
+                    interpolationChanged
                 ) {
                     LinearGradient(_x1, _y1, _x2, _y2, effColors, effPositions, tileMode).also {
                         resolved.shader = it
@@ -2023,6 +2049,7 @@ internal class Renderer internal constructor(
                 } else {
                     prevGradient
                 }
+                resolved.lastInterpolation = interpolation
                 gr.setLocalMatrix(m)
                 paint.setShader(gr)
                 paint.alpha = clamp255(paintOpacity * 255f)
@@ -2096,6 +2123,10 @@ internal class Renderer internal constructor(
         try {
             // Set the style for the gradient (inherits from its own ancestors, not from callee's state)
             switchState(findInheritFromAncestorState(gradient, resolved.ancestorAnimationNodes))
+
+            // Effective color-interpolation, same semantics as the linear path.
+            val interpolation = state.style.colorInterpolation
+            val linearStops = interpolation == ColorInterpolation.LINEAR_RGB
 
             matrixPool.withPooledObject { m ->
                 // Calculate the gradient transform matrix
@@ -2191,10 +2222,13 @@ internal class Renderer internal constructor(
                 // Straight-space correction: like the linear path, but
                 // the write-only GradientColorArray cannot feed expansion —
                 // densify from the straight mirror into flavor-matched dense
-                // storage (extra pack pass, no allocation).
+                // storage (extra pack pass, no allocation). linearRGB always
+                // densifies via the linearized subdivision (see linear path).
                 val effColors: GradientColorArray
                 val effPositions: FloatArray
-                val densified = needsDensify(straightColors, numStops)
+                val interpolationChanged = resolved.lastInterpolation != interpolation
+                val linearDensified = linearStops
+                val densified = linearDensified || needsDensify(straightColors, numStops)
                 if (densified) {
                     val m = denseCount(numStops)
                     var dense = resolved.denseColors
@@ -2210,10 +2244,19 @@ internal class Renderer internal constructor(
                     if (resolved.denseInts.size != m) {
                         resolved.denseInts = IntArray(m)
                     }
-                    densifyStops(
-                        straightColors, positions, numStops,
-                        resolved.denseInts, resolved.densePositions,
-                    )
+                    if (resolved.colorsChanged() || interpolationChanged) {
+                        if (linearDensified) {
+                            densifyStopsLinear(
+                                straightColors, positions, numStops,
+                                resolved.denseInts, resolved.densePositions,
+                            )
+                        } else {
+                            densifyStops(
+                                straightColors, positions, numStops,
+                                resolved.denseInts, resolved.densePositions,
+                            )
+                        }
+                    }
                     for (i in 0 until m) {
                         dense[i] = resolved.denseInts[i]
                     }
@@ -2261,6 +2304,7 @@ internal class Renderer internal constructor(
                     resolved.updateGeometry(_cx, _cy, _r, _fx, _fy, _fr, tileMode) ||
                     prevGradient == null ||
                     resolved.colorsChanged() ||
+                    interpolationChanged ||
                     (needsFocalBake && resolved.bakeRegionChanged(bakeW, bakeH, bakeX, bakeY))
                 ) {
                     if (needsFocalBake) {
@@ -2304,6 +2348,7 @@ internal class Renderer internal constructor(
                 } else {
                     prevGradient
                 }
+                resolved.lastInterpolation = interpolation
                 if (needsFocalBake) {
                     // The bake bitmap lives in texel space, not gradient space:
                     // map unit (0..1) across the referencing bbox onto texels

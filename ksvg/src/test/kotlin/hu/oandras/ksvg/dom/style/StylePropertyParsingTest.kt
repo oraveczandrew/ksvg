@@ -19,6 +19,7 @@ package hu.oandras.ksvg.dom.style
 import hu.oandras.ksvg.NoopLoggerContext
 import hu.oandras.ksvg.assertIs
 import hu.oandras.ksvg.css.CSSLength
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.text.TextAnchor
 import hu.oandras.ksvg.dom.text.TextDecoration
 import hu.oandras.ksvg.dom.text.TextDirection
@@ -1168,6 +1169,54 @@ class StylePropertyParsingTest {
         builder.reset(Style())
         builder.resetNonInheritingProperties(isRootSVG = false)
         assertEquals(EnableBackground.Accumulate, builder.enableBackground)
+    }
+
+    // --- color-interpolation (presentation attribute AND style, inherited) ---
+
+    @Test
+    fun testColorInterpolationLinearRgb() {
+        val s = process("color-interpolation", "linearRGB").buildAndGet()
+        assertEquals(ColorInterpolation.LINEAR_RGB, s.colorInterpolation)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_COLOR_INTERPOLATION))
+    }
+
+    @Test
+    fun testColorInterpolationLinearRgbFromAttribute() {
+        // color-interpolation IS a presentation attribute (SVG 1.1).
+        val s = process("color-interpolation", "linearRGB", isFromAttribute = true).buildAndGet()
+        assertEquals(ColorInterpolation.LINEAR_RGB, s.colorInterpolation)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_COLOR_INTERPOLATION))
+    }
+
+    @Test
+    fun testColorInterpolationSrgbAndAuto() {
+        assertEquals(
+            ColorInterpolation.SRGB,
+            process("color-interpolation", "sRGB").buildAndGet().colorInterpolation,
+        )
+        assertEquals(
+            ColorInterpolation.AUTO,
+            process("color-interpolation", "auto").buildAndGet().colorInterpolation,
+        )
+    }
+
+    @Test
+    fun testColorInterpolationInvalid() {
+        for (value in listOf("banana", "linear-rgb", "")) {
+            val s = process("color-interpolation", value).buildAndGet()
+            assertFalse(specified(s.specifiedFlags2, Style.SPECIFIED_COLOR_INTERPOLATION))
+            assertEquals(ColorInterpolation.UNSPECIFIED, s.colorInterpolation)
+        }
+    }
+
+    @Test
+    fun testColorInterpolationDefaultUnspecified() {
+        // Inherited: no reset in resetNonInheritingProperties; fresh styles stay unspecified.
+        val builder = Style.Builder()
+        builder.reset(Style())
+        builder.resetNonInheritingProperties(isRootSVG = false)
+        assertEquals(ColorInterpolation.UNSPECIFIED, builder.colorInterpolation)
+        assertEquals(ColorInterpolation.UNSPECIFIED, Style().colorInterpolation)
     }
 
     // --- mask-type ---

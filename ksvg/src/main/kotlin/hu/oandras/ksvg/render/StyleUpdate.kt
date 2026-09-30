@@ -498,6 +498,10 @@ internal fun updateStyle(
         builder.enableBackground = sourceStyle.enableBackground
     }
 
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_COLOR_INTERPOLATION)) {
+        builder.colorInterpolation = sourceStyle.colorInterpolation
+    }
+
     builder.addSpecifiedFlag(sourceStyle.specifiedFlags and sourceStyle.suppressedFlags.inv())
     builder.addSpecifiedFlag2(sourceStyle.specifiedFlags2)
 }

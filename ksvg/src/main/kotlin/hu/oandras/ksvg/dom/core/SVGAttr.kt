@@ -37,6 +37,7 @@ internal enum class SVGAttr {
     clipPathUnits,
     clip_rule,
     color,
+    color_interpolation,
     color_interpolation_filters,
     cx, cy,
     direction,
@@ -208,6 +209,7 @@ internal enum class SVGAttr {
             "clipPathUnits" -> clipPathUnits
             "clip-rule" -> clip_rule
             "color" -> color
+            "color-interpolation" -> color_interpolation
             "color-interpolation-filters" -> color_interpolation_filters
             "cx" -> cx
             "cy" -> cy
