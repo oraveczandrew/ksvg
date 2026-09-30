@@ -20,8 +20,7 @@ import android.os.Build
 import java.io.File
 
 /**
- * Best-effort CPU and SoC metadata for the benchmark environment (spec §10, §11;
- * TEST_HARNESS_PLAN Step 6).
+ * Best-effort CPU and SoC metadata for the benchmark environment.
  *
  * SoC fields (`SOC_MANUFACTURER`, `SOC_MODEL`) are API 31+; the frequency read is a
  * best-effort file I/O of `cpu0/cpufreq/scaling_cur_freq` that may be absent or denied

@@ -52,7 +52,7 @@ public object StackBlur {
      * High quality, fast alternative to Gaussian Blur.
      * Reusable buffers must be provided by the caller through a scratch object.
      *
-     * Straight-in → premultiplied-out (F1): taps are weighted premultiplied
+     * Straight-in → premultiplied-out: taps are weighted premultiplied
      * exactly ONCE across both separable passes (the first executed pass
      * premultiplies, the second blurs premultiplied channels directly —
      * premultiplying per pass would square alpha). The caller unpremultiplies
@@ -116,7 +116,7 @@ public object StackBlur {
                 val p = sample(pix, w, i, innerMax, horizontal, j)
                 val a = p shr 24 and 0xff
                 val sir = stack[j + radius]
-                // Single premultiply across passes (F1): premultiply here
+                // Single premultiply across passes: premultiply here
                 // only when the input is still straight; the second pass
                 // receives premultiplied channels and must blur them as-is.
                 sir[0] = a

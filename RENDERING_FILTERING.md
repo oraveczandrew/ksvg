@@ -458,7 +458,7 @@ emulated x86 environments.
 
 Methodology note: for everything except Morphology, `ms` is the raw-runner
 **average** (2026-09-02); the Morphology rows come from the stable `nativeBenchmark { }`
-harness (spec §6.2, median of 5 batches with warmup + thermal gating + batch-CV
+harness (median of 5 batches with warmup + thermal gating + batch-CV
 classifier, measured 2026-09-05 on the same OnePlus 12 / SM8550). Scalar-vs-SIMD
 speedups are only directly comparable within the same run (CPU-frequency/thermal
 drift makes cross-session absolute times differ — e.g. Morphology scalar 512² was
@@ -483,15 +483,14 @@ path measured **0.44x** vs scalar.
 
 A stable, long-running **harness** for comparing native/NEON kernel work (e.g. `old
 assembly vs new assembly`) lives in `filtering/src/androidTest/.../benchmark/`
-(`NativeBenchmarkHarness.kt`, DSL `nativeBenchmark { }`; spec = `tmp/TEST_HARNESS.md`,
-plan = `TEST_HARNESS_PLAN.md`, findings = `tmp/TEST_HARNESS_WORKLOG.md`). The device
+(`NativeBenchmarkHarness.kt`, DSL `nativeBenchmark { }`). The device
 kernel benchmark (`KernelPerformanceDeviceBenchmark`, §6.1) runs every filter kernel
 (UnLinearize, ComponentTransfer, Morphology, ArithmeticComposite non-linear + linear,
 ConvolveMatrix, DisplacementMap, Lighting, Turbulence, GaussianBlur) through it — the
 Morphology-only `TurbulenceNativeHarnessBenchmark` was the step-7 precursor and was
 removed once the general driver landed.
 
-It provides, per benchmark block (measured region = **only the JNI call**, spec §20):
+It provides, per benchmark block (measured region = **only the JNI call**):
 
 - foreground `BenchmarkActivity` + focus wait (the window is held by the same process
   that loads `libksvgfilters`),
@@ -516,9 +515,9 @@ It provides, per benchmark block (measured region = **only the JNI call**, spec 
   are tracked,
 - per-sample statistics (`BenchmarkStats`: min/median/mean/max/p90/p95/p99/stddev;
   compare by median → p90 → min),
-- classification (spec §15): `VALID / THERMAL_THROTTLED / THERMAL_RECOVERY /
+- classification: `VALID / THERMAL_THROTTLED / THERMAL_RECOVERY /
   UNSTABLE / INSUFFICIENT_SAMPLES`, `isValid` flag (batch-average CV > 5% → `UNSTABLE`),
-- environment report (spec §16): device/model/abi/coreCount, SoC (`CpuInfo`:
+- environment report: device/model/abi/coreCount, SoC (`CpuInfo`:
   QTI SM8550 on the test device), sustained-mode result, `thermalStatusBefore/After`,
   `invalidatedBatches`/`cooldownTimeMs`, best-effort sysfs CPU frequency
   `cpuFreqBeforeKhz`/`cpuFreqAfterKhz`, `cpuAffinityControlAvailable` (always `false`,
@@ -553,8 +552,8 @@ adb -s adbca122 logcat -d -s System.out
 `KernelPerformanceDeviceBenchmark` covers every native backend (scalar, neon64, …) ×
 both sizes (512² / 2048²; quick = 512² only) per kernel and honours the
 `benchmark.kernel` / `benchmark.quick` args. Buffer reuse means the measured region is
-exactly the JNI call (spec §20). The raw-vs-harness comparison lives in
-`HarnessValidationRawTest` (spec §22). Console output example:
+exactly the JNI call. The raw-vs-harness comparison lives in
+`HarnessValidationRawTest`. Console output example:
 
 ```text
 === Benchmark: Turbulence (neon64) 512x512 ===

@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
 /**
- * Host-side snapshot of the round-B displacement-map SVG builder.
+ * Host-side snapshot of the corpus displacement\-map SVG builder.
  */
 @RunWith(JUnit4::class)
 class DisplacementMapParitySvgTest {

@@ -27,15 +27,15 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-B pilot (`tmp/GPU_PARITY_PLAN_B.md` §5.1-5.2): corpus-driven
+ * Corpus pilot: corpus-driven
  * single-primitive coverage for `feMorphology`.
  *
  * Each [MorphologyValidationCorpus.Case] becomes an SVG via
  * [MorphologyParitySvg] (input pixels travel as a PNG data-URI `<image>`)
- * and is measured SW-vs-HW with the round-A gates ([assertParity] strict,
+ * and is measured SW-vs-HW with the strict gates ([assertParity],
  * [assertVisibleFilterEffect] against the unfiltered baseline).
  *
- * Quantity control (plan §4): the PR gate runs the curated [CURATED] edge
+ * Quantity control: the PR gate runs the curated [CURATED] edge
  * representatives; `-e gpu_parity_full true` runs the whole corpus
  * (nightly); `-e gpu_parity_filter <substring>` selects by case name.
  * (Underscore keys: dots break `am instrument -e` parsing.)
@@ -60,7 +60,7 @@ class GpuMorphologyCorpusParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E chain-taken proof.
+        // Chain-taken proof.
         assertChainBackend(name, minGpuApi = 33)
         assertParity(
             name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",

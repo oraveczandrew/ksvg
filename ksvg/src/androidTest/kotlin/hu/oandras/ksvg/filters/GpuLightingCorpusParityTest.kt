@@ -26,9 +26,9 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-B corpus coverage for `feDiffuseLighting`/`feSpecularLighting`
- * (`tmp/GPU_PARITY_PLAN_B.md` §2): each [LightingValidationCorpus.Case]
- * becomes an SVG via [LightingParitySvg] and is measured SW-vs-HW.
+ * Corpus coverage for `feDiffuseLighting`/`feSpecularLighting`: each
+ * [LightingValidationCorpus.Case] becomes an SVG via [LightingParitySvg]
+ * and is measured SW-vs-HW.
  *
  * Two deliberate deviations from the other corpus runners:
  * - NO `opaqueInput`: the height map is read from ALPHA on both sides,
@@ -63,10 +63,10 @@ class GpuLightingCorpusParityTest(
             unfiltered = renderSoftware(corpusBaseline(svg), case.width, case.height)
         )
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E chain-taken proof (lightless cases pass through on GPU
-        // since F3 — still a taken chain, not a decline).
+        // Chain-taken proof (lightless cases pass through on GPU
+        // — still a taken chain, not a decline).
         assertChainBackend(name, minGpuApi = 33)
-        // Per-case gates (all Adreno-measured, see GPU_ROUNDB_LIGHT_WORKLOG):
+        // Per-case gates (all Adreno-measured):
         // - point specular (sRGB + linear): fp intensity noise amplified by
         //   exponent 20 (10 scattered ±4 alpha pixels, RGB exact).
         // - point diffuse non-linear: 2 scattered ±3 pixels (fp normals).
@@ -112,12 +112,12 @@ class GpuLightingCorpusParityTest(
                 "GpuLightingCorpusParityTest: no cases selected " +
                     "(filter=$nameFilter, curated=${CURATED.size}, corpus=${LightingValidationCorpus.cases.size})"
             }
-            // Excluded (see GPU_ROUNDB_LIGHT_WORKLOG.md): spot specular
+            // Excluded: spot specular
             // premult — single exact-corner pixel (0,0) where CPU intensity
             // is exactly 0 (transparent-black) and the GPU has fp dust
             // (white, alpha 1); everything else matches within fp noise.
             // Representation (premult-white, 255/256 px) is proven by the
-            // passing pixels + Round-A specular; the NaN-cone path agrees
+            // passing pixels + isolated-primitive specular; the NaN-cone path agrees
             // trivially (no cone logic on either side here).
             return cases
                 .filter { it.name != "spot specular premult 16x16" }

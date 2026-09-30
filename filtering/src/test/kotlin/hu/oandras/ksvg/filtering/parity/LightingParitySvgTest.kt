@@ -24,7 +24,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
 /**
- * Host-side snapshot of the round-B lighting SVG builder.
+ * Host-side snapshot of the corpus lighting SVG builder.
  */
 @RunWith(JUnit4::class)
 class LightingParitySvgTest {

@@ -32,19 +32,19 @@ import hu.oandras.ksvg.render.FeImageRenderNode
  * filter-region origin (mirroring the CPU kernel, which returns the bitmap
  * unscaled and unclipped), transparent outside the image bounds (the CPU
  * output carries no content there either — verified against the software
- * bitmap, C20 precedent). Edge clamping inside the bounds is exact at
- * integer texel centers.
+ * bitmap when this step was added). Edge clamping inside the bounds is
+ * exact at integer texel centers.
  *
  * Premultiplied note (standard across this package): the GPU texture
  * upload premultiplies, so translucent raster sources read back darker
- * than the CPU straight bytes. Round-B/C image inputs stay opaque
+ * than the CPU straight bytes. Corpus image inputs stay opaque
  * (`opaqueInput`), where premultiplied == straight and the comparison is
  * exact.
  */
 private const val IMAGE_SHADER: String = """
             // uInput is declared (not read): the effect wrapper binds the
             // chain input under this name, and an undeclared uniform aborts
-            // in nativeCreateRuntimeShaderEffect (C20 lesson). The primitive
+            // effect creation. The primitive
             // is generative; the pixels come from uImage alone.
             uniform shader uInput;
             uniform shader uImage;
@@ -67,8 +67,8 @@ private const val IMAGE_SHADER: String = """
  * The primitive is generative (ignores its input): the caller registers
  * the shader but does NOT chain the effect. Returns null when there is no
  * decoded bitmap (missing file, unresolvable href — including element
- * references, whose `referencedNode` only the CPU backend rasterizes
- * (F10)): the caller declines so software renders instead.
+ * references, whose `referencedNode` only the CPU backend rasterizes):
+ * the caller declines so software renders instead.
  *
  * @param node the image render node (decoded bitmap)
  * @param padX padY the device-space padding of the filter region top-left

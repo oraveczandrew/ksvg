@@ -25,7 +25,7 @@ import hu.oandras.ksvg.filtering.getTestTargetContext
 
 /**
  * Device implementation of [KernelBenchmarkSink]: every cell runs through the stable
- * `nativeBenchmark { }` harness (spec `tmp/TEST_HARNESS.md`; TEST_HARNESS_PLAN) as its own
+ * `nativeBenchmark { }` harness as its own
  * harness block, so every cell shares the same stabilizers (foreground window + focus wait,
  * thread-priority bump, warmup, per-batch cache normalization, optional warmup-calibrated
  * batch counts, thermal gating with cooldown/retry, and the five-way classification

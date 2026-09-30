@@ -1910,7 +1910,7 @@ internal class Renderer internal constructor(
                     return
                 }
 
-                // Straight-space correction (F2): the platform lerps
+                // Straight-space correction: the platform lerps
                 // premultiplied, which diverges from straight (spec/rsvg)
                 // when stop alphas differ. Subdivide into dense
                 // straight-lerped stops; uniform-alpha gradients keep the
@@ -2094,7 +2094,7 @@ internal class Renderer internal constructor(
                     return
                 }
 
-                // Straight-space correction (F2): like the linear path, but
+                // Straight-space correction: like the linear path, but
                 // the write-only GradientColorArray cannot feed expansion —
                 // densify from the straight mirror into flavor-matched dense
                 // storage (extra pack pass, no allocation).

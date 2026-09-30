@@ -47,7 +47,7 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * Implements the *idea* of androidx.benchmark.IsolationActivity (a foreground window that
  * keeps the process in the "foreground app" scheduling class and opts into sustained
- * performance mode) without copying any AndroidX code (spec §18).
+ * performance mode) without copying any AndroidX code.
  *
  * Everything this Activity reports is observable state; the harness never asserts that
  * sustained performance mode actually took effect (a device/platform may silently ignore it,
@@ -219,7 +219,7 @@ internal class BenchmarkActivity : ComponentActivity() {
         private var sustainedSetAttempted: Boolean = false
 
         /**
-         * Brings the foreground window up (spec §17) if no live instance exists. Reuses the
+         * Brings the foreground window up if no live instance exists. Reuses the
          * already-foreground Activity across the whole instrumentation process so benchmarks
          * never create/destroy a Window in the middle of a suite.
          */

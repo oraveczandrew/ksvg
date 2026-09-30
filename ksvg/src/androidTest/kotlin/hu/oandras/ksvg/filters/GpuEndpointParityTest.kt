@@ -25,19 +25,19 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-D end-point parity (`tmp/GPU_PARITY_PLAN_D.md`): full-document
+ * End-point parity: full-document
  * renders (`test-data/visual/filter_*.svg` + `filters.svg`, mirrored
  * under `assets/endpoint/`) through the real pipeline (RenderScene,
  * viewport, bbox-inherited regions, dispatcher) on software vs hardware
- * canvas. What A/B/C cannot see: document-level fallback decisions,
- * region inheritance from real bounding boxes, CSS inheritance, mixed
- * content around filtered elements.
+ * canvas. What the isolated-primitive, corpus and chain rounds cannot see:
+ * document-level fallback decisions, region inheritance from real bounding
+ * boxes, CSS inheritance, mixed content around filtered elements.
  *
  * Conventions:
  * - Each file renders at its NATIVE size (viewBox): scaler-introduced
  *   canvas AA noise is a base-scene artifact, not filter signal (the
  *   256-default smeared non-square viewBoxes).
- * - Reference strategy per file (see `tmp/GPU_ROUNDD_WORKLOG.md`):
+ * - Reference strategy per file:
  *   device-SW by default; repo rsvg goldens (`assets/endpoint-golden/`)
  *   where device-SW is untrusted (native linear-arithmetic lane bug);
  *   explicit HW==SW fallback asserts where the GPU must decline.
@@ -46,7 +46,8 @@ import org.junit.runners.Parameterized
  *   - `filter_specular.svg`: Skia-blur approximation feeds exponent-20
  *     specular — HW highlight half the rsvg/SW size (device-SW matches
  *     rsvg). Pixel gates cannot distinguish approximation from bug here;
- *     both primitives are covered in Round-A/B.
+ *     both primitives are covered in the isolated-primitive and corpus
+ *     suites.
  *   - `filter_morphology_erode.svg`: device glyph rasterization differs
  *     SW-vs-HW (different subsystem) and erode/dilate min/max amplifies
  *     coverage diffs; morphology kernel covered text-free 52/52.
@@ -63,9 +64,9 @@ class GpuEndpointParityTest(
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )
         // x86 emulators cannot run the native displacement kernel
-        // (Round-A SIGILL precedent); physical ARM64 covers these.
+        // (SIGILL); physical ARM64 covers these.
         Assume.assumeFalse(
-            "x86 emulator: native displacement kernel SIGILL (see report §5)",
+            "x86 emulator: native displacement kernel SIGILL",
             Build.SUPPORTED_ABIS.any { it.startsWith("x86") },
         )
         val case = endpointCase(fileName)
@@ -77,7 +78,7 @@ class GpuEndpointParityTest(
             val sw = renderSoftware(svg, case.width, case.height)
             assertVisibleFilterEffect(name, sw, renderSoftware(unfilteredEndpoint(svg), case.width, case.height))
             val hw = renderOnHardware(svg, case.width, case.height)
-            // Round-E: per-filter chain-taken proof (E5/E6); the geometry
+            // Per-filter chain-taken proof; the geometry
             // case declines (fallback = true).
             assertChainBackend(
                 name, minGpuApi = 33,
@@ -103,7 +104,7 @@ class GpuEndpointParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(unfilteredEndpoint(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E: per-filter chain-taken proof (E5/E6); the geometry
+        // Per-filter chain-taken proof; the geometry
         // case declines (fallback = true).
         assertChainBackend(
             name, minGpuApi = 33,
@@ -136,13 +137,13 @@ class GpuEndpointParityTest(
             val goldenAsset: String? = null,
             val matchRadius: Int = 0,
             /**
-             * Round-E: filter element ids expected to draw in this file
-             * (E5 per-filter map). Must match the `<filter id="...">`s
+             * Filter element ids expected to draw in this file
+             * (per-filter map). Must match the `<filter id="...">`s
              * referenced by rendered elements in `assets/endpoint/$file`.
              */
             val chainFilters: List<String> = emptyList(),
             /**
-             * Round-E: per-filter minimum draw counts (E6: shared filter
+             * Per-filter minimum draw counts (shared filter
              * nodes must draw once per use — guards the per-element slot
              * fix against cache regressions).
              */
@@ -150,7 +151,7 @@ class GpuEndpointParityTest(
         )
 
         // NOTE: gates are first-run placeholders (strict); calibrated
-        // per file from measured stats (see GPU_ROUNDD_WORKLOG.md).
+        // per file from measured stats.
         // `fallback` cases assert HW==SW (strict): a taken GPU path
         // would diverge hugely.
         private val ENDPOINT_CASES: Map<String, EndpointCase> = listOf(
@@ -162,14 +163,14 @@ class GpuEndpointParityTest(
             ),
             EndpointCase(
                 "filter_composite_arithmetic.svg", 256, 256,
-                // Linear by default: HW computes linear (F9), so the sRGB
+                // Linear by default: HW computes linear, so the sRGB
                 // rsvg golden can never match — host linear golden instead
                 // (render-path recipe, determinism-checked).
                 goldenAsset = "endpoint-golden/endpoint_composite_arithmetic_linear.png",
                 premultiplyReference = true,
                 // 1px region-rounding ring (host region slightly bigger):
                 // chamfer forgives the boundary shift, value errors still
-                // fail (F9 worklog).
+                // fail.
                 matchRadius = 1,
                 chainFilters = listOf("arithmetic"),
             ),
@@ -180,10 +181,10 @@ class GpuEndpointParityTest(
                 // coverage diffs into ≤222 spikes; the max-gate cannot
                 // exist here, the ratio budgets spike pixels (a wrong
                 // kernel/divisor/target shifts whole edge bands far
-                // outside it). Round-B covers values/targets precisely.
+                // outside it). The corpus suite covers values/targets precisely.
                 maxAbsTol = 255,
                 maxOutlierRatio = 0.03,
-                // `#conv` is shared by two elements (E6 class) — both uses
+                // `#conv` is shared by two elements — both uses
                 // must draw.
                 chainFilters = listOf("conv"),
                 chainMinUses = mapOf("conv" to 2),
@@ -195,8 +196,8 @@ class GpuEndpointParityTest(
                 maxOutlierRatio = 0.01,
                 chainFilters = listOf("edge"),
             ),
-            // Round-E: fragment-reference feImage (`href="#source"`) still
-            // declines — F8 covers raster (data-URI) feImage only. Legit
+            // Fragment-reference feImage (`href="#source"`) still
+            // declines — only raster (data-URI) feImage is covered. Legit
             // fallback: expect sw.
             EndpointCase(
                 "filter_feImage.svg", 240, 220, fallback = true,
@@ -208,8 +209,8 @@ class GpuEndpointParityTest(
                 // Fallback-blit fringe (deterministic ~1.1k px — the
                 // software result composited onto the HW canvas differs at
                 // the blob edge; blob geometry + rsvg agree, decline proven
-                // by log). F1 brightened the fringe chroma (SW now keeps
-                // straight chroma at a≈0 where premult stores zero), so the
+                // by log). SW now keeps straight chroma at a≈0 where
+                // premult stores zero, so the
                 // alpha-scaled bound (K=510) budgets it like turbulence:
                 // invisible low-alpha residue passes, opaque divergence
                 // still fails via maxAbs/ratio. Still catches a broken
@@ -230,7 +231,7 @@ class GpuEndpointParityTest(
                 maxAbsTol = 24,
                 maxOutlierRatio = 0.10,
                 chainFilters = listOf("a", "b"),
-                // Readback space (F1): blur halos straight SW-side,
+                // Readback space: blur halos straight SW-side,
                 // premultiplied HW-side.
                 premultiplyReference = true,
             ),
@@ -246,7 +247,7 @@ class GpuEndpointParityTest(
                 // and region bugs hit opaque areas far outside it.
                 maxAbsTol = 64,
                 maxOutlierRatio = 0.06,
-                // E5: all 9 filters must take the chain, one draw each.
+                // All 9 filters must take the chain, one draw each.
                 chainFilters = listOf(
                     "blur", "gray", "cm", "morph", "offset",
                     "blend", "ct", "disp", "light",
@@ -268,10 +269,10 @@ class GpuEndpointParityTest(
                 maxAbsTol = 255,
                 maxOutlierRatio = 0.05,
                 chainFilters = listOf("blur", "shadow"),
-                // Readback space (F1): blur halo straight SW-side,
+                // Readback space: blur halo straight SW-side,
                 // premultiplied HW-side.
                 premultiplyReference = true,
-                // E6: `#shadow` is shared by the circle AND the text — both
+                // `#shadow` is shared by the circle AND the text — both
                 // uses must draw on GPU (guards the per-element slot fix).
                 chainMinUses = mapOf("shadow" to 2),
             ),
@@ -281,7 +282,8 @@ class GpuEndpointParityTest(
          * Files excluded from device parity (mirrors the host
          * `EXCLUDED_FROM_VISUAL_VERIFICATION` pattern): pixel gates
          * cannot distinguish approximation from bug here, while the
-         * primitives are covered in Round-A/B and the compositions are
+         * primitives are covered in the isolated-primitive and corpus
+         * suites and the compositions are
          * covered host-side SW-vs-rsvg.
          * - `filter_specular.svg`: Skia-blur approximation feeds
          *   exponent-20 specular — HW highlight half the rsvg/SW size.

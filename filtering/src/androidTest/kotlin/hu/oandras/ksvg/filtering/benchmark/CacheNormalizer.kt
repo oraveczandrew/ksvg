@@ -17,7 +17,7 @@
 package hu.oandras.ksvg.filtering.benchmark
 
 /**
- * Deterministic cache-state normalizer (spec §8; TEST_HARNESS_PLAN Step 5).
+ * Deterministic cache-state normalizer.
  *
  * Before each measurement batch (but not inside the measured region), a small fixed-size
  * memory workload is executed to evict CPU-cache state left by the previous batch. This

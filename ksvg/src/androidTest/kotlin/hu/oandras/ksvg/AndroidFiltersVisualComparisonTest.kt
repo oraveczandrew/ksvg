@@ -34,8 +34,7 @@ internal const val ANDROID_FILTERS_TARGET_SIZE = 256
 // Gating policy mirrored from the host VisualComparisonTest
 // (ksvg/.../comparisons/VisualComparisonTest.kt): same exclusions, same
 // per-file thresholds with the same reasons. Anything red here that the host
-// gates green is an on-device divergence worth investigating (see
-// tmp/RENDER_FIDELITY_PLAN.md items 9-13); anything red on the host too is a
+// gates green is an on-device divergence worth investigating; anything red on the host too is a
 // host-side issue and must not be "fixed" against the emulator.
 
 // No valid rsvg reference exists (mirrors EXCLUDED_FROM_VISUAL_VERIFICATION).

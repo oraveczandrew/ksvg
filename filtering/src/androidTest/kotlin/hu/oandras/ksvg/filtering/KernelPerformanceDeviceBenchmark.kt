@@ -27,7 +27,7 @@ import org.junit.runner.RunWith
 
 /**
  * Device kernel benchmark running every native filter kernel through the stable
- * `nativeBenchmark { }` harness (spec `tmp/TEST_HARNESS.md`; TEST_HARNESS_PLAN), replacing
+ * `nativeBenchmark { }` harness, replacing
  * the old raw `KernelBenchmarkRunner` driver.
  *
  * The kernel/config/size matrix comes from [KernelBenchmarkMatrix]; the per-cell workload

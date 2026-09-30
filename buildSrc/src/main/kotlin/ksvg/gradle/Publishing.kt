@@ -148,7 +148,7 @@ public fun Project.configureKsvgRepositories(): Unit {
             }
             // NOTE: Maven Central has no plain maven repo endpoint — uploads go through
             // the Central Publisher Portal (namespace + portal token, bundle upload).
-            // See tmp/RELEASE_CHECKLIST.md; wire it here once publishing starts.
+            // Wire the release checklist here once publishing starts.
         }
     }
 }

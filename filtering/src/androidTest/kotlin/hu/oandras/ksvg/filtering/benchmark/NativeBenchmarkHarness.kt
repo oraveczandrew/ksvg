@@ -34,7 +34,7 @@ internal const val BENCHMARKS_DIR_NAME = "benchmarks"
 
 /**
  * Clears one benchmark suite's previous result files (`benchmarks/<suite>/` in the
- * device's external cache directory, spec §24), so a fresh run is not mixed with
+ * device's external cache directory), so a fresh run is not mixed with
  * stale files on pull. Each benchmark class calls this in its setup with its own
  * [SUITE]-style name: per-suite subdirectories make cross-class deletion
  * structurally impossible within a shared instrumentation run.
@@ -53,8 +53,7 @@ fun clearSuiteResults(suite: String) {
 }
 
 /**
- * Public DSL + orchestration for the stable native benchmark harness
- * (TEST_HARNESS_PLAN.md Step 1-2; spec §12, §13, §14, §17, §19).
+ * Public DSL + orchestration for the stable native benchmark harness.
  *
  * The benchmark test only describes the workload:
  *
@@ -75,12 +74,12 @@ fun clearSuiteResults(suite: String) {
 * The harness provides: foreground Activity + sustained-performance opt-in
      * ([BenchmarkActivity]), benchmark-thread priority raise/restore, warmup, a batch
      * measurement loop with per-iteration `System.nanoTime()` sampling, thermal gating
-     * ([ThermalStateMonitor], spec §6/§7: batches measured while throttled are dropped),
+     * ([ThermalStateMonitor]: batches measured while throttled are dropped),
      * optional warmup-based batch calibration — set [NativeBenchmarkBuilder.targetBatchMillis]
      * to time the warmup and scale the per-batch iteration count toward a target batch
      * duration, so sub-ms kernels average out per-iteration timer/GC noise — per-sample
-     * statistics ([BenchmarkStats], spec §14), and an environment report. The
-     * measured region is exactly the [run] block (spec §20: no logging, I/O, thermal reads
+     * statistics ([BenchmarkStats]) and an environment report. The
+     * measured region is exactly the [run] block (no logging, I/O, thermal reads
      * or GC inside it).
      *
      * Later steps add cache normalization, CPU-frequency info, and the validation-vs-raw
@@ -176,7 +175,7 @@ class NativeBenchmarkBuilder {
     var cpuCore: Int? = null
 
     /**
-     * Sleep before retrying a batch invalidated by thermal throttling (spec §9). Actual
+     * Sleep before retrying a batch invalidated by thermal throttling. Actual
      * sleep duration accumulates into the report's `cooldownTimeMs`.
      */
     @JvmField
@@ -328,7 +327,7 @@ class NativeBenchmarkBuilder {
                 warmupActualIterations + measurementBatches * effectiveIterationsPerBatch
             )
 
-            // Batches are gated on thermal state (spec §6/§9): a batch measured while
+            // Batches are gated on thermal state: a batch measured while
             // throttled is invalidated (not counted) -> cooldown sleep -> fresh batch.
             var attempted = 0
             val maxAttempts = maxOf(measurementBatches * 3, measurementBatches + 8)
@@ -352,7 +351,7 @@ class NativeBenchmarkBuilder {
                     currentTask.cooldownMillis = cooldownTimeMs
                     continue
                 }
-                // Flush CPU-cache state left by the previous batch (spec §8; outside
+                // Flush CPU-cache state left by the previous batch (outside
                 // the measured region — no kernel call, no timing here).
                 CacheNormalizer.normalize()
                 val batch = DoubleArray(effectiveIterationsPerBatch)
@@ -369,7 +368,7 @@ class NativeBenchmarkBuilder {
                     batch[i] = (t1 - t0) / 1_000_000.0
                 }
                 if (thermalGatingEnabled && thermal.isThrottled()) {
-                    // Status rose while the batch was being measured -> invalid (spec §6).
+                    // Status rose while the batch was being measured -> invalid.
                     thermalThrottled = true
                     currentTask.invalidatedBatches = ++invalidatedBatches
                     currentTask.phase = "THERMAL RECOVERY"
@@ -509,7 +508,7 @@ class NativeBenchmarkBuilder {
     }
 
     /**
-     * Blocks for the configured cooldown (spec §9) and returns the actual elapsed time.
+     * Blocks for the configured cooldown and returns the actual elapsed time.
      * Uses `SystemClock.sleep` so an interrupt never truncates the recovery; the measured
      * region is untouched — no kernel call happens here.
      */
@@ -576,7 +575,7 @@ class NativeBenchmarkReport(
         }
 
     /**
-     * Result classification (spec §15): `VALID / THERMAL_THROTTLED / THERMAL_RECOVERY /
+     * Result classification: `VALID / THERMAL_THROTTLED / THERMAL_RECOVERY /
      * UNSTABLE / INSUFFICIENT_SAMPLES`.
      *
      *  - `INSUFFICIENT_SAMPLES` — no batch collected, or fewer than requested without any
@@ -650,7 +649,7 @@ class NativeBenchmarkReport(
     /**
      * Writes two CSVs into `benchmarks/<suite>/`:
      *  - `benchmarks_device_harness_<name>.csv` — one summary row, glob-compatible with the
-     *    existing `runDeviceBenchmark` pull task (spec §24 deliverable 4);
+     *    existing `runDeviceBenchmark` pull task;
      *  - `benchmarks_harness_detail_<name>.csv` — environment block and per-sample rows.
      */
     fun writeCsv(context: Context) {
@@ -739,7 +738,7 @@ class NativeBenchmarkReport(
     private fun formatMs(value: Double): String = String.format(Locale.US, "%.4f", value)
 }
 
-/** Builds the spec §16 environment block (key=value lines). */
+/** Builds the environment block (key=value lines). */
 private fun buildEnvironment(
     frontend: NativeBenchmarkBuilder,
     threadPriorityApplied: Boolean,
@@ -801,14 +800,14 @@ private fun buildEnvironment(
         appendLine("threadPriorityApplied=$threadPriorityApplied")
     }
 
-/** Result classifications (spec §15). */
+/** Result classifications. */
 private const val VALID = "VALID"
 private const val THERMAL_THROTTLED = "THERMAL_THROTTLED"
 private const val THERMAL_RECOVERY = "THERMAL_RECOVERY"
 private const val UNSTABLE = "UNSTABLE"
 private const val INSUFFICIENT_SAMPLES = "INSUFFICIENT_SAMPLES"
 
-/** Batch-average CV above which an otherwise clean run is classified UNSTABLE (spec §15). */
+/** Batch-average CV above which an otherwise clean run is classified UNSTABLE. */
 private const val UNSTABLE_CV = 0.05
 
 /**

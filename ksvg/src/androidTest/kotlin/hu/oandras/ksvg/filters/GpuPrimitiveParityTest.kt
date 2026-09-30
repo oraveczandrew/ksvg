@@ -25,7 +25,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * A-round of the CPU↔GPU filter parity work (`tmp/GPU_PARITY_PLAN_A.md`):
+ * Isolated-primitive round of the CPU↔GPU filter parity work:
  * one minimal SVG per GPU-supported filter primitive, rendered both on the
  * software backend and on a hardware canvas, compared with [assertParity].
  *
@@ -36,7 +36,7 @@ import org.junit.runner.RunWith
  *   GPU path (Impl31 = 31, Impl33 = 33). Below it the HW side silently falls
  *   back to software, so the parity assert passes trivially.
  * - `feImage` is intentionally absent: no GPU backend supports it (never in
- *   the supported mask) — it belongs to the round-B fallback tests.
+ *   the supported mask) — it belongs to the corpus fallback tests.
  */
 @RunWith(AndroidJUnit4::class)
 class GpuPrimitiveParityTest {
@@ -54,7 +54,7 @@ class GpuPrimitiveParityTest {
             maxAbsTol = 14,
             maxOutlierRatio = 0.006,
             // Readback space: the HW chain emits premultiplied blur halos
-            // while SW stores straight (rsvg-correct bright halo, F1) —
+            // while SW stores straight (rsvg-correct bright halo) —
             // compare premultiplied (display-identical either way).
             premultiplyReference = true,
         )
@@ -72,7 +72,7 @@ class GpuPrimitiveParityTest {
             // Steep small-sigma edges amplify residual calibration error.
             maxAbsTol = 8,
             maxOutlierRatio = 0.002,
-            // Same readback-space reason as gaussianBlur (F1).
+            // Same readback-space reason as the gaussianBlur test above.
             premultiplyReference = true,
         )
     }
@@ -86,7 +86,7 @@ class GpuPrimitiveParityTest {
             svg = filteredSvg("""<feGaussianBlur stdDeviation="1"/>"""),
             maxAbsTol = 6,
             maxOutlierRatio = 0.001,
-            // Same readback-space reason as gaussianBlur (F1).
+            // Same readback-space reason as the gaussianBlur test above.
             premultiplyReference = true,
         )
     }
@@ -334,7 +334,7 @@ class GpuPrimitiveParityTest {
         // render against the asset instead of the software render. The SW
         // render still runs for the visible-effect guard.
         goldenAsset: String? = null,
-        // Readback space (F1): blur halos are stored straight SW-side
+        // Readback space: blur halos are stored straight SW-side
         // (rsvg-correct) but read back premultiplied HW-side — compare
         // premultiplied (display-identical either way).
         premultiplyReference: Boolean = false,
@@ -346,7 +346,7 @@ class GpuPrimitiveParityTest {
         val sw = renderSoftware(svg)
         assertVisibleFilterEffect(name, sw, renderSoftware(unfilteredBaseline(svg)))
         val hw = renderOnHardware(svg)
-        // Round-E chain-taken proof: below minGpuApi the HW side
+        // Chain-taken proof: below minGpuApi the HW side
         // legitimately falls back (assert expects sw there).
         assertChainBackend(name, minGpuApi)
         val reference = if (goldenAsset != null) {

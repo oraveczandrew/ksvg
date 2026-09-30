@@ -26,16 +26,15 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-B corpus coverage for `feGaussianBlur` (`tmp/GPU_PARITY_PLAN_B.md`
- * §2): each [GaussianBlurValidationCorpus.Case] becomes an SVG via
+ * Corpus coverage for `feGaussianBlur`: each
+ * [GaussianBlurValidationCorpus.Case] becomes an SVG via
  * [GaussianBlurParitySvg] (input pixels travel as a PNG data-URI `<image>`,
  * alpha pinned opaque — see `opaqueInput`) and is measured SW-vs-HW.
  *
  * The GPU path (`RenderEffect.createBlurEffect` with the calibrated
  * `skiaBlurRadiusForSigma` mapping) approximates the CPU kernel
- * (`GPU_SCALAR_PARITY_REPORT.md` §7: non-separable Skia kernel, corner
- * zones): strict gates first, per-case tolerances only from measured
- * device data with justification comments.
+ * (non-separable Skia kernel, corner zones): strict gates first, per-case
+ * tolerances only from measured device data with justification comments.
  */
 @RunWith(Parameterized::class)
 class GpuGaussianBlurCorpusParityTest(
@@ -57,11 +56,11 @@ class GpuGaussianBlurCorpusParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E chain-taken proof.
+        // Chain-taken proof.
         assertChainBackend(name, minGpuApi = 31)
-        // The GPU path (Skia blur) approximates the CPU kernel (report §7:
-        // non-separable kernel, corner zones): per-case tolerances below are
-        // Adreno-measured (see GPU_ROUNDB_BLUR_WORKLOG.md), never global.
+        // The GPU path (Skia blur) approximates the CPU kernel
+        // (non-separable kernel, corner zones): per-case tolerances below
+        // are Adreno-measured, never global.
         val (maxAbsTol, maxOutlierRatio) = when {
             case.stdDeviationX >= 8f || case.stdDeviationY >= 8f ->
                 5 to 0.025
@@ -77,7 +76,7 @@ class GpuGaussianBlurCorpusParityTest(
             hw,
             maxAbsTol = maxAbsTol,
             maxOutlierRatio = maxOutlierRatio,
-            // Readback space (F1): SW stores straight bright halos
+            // Readback space: SW stores straight bright halos
             // (rsvg-correct), HW reads back premultiplied — compare
             // premultiplied (display-identical either way). Replaces the
             // old dark-vs-dark accidental match.
@@ -98,7 +97,7 @@ class GpuGaussianBlurCorpusParityTest(
             } else {
                 GaussianBlurValidationCorpus.cases.filter { it.name.contains(nameFilter) }
             }
-            // Excluded (see GPU_ROUNDB_BLUR_WORKLOG.md): isotropic 0.5 is
+            // Excluded: isotropic 0.5 is
             // below Skia's faithful range (radius floor over-blurs; fully
             // edge-dominated 8x8) and large 10.0 is beyond the calibrated
             // mapping on a fully kernel-dominated 16px image (96% outlier

@@ -49,7 +49,7 @@ class D8D9FilterSpecTest {
     private fun alpha(bitmap: Bitmap, x: Int, y: Int): Int =
         (bitmap.getPixel(x, y) ushr 24) and 0xff
 
-    // --- D8: terminal feSpecularLighting emits the cairo form ---
+    // --- Terminal feSpecularLighting emits the cairo form ---
     //
     // Since 91dc5961 the terminal kernel emits premultiplied (lightColor,
     // intensity): full-strength light color in RGB, specular intensity in
@@ -108,7 +108,7 @@ class D8D9FilterSpecTest {
         assertTrue("Expected lit pixels", checked > 0)
     }
 
-    // --- D9: feMorphology erode treats out-of-bounds as transparent black ---
+    // --- feMorphology erode treats out-of-bounds as transparent black ---
 
     @Test
     fun erodeShrinksBorderToTransparent() {

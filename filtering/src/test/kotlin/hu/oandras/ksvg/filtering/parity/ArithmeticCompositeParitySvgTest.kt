@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
 /**
- * Host-side snapshot of the round-B arithmetic-composite SVG builder.
+ * Host-side snapshot of the corpus arithmetic\-composite SVG builder.
  */
 @RunWith(JUnit4::class)
 class ArithmeticCompositeParitySvgTest {

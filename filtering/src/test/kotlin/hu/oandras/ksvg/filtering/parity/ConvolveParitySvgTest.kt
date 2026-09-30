@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
 /**
- * Host-side snapshot of the round-B convolve SVG builder: the generated
+ * Host-side snapshot of the corpus convolve SVG builder: the generated
  * string must stay byte-stable so device runs measure the intended SVG.
  */
 @RunWith(JUnit4::class)

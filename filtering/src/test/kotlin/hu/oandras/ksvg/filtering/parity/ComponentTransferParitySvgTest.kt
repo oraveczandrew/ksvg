@@ -24,7 +24,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
 /**
- * Host-side snapshot of the round-B transfer SVG builder: byte-stable
+ * Host-side snapshot of the corpus transfer SVG builder: byte-stable
  * output plus `tableValues` float fidelity over every corpus table.
  */
 @RunWith(JUnit4::class)

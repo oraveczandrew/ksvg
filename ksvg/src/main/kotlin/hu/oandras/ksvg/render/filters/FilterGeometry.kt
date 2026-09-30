@@ -244,8 +244,8 @@ internal fun doFeGaussianBlurFilter(
     primitiveNode.blurScratch.blur(pixels, width, height, stdDeviationX, stdDeviationY)
 
     // Unpremultiplying normalizes uniform regions exactly on both
-    // backends (halo chroma stays full while alpha fades — F1, rsvg
-    // reference). In place, no allocation.
+    // backends (halo chroma stays full while alpha fades — matches the
+    // rsvg reference). In place, no allocation.
     unpremultiplyInPlace(pixels)
 
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
@@ -297,7 +297,7 @@ private fun premultiplyInPlace(pixels: IntArray) {
 }
 
 /**
- * In-place straight-normalization for blur output (F1): maps premultiplied
+ * In-place straight-normalization for blur output: maps premultiplied
  * channels back to straight (`c = c*255/a`, half-up) so halo chroma survives
  * `setPixels` (straight-in store). Exact for uniform regions on both blur
  * backends (both emit premultiplied); alpha untouched; a==0 stays 0, a==255

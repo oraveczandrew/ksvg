@@ -19,8 +19,7 @@ package hu.oandras.ksvg.filtering.parity
 import hu.oandras.ksvg.filtering.DisplacementMapValidationCorpus
 
 /**
- * Round-B SVG builder for [DisplacementMapValidationCorpus] cases
- * (`tmp/GPU_PARITY_PLAN_B.md` §2-3).
+ * Corpus SVG builder for [DisplacementMapValidationCorpus] cases.
  *
  * Pure Kotlin (no Android types): same data-URI `<image>` mechanism as
  * [MorphologyParitySvg] (see that builder for why `feImage` is out).
@@ -41,7 +40,7 @@ import hu.oandras.ksvg.filtering.DisplacementMapValidationCorpus
  *   centered (~112-143, never near 0), and the turbulence shader emits
  *   straight values into the chain, so both backends read the same
  *   straight map channels (no premultiplied-storage divergence).
- *   Base frequency 0.15 (not the Round-A 0.05): the corpus surfaces are
+ *   Base frequency 0.15 (not the isolated-primitive 0.05): the corpus surfaces are
  *   tiny (16x16), and 0.05 leaves less than one noise feature across the
  *   map — so flat the corpus smallest scale (-5) displaces nothing.
  * - `src` representation: the GPU chain is premultiplied end to end

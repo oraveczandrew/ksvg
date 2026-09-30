@@ -19,8 +19,7 @@ package hu.oandras.ksvg.filtering.parity
 import hu.oandras.ksvg.filtering.ComponentTransferValidationCorpus
 
 /**
- * Round-B SVG builder for [ComponentTransferValidationCorpus] cases
- * (`tmp/GPU_PARITY_PLAN_B.md` §2-3).
+ * Corpus SVG builder for [ComponentTransferValidationCorpus] cases.
  *
  * Pure Kotlin (no Android types): same data-URI `<image>` mechanism as
  * [MorphologyParitySvg] (see that builder for why `feImage` is out).

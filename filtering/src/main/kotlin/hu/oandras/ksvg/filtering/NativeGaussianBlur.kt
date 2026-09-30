@@ -41,7 +41,7 @@ public sealed interface StackBlurScratch {
      * (exactly once across both separable passes). See
      * [requiresPremultipliedInput]. Both backends emit premultiplied
      * channels; the render boundary (`doFeGaussianBlurFilter`) unpremultiplies
-     * before straight storage (F1).
+     * before straight storage.
      */
     public fun blur(
         pixels: IntArray,

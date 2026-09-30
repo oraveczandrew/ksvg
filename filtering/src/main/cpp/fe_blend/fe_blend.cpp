@@ -221,7 +221,7 @@ namespace {
 
 jint nativeBackendForAbi() {
 #if defined(__aarch64__)
-    // NEON64 separable rows are device-verified (see tmp/FEBLEND_WORKLOG.md).
+    // NEON64 separable rows are device-verified.
     // Group E stays scalar per-mode (see runForced), but the backend bit is
     // per-kernel, not per-mode.
     return SIMD_BACKEND_SCALAR | SIMD_BACKEND_NEON64;

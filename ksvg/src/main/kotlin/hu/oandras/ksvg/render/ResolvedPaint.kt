@@ -56,7 +56,7 @@ internal sealed class ResolvedPaint {
         @JvmField
         var positions: FloatArray = FloatArray(0)
         /**
-         * Densified straight-lerp stops (F2), used for the shader when stop
+         * Densified straight-lerp stops, used for the shader when stop
          * alphas differ. Rebuilt from [colors]/[positions] every draw;
          * reallocated only on count change (no hot-path allocation).
          */
@@ -118,14 +118,14 @@ internal sealed class ResolvedPaint {
         @JvmField
         var positions: FloatArray = FloatArray(0)
         /**
-         * Readable straight-color mirror of [colors] (F2): `GradientColorArray`
+         * Readable straight-color mirror of [colors]: `GradientColorArray`
          * is write-only, but densification needs straight inputs. Sized
          * numStops, reallocated with [colors].
          */
         @JvmField
         var straightColors: IntArray = IntArray(0)
         /**
-         * Densified stops (F2), like [Linear.denseColors]. [denseColors]
+         * Densified stops, like [Linear.denseColors]. [denseColors]
          * flavor-matches [colors] (Ints/Longs) for the shader constructor,
          * expanded from [denseInts] staging (the packed Longs form cannot
          * feed expansion directly).

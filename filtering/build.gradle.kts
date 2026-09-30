@@ -124,10 +124,9 @@ android {
                 // (Gradle native services don't exist for i386 and the daemon
                 // won't even start there). Unset: no behavior change. NOTE: CI
                 // does not use this — 32-bit test execution was tried
-                // (2026-09-25, see tmp/SIGILL_FLAKY_WORKLOG.md): the JVM
-                // starts, but the hosted kernel's 32-bit signal handling is
-                // unstable (SI_KERNEL abort mid-suite), so the i386 leg only
-                // builds, never executes.
+                // (2026-09-25): the JVM starts, but the hosted kernel's
+                // 32-bit signal handling is unstable (SI_KERNEL abort
+                // mid-suite), so the i386 leg only builds, never executes.
                 val testJava32: String? = project.findStringProperty("ksvg.testJava32")
                     ?.takeIf { v -> v.isNotBlank() }
                     ?: System.getenv("KSVG_TEST_JAVA32")?.takeIf { v -> v.isNotBlank() }

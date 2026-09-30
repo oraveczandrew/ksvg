@@ -24,7 +24,7 @@ import java.util.Locale
  * host JVM benchmark (`KernelPerformanceBenchmark`, src/test). The Android
  * device benchmark (`KernelPerformanceDeviceBenchmark`, src/androidTest) no
  * longer uses this: it runs through the stable `nativeBenchmark { }` harness
- * (`benchmark` package, spec `tmp/TEST_HARNESS.md`).
+ * (`benchmark` package).
  */
 object KernelBenchmarkRunner {
 

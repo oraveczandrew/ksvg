@@ -29,7 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * F2 (`tmp/VISUAL_FIX_PLAN.md`): gradient stops interpolate in straight
+ * Gradient stops interpolate in straight
  * space (spec/rsvg), not premultiplied (platform `LinearGradient` default).
  *
  * The platform lerps premultiplied, which diverges from straight whenever

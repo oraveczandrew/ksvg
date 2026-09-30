@@ -739,7 +739,7 @@ class P1AuditReproTest {
     }
 
     // A bad preserveAspectRatio must surface as KSVGParseException
-    // (via PreserveAspectRatio.of), so the D2 per-element dispatch skips only
+    // (via PreserveAspectRatio.of), so the per-element dispatch skips only
     // the broken element and siblings still render. No IAE escapes.
     @Test
     fun invalidPreserveAspectRatioSkipsElementOnly() {

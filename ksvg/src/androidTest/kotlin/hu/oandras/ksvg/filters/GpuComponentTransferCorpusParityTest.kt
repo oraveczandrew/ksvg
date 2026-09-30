@@ -27,8 +27,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-B corpus coverage for `feComponentTransfer`
- * (`tmp/GPU_PARITY_PLAN_B.md` §2): each
+ * Corpus coverage for `feComponentTransfer`: each
  * [ComponentTransferValidationCorpus.Case] becomes an SVG via
  * [ComponentTransferParitySvg] (baked tables as `type="table"`, input
  * pixels as PNG data-URI `<image>` with alpha pinned opaque — see
@@ -55,7 +54,7 @@ class GpuComponentTransferCorpusParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E chain-taken proof.
+        // Chain-taken proof.
         assertChainBackend(name, minGpuApi = 33)
         // Single-row images are bilinear-sensitive: the content row has
         // transparent padding on both vertical sides, so any sub-texel
@@ -171,7 +170,7 @@ class GpuComponentTransferFuncParityTest {
         val sw = renderSoftware(svg, 16, 16)
         assertVisibleFilterEffect(fullName, sw, renderSoftware(corpusBaseline(svg), 16, 16))
         val hw = renderOnHardware(svg, 16, 16)
-        // Round-E chain-taken proof.
+        // Chain-taken proof.
         assertChainBackend(fullName, minGpuApi = 33)
         assertParity(
             name = "$fullName (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",

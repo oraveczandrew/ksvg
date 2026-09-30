@@ -29,7 +29,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Step-0 spike (see TEST_HARNESS_PLAN.md Step 0): proves that a [BenchmarkActivity]
+ * Startup spike: proves that a [BenchmarkActivity]
  * declared in the test APK's manifest can come to the foreground of the connected device
  * and that `setSustainedPerformanceMode(true)` is callable/observable there.
  *

@@ -88,7 +88,7 @@ private val ACCEPTED_SIMILARITY_EXCEPTIONS: Map<String, Double> = mapOf(
     "filter_primitives.svg" to 0.78,
     // Eroded/dilated glyphs amplify base-font coverage noise (the NORMAL
     // line alone is 40%+ band-diff from Roboto-vs-rsvg letterforms; measured
-    // 0.8699 on 2026-09-22). Kernel itself covered text-free in Round-B.
+    // 0.8699 on 2026-09-22). Kernel itself covered text-free in the corpus suite.
     "filter_morphology_erode.svg" to 0.86,
     "filter_component_transfer_complex.svg" to 0.94,
 )

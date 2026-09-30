@@ -28,8 +28,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-B corpus coverage for `feTurbulence`
- * (`tmp/GPU_PARITY_PLAN_B.md` §2): each
+ * Corpus coverage for `feTurbulence`: each
  * [TurbulenceValidationCorpus.Case] becomes an SVG via
  * [TurbulenceParitySvg] and is measured on HW.
  *
@@ -37,7 +36,7 @@ import org.junit.runners.Parameterized
  * round-trips straight turbulence output through premultiplied `Bitmap`
  * storage, which is lossy at low alpha — so non-stitch cases compare HW
  * against host-generated goldens (`parity/turbulence/` PNGs, pure-Kotlin
- * reference + terminal UN_LINEARIZE, Round-A turb_seed8 precedent).
+ * reference + terminal UN_LINEARIZE, turb_seed8 precedent).
  * The SW render only feeds the vacuous-pass guard.
  *
  * Comparison space: straight bytes with the alpha-scaled quantization bound
@@ -51,10 +50,10 @@ import org.junit.runners.Parameterized
  * The bound stays tight at opaque pixels, so real kernel regressions (wrong
  * lattice/accumulation/EOTF) still fail there.
  *
- * Stitch cases (`periodX/Y != 0`, F6): the GPU chain serves stitch
+ * Stitch cases (`periodX/Y != 0`): the GPU chain serves stitch
  * itself (`uTilePeriod` + adjusted frequencies + rsvg-form wrap offsets,
  * same math as FilterGeneration). Their goldens use device-derived params
- * (NOT corpus kernel params — see F6 worklog); comparison is straight
+ * (not corpus kernel params); comparison is straight
  * space like the rest (the chain emits straight, and a premultiplied
  * reference would crush low-alpha signal vacuously).
  */
@@ -86,12 +85,12 @@ class GpuTurbulenceCorpusParityTest(
             unfiltered = renderSoftware(corpusBaseline(svg), case.width, case.height)
         )
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E chain-taken proof (stitch takes the GPU chain since F6).
+        // Chain-taken proof (stitch takes the GPU chain).
         assertChainBackend(name, minGpuApi = 33)
         // Host golden for every case (straight bytes, no roundtrip):
         // non-stitch goldens use corpus params (== device params, no
         // adjustment); stitch goldens use device-derived params (adjusted
-        // frequencies + derived periods, F6 — the corpus pins kernel params
+        // frequencies + derived periods — the corpus pins kernel params
         // instead, which the device never computes). The SW render only
         // feeds the vacuous-pass guard (its Bitmap roundtrip corrupts
         // low-alpha straight values one-sidedly, which no symmetric bound
@@ -104,7 +103,7 @@ class GpuTurbulenceCorpusParityTest(
             name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",
             sw = golden,
             hw = hw,
-            // Round-A turbulence gates (fp32 + 8-bit gradient packing).
+            // Isolated-primitive turbulence gates (fp32 + 8-bit gradient packing).
             maxAbsTol = 4,
             maxOutlierRatio = 0.005,
             ignoreBoundaryFringe = true,

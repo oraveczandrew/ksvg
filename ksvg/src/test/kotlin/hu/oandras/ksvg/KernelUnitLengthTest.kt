@@ -28,7 +28,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * `kernelUnitLength` on `feConvolveMatrix`: scales the kernel sampling step
  * (reference model: downscale input → convolve at 1px steps → upscale back,
- * validated against `rsvg-convert`; see `tmp/kul/`).
+ * validated against `rsvg-convert`).
  *
  * Raster assertions use NATIVE graphics + the software filter backend
  * (per AGENTS.md). Structural asserts (monotonicity, ranges) are used
@@ -118,7 +118,7 @@ class KernelUnitLengthTest {
         assertTrue("expected flat field at x=26, got ${flat[26]}", flat[26] in 230..255)
 
         // kernelUnitLength=3: same flat field and black core, but the
-        // shoulders spread (validated against rsvg-convert; tmp/kul/).
+        // shoulders spread (validated against rsvg-convert).
         val row = renderLit(" kernelUnitLength=\"3\"")
         assertTrue("expected flat field at x=24, got ${row[24]}", row[24] in 230..255)
         assertEquals(0, row[29])

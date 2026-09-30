@@ -19,8 +19,7 @@ package hu.oandras.ksvg.filtering.parity
 import hu.oandras.ksvg.filtering.TurbulenceValidationCorpus
 
 /**
- * Round-B SVG builder for [TurbulenceValidationCorpus] cases
- * (`tmp/GPU_PARITY_PLAN_B.md` §2-3).
+ * Corpus SVG builder for [TurbulenceValidationCorpus] cases.
  *
  * Pure Kotlin (no Android types): the filtered element is a data-URI
  * `<image>` like the other builders (uniform baseline-derivation

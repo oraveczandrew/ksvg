@@ -27,15 +27,13 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-B corpus coverage for `feDisplacementMap`
- * (`tmp/GPU_PARITY_PLAN_B.md` §2): each
+ * Corpus coverage for `feDisplacementMap`: each
  * [DisplacementMapValidationCorpus.Case] becomes an SVG via
  * [DisplacementMapParitySvg] and is measured SW-vs-HW.
  *
  * Reference strategy: on-device software bitmap (the native displacement
  * kernel is trusted on ARM64 — bit-exact vs the Kotlin reference; the
- * x86 SIGILL dispatch issue from Round-A does not apply on-device here).
- * The corpus map array is replaced by a fixed `feTurbulence` field
+ * x86 SIGILL dispatch issue does not apply on-device). The corpus map array is replaced by a fixed `feTurbulence` field
  * (documented in the builder); scale, channel selectors and src size run
  * verbatim. Comparison is in premultiplied space (`premultiplyReference`):
  * the GPU chain is premultiplied end to end (morphology-shader kdoc) and
@@ -58,7 +56,7 @@ class GpuDisplacementCorpusParityTest(
             "GpuParityHarness needs API 29+ (HardwareRenderer)",
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
         )
-        // Round-A precedent: the native displacement kernel SIGILL-crashes
+        // Known issue: the native displacement kernel SIGILL-crashes
         // on x86 emulators (native-dispatch issue, not GPU). Physical ARM64
         // covers these cases.
         assumeFalse(
@@ -83,7 +81,7 @@ class GpuDisplacementCorpusParityTest(
             )
         }
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E chain-taken proof.
+        // Chain-taken proof.
         assertChainBackend(name, minGpuApi = 33)
         // Per-case gates (Adreno CPH2449 measured 2026-09-21; flip rate
         // grows with |scale| as modeled: ±1 LSB map quantization flips

@@ -22,7 +22,7 @@ import hu.oandras.ksvg.render.createBitmap
 import java.io.ByteArrayOutputStream
 
 /**
- * Round-B shared helpers (`tmp/GPU_PARITY_PLAN_B.md` §3, §5.1).
+ * Shared corpus-parity helpers.
  *
  * Corpus [IntArray] inputs reach the GPU path as `SourceGraphic` through a
  * device-encoded lossless PNG data URI (`<image href="data:...">`).
@@ -58,15 +58,15 @@ internal fun imageSource(input: IntArray, width: Int, height: Int): String {
  * (`RAW == half-up-premult(SW)`, verified on-device), and the alpha channel
  * exercises the same min/max code path as RGB. With opaque inputs
  * premultiplied == straight, the PNG is lossless, taps are bit-exact, and
- * the strict gates measure what Round-B is for: window geometry, subregions,
- * radii, operators. Documented adaptation, see `tmp/GPU_PARITY_PLAN_B.md` §2.
+ * the strict gates measure what the corpus round is for: window geometry,
+ * subregions, radii, operators.
  */
 internal fun opaqueInput(input: IntArray): IntArray {
     return IntArray(input.size) { i -> -0x1000000 or (input[i] and 0x00FFFFFF) }
 }
 
 /**
- * Round-A baseline convention, reused for corpus SVGs: every corpus SVG
+ * Baseline convention, reused for corpus SVGs: every corpus SVG
  * marks the filtered element with `filter="url(#f)"`.
  */
 internal fun corpusBaseline(svg: String): String {

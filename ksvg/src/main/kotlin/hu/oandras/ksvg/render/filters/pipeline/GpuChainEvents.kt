@@ -19,7 +19,7 @@ package hu.oandras.ksvg.render.filters.pipeline
 import hu.oandras.ksvg.render.FilterRenderNode
 
 /**
- * Test-only record of which backend drew each filter (`tmp/GPU_PARITY_PLAN_E.md`).
+ * Test-only record of which backend drew each filter.
  *
  * Pixel asserts cannot distinguish "GPU rendered correctly" from "GPU
  * silently declined and software rendered instead" (vacuous pass). The

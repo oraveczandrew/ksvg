@@ -28,7 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * RENDER_FIDELITY_PLAN item 1: `filter_primitives.svg` cells must blend / apply
+ * `filter_primitives.svg` cells must blend / apply
  * the color matrix in linearRGB (the filter default), not gamma space.
  * Pins the rsvg golden values for the `blend` (multiply over turbulence-red),
  * `cm` (0.33 matrix over blue) and `gray` (saturate 0 over green) cells.

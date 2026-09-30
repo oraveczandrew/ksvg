@@ -22,16 +22,16 @@ import android.os.PowerManager
 import hu.oandras.ksvg.filtering.benchmark.ThermalStateMonitor.Companion.THROTTLE_RATIO
 
 /**
- * Thermal state source for the benchmark harness (spec §6, §7; TEST_HARNESS_PLAN Step 3).
+ * Thermal state source for the benchmark harness.
  *
  * API 29+ routes through `PowerManager.currentThermalStatus`; a status above
- * `THERMAL_STATUS_NONE` invalidates the current batch (spec §6). Under API 29 the status
- * API does not exist, so a deterministic single-threaded compute probe is used instead
- * (spec §7): a baseline is taken at the start of the run and a probe that slows down by
+ * `THERMAL_STATUS_NONE` invalidates the current batch. Under API 29 the status
+ * API does not exist, so a deterministic single-threaded compute probe is used instead:
+ * a baseline is taken at the start of the run and a probe that slows down by
  * more than [THROTTLE_RATIO] (≈10%, matching the AndroidX ThrottleDetector heuristic)
  * counts as throttling. The probe never reconstructs a frequency, it only flags degradation.
  *
- * Every call happens outside the measured region (spec §20).
+ * Every call happens outside the measured region.
  */
 internal class ThermalStateMonitor private constructor(
     private val powerManager: PowerManager?,
@@ -82,7 +82,7 @@ internal class ThermalStateMonitor private constructor(
     }
 
     companion object {
-        /** Slowdown ratio of the probe that flags throttling on API < 29 (spec §7). */
+        /** Slowdown ratio of the probe that flags throttling on API < 29. */
         private const val THROTTLE_RATIO = 1.10
 
         private const val PROBE_REPEATS = 7

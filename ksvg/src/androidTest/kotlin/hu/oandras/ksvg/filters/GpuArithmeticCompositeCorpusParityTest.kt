@@ -27,8 +27,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-B corpus coverage for `feComposite operator="arithmetic"`
- * (`tmp/GPU_PARITY_PLAN_B.md` §2): each
+ * Corpus coverage for `feComposite operator="arithmetic"`: each
  * [ArithmeticCompositeValidationCorpus.Case] becomes an SVG via
  * [ArithmeticCompositeParitySvg] (`input1` as PNG data-URI `<image>`,
  * `input2` adapted to a constant `feFlood`, alpha pinned opaque — see
@@ -36,11 +35,10 @@ import org.junit.runners.Parameterized
  *
  * Reference strategy (NOT device-SW): the on-device native
  * `arithmeticComposite` kernel is nondeterministic in `useLinear`
- * (identical calls flip between linear/sRGB math run-to-run —
- * `GPU_ROUNDB_ARITH_WORKLOG.md`), so no pixel assert may use it.
- * All cases compare HW against host-generated goldens
- * (`parity/arithmetic/\*.png`, pure-Kotlin reference, sRGB + linear —
- * F9 generated the linear set with the validated sRGB recipe).
+ * (identical calls flip between linear/sRGB math run-to-run), so no pixel
+ * assert may use it. All cases compare HW against host-generated goldens
+ * (`parity/arithmetic/\*.png`, pure-Kotlin reference, sRGB + linear — the
+ * linear set was generated with the validated sRGB recipe).
  * with `premultiplyReference` (arithmetic output is
  * premultiplied, like morphology). The SW render only feeds the
  * vacuous-pass guard (robust: any native behavior differs hugely from
@@ -66,8 +64,8 @@ class GpuArithmeticCompositeCorpusParityTest(
         val sw = renderSoftware(svg, case.width, case.height)
         assertVisibleFilterEffect(name, sw, renderSoftware(corpusBaseline(svg), case.width, case.height))
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E chain-taken proof (linear arithmetic takes the GPU chain
-        // since F9; the golden exists because device-SW is nondeterministic,
+        // Chain-taken proof (linear arithmetic takes the GPU chain;
+        // the golden exists because device-SW is nondeterministic,
         // not because HW declines).
         assertChainBackend(name, minGpuApi = 33)
         val golden = loadGoldenAsset(

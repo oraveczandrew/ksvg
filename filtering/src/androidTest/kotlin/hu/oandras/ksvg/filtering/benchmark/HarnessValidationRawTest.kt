@@ -26,7 +26,7 @@ import org.junit.runner.RunWith
 import kotlin.math.sqrt
 
 /**
- * Validation test (spec §22; TEST_HARNESS_PLAN Step 8): prove the harness stabilises the
+ * Validation test: prove the harness stabilises the
  * measurement versus a raw (harness-free) run of the same kernel.
  *
  * Both approaches measure the same `TurbulenceNative` neon64-dispatch call on 512x512. The

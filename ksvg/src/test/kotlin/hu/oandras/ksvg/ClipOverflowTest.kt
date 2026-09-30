@@ -29,7 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * F3 (`tmp/VISUAL_FIX_PLAN.md`): CSS `clip` is ignored when `overflow` is
+ * CSS `clip` is ignored when `overflow` is
  * not `visible` (used value `auto` — Chrome and rsvg agree: the circle in
  * `clip_overflow.svg` renders whole). The renderer used to apply both the
  * overflow viewport clip AND the `clip` rect, over-clipping the circle to

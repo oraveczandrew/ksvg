@@ -127,8 +127,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         var first = true
         val resultShaders = ArrayMap<String, RuntimeShader>()
         val resultEffects = ArrayMap<String, RenderEffect>()
-        // Raw-shader input bindings for downstream in2/uMap references
-        // (C6 lesson): `resultShaders` holds RAW RuntimeShaders, but the
+        // Raw-shader input bindings for downstream in2/uMap references:
+        // `resultShaders` holds RAW RuntimeShaders, but the
         // chain wires inputs at the EFFECT level
         // (`createRuntimeShaderEffect(...).chainWith(inputEffect)`). A raw
         // shader sampled via `setInputShader` (displacement `uMap`,
@@ -350,8 +350,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             val (shader, colorMatrixEffect) = if (
                                 primitive.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
                             ) {
-                                // Linear-light matrix runs linearized (same class as
-                                // the F9 arithmetic fix); the sRGB shader below is
+                                // Linear-light matrix runs linearized (like the
+                                // arithmetic path); the sRGB shader below is
                                 // gamma-space only.
                                 createLinearColorMatrixShaderEffect(
                                     matrix = buildColorMatrixValues(colorMatrix.type, colorMatrix.values),
@@ -387,7 +387,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                             // No light source: the CPU passes the input through
                             // (`doLightingFilter`: `light ?: return inputBitmap`).
-                            // Mirror with passthrough (F3); the output raw form
+                            // Mirror with passthrough; the output raw form
                             // is the input raw form for downstream in2.
                             if (primitive.sourceElement.light == null) {
                                 if (resultName != null && lastRawBound && lastRawShader != null) {
@@ -429,7 +429,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                             // Terminal specular emits premultiplied output on the CPU
                             // path (full light color + intensity alpha); mirror it.
-                            // No light source: input passthrough like diffuse (F3).
+                            // No light source: input passthrough like diffuse.
                             if (primitive.sourceElement.light == null) {
                                 if (resultName != null && lastRawBound && lastRawShader != null) {
                                     resultShaders[resultName] = lastRawShader
@@ -517,8 +517,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             if (primitive.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB &&
                                 primitive.mode != FeBlendMode.normal
                             ) {
-                                // Linear-light blend runs linearized (same class as
-                                // the F9 arithmetic fix); the BlendMode effect
+                                // Linear-light blend runs linearized (like the
+                                // arithmetic path); the BlendMode effect
                                 // below is sRGB-only. Needs the backdrop as a raw
                                 // shader: null in2 defaults to the previous result
                                 // (spec), named in2 to a bound result — decline
@@ -570,7 +570,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                 resolveEffect(composite.in2, previousResult, first, chain, resultEffects) ?: return null
 
                             if (composite.operator == FeCompositeOperator.arithmetic) {
-                                // Linear-light arithmetic runs linearized (F9);
+                                // Linear-light arithmetic runs linearized;
                                 // the PLUS fast path below is sRGB-only (raw
                                 // tap addition), so linear always takes the
                                 // shader even for PLUS coefficients.
@@ -584,7 +584,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     val in2Name = composite.in2
                                     // Null in2 defaults to the previous result
                                     // (spec): reuse its raw shader when bound,
-                                    // decline otherwise (F1).
+                                    // decline otherwise.
                                     val in2Shader = if (in2Name == null) {
                                         if (!lastRawBound) return null
                                         lastRawShader ?: return null
@@ -639,8 +639,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             val mapName = disp.in2
                             // Null in2 defaults to the previous result (spec):
                             // reuse its raw shader when bound, decline
-                            // otherwise (F1). Bound gate like composite in2
-                            // (C6 lesson).
+                            // otherwise. Bound gate like composite in2.
                             val mapShader = if (mapName == null) {
                                 if (!lastRawBound) return null
                                 lastRawShader ?: return null
@@ -660,7 +659,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeTurbulenceRenderNode -> {
-                            // Stitch wrap origin (F6): CPU `clipLeft`/`clipTop`
+                            // Stitch wrap origin: CPU `clipLeft`/`clipTop`
                             // mirrored from user space BEFORE the buffer-space
                             // mapping below (same formula as the CPU remap).
                             val clipLeft = ((primitiveRegion.left - filterRegion.left) * sx).toInt()
@@ -676,7 +675,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             )
 
                             // stitchTiles="stitch" is served by the shader itself
-                            // (uTilePeriod, F6 — same adjusted-frequency math
+                            // (uTilePeriod — same adjusted-frequency math
                             // as FilterGeneration).
 
                             // Terminal turbulence under linearRGB gets the linear->sRGB transfer
@@ -747,9 +746,9 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeImageRenderNode -> {
-                            // Raster feImage only (F8): element references
+                            // Raster feImage only: element references
                             // (`referencedNode`) have no decoded bitmap — only
-                            // the CPU backend rasterizes them (F10) — so
+                            // the CPU backend rasterizes them — so
                             // decline and let software render instead.
                             // Pre-rasterizing into a BitmapShader input is
                             // deliberately NOT done: chains are cached per
@@ -781,11 +780,10 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                         is FeDropShadowRenderNode -> {
                             // The Skia dropShadow composite ignores the
-                            // primitive subregion (same class as the
-                            // blur/offset declines): an explicit
-                            // x/y/width/height would silently paint the whole
-                            // input. Decline so software renders the clip
-                            // instead (F2).
+                            // primitive subregion (like the blur/offset
+                            // declines): an explicit x/y/width/height would
+                            // silently paint the whole input. Decline so
+                            // software renders instead.
                             val shadowElement = primitive.sourceElement
                             if (shadowElement.x != null || shadowElement.y != null ||
                                 shadowElement.width != null || shadowElement.height != null

@@ -23,7 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 
 /**
- * Host-side snapshot of the round-B morphology SVG builder: the generated
+ * Host-side snapshot of the corpus morphology SVG builder: the generated
  * string must stay byte-stable so device runs measure the intended SVG.
  */
 @RunWith(JUnit4::class)

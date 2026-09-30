@@ -29,7 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * F1 (`tmp/VISUAL_FIX_PLAN.md`): the SW blur must keep chroma in the halo.
+ * The SW blur must keep chroma in the halo.
  *
  * Blurring uniform red over transparency must fade ALPHA while red stays
  * 255 (straight storage, rsvg reference) — i.e. the blur kernel contract is

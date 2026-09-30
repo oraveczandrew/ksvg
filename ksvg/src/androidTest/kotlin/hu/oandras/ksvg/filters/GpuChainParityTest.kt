@@ -24,37 +24,38 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Round-C chain-level parity (`tmp/GPU_PARITY_PLAN_C.md`): hand-designed
- * 2-3 primitive chains exercising composition the Round-A/B isolated
- * primitive tests cannot see (distant `in2` references across the
+ * Chain-level parity: hand-designed
+ * 2-3 primitive chains exercising composition the isolated-primitive
+ * tests cannot see (distant `in2` references across the
  * `resultShaders` map, terminal-position sensitivity, region inheritance
  * through chains, mid-chain decline fallbacks, Skia×AGSL mixing).
  *
- * Conventions (Round-A): 256x256 SVG, opaque rect source (flat color —
+ * Conventions: 256x256 SVG, opaque rect source (flat color —
  * displacement/composite signal lives in the edge bands; interior pixels
  * still pin exact agreement), `filter="url(#f)"` with the baseline
- * derived by stripping it. Fallback chains (C7–C9) assert the decline
- * explicitly (stitch precedent) instead of pixel parity.
+ * derived by stripping it. Fallback chains assert the decline
+ * explicitly instead of pixel parity.
  *
- * Known gap (plan §4.1): a silently declined chain renders SW on both
+ * Known gap: a silently declined chain renders SW on both
  * sides and passes vacuously. The visible-effect guard plus strict gates
- * catch wrong pixels, but not a whole-chain fallback; chain-taken proof
- * is follow-up work.
+ * catch wrong pixels, but not a whole-chain fallback; the chain-taken
+ * assert covers that.
  */
 @RunWith(AndroidJUnit4::class)
 class GpuChainParityTest {
 
     @Test
     fun distantIn2Arithmetic() {
-        // C1: flood result feeds BOTH the displacement map (neighbor) and
+        // Flood result feeds BOTH the displacement map (neighbor) and
         // the arithmetic in2 (2 hops back) — proves resultShaders lifetime
         // across the chain, not just adjacent references. Host golden
-        // (F9: device-SW arithmetic is nondeterministic); premultiplied
+        // (device-SW arithmetic is nondeterministic here); premultiplied
         // comparison like the corpus (chain emits premult verbatim).
         // Measured 7/65536 at ≤45: displacement edge-straddle flips
         // (map ±1 LSB at the rect boundary selects neighbor texels),
-        // amplified by linear+EOTF — same family as C2/C4, so the ratio
-        // stays strict and only the max gate budgets them.
+        // amplified by linear+EOTF — same family as the sibling
+        // displacement tests, so the ratio stays strict and only the max
+        // gate budgets them.
         checkParity(
             name = "chainC1",
             svg = chainSvg(
@@ -72,7 +73,7 @@ class GpuChainParityTest {
 
     @Test
     fun turbulenceMapBlend() {
-        // C2: generative turbulence map displaces the source, the product
+        // Generative turbulence map displaces the source, the product
         // blends with SourceGraphic — a computed branch consumed by blend.
         // Gates: ±1 LSB map quantization flips the truncated shift at
         // scattered edge pixels (measured 37/65536, all within 1 px of an
@@ -95,17 +96,18 @@ class GpuChainParityTest {
 
     @Test
     fun nonTerminalSpecularTransfer() {
-        // C3: turbulence height-map feeds specular in NON-terminal
+        // Turbulence height-map feeds specular in NON-terminal
         // position (premultiplied chain output, NOT the terminal
         // (lightColor, intensity) form), consumed by componentTransfer —
         // proves the terminal/non-terminal branch, not just the isolated
-        // terminal case Round-A covers. Premultiplied comparison (chain
-        // emits premult; straight comparison would repeat the C1 trap).
+        // terminal case the primitive suite covers. Premultiplied
+        // comparison (chain emits premult; a straight comparison would
+        // misread the halo as error).
         // NOTE: strict placeholder gates — calibrated from measured stats
-        // after the specular-premult fix (see GPU_ROUNDC_WORKLOG.md §C3).
+        // after the specular-premult fix.
         // Measured (premult space): 943/65536 (0.014), max 6, mean 0.39 —
         // specular fp-intensity noise (exponent 8) passed through the
-        // transfer, same class as the Round-B point-specular gates.
+        // transfer, same class as the corpus point-specular gates.
         checkParity(
             name = "chainC3",
             svg = chainSvg(
@@ -125,9 +127,9 @@ class GpuChainParityTest {
 
     @Test
     fun linearTurbulenceDisplacement() {
-        // C4: turbulence in NON-terminal position under linearRGB gets no
+        // Turbulence in NON-terminal position under linearRGB gets no
         // EOTF (intermediate stays linear on both backends); displacement
-        // consumes the linear map. Gates like C2: 37/65536 edge-straddle
+        // consumes the linear map. Gates: 37/65536 edge-straddle
         // flips, all within 1 px of an edge (verified offline).
         checkParity(
             name = "chainC4",
@@ -145,10 +147,10 @@ class GpuChainParityTest {
 
     @Test
     fun subregionArithmetic() {
-        // C5: flood subregion + composite clip (different rects,
+        // Flood subregion + composite clip (different rects,
         // userSpaceOnUse units) — region-guard mapping consistency across
-        // two primitives. Host golden (F9: device-SW arithmetic is
-        // nondeterministic); premultiplied comparison like the corpus.
+        // two primitives. Host golden (device-SW arithmetic is
+        // nondeterministic here); premultiplied comparison like the corpus.
         checkParity(
             name = "chainC5",
             svg = chainSvg(
@@ -165,7 +167,7 @@ class GpuChainParityTest {
 
     @Test
     fun tileDisplacement() {
-        // C6: flood tiled, then used as displacement map — uniform map
+        // Flood tiled, then used as displacement map — uniform map
         // (constant shift, no quantization flips), but the tile mod/rect
         // logic runs in-chain. Strict gates; premultiplied comparison for
         // the displacement halo.
@@ -184,7 +186,7 @@ class GpuChainParityTest {
 
     @Test
     fun wrapConvolveChain() {
-        // C7: wrap-convolve mid-chain (F4: explicit mod-tap sampling, no
+        // Wrap-convolve mid-chain (explicit mod-tap sampling, no
         // more decline). Strict gates first, calibrated from measurement.
         checkParity(
             name = "chainC7",
@@ -200,7 +202,7 @@ class GpuChainParityTest {
 
     @Test
     fun noneConvolveChain() {
-        // C17: none-convolve (transparent out-of-bounds taps, F4).
+        // None-convolve (transparent out-of-bounds taps).
         // Strict gates first, calibrated from measurement.
         checkParity(
             name = "chainC17",
@@ -216,8 +218,8 @@ class GpuChainParityTest {
 
     @Test
     fun stitchTurbulenceChain() {
-        // C8: stitch-turbulence map feeding displacement (F6: real stitch
-        // on GPU, no more fallback). Gates like C2: map quantization flips
+        // Stitch-turbulence map feeding displacement (real stitch
+        // on GPU, no more fallback). Gates: map quantization flips
         // the truncated shift at scattered edge pixels over the flat rect
         // (measured 45/65536, max 255 where the straddle crosses
         // transparent↔opaque); the ratio budgets them.
@@ -236,13 +238,13 @@ class GpuChainParityTest {
 
     @Test
     fun nonTerminalArithmeticOver() {
-        // C9 (repurposed — see worklog): non-terminal sRGB arithmetic
-        // consumed by composite-over. The linear-decline fallback originally
+        // Non-terminal sRGB arithmetic consumed by composite-over
+        // (repurposed slot). The linear-decline fallback originally
         // planned here is unmeasurable (native linear arithmetic is
-        // nondeterministic run-to-run, Round-B arith worklog §2 — device-SW
-        // cannot reference it); mid-chain decline mechanics are covered
-        // deterministically by C7/C8 instead. Premultiplied comparison:
-        // the over halo outside the rect stays translucent (C1 lesson).
+        // nondeterministic run-to-run — device-SW cannot reference it);
+        // mid-chain decline mechanics are covered deterministically by the
+        // wrap/stitch convolve tests instead. Premultiplied comparison:
+        // the over halo outside the rect stays translucent.
         // Verified offline maxAbs 1, 0/65536 — strict gates hold.
         checkParity(
             name = "chainC9",
@@ -259,10 +261,10 @@ class GpuChainParityTest {
 
     @Test
     fun skiaBlurComposite() {
-        // C10: Skia blur inside an AGSL chain (Skia×AGSL boundary:
+        // Skia blur inside an AGSL chain (Skia×AGSL boundary:
         // premult Skia output as AGSL input). Measured: 14/65536 at
-        // ≤3 abs (flood-edge clamp, same class as the Round-A blur
-        // corners) — tol 4 keeps it honest, ratio stays strict.
+        // ≤3 abs (flood-edge clamp, same class as the isolated-primitive
+        // blur corners) — tol 4 keeps it honest, ratio stays strict.
         checkParity(
             name = "chainC10",
             svg = chainSvg(
@@ -273,7 +275,7 @@ class GpuChainParityTest {
                 """.trimIndent(),
             ),
             maxAbsTol = 4,
-            // Readback space (F1): Skia-blur HW halo reads back
+            // Readback space: Skia-blur HW halo reads back
             // premultiplied, SW stores straight — compare premultiplied.
             premultiplyReference = true,
         )
@@ -281,7 +283,7 @@ class GpuChainParityTest {
 
     @Test
     fun offsetMorphology() {
-        // C11: offset shifts geometry, morphology erodes in the shifted
+        // Offset shifts geometry, morphology erodes in the shifted
         // frame — region mapping across a geometric primitive. Strict
         // placeholder gates, calibrated after first run.
         checkParity(
@@ -297,7 +299,7 @@ class GpuChainParityTest {
 
     @Test
     fun diffuseMerge() {
-        // C12: turbulence height-map → diffuse lighting, merged over
+        // Turbulence height-map → diffuse lighting, merged over
         // SourceGraphic — two-branch merge of a computed result.
         // Strict placeholder gates, calibrated after the first run.
         checkParity(
@@ -316,7 +318,7 @@ class GpuChainParityTest {
 
     @Test
     fun subregionColorMatrix() {
-        // C13: saturate-0 colormatrix confined to a user-space subregion —
+        // Saturate-0 colormatrix confined to a user-space subregion —
         // proves the uPrimitiveRegion guard (the Skia/AGSL paths used to
         // ignore it; geometry_units precedent for blur). Premultiplied
         // comparison for the antialiased rect fringe.
@@ -334,10 +336,10 @@ class GpuChainParityTest {
 
     @Test
     fun implicitIn2Displacement() {
-        // C14: flood map feeds displacement through the IMPLICIT in2
+        // Flood map feeds displacement through the IMPLICIT in2
         // default (no in2 attribute = previous result, per spec) — proves
-        // the F1 defaulting, not just named references. Constant map:
-        // strict gates + premult (halo).
+        // the implicit-input defaulting, not just named references.
+        // Constant map: strict gates + premult (halo).
         checkParity(
             name = "chainC14",
             svg = chainSvg(
@@ -352,8 +354,8 @@ class GpuChainParityTest {
 
     @Test
     fun subregionDropShadowFallback() {
-        // C15: dropShadow with an explicit subregion declines (the Skia
-        // composite ignores it — F2) → whole-chain software fallback.
+        // DropShadow with an explicit subregion declines (the Skia
+        // composite ignores it) → whole-chain software fallback.
         // HW==SW assert (a taken path would paint the whole input).
         // NOTE: the subregion must EXTEND past the rect (shadow lives at
         // +10/+10 outside it); a rect-equal subregion clips the shadow
@@ -371,9 +373,9 @@ class GpuChainParityTest {
 
     @Test
     fun lightlessDiffusePassthrough() {
-        // C16: diffuse lighting WITHOUT a light child passes the input
+        // Diffuse lighting WITHOUT a light child passes the input
         // through on the CPU (`light ?: return inputBitmap`) — the GPU
-        // mirrors with passthrough (F3), no decline. No visible-effect
+        // mirrors with passthrough, no decline. No visible-effect
         // guard (passthrough by design, like identity); parity is strict
         // (bit-exact expected).
         checkParity(
@@ -387,7 +389,7 @@ class GpuChainParityTest {
 
     @Test
     fun largeKernelConvolve() {
-        // C18: 7x7 box blur (F5: uKernel[49]). Exercises taps beyond the
+        // 7x7 box blur (uKernel[49]). Exercises taps beyond the
         // old 5x5 limit. Strict gates first, calibrated from measurement.
         checkParity(
             name = "chainC18",
@@ -404,7 +406,7 @@ class GpuChainParityTest {
 
     @Test
     fun subregionOffset() {
-        // C19: offset confined to a user-space subregion (F7: AGSL offset
+        // Offset confined to a user-space subregion (AGSL offset
         // with region guard). Strict gates first, calibrated from
         // measurement.
         checkParity(
@@ -418,8 +420,8 @@ class GpuChainParityTest {
 
     @Test
     fun rasterImageComposite() {
-        // C20: raster feImage (data-URI PNG) composited over SourceGraphic
-        // (F8: decoded bitmap as chain input). Opaque pixels (premult ==
+        // Raster feImage (data-URI PNG) composited over SourceGraphic
+        // (decoded bitmap as chain input). Opaque pixels (premult ==
         // straight, exact). Strict gates first, calibrated from measurement.
         checkParity(
             name = "chainC20",
@@ -473,12 +475,12 @@ class GpuChainParityTest {
             assertVisibleFilterEffect(name, sw, renderSoftware(chainBaseline(svg)))
         }
         val hw = renderOnHardware(svg)
-        // Round-E chain-taken proof (all parity chains run Impl33, min 33 —
-        // including C16 lightless passthrough, which the GPU serves, and
-        // C1/C5 golden paths, whose goldens exist for determinism, not
+        // Chain-taken proof (all parity chains run Impl33, min 33 —
+        // including the lightless passthrough, which the GPU serves, and
+        // the golden paths, whose goldens exist for determinism, not
         // decline, reasons).
         assertChainBackend(name, minGpuApi = 33)
-        // Host-golden path (F9): device-SW is untrusted here (native
+        // Host-golden path: device-SW is untrusted here (native
         // nondeterminism), so parity is HW vs the committed golden
         // (host render-path recipe, determinism-checked at generation).
         val reference = if (goldenAsset != null) {
@@ -534,7 +536,7 @@ class GpuChainParityTest {
     }
 
     /**
-     * Fallback assert for chains the GPU must decline (C7–C9): both sides
+     * Fallback assert for chains the GPU must decline: both sides
      * render through the software backend, so HW==SW bit-exactly. Strict
      * gates — any taken (wrong) GPU path diverges hugely. The SW
      * visible-effect guard proves the chain does something (non-vacuous).
@@ -547,7 +549,7 @@ class GpuChainParityTest {
         val sw = renderSoftware(svg)
         assertVisibleFilterEffect(name, sw, renderSoftware(chainBaseline(svg)))
         val hw = renderOnHardware(svg)
-        // Round-E decline proof: C15 must NOT take the chain.
+        // Decline proof: this chain must NOT take the GPU path.
         assertChainBackend(name, minGpuApi = 33, expectFallback = true)
         assertParity(
             "$name (fallback, minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",

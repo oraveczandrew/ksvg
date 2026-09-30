@@ -19,8 +19,7 @@ package hu.oandras.ksvg.filtering.parity
 import hu.oandras.ksvg.filtering.MorphologyValidationCorpus
 
 /**
- * Round-B SVG builder for [MorphologyValidationCorpus] cases
- * (`tmp/GPU_PARITY_PLAN_B.md` §2-3).
+ * Corpus SVG builder for [MorphologyValidationCorpus] cases.
  *
  * Pure Kotlin (no Android types): the corpus [IntArray] input reaches the
  * filter as `SourceGraphic` through a device-side PNG data URI

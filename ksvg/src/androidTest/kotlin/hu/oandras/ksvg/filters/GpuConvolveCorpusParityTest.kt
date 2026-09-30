@@ -26,16 +26,16 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Round-B corpus coverage for `feConvolveMatrix` (`tmp/GPU_PARITY_PLAN_B.md`
- * §2): each [ConvolveValidationCorpus.Case] becomes an SVG via
- * [ConvolveParitySvg] (input pixels travel as a PNG data-URI `<image>`,
- * alpha pinned opaque — see `opaqueInput`) and is measured SW-vs-HW.
+ * Corpus coverage for `feConvolveMatrix`: each
+ * [ConvolveValidationCorpus.Case] becomes an SVG via [ConvolveParitySvg]
+ * (input pixels travel as a PNG data-URI `<image>`, alpha pinned opaque —
+ * see `opaqueInput`) and is measured SW-vs-HW.
  *
- * All three edge modes take the GPU chain now (F4: duplicate/clamp,
- * wrap/modulo, none/transparent taps): strict [assertParity] everywhere
+ * All three edge modes take the GPU chain now — duplicate/clamp,
+ * wrap/modulo, none/transparent taps: strict [assertParity] everywhere
  * with `premultiplyReference` (same representation rationale as the
  * morphology runner: corpus pipeline ends straight on SW, premultiplied
- * on HW). Per-case gates below are Adreno-measured (see worklog).
+ * on HW). Per-case gates below are Adreno-measured.
  */
 @RunWith(Parameterized::class)
 class GpuConvolveCorpusParityTest(
@@ -73,9 +73,9 @@ class GpuConvolveCorpusParityTest(
             )
         )
         val hw = renderOnHardware(svg, case.width, case.height)
-        // Round-E chain-taken proof (wrap/none take the GPU chain since F4).
+        // Chain-taken proof (wrap/none take the GPU chain).
         assertChainBackend(name, minGpuApi = 33)
-        // NOTE (F4): wrap/none take the GPU chain now; strict placeholder
+        // NOTE: wrap/none take the GPU chain now; strict placeholder
         // gates for all modes, calibrated from measured stats (worklog).
         assertParity(
             name = "$name (minGpuApi=33, deviceApi=${Build.VERSION.SDK_INT})",

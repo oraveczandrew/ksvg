@@ -19,8 +19,7 @@ package hu.oandras.ksvg.filtering.parity
 import hu.oandras.ksvg.filtering.GaussianBlurValidationCorpus
 
 /**
- * Round-B SVG builder for [GaussianBlurValidationCorpus] cases
- * (`tmp/GPU_PARITY_PLAN_B.md` §2-3).
+ * Corpus SVG builder for [GaussianBlurValidationCorpus] cases.
  *
  * Pure Kotlin (no Android types): same data-URI `<image>` mechanism as
  * [MorphologyParitySvg] (see that builder for why `feImage` is out).
@@ -32,14 +31,14 @@ import hu.oandras.ksvg.filtering.GaussianBlurValidationCorpus
  * - No primitive subregion attributes: the corpus has no clip, so union
  *   inheritance (full filter region) applies on both backends.
  *
- * Conventions (shared with round-A): the filtered element carries
+ * Conventions (shared with the isolated-primitive round): the filtered element carries
  * `filter="url(#f)"` (the runner derives the unfiltered baseline by
  * stripping it), and the filter region is pinned to the image bounds in
  * `userSpaceOnUse` so both backends measure the same pixels.
  *
  * Note: the GPU path (`RenderEffect.createBlurEffect` with the calibrated
  * `skiaBlurRadiusForSigma` mapping) is an approximation of the CPU kernel
- * (see `GPU_SCALAR_PARITY_REPORT.md` §7) — the runner carries per-case
+ * (non-separable Skia kernel, corner zones) — the runner carries per-case
  * tolerances for it. Both sides clamp out-of-bounds taps (Skia CLAMP vs
  * stack-blur clamp), so edges are comparable, unlike the wrap/none
  * convolve gap.

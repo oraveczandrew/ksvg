@@ -47,7 +47,7 @@ import kotlin.math.abs
 
 internal const val GPU_PARITY_SIZE = 256
 
-/** Default per-channel tolerance (see `tmp/GPU_PARITY_PLAN_A.md` §1). */
+/** Default per-channel tolerance (GPU float math vs CPU kernels: ±1-2 LSB expected). */
 internal const val GPU_PARITY_MAX_ABS = 2
 
 /** Default allowed ratio of pixels with any channel diff above [GPU_PARITY_MAX_ABS]. */
@@ -57,7 +57,7 @@ internal const val GPU_PARITY_MAX_OUTLIER_RATIO = 0.001
 internal const val GPU_PARITY_MIN_VISIBLE_EFFECT_RATIO = 0.005
 
 /**
- * Round-E chain-taken proof (`tmp/GPU_PARITY_PLAN_E.md` §1.1): per-filter
+ * Chain-taken proof: per-filter
  * record of which backend drew each filter use. Both renders clear on
  * entry (one-render-per-test convention), so the snapshot after
  * [renderOnHardware] holds exactly that render's HW-side events.
@@ -95,15 +95,14 @@ internal fun snapshotChainEvents(): List<Pair<String, String>> =
  * correctly" from "GPU silently declined and software rendered instead"
  * (vacuous pass); this pins the mechanism.
  *
- * @param minGpuApi API level from which the chain is taken (Round-A
- * convention): below it the HW side legitimately falls back, so `sw` is
- * expected there.
- * @param expectFallback the chain must decline (fallback tests: C15,
- * geometry endpoint) — `sw` expected regardless of API.
+ * @param minGpuApi API level from which the chain is taken: below it the
+ * HW side legitimately falls back, so `sw` is expected there.
+ * @param expectFallback the chain must decline (fallback tests) — `sw`
+ * expected regardless of API.
  * @param expectedFilterIds filter element ids that must have drawn (test
  * SVGs carry ids by convention; anonymous filters record as
  * `"(anonymous)"`).
- * @param expectedMinUses per-filter minimum draw counts (E6: the
+ * @param expectedMinUses per-filter minimum draw counts (the
  * `filters.svg` `#shadow` shared by circle+text must draw twice — guards
  * the per-element slot fix against cache regressions).
  */
@@ -360,7 +359,8 @@ internal fun parityStats(
             // scene rasterization differences into huge channel diffs. With
             // matchRadius=1 the pixel passes when it matches ANY pixel in
             // the other's 3x3 window. This blinds ≤1px geometry shifts
-            // (covered precisely, shift-sensitively, in Round-B/C); value
+            // (covered precisely, shift-sensitively, in the corpus/chain
+            // suites); value
             // errors still fail everywhere. Test-only cost (9 taps/px).
             val b = if (matchRadius <= 0) {
                 hwPx[i]
@@ -449,8 +449,7 @@ internal fun parityStats(
  * integral filter regions) as CUT where SwiftShader and the CPU keep them,
  * plus dithering on the fractional top row (both verified deterministically
  * on-device). Confined to single boundary-adjacent pixels; interior
- * divergences (wrong kernels, shapes, colors) still fail. See
- * `tmp/GPU_SCALAR_PARITY_REPORT.md` §8.
+ * divergences (wrong kernels, shapes, colors) still fail.
  * @param premultiplyReference when true, the reference (software) bitmap is
  * converted to premultiplied form before comparison. The software backend
  * emits straight pixels (`getPixels` contract) while the hardware
@@ -465,8 +464,8 @@ internal fun parityStats(
  * content, but straight and premultiplied pipelines legitimately store
  * different RGB under alpha-zero (e.g., arithmetic-subterminal output) —
  * comparing them would fail byte-exactness on invisible pixels. Opt-in;
- * Round-A cases are unaffected (their transparent pixels already match
- * exactly).
+ * isolated-primitive cases are unaffected (their transparent pixels
+ * already match exactly).
  * @param translucentQuantK when positive, each pixel's failure/outlier bound
  * is `max(maxAbsTol, ceil(translucentQuantK / max(alpha)))` instead of a
  * flat `maxAbsTol`. Generative noise (feTurbulence `type=turbulence`) emits
@@ -489,7 +488,7 @@ internal fun parityStats(
  * (convolve edge-detect, morphology, blur halos) that turn ±1px
  * base-scene rasterization differences into huge channel diffs. This
  * blinds ≤1px geometry shifts — acceptable only where shift-sensitive
- * unit coverage exists elsewhere (Round-B/C corpora); value errors
+ * unit coverage exists elsewhere (corpus/chain suites); value errors
  * still fail everywhere. Opt-in; 0 keeps exact matching.
  */
 internal fun assertParity(
@@ -538,7 +537,7 @@ internal fun assertParity(
  * Loads a golden reference PNG from androidTest assets into [outBitmap].
  * Used where the on-device software reference is itself untrusted (e.g., a
  * divergent native kernel); the golden is generated host-side from the
- * pure-Kotlin reference (see `tmp/GPU_SCALAR_PARITY_REPORT.md`).
+ * pure-Kotlin reference.
  */
 internal fun loadGoldenAsset(assetPath: String, outBitmap: Bitmap): Bitmap {
     val assets = InstrumentationRegistry.getInstrumentation().context.assets

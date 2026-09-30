@@ -19,8 +19,8 @@ package hu.oandras.ksvg.filtering.benchmark
 import kotlin.math.sqrt
 
 /**
- * Per-sample distribution math for a benchmark run (spec §14). Comparison order per spec and
- * plan: median first, then p90, then min. Percentiles use linear interpolation ("Method 7",
+ * Per-sample distribution math for a benchmark run. Comparison order:
+ * median first, then p90, then min. Percentiles use linear interpolation ("Method 7",
  * the NumPy default): for p, index = p * (n - 1). StdDev is population (n).
  */
 class BenchmarkStats(sortedSamples: DoubleArray) {
