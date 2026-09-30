@@ -485,6 +485,29 @@ class GpuChainParityTest {
         )
     }
 
+    @Test
+    fun backgroundImageDeclinesToSoftware() {
+        // BackgroundImage resolves to a transparent software bitmap the GPU
+        // chain cannot produce, so the chain must decline and both sides
+        // render SW bit-exactly. SW correctness (transparent, primitives run)
+        // is pinned by BackgroundImageTest (host); this pins the routing.
+        // Source clipped to the transparent backdrop vanishes, so the effect
+        // is visible (non-vacuous) against the unfiltered baseline.
+        checkFallback(
+            name = "chainBackgroundImageDecline",
+            svg = """
+                <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+                  <defs>
+                    <filter id="f" x="-20%" y="-20%" width="140%" height="140%">
+                      <feComposite in="SourceGraphic" in2="BackgroundImage" operator="in"/>
+                    </filter>
+                  </defs>
+                  <rect x="48" y="48" width="160" height="160" fill="#c83232" filter="url(#f)"/>
+                </svg>
+            """.trimIndent(),
+        )
+    }
+
     private fun checkParity(
         name: String,
         svg: String,

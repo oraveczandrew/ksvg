@@ -70,6 +70,8 @@ import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.filtering.StackBlurScratch
 import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.render.animation.AnimationNode
+import hu.oandras.ksvg.render.filters.BACKGROUND_ALPHA_INPUT
+import hu.oandras.ksvg.render.filters.BACKGROUND_IMAGE_INPUT
 import hu.oandras.ksvg.render.filters.FILL_PAINT_INPUT
 import hu.oandras.ksvg.render.filters.LightVector
 import hu.oandras.ksvg.render.filters.NormalVector
@@ -673,25 +675,43 @@ internal class FilterRenderNode(
      */
     @JvmField var usesFillPaint: Boolean = false
     @JvmField var usesStrokePaint: Boolean = false
+    /**
+     * True when any primitive reads the backdrop ([BACKGROUND_IMAGE_INPUT] /
+     * [BACKGROUND_ALPHA_INPUT]). Same build-once semantics as above; always
+     * resolves to transparent (see the consts), so no recording is needed,
+     * only backend selection (software) and result wiring.
+     */
+    @JvmField var usesBackgroundImage: Boolean = false
+    @JvmField var usesBackgroundAlpha: Boolean = false
 
     init {
         for (primitive in primitives) {
-            if (usesFillPaint && usesStrokePaint) break
+            if (usesFillPaint && usesStrokePaint &&
+                usesBackgroundImage && usesBackgroundAlpha
+            ) break
             val src = primitive.sourceElement
             if (src.`in` == FILL_PAINT_INPUT) usesFillPaint = true
             if (src.`in` == STROKE_PAINT_INPUT) usesStrokePaint = true
+            if (src.`in` == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
+            if (src.`in` == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
             when (src) {
                 is FeBlend -> {
                     if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
                     if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
+                    if (src.in2 == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
+                    if (src.in2 == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
                 }
                 is FeComposite -> {
                     if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
                     if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
+                    if (src.in2 == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
+                    if (src.in2 == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
                 }
                 is FeDisplacementMap -> {
                     if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
                     if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
+                    if (src.in2 == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
+                    if (src.in2 == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
                 }
                 else -> {}
             }
@@ -699,6 +719,8 @@ internal class FilterRenderNode(
                 for (id in primitive.mergeNodes) {
                     if (id == FILL_PAINT_INPUT) usesFillPaint = true
                     if (id == STROKE_PAINT_INPUT) usesStrokePaint = true
+                    if (id == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
+                    if (id == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
                 }
             }
         }

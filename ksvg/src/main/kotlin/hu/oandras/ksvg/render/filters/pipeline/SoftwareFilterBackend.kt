@@ -46,6 +46,9 @@ import hu.oandras.ksvg.render.FeTileRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.FilterPrimitiveRenderNode
 import hu.oandras.ksvg.render.FilterRenderNode
+import hu.oandras.ksvg.render.extractAlpha
+import hu.oandras.ksvg.render.filters.BACKGROUND_ALPHA_INPUT
+import hu.oandras.ksvg.render.filters.BACKGROUND_IMAGE_INPUT
 import hu.oandras.ksvg.render.FilterSourceMap
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.RenderNode
@@ -371,6 +374,23 @@ internal class SoftwareFilterBackend internal constructor(
         }
 
         results.reInitWith(sourceBitmap, fillPaint, strokePaint)
+
+        // BackgroundImage/BackgroundAlpha resolve to transparent (documented
+        // deviation: no readable backdrop surface exists on any path). The
+        // bitmap comes erased from the pool; map-owned like primitive outputs
+        // so recycle() releases it normally. Only acquired when referenced
+        // (flags are build-time), so other filters pay nothing.
+        if (filterNode.usesBackgroundImage || filterNode.usesBackgroundAlpha) {
+            val backdrop = renderContext.bitmapPool.acquire(
+                sourceBitmap.width,
+                sourceBitmap.height,
+                Bitmap.Config.ARGB_8888,
+            )
+            results.set(BACKGROUND_IMAGE_INPUT, backdrop)
+            if (filterNode.usesBackgroundAlpha) {
+                results.set(BACKGROUND_ALPHA_INPUT, extractAlpha(backdrop))
+            }
+        }
 
         // The filter bitmap is sized to the *device-space* filter region, while
         // `filterRegion` (below) is in user space. Per-primitive subregion clipping

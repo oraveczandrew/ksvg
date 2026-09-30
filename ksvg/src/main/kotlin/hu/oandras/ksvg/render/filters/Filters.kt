@@ -37,3 +37,15 @@ internal fun getFilterInput(
  */
 internal const val FILL_PAINT_INPUT: String = "FillPaint"
 internal const val STROKE_PAINT_INPUT: String = "StrokePaint"
+
+/**
+ * Standard input names for the backdrop behind the filtered element.
+ *
+ * Per the documented deviation (see SUPPORT `<filter>` row) these resolve to
+ * transparent on every path: a true backdrop snapshot would need readable
+ * surfaces, which neither the software `Canvas` (no readback, opaque layers)
+ * nor hardware canvases provide. Primitives still run with the transparent
+ * input (defined output) instead of being skipped.
+ */
+internal const val BACKGROUND_IMAGE_INPUT: String = "BackgroundImage"
+internal const val BACKGROUND_ALPHA_INPUT: String = "BackgroundAlpha"

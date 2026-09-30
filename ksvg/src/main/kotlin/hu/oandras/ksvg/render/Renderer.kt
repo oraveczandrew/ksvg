@@ -1405,9 +1405,14 @@ internal class Renderer internal constructor(
         // would not need a separate compositing layer for the result.
         // FillPaint/StrokePaint inputs need per-element fill-only/stroke-only
         // recordings that the GPU chain cannot represent: decline to software.
-        if (filterNode.usesFillPaint || filterNode.usesStrokePaint) {
+        // BackgroundImage/BackgroundAlpha likewise resolve to a transparent
+        // software bitmap the chain cannot produce: decline to software.
+        if (filterNode.usesFillPaint || filterNode.usesStrokePaint ||
+            filterNode.usesBackgroundImage || filterNode.usesBackgroundAlpha
+        ) {
             logD(TAG) {
-                "Filter '${filterNode.sourceElement.id}' uses FillPaint/StrokePaint inputs; " +
+                "Filter '${filterNode.sourceElement.id}' uses FillPaint/StrokePaint/" +
+                    "BackgroundImage/BackgroundAlpha inputs; " +
                     "declining GPU chain, software backend renders instead."
             }
             return softwareBackend ?: gpuBackendFactory.createSoftware(this).also { softwareBackend = it }
