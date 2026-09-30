@@ -90,7 +90,12 @@ internal class FeImage(
                 result = getResult(),
                 `in` = getIn(),
                 href = href,
-            )
+            ).also {
+                // Inherited slot (ConditionalContainer.Builder parses the
+                // attribute); the raster backend maps the image into the
+                // primitive subregion through it.
+                it.preserveAspectRatio = getPreserveAspectRatio()
+            }
         }
     }
 }

@@ -85,4 +85,5 @@ private fun writeConfigDiff(p: Paint, applied: PaintConfiguration, cfg: PaintCon
     if (applied.wordSpacing != cfg.wordSpacing && !cfg.wordSpacing.isNaN()) {
         p.setWordSpacingCompat(cfg.wordSpacing)
     }
+    if (applied.antiAlias != cfg.antiAlias) p.isAntiAlias = cfg.antiAlias
 }

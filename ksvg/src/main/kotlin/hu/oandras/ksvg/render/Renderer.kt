@@ -843,6 +843,7 @@ internal class Renderer internal constructor(
         apply(obj.style, true)
 
         applyAnimatedStyle(state, builder, animationNodes)
+        applyAntiAliasHint(state, builder, obj)
     }
 
     /*

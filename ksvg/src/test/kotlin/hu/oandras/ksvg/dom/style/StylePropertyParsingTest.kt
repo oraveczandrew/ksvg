@@ -1219,6 +1219,56 @@ class StylePropertyParsingTest {
         assertEquals(ColorInterpolation.UNSPECIFIED, Style().colorInterpolation)
     }
 
+    // --- shape-rendering / text-rendering / color-rendering ---
+
+    @Test
+    fun testShapeRenderingCrispEdges() {
+        val s = process("shape-rendering", "crispEdges", isFromAttribute = true).buildAndGet()
+        assertEquals(ShapeRendering.crispEdges, s.shapeRendering)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_SHAPE_RENDERING))
+    }
+
+    @Test
+    fun testShapeRenderingFromStyle() {
+        val s = process("shape-rendering", "optimizeSpeed").buildAndGet()
+        assertEquals(ShapeRendering.optimizeSpeed, s.shapeRendering)
+    }
+
+    @Test
+    fun testShapeRenderingInvalid() {
+        val s = process("shape-rendering", "banana").buildAndGet()
+        assertFalse(specified(s.specifiedFlags2, Style.SPECIFIED_SHAPE_RENDERING))
+        assertNull(s.shapeRendering)
+    }
+
+    @Test
+    fun testTextRenderingOptimizeSpeed() {
+        val s = process("text-rendering", "optimizeSpeed", isFromAttribute = true).buildAndGet()
+        assertEquals(TextRendering.optimizeSpeed, s.textRendering)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_TEXT_RENDERING))
+    }
+
+    @Test
+    fun testTextRenderingInvalid() {
+        val s = process("text-rendering", "smooth").buildAndGet()
+        assertFalse(specified(s.specifiedFlags2, Style.SPECIFIED_TEXT_RENDERING))
+        assertNull(s.textRendering)
+    }
+
+    @Test
+    fun testColorRenderingParsed() {
+        val s = process("color-rendering", "optimizeQuality", isFromAttribute = true).buildAndGet()
+        assertEquals(ColorRendering.optimizeQuality, s.colorRendering)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_COLOR_RENDERING))
+    }
+
+    @Test
+    fun testColorRenderingInvalid() {
+        val s = process("color-rendering", "banana").buildAndGet()
+        assertFalse(specified(s.specifiedFlags2, Style.SPECIFIED_COLOR_RENDERING))
+        assertNull(s.colorRendering)
+    }
+
     // --- mask-type ---
 
     @Test

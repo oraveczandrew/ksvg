@@ -755,6 +755,31 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             // element slot across frames, so baked content
                             // would go stale (and freeze animations inside
                             // the referenced subtree).
+                            //
+                            // preserveAspectRatio mapping lives on the CPU
+                            // path only (the chain blits unscaled at the
+                            // region origin): decline whenever the software
+                            // output would differ — an explicit PAR, or a
+                            // subregion that is not exactly the unscaled
+                            // bitmap at the region origin. Spurious declines
+                            // (float dust) only cost software rendering,
+                            // never correctness.
+                            val image = primitive.image
+                            if (primitive.sourceElement.preserveAspectRatio != null) {
+                                return null
+                            }
+                            if (image != null) {
+                                val subLeft = (primitiveRegion.left - filterRegion.left) * sx + totalPadX
+                                val subTop = (primitiveRegion.top - filterRegion.top) * sy + totalPadY
+                                val subRight = (primitiveRegion.right - filterRegion.left) * sx + totalPadX
+                                val subBottom = (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
+                                if (subLeft != totalPadX.toFloat() || subTop != totalPadY.toFloat() ||
+                                    subRight - subLeft != image.width.toFloat() ||
+                                    subBottom - subTop != image.height.toFloat()
+                                ) {
+                                    return null
+                                }
+                            }
                             val (shader, imageEffect) = createImageShaderEffect(
                                 primitive,
                                 totalPadX,

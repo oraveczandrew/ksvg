@@ -2147,6 +2147,7 @@ internal class RenderTreeBuilder(
             builder.reset(state.style)
             updateStyleForElement(state, builder, obj)
             state.style = builder.build()
+            applyAntiAliasHint(state, builder, obj)
         }
     }
 

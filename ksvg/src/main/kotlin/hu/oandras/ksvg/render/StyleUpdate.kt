@@ -20,13 +20,17 @@ import android.graphics.Paint
 import hu.oandras.ksvg.compat.supportsWordSpacing
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.dom.COLOR_BLACK
+import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.style.ColorValue
 import hu.oandras.ksvg.dom.style.ContextFill
 import hu.oandras.ksvg.dom.style.ContextStroke
 import hu.oandras.ksvg.dom.style.CurrentColor
 import hu.oandras.ksvg.dom.style.FontStyle
+import hu.oandras.ksvg.dom.style.ShapeRendering
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.SvgPaint
+import hu.oandras.ksvg.dom.style.TextRendering
+import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
 
@@ -38,6 +42,32 @@ import hu.oandras.ksvg.utils.forEachElement
  * Shared by the builder and renderer style paths so variable-font axes and
  * external resolvers never see the raw sentinels.
  */
+/**
+ * Applies the shape/text-rendering anti-alias switch to both paint configs.
+ * Text elements ([TextContainer]) honor `text-rendering`, everything else
+ * `shape-rendering` (both inherited; unspecified keeps antialiasing on).
+ *
+ * Written unconditionally (like letter-spacing in [applyStateFromBuilder]),
+ * so pooled states never carry a stale switch from a previous element.
+ * Deliberately NOT part of [applyStateFromBuilder]: that builds derived
+ * substates (e.g., gradients), which inherit the element's rendering intent.
+ */
+internal fun applyAntiAliasHint(
+    state: RendererState,
+    builder: Style.Builder,
+    obj: ElementBase,
+) {
+    val antiAlias = if (obj is TextContainer) {
+        val mode = builder.textRendering
+        mode == null || !mode.disablesAntiAlias
+    } else {
+        val mode = builder.shapeRendering
+        mode == null || !mode.disablesAntiAlias
+    }
+    state.fillConfig.setAntiAlias(antiAlias)
+    state.strokeConfig.setAntiAlias(antiAlias)
+}
+
 internal fun resolveRelativeFontWeight(specified: Float, baseWeight: Float): Float {
     return when (specified) {
         Style.FONT_WEIGHT_LIGHTER -> {
@@ -500,6 +530,18 @@ internal fun updateStyle(
 
     if (sourceStyle.isSpecified2(Style.SPECIFIED_COLOR_INTERPOLATION)) {
         builder.colorInterpolation = sourceStyle.colorInterpolation
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_SHAPE_RENDERING)) {
+        builder.shapeRendering = sourceStyle.shapeRendering
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_TEXT_RENDERING)) {
+        builder.textRendering = sourceStyle.textRendering
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_COLOR_RENDERING)) {
+        builder.colorRendering = sourceStyle.colorRendering
     }
 
     builder.addSpecifiedFlag(sourceStyle.specifiedFlags and sourceStyle.suppressedFlags.inv())

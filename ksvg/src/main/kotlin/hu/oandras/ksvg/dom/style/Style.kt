@@ -155,6 +155,9 @@ internal class Style internal constructor(
     @JvmField val isolation: Isolation?,
     @JvmField val mixBlendMode: CSSBlendMode?,
     @JvmField val enableBackground: EnableBackground?,
+    @JvmField val shapeRendering: ShapeRendering?,
+    @JvmField val textRendering: TextRendering?,
+    @JvmField val colorRendering: ColorRendering?,
 
     @JvmField val fontKerning: FontKerning?,
 
@@ -256,6 +259,9 @@ internal class Style internal constructor(
         isolation = null,
         mixBlendMode = null,
         enableBackground = null,
+        shapeRendering = null,
+        textRendering = null,
+        colorRendering = null,
         fontKerning = null,
         fontVariantLigatures = null,
         fontVariantPosition = null,
@@ -400,6 +406,12 @@ internal class Style internal constructor(
         var mixBlendMode: CSSBlendMode? = null
         @JvmField
         var enableBackground: EnableBackground? = null
+        @JvmField
+        var shapeRendering: ShapeRendering? = null
+        @JvmField
+        var textRendering: TextRendering? = null
+        @JvmField
+        var colorRendering: ColorRendering? = null
         @JvmField
         var fontKerning: FontKerning? = null
         @JvmField
@@ -593,6 +605,9 @@ internal class Style internal constructor(
             this.isolation = original.isolation
             this.mixBlendMode = original.mixBlendMode
             this.enableBackground = original.enableBackground
+            this.shapeRendering = original.shapeRendering
+            this.textRendering = original.textRendering
+            this.colorRendering = original.colorRendering
             this.fontKerning = original.fontKerning
             this.fontVariantLigatures = original.fontVariantLigatures
             this.fontVariantPosition = original.fontVariantPosition
@@ -684,6 +699,9 @@ internal class Style internal constructor(
                 isolation = isolation,
                 mixBlendMode = mixBlendMode,
                 enableBackground = enableBackground,
+                shapeRendering = shapeRendering,
+                textRendering = textRendering,
+                colorRendering = colorRendering,
                 fontKerning = fontKerning,
                 fontVariantLigatures = fontVariantLigatures,
                 fontVariantPosition = fontVariantPosition,
@@ -772,6 +790,9 @@ internal class Style internal constructor(
                     isolation == original.isolation &&
                     mixBlendMode == original.mixBlendMode &&
                     enableBackground == original.enableBackground &&
+                    shapeRendering == original.shapeRendering &&
+                    textRendering == original.textRendering &&
+                    colorRendering == original.colorRendering &&
                     fontKerning == original.fontKerning &&
                     fontVariantLigatures == original.fontVariantLigatures &&
                     fontVariantPosition == original.fontVariantPosition &&
@@ -868,7 +889,10 @@ internal class Style internal constructor(
         value = [
             SPECIFIED_PAINT_ORDER,
             SPECIFIED_ENABLE_BACKGROUND,
-            SPECIFIED_COLOR_INTERPOLATION
+            SPECIFIED_COLOR_INTERPOLATION,
+            SPECIFIED_SHAPE_RENDERING,
+            SPECIFIED_TEXT_RENDERING,
+            SPECIFIED_COLOR_RENDERING
         ]
     )
     annotation class SpecifiedFlags2
@@ -951,6 +975,9 @@ internal class Style internal constructor(
         isolation: Isolation? = this.isolation,
         mixBlendMode: CSSBlendMode? = this.mixBlendMode,
         enableBackground: EnableBackground? = this.enableBackground,
+        shapeRendering: ShapeRendering? = this.shapeRendering,
+        textRendering: TextRendering? = this.textRendering,
+        colorRendering: ColorRendering? = this.colorRendering,
         fontKerning: FontKerning? = this.fontKerning,
         fontVariantLigatures: CSSFontFeatureSettings? = this.fontVariantLigatures,
         fontVariantPosition: CSSFontFeatureSettings? = this.fontVariantPosition,
@@ -1027,6 +1054,9 @@ internal class Style internal constructor(
             isolation = isolation,
             mixBlendMode = mixBlendMode,
             enableBackground = enableBackground,
+            shapeRendering = shapeRendering,
+            textRendering = textRendering,
+            colorRendering = colorRendering,
             fontKerning = fontKerning,
             fontVariantLigatures = fontVariantLigatures,
             fontVariantPosition = fontVariantPosition,
@@ -1156,6 +1186,12 @@ internal class Style internal constructor(
             append(mixBlendMode)
             append(", enableBackground=")
             append(enableBackground)
+            append(", shapeRendering=")
+            append(shapeRendering)
+            append(", textRendering=")
+            append(textRendering)
+            append(", colorRendering=")
+            append(colorRendering)
             append(", fontKerning=")
             append(fontKerning)
             append(", fontVariantLigatures=")
@@ -1273,6 +1309,9 @@ internal class Style internal constructor(
         const val SPECIFIED_PAINT_ORDER: Long = 1L shl 0
         const val SPECIFIED_ENABLE_BACKGROUND: Long = 1L shl 1
         const val SPECIFIED_COLOR_INTERPOLATION: Long = 1L shl 2
+        const val SPECIFIED_SHAPE_RENDERING: Long = 1L shl 3
+        const val SPECIFIED_TEXT_RENDERING: Long = 1L shl 4
+        const val SPECIFIED_COLOR_RENDERING: Long = 1L shl 5
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1774,6 +1813,27 @@ internal class Style internal constructor(
                     if (enableBackground != null) builder.addSpecifiedFlag2(SPECIFIED_ENABLE_BACKGROUND)
                 }
 
+                SVGAttr.shape_rendering -> {
+                    // Presentation attribute (SVG 1.1): both paths parse it.
+                    val shapeRendering = parseShapeRendering(value)
+                    builder.shapeRendering = shapeRendering
+                    if (shapeRendering != null) builder.addSpecifiedFlag2(SPECIFIED_SHAPE_RENDERING)
+                }
+
+                SVGAttr.text_rendering -> {
+                    // Presentation attribute (SVG 1.1): both paths parse it.
+                    val textRendering = parseTextRendering(value)
+                    builder.textRendering = textRendering
+                    if (textRendering != null) builder.addSpecifiedFlag2(SPECIFIED_TEXT_RENDERING)
+                }
+
+                SVGAttr.color_rendering -> {
+                    // Presentation attribute (SVG 1.1): both paths parse it.
+                    val colorRendering = parseColorRendering(value)
+                    builder.colorRendering = colorRendering
+                    if (colorRendering != null) builder.addSpecifiedFlag2(SPECIFIED_COLOR_RENDERING)
+                }
+
                 SVGAttr.font_kerning -> {
                     if (!isFromAttribute) {
                         val fontKerning = CSSFontFeatureSettings.parseFontKerning(value)
@@ -1885,6 +1945,7 @@ internal class Style internal constructor(
             SVGAttr.clip_rule -> SPECIFIED_CLIP_RULE
             SVGAttr.color -> SPECIFIED_COLOR
             SVGAttr.color_interpolation -> SPECIFIED_COLOR_INTERPOLATION
+            SVGAttr.color_rendering -> SPECIFIED_COLOR_RENDERING
             SVGAttr.color_interpolation_filters -> SPECIFIED_COLOR_INTERPOLATION_FILTERS
             SVGAttr.direction -> SPECIFIED_DIRECTION
             SVGAttr.display -> SPECIFIED_DISPLAY
@@ -1923,6 +1984,8 @@ internal class Style internal constructor(
             SVGAttr.opacity -> SPECIFIED_OPACITY
             SVGAttr.overflow -> SPECIFIED_OVERFLOW
             SVGAttr.paint_order -> SPECIFIED_PAINT_ORDER
+            SVGAttr.shape_rendering -> SPECIFIED_SHAPE_RENDERING
+            SVGAttr.text_rendering -> SPECIFIED_TEXT_RENDERING
             SVGAttr.solid_color -> SPECIFIED_SOLID_COLOR
             SVGAttr.solid_opacity -> SPECIFIED_SOLID_OPACITY
             SVGAttr.stop_color -> SPECIFIED_STOP_COLOR

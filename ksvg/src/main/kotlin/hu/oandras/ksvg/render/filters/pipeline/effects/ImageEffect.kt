@@ -29,11 +29,10 @@ import hu.oandras.ksvg.render.FeImageRenderNode
 
 /**
  * Raster `feImage` step: samples the decoded image bitmap pinned at the
- * filter-region origin (mirroring the CPU kernel, which returns the bitmap
- * unscaled and unclipped), transparent outside the image bounds (the CPU
- * output carries no content there either — verified against the software
- * bitmap when this step was added). Edge clamping inside the bounds is
- * exact at integer texel centers.
+ * filter-region origin (the legacy CPU shape, kept when no
+ * preserveAspectRatio mapping applies — the chain caller declines
+ * otherwise), transparent outside the image bounds. Edge clamping inside
+ * the bounds is exact at integer texel centers.
  *
  * Premultiplied note (standard across this package): the GPU texture
  * upload premultiplies, so translucent raster sources read back darker
@@ -73,8 +72,10 @@ private const val IMAGE_SHADER: String = """
  * @param node the image render node (decoded bitmap)
  * @param padX padY the device-space padding of the filter region top-left
  * (bitmap index space starts here, like the turbulence `uOffset`; the
- * image bounds are `pad + bitmap size`, device px == bitmap px — the CPU
- * returns the bitmap unscaled)
+ * image bounds are `pad + bitmap size`. Only used when the CPU output is
+ * the same unscaled blit — i.e. no preserveAspectRatio mapping, subregion
+ * at the region origin, matching bitmap size; the caller declines
+ * otherwise and software renders instead)
  * @param inputUniformName the shader-input uniform name (`uInput`)
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)

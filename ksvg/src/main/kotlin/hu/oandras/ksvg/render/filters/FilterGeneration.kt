@@ -18,7 +18,10 @@ package hu.oandras.ksvg.render.filters
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.Paint
 import android.graphics.RectF
+import hu.oandras.ksvg.PreserveAspectRatio
+import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.FeStitchTiles
 import hu.oandras.ksvg.dom.filter.FeTurbulenceType
 import hu.oandras.ksvg.filtering.SoftwareKernels
@@ -27,10 +30,17 @@ import hu.oandras.ksvg.render.FeImageRenderNode
 import hu.oandras.ksvg.render.FeTurbulenceRenderNode
 import hu.oandras.ksvg.render.FilterSourceMap
 import hu.oandras.ksvg.render.RenderContext
+import hu.oandras.ksvg.render.calculateViewBoxTransform
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.pool.withPooledObject
 import kotlin.math.ceil
 import kotlin.math.floor
+
+/**
+ * Shared immutable paint for feImage raster blits (bilinear scaling).
+ * Module-level: no per-frame allocation, never mutated after creation.
+ */
+private val feImageBitmapPaint: Paint = Paint(Paint.FILTER_BITMAP_FLAG)
 
 @SuppressLint("UseKtx")
 context(renderContext: RenderContext)
@@ -202,7 +212,33 @@ internal fun doFeImageFilter(
         return res
     }
     val bitmap = primitiveNode.image ?: return createBitmap(1, 1)
-    // feImage output size is determined by its primitive subregion, but the
-    // source bitmap might be different size, so we scale by the canvas (device) scale.
-    return bitmap
+    if (bitmap.width <= 0 || bitmap.height <= 0) {
+        // Degenerate source: transparent (pooled bitmaps come erased).
+        return renderContext.bitmapPool.acquireSameAs(inputBitmap)
+    }
+    // Raster feImage honors preserveAspectRatio (default xMidYMid meet,
+    // like <image>): the bitmap is mapped into the primitive subregion;
+    // letterbox spill stays transparent, slice overflow is clipped.
+    val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
+    renderContext.canvasPool.withPooledObject { c ->
+        c.setBitmap(res)
+        c.save()
+        c.clipRect(primitiveRegion)
+        renderContext.matrixPool.withPooledObject { m ->
+            calculateViewBoxTransform(
+                viewPortMinX = primitiveRegion.left,
+                viewPortMinY = primitiveRegion.top,
+                viewPortWidth = primitiveRegion.width(),
+                viewPortHeight = primitiveRegion.height(),
+                viewBox = Box(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat()),
+                positioning = primitiveNode.sourceElement.preserveAspectRatio
+                    ?: PreserveAspectRatio.LETTERBOX,
+                outMatrix = m,
+            )
+            c.concat(m)
+        }
+        c.drawBitmap(bitmap, 0f, 0f, feImageBitmapPaint)
+        c.restore()
+    }
+    return res
 }

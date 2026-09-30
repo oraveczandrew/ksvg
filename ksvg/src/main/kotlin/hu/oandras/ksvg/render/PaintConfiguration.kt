@@ -89,6 +89,15 @@ internal class PaintConfiguration {
     @JvmField
     var wordSpacing: Float = Float.NaN
 
+    /**
+     * Edge anti-aliasing switch (shape-rendering/text-rendering). Defaults to
+     * a freshly constructed Android Paint with ANTI_ALIAS_FLAG (true); paired
+     * snapshots start from the same configuration, so the first diff is a
+     * no-op like every other field.
+     */
+    @JvmField
+    var antiAlias: Boolean = true
+
     fun setColor(value: Int) {
         if (color != value) {
             color = value
@@ -190,6 +199,13 @@ internal class PaintConfiguration {
         }
     }
 
+    fun setAntiAlias(value: Boolean) {
+        if (antiAlias != value) {
+            antiAlias = value
+            bump()
+        }
+    }
+
     /** Copies all fields from [src]; bumps the version only when something changed. */
     fun setFrom(src: PaintConfiguration) {
         val changed =
@@ -207,7 +223,8 @@ internal class PaintConfiguration {
                     typeface !== src.typeface ||
                     fontVariationSettings != src.fontVariationSettings ||
                     fontFeatureSettings != src.fontFeatureSettings ||
-                    wordSpacing != src.wordSpacing
+                    wordSpacing != src.wordSpacing ||
+                    antiAlias != src.antiAlias
         if (changed) {
             color = src.color
             shader = src.shader
@@ -224,6 +241,7 @@ internal class PaintConfiguration {
             fontVariationSettings = src.fontVariationSettings
             fontFeatureSettings = src.fontFeatureSettings
             wordSpacing = src.wordSpacing
+            antiAlias = src.antiAlias
             bump()
         }
     }
@@ -249,6 +267,7 @@ internal class PaintConfiguration {
         fontVariationSettings = src.fontVariationSettings
         fontFeatureSettings = src.fontFeatureSettings
         wordSpacing = src.wordSpacing
+        antiAlias = src.antiAlias
     }
 
     companion object {
@@ -284,5 +303,6 @@ internal object PaintConfigSync {
         paint.typeface = cfg.typeface ?: Typeface.DEFAULT
         paint.fontFeatureSettings = cfg.fontFeatureSettings
         paint.fontVariationSettings = cfg.fontVariationSettings
+        paint.isAntiAlias = cfg.antiAlias
     }
 }

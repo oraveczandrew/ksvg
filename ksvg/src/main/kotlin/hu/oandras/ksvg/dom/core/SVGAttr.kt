@@ -167,6 +167,9 @@ internal enum class SVGAttr {
     text_decoration,
     text_orientation,
     text_transform,
+    text_rendering,
+    shape_rendering,
+    color_rendering,
     to,
     transform,
     type,
@@ -359,6 +362,9 @@ internal enum class SVGAttr {
             "text-decoration" -> text_decoration
             "text-orientation" -> text_orientation
             "text-transform" -> text_transform
+            "text-rendering" -> text_rendering
+            "shape-rendering" -> shape_rendering
+            "color-rendering" -> color_rendering
             "to" -> to
             "transform" -> transform
             "type" -> type
