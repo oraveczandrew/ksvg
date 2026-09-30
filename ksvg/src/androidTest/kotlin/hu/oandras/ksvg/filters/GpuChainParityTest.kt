@@ -75,12 +75,14 @@ class GpuChainParityTest {
     fun turbulenceMapBlend() {
         // Generative turbulence map displaces the source, the product
         // blends with SourceGraphic — a computed branch consumed by blend.
-        // Gates: ±1 LSB map quantization flips the truncated shift at
-        // scattered edge pixels (measured 37/65536, all within 1 px of an
-        // alpha/RGB edge, max 255 where the straddle crosses
-        // transparent↔opaque); the outlier ratio budgets them while the
-        // near-zero mean pins the field.
-        checkParity(
+        // Since `0711e303` linear-light blend needs its in2 as a bound raw
+        // shader and SourceGraphic has no raw form, this chain DELIBERATELY
+        // declines (see the in2 gate in `GpuFilterBackendApi33`): fallback
+        // routing + SW==HW parity is the assertion. Pixel gates from the
+        // all-GPU era are kept as documentation of the displaced-edge class
+        // (±1 LSB map quantization flips the truncated shift at scattered
+        // edge pixels); they re-activate if SourceGraphic-in2 ever binds.
+        checkFallback(
             name = "chainC2",
             svg = chainSvg(
                 """
@@ -89,8 +91,6 @@ class GpuChainParityTest {
                 <feBlend in="disp" in2="SourceGraphic" mode="multiply"/>
                 """.trimIndent(),
             ),
-            maxAbsTol = 255,
-            maxOutlierRatio = 0.002,
         )
     }
 

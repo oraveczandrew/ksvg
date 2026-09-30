@@ -44,10 +44,19 @@ private const val DISPLACEMENT_MAP_SHADER: String = """
                 // interpolate here; migrating both paths is future work. The
                 // CPU clamps out-of-range reads to the bitmap edge while this
                 // shader relies on the input effect's edge behavior instead.)
+                // `uMap` arrives premultiplied (hwui convention; e.g. the
+                // turbulence effect emits premultiplied since `b4d5020f`)
+                // while the CPU kernel shifts from straight map bytes, so
+                // unpremultiply first — same `rgb / alpha` convention as the
+                // colormatrix/blend/composite consumers. Alpha clamped to
+                // 1/255: under zero alpha premultiplied RGB is (0,0,0),
+                // matching the erased-transparent CPU bytes.
                 float4 mapColor = uMap.eval(floor(fragCoord) + 0.5);
+                float mapAlpha = max(mapColor.a, 0.0039215686);
+                float4 straightMap = float4(mapColor.rgb / mapAlpha, mapColor.a);
                 int2 d = int2(
-                    (getChannel(mapColor, uXChannel) - 0.5) * uScale.x,
-                    (getChannel(mapColor, uYChannel) - 0.5) * uScale.y
+                    (getChannel(straightMap, uXChannel) - 0.5) * uScale.x,
+                    (getChannel(straightMap, uYChannel) - 0.5) * uScale.y
                 );
                 return uInput.eval(floor(fragCoord + float2(d)) + 0.5);
             }

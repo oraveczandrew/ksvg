@@ -39,23 +39,27 @@ import org.junit.runners.Parameterized
  * reference + terminal UN_LINEARIZE, turb_seed8 precedent).
  * The SW render only feeds the vacuous-pass guard.
  *
- * Comparison space: straight bytes with the alpha-scaled quantization bound
- * (`translucentQuantK = 510`). `type=turbulence` alpha is abs-noise with most
+ * Comparison space: premultiplied reference with the alpha-scaled
+ * quantization bound (`translucentQuantK = 510`). Since `b4d5020f` the AGSL
+ * turbulence effect emits premultiplied terminal output (chained consumers
+ * unpremultiply `uInput`, hwui composites premultiplied), while the goldens
+ * pin the straight CPU convention — so the reference is converted, exactly
+ * like the displacement corpus. `type=turbulence` alpha is abs-noise with most
  * pixels near zero, where straight RGB is unrepresentable through premultiplied
  * 8-bit storage (at alpha 1 only {0, 255} survive): the GPU chain, the software
  * `Bitmap` round-trips, and the `ImageReader` readback each keep an equally
  * valid but byte-different survivor. The kernels themselves are proven exact
  * (native `TurbulenceNative` bit-matches Kotlin on-device; the AGSL shader
- * matches the golden within fp noise wherever alpha makes values observable).
+ * matches the premultiplied golden within fp noise wherever alpha makes
+ * values observable).
  * The bound stays tight at opaque pixels, so real kernel regressions (wrong
  * lattice/accumulation/EOTF) still fail there.
  *
  * Stitch cases (`periodX/Y != 0`): the GPU chain serves stitch
  * itself (`uTilePeriod` + adjusted frequencies + rsvg-form wrap offsets,
  * same math as FilterGeneration). Their goldens use device-derived params
- * (not corpus kernel params); comparison is straight
- * space like the rest (the chain emits straight, and a premultiplied
- * reference would crush low-alpha signal vacuously).
+ * (not corpus kernel params); comparison is premultiplied-reference
+ * like the rest (the chain emits premultiplied since `b4d5020f`).
  */
 @RunWith(Parameterized::class)
 class GpuTurbulenceCorpusParityTest(
@@ -107,11 +111,11 @@ class GpuTurbulenceCorpusParityTest(
             maxAbsTol = 4,
             maxOutlierRatio = 0.005,
             ignoreBoundaryFringe = true,
-            // Straight-space comparison with the alpha-scaled
-            // quantization bound (see class kdoc): premultiplying the
-            // reference would crush all low-alpha signal to ~0 and pass
-            // vacuously there, while straight comparison keeps the
-            // observable pixels tight.
+            // Premultiplied-reference comparison (chain emits premultiplied
+            // since `b4d5020f`; the golden pins straight CPU bytes): same
+            // convention as the displacement corpus. The alpha-scaled bound
+            // keeps opaque pixels tight — real kernel regressions still fail.
+            premultiplyReference = true,
             translucentQuantK = 510,
         )
     }
