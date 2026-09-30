@@ -27,3 +27,13 @@ internal fun getFilterInput(
     if (name == null) return lastResult
     return results.get(name)
 }
+
+/**
+ * Standard input names for the element's own paint, without its filter.
+ * `FillPaint` is the fill without the stroke; `StrokePaint` the stroke
+ * without the fill. Resolved from element-owned recordings (see
+ * `FilterSourceMap`), never from primitive `result`s (a primitive shadowing
+ * these names with its own `result` wins for later references, per spec).
+ */
+internal const val FILL_PAINT_INPUT: String = "FillPaint"
+internal const val STROKE_PAINT_INPUT: String = "StrokePaint"

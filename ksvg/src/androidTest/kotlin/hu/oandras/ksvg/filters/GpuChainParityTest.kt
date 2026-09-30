@@ -457,6 +457,34 @@ class GpuChainParityTest {
         )
     }
 
+    @Test
+    fun fillPaintDeclinesToSoftware() {
+        // FillPaint needs a per-element fill-only recording that the GPU chain
+        // cannot represent, so the chain must decline and both sides render SW
+        // bit-exactly. SW correctness (fill without stroke) is pinned by
+        // FillStrokePaintTest (host); this pins the routing. The stroked rect
+        // makes FillPaint differ from SourceGraphic, so the decline is load-
+        // bearing (an unstroked rect would pass vacuously).
+        checkFallback(
+            name = "chainFillPaintDecline",
+            svg = """
+                <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+                  <defs>
+                    <filter id="f" x="-20%" y="-20%" width="140%" height="140%">
+                      <feOffset in="FillPaint" dx="20" dy="0" result="shift"/>
+                      <feMerge>
+                        <feMergeNode in="shift"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <rect x="48" y="48" width="160" height="160" fill="#c83232"
+                        stroke="#2020c0" stroke-width="16" filter="url(#f)"/>
+                </svg>
+            """.trimIndent(),
+        )
+    }
+
     private fun checkParity(
         name: String,
         svg: String,

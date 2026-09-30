@@ -70,8 +70,10 @@ import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.filtering.StackBlurScratch
 import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.render.animation.AnimationNode
+import hu.oandras.ksvg.render.filters.FILL_PAINT_INPUT
 import hu.oandras.ksvg.render.filters.LightVector
 import hu.oandras.ksvg.render.filters.NormalVector
+import hu.oandras.ksvg.render.filters.STROKE_PAINT_INPUT
 import hu.oandras.ksvg.render.filters.pipeline.FilterPrimitiveSet
 import hu.oandras.ksvg.render.filters.pipeline.GpuFilterSlot
 import androidx.collection.ArrayMap
@@ -179,6 +181,15 @@ internal sealed class RenderNode<T: SvgObject>(
 
     @JvmField var cachedFilterOutput: Bitmap? = null
     @JvmField var cachedSourceContent: Bitmap? = null
+    /**
+     * Element-owned `FillPaint`/`StrokePaint` recordings (software filter
+     * backend only): the element with only-fill / only-stroke, same size as
+     * [cachedSourceContent], re-recorded whenever the source re-records.
+     * Owned by the node (like [cachedSourceContent]); `FilterSourceMap`
+     * borrows them per run and never releases them.
+     */
+    @JvmField var cachedFillPaint: Bitmap? = null
+    @JvmField var cachedStrokePaint: Bitmap? = null
     
     @JvmField var lastSourceVersion: Int = -1
     @JvmField var lastFilterVersion: Int = -1
@@ -242,6 +253,14 @@ internal sealed class RenderNode<T: SvgObject>(
             bitmapPool.release(it)
             cachedSourceContent = null
         }
+        cachedFillPaint?.let {
+            bitmapPool.release(it)
+            cachedFillPaint = null
+        }
+        cachedStrokePaint?.let {
+            bitmapPool.release(it)
+            cachedStrokePaint = null
+        }
         filterNode?.recycle()
     }
 
@@ -253,6 +272,7 @@ internal sealed class RenderNode<T: SvgObject>(
      */
     internal open fun retainedByteCount(): Long {
         var total = cachedFilterOutput.retainedBytes() + cachedSourceContent.retainedBytes()
+        total += cachedFillPaint.retainedBytes() + cachedStrokePaint.retainedBytes()
         total += filterNode?.retainedByteCount() ?: 0L
         total += maskNode?.retainedByteCount() ?: 0L
         total += clipPathNode?.retainedByteCount() ?: 0L
@@ -264,7 +284,7 @@ internal sealed class RenderNode<T: SvgObject>(
     }
 
     override fun toString(): String {
-        return "RenderNode(sourceElement=$sourceElement, transform=$transform, viewBoxTransform=$viewBoxTransform, opacity=$opacity, filterNode=$filterNode, maskNode=$maskNode, clipPathNode=$clipPathNode, clipShape=$clipShape, markerStartNode=$markerStartNode, markerMidNode=$markerMidNode, markerEndNode=$markerEndNode, fillPatternNode=$fillPatternNode, strokePatternNode=$strokePatternNode, fillPaintRef=$fillPaintRef, strokePaintRef=$strokePaintRef, animationNodes=$animationNodes, renderState=$renderState, boundingBox=$boundingBox, version=$version, contentVersion=$contentVersion, cachedFilterOutput=$cachedFilterOutput, cachedSourceContent=$cachedSourceContent, lastSourceVersion=$lastSourceVersion, lastFilterVersion=$lastFilterVersion, lastScaleX=$lastScaleX, lastScaleY=$lastScaleY)"
+        return "RenderNode(sourceElement=$sourceElement, transform=$transform, viewBoxTransform=$viewBoxTransform, opacity=$opacity, filterNode=$filterNode, maskNode=$maskNode, clipPathNode=$clipPathNode, clipShape=$clipShape, markerStartNode=$markerStartNode, markerMidNode=$markerMidNode, markerEndNode=$markerEndNode, fillPatternNode=$fillPatternNode, strokePatternNode=$strokePatternNode, fillPaintRef=$fillPaintRef, strokePaintRef=$strokePaintRef, animationNodes=$animationNodes, renderState=$renderState, boundingBox=$boundingBox, version=$version, contentVersion=$contentVersion, cachedFilterOutput=$cachedFilterOutput, cachedSourceContent=$cachedSourceContent, cachedFillPaint=$cachedFillPaint, cachedStrokePaint=$cachedStrokePaint, lastSourceVersion=$lastSourceVersion, lastFilterVersion=$lastFilterVersion, lastScaleX=$lastScaleX, lastScaleY=$lastScaleY)"
     }
 }
 
@@ -643,6 +663,46 @@ internal class FilterRenderNode(
 
     @JvmField var version: Int = 0
     @JvmField var contentVersion: Int = 0
+
+    /**
+     * True when any primitive reads the element's fill paint ([FILL_PAINT_INPUT])
+     * / stroke paint ([STROKE_PAINT_INPUT]). Computed once at build (the only
+     * construction site is `buildFilter`), so per-frame backend selection and
+     * recording decisions cost a field read. Input names are structural (not
+     * animatable), so no version tracking is needed.
+     */
+    @JvmField var usesFillPaint: Boolean = false
+    @JvmField var usesStrokePaint: Boolean = false
+
+    init {
+        for (primitive in primitives) {
+            if (usesFillPaint && usesStrokePaint) break
+            val src = primitive.sourceElement
+            if (src.`in` == FILL_PAINT_INPUT) usesFillPaint = true
+            if (src.`in` == STROKE_PAINT_INPUT) usesStrokePaint = true
+            when (src) {
+                is FeBlend -> {
+                    if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
+                    if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
+                }
+                is FeComposite -> {
+                    if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
+                    if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
+                }
+                is FeDisplacementMap -> {
+                    if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
+                    if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
+                }
+                else -> {}
+            }
+            if (primitive is FeMergeRenderNode) {
+                for (id in primitive.mergeNodes) {
+                    if (id == FILL_PAINT_INPUT) usesFillPaint = true
+                    if (id == STROKE_PAINT_INPUT) usesStrokePaint = true
+                }
+            }
+        }
+    }
 
     fun collectPrimitives(): FilterPrimitiveSet {
         var bits = 0

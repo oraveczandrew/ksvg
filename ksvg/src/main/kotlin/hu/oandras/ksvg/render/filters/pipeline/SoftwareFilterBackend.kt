@@ -169,6 +169,56 @@ internal class SoftwareFilterBackend internal constructor(
         activeNode = null
     }
 
+    /**
+     * Starts recording the `FillPaint` (`fill = true`) or `StrokePaint`
+     * (`fill = false`) variant of the element: same geometry/transform as the
+     * source record, into the node-owned cached bitmap. Returns the canvas to
+     * record into, or null when the cached variant is still valid (the source
+     * did not re-record and the bitmap exists with matching size).
+     *
+     * The caller invokes the state-toggled record lambda synchronously (see
+     * `renderWithFilter`) and must not retain the canvas. Variants piggyback
+     * the source version (re-recorded whenever the source re-records), so no
+     * separate version is tracked. Bitmaps come erased from the pool; a reused
+     * same-size bitmap is erased explicitly before re-recording.
+     */
+    fun beginPaintRecording(
+        node: RenderNode<*>,
+        width: Int,
+        height: Int,
+        matrix: Matrix,
+        newMatrix: Matrix,
+        deviceRegion: RectF,
+        fill: Boolean,
+        sourceReRecorded: Boolean,
+    ): Canvas? {
+        var variant = if (fill) node.cachedFillPaint else node.cachedStrokePaint
+        if (variant != null && (variant.isRecycled || variant.width != width || variant.height != height)) {
+            renderContext.bitmapPool.release(variant)
+            variant = null
+        }
+        if (variant == null) {
+            variant = renderContext.bitmapPool.acquire(width, height, Bitmap.Config.ARGB_8888)
+            if (fill) {
+                node.cachedFillPaint = variant
+            } else {
+                node.cachedStrokePaint = variant
+            }
+        } else if (!sourceReRecorded) {
+            return null
+        } else {
+            variant.eraseColor(0)
+        }
+
+        newMatrix.set(matrix)
+        newMatrix.postTranslate(-deviceRegion.left, -deviceRegion.top)
+        recordCanvas.setBitmap(variant)
+        // NB: property syntax (`recordCanvas.matrix = …`) does not compile
+        // (getter-only); mirrors beginRecording's setMatrix above.
+        recordCanvas.setMatrix(newMatrix)
+        return recordCanvas
+    }
+
     override fun drawFiltered(
         canvas: Canvas,
         node: RenderNode<*>,
@@ -208,6 +258,8 @@ internal class SoftwareFilterBackend internal constructor(
         val filteredBitmap = applyFilterToBitmap(
             canvas = canvas,
             sourceBitmap = sourceBitmap,
+            fillPaint = node.cachedFillPaint,
+            strokePaint = node.cachedStrokePaint,
             filterRegion = filterRegion,
             deviceRegion = deviceRegion,
             sx = sx,
@@ -302,6 +354,8 @@ internal class SoftwareFilterBackend internal constructor(
     internal fun applyFilterToBitmap(
         canvas: Canvas,
         sourceBitmap: Bitmap,
+        fillPaint: Bitmap?,
+        strokePaint: Bitmap?,
         filterRegion: RectF,
         deviceRegion: RectF,
         sx: Float,
@@ -316,7 +370,7 @@ internal class SoftwareFilterBackend internal constructor(
             filterNode.filterSourceMap = it
         }
 
-        results.reInitWith(sourceBitmap)
+        results.reInitWith(sourceBitmap, fillPaint, strokePaint)
 
         // The filter bitmap is sized to the *device-space* filter region, while
         // `filterRegion` (below) is in user space. Per-primitive subregion clipping

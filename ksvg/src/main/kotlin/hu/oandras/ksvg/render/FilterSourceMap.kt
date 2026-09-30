@@ -20,6 +20,8 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import androidx.collection.ArrayMap
 import hu.oandras.ksvg.render.pool.PoolOwner
+import hu.oandras.ksvg.render.filters.FILL_PAINT_INPUT
+import hu.oandras.ksvg.render.filters.STROKE_PAINT_INPUT
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.forEachKey
 import hu.oandras.ksvg.utils.forEachValue
@@ -37,11 +39,20 @@ internal class FilterSourceMap(
     private val resultRegion = ArrayMap<String, RectF>()
 
     private var sourceGraphic: Bitmap? = null
+    /**
+     * Element-owned `FillPaint`/`StrokePaint` recordings (see
+     * `RenderNode.cachedFillPaint`). Borrowed per run like [sourceGraphic]:
+     * never released nor byte-counted here (the node owns them).
+     */
+    private var fillPaint: Bitmap? = null
+    private var strokePaint: Bitmap? = null
 
-    fun reInitWith(sourceGraphic: Bitmap) {
+    fun reInitWith(sourceGraphic: Bitmap, fillPaint: Bitmap?, strokePaint: Bitmap?) {
         clearMap()
         this.sourceGraphic = sourceGraphic
         results["SourceGraphic"] = sourceGraphic
+        this.fillPaint = fillPaint
+        this.strokePaint = strokePaint
 
         resultsWithoutId.clear()
     }
@@ -68,16 +79,17 @@ internal class FilterSourceMap(
 
     fun get(id: String): Bitmap? {
         return results[id] ?: run {
-            if (id == "SourceAlpha") {
-                sourceGraphic?.let { sourceGraphic ->
+            when (id) {
+                "SourceAlpha" -> sourceGraphic?.let { sourceGraphic ->
                     poolOwner.run {
                         extractAlpha(sourceGraphic).also {
                             results["SourceAlpha"] = it
                         }
                     }
                 }
-            } else {
-                null
+                FILL_PAINT_INPUT -> fillPaint
+                STROKE_PAINT_INPUT -> strokePaint
+                else -> null
             }
         }
     }
@@ -97,8 +109,11 @@ internal class FilterSourceMap(
             // `sourceGraphic` is owned by the element that hosts the filter (its cached
             // source content), not by this map. Releasing it here would hand a live,
             // referenced bitmap back to the pool, where `clear()` could recycle it and
-            // cause a later "trying to use a recycled bitmap" crash.
-            if (bitmap !== exclude && bitmap !== sourceGraphic) {
+            // cause a later "trying to use a recycled bitmap" crash. The element-owned
+            // `fillPaint`/`strokePaint` recordings are excluded for the same reason.
+            if (bitmap !== exclude && bitmap !== sourceGraphic &&
+                bitmap !== fillPaint && bitmap !== strokePaint
+            ) {
                 bitmapPool.release(bitmap)
             }
         }
@@ -128,7 +143,7 @@ internal class FilterSourceMap(
         var total = 0L
         try {
             results.forEachValue { bitmap ->
-                if (bitmap !== sourceGraphic) {
+                if (bitmap !== sourceGraphic && bitmap !== fillPaint && bitmap !== strokePaint) {
                     total += bitmap.retainedBytes()
                 }
             }

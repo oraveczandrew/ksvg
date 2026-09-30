@@ -1158,6 +1158,62 @@ internal class Renderer internal constructor(
                                     }
                                 }
                             }
+                            // FillPaint/StrokePaint variants (software backend only; the
+                            // GPU backend declines such graphs in obtainFilterBackend, so
+                            // it never needs them). Two separate inline branches — not a
+                            // wrapped lambda — so nothing is captured and nothing
+                            // allocates on this hot path. The toggled flags are saved
+                            // and restored; shapes/text read them from the passed
+                            // state, container children reset from their own state
+                            // (their FillPaint degrades to SourceGraphic-equivalent).
+                            val swBackend = backend as? SoftwareFilterBackend
+                            if (swBackend != null &&
+                                (filterNode.usesFillPaint || filterNode.usesStrokePaint)
+                            ) {
+                                val sourceReRecorded = recCanvas != null
+                                if (filterNode.usesFillPaint) {
+                                    val fillCanvas = swBackend.beginPaintRecording(
+                                        node = node,
+                                        width = width,
+                                        height = height,
+                                        matrix = matrix,
+                                        newMatrix = newMatrix,
+                                        deviceRegion = deviceRegion,
+                                        fill = true,
+                                        sourceReRecorded = sourceReRecorded,
+                                    )
+                                    if (fillCanvas != null) {
+                                        val oldStroke = state.hasStroke
+                                        state.hasStroke = false
+                                        try {
+                                            r(fillCanvas, state)
+                                        } finally {
+                                            state.hasStroke = oldStroke
+                                        }
+                                    }
+                                }
+                                if (filterNode.usesStrokePaint) {
+                                    val strokeCanvas = swBackend.beginPaintRecording(
+                                        node = node,
+                                        width = width,
+                                        height = height,
+                                        matrix = matrix,
+                                        newMatrix = newMatrix,
+                                        deviceRegion = deviceRegion,
+                                        fill = false,
+                                        sourceReRecorded = sourceReRecorded,
+                                    )
+                                    if (strokeCanvas != null) {
+                                        val oldFill = state.hasFill
+                                        state.hasFill = false
+                                        try {
+                                            r(strokeCanvas, state)
+                                        } finally {
+                                            state.hasFill = oldFill
+                                        }
+                                    }
+                                }
+                            }
                             backend.drawFiltered(
                                 canvas = canvas,
                                 node = node,
@@ -1347,6 +1403,15 @@ internal class Renderer internal constructor(
         // GPU effect-chain attempt (RenderEffect + RenderNode recording).
         // Only for graphs Impl31 represents exactly, and only when the element
         // would not need a separate compositing layer for the result.
+        // FillPaint/StrokePaint inputs need per-element fill-only/stroke-only
+        // recordings that the GPU chain cannot represent: decline to software.
+        if (filterNode.usesFillPaint || filterNode.usesStrokePaint) {
+            logD(TAG) {
+                "Filter '${filterNode.sourceElement.id}' uses FillPaint/StrokePaint inputs; " +
+                    "declining GPU chain, software backend renders instead."
+            }
+            return softwareBackend ?: gpuBackendFactory.createSoftware(this).also { softwareBackend = it }
+        }
         if (!forceSoftwareFiltering && canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 31 &&
             state.style.opacity == 1f && state.style.mixBlendMode == CSSBlendMode.normal
         ) {
