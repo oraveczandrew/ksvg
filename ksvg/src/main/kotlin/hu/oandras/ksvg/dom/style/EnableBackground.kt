@@ -21,8 +21,8 @@ package hu.oandras.ksvg.dom.style
  * (`accumulate | new [<x> <y> <width> <height>]`).
  *
  * The property is not inherited: each container element either accumulates
- * into the parent backdrop ([Accumulate], the initial value) or establishes
- * a new one ([New], optionally clipped to [bounds]).
+ * into the parent backdrop ([EnableBackground.Accumulate], the initial value) or establishes
+ * a new one ([EnableBackground.New], optionally clipped to a subregion).
  *
  * Backdrop capture itself is not implemented yet (BackgroundImage resolves
  * to transparent); the parsed value is stored so Phase B can consume it.
