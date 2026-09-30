@@ -494,6 +494,10 @@ internal fun updateStyle(
         builder.paintOrder = sourceStyle.paintOrder
     }
 
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_ENABLE_BACKGROUND)) {
+        builder.enableBackground = sourceStyle.enableBackground
+    }
+
     builder.addSpecifiedFlag(sourceStyle.specifiedFlags and sourceStyle.suppressedFlags.inv())
     builder.addSpecifiedFlag2(sourceStyle.specifiedFlags2)
 }

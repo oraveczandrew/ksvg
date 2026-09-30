@@ -154,6 +154,7 @@ internal class Style internal constructor(
 
     @JvmField val isolation: Isolation?,
     @JvmField val mixBlendMode: CSSBlendMode?,
+    @JvmField val enableBackground: EnableBackground?,
 
     @JvmField val fontKerning: FontKerning?,
 
@@ -251,6 +252,7 @@ internal class Style internal constructor(
         imageRendering = null,
         isolation = null,
         mixBlendMode = null,
+        enableBackground = null,
         fontKerning = null,
         fontVariantLigatures = null,
         fontVariantPosition = null,
@@ -393,6 +395,8 @@ internal class Style internal constructor(
         @JvmField
         var mixBlendMode: CSSBlendMode? = null
         @JvmField
+        var enableBackground: EnableBackground? = null
+        @JvmField
         var fontKerning: FontKerning? = null
         @JvmField
         var fontVariantLigatures: CSSFontFeatureSettings? = null
@@ -513,6 +517,7 @@ internal class Style internal constructor(
             if (kw and SPECIFIED_VECTOR_EFFECT == 0L) this.vectorEffect = VectorEffect.None
             if (kw and SPECIFIED_ISOLATION == 0L) this.isolation = Isolation.auto
             if (kw and SPECIFIED_MIX_BLEND_MODE == 0L) this.mixBlendMode = CSSBlendMode.normal
+            if (kw and SPECIFIED_ENABLE_BACKGROUND == 0L) this.enableBackground = EnableBackground.Accumulate
             return this
         }
 
@@ -580,6 +585,7 @@ internal class Style internal constructor(
             this.imageRendering = original.imageRendering
             this.isolation = original.isolation
             this.mixBlendMode = original.mixBlendMode
+            this.enableBackground = original.enableBackground
             this.fontKerning = original.fontKerning
             this.fontVariantLigatures = original.fontVariantLigatures
             this.fontVariantPosition = original.fontVariantPosition
@@ -669,6 +675,7 @@ internal class Style internal constructor(
                 imageRendering = imageRendering,
                 isolation = isolation,
                 mixBlendMode = mixBlendMode,
+                enableBackground = enableBackground,
                 fontKerning = fontKerning,
                 fontVariantLigatures = fontVariantLigatures,
                 fontVariantPosition = fontVariantPosition,
@@ -755,6 +762,7 @@ internal class Style internal constructor(
                     imageRendering == original.imageRendering &&
                     isolation == original.isolation &&
                     mixBlendMode == original.mixBlendMode &&
+                    enableBackground == original.enableBackground &&
                     fontKerning == original.fontKerning &&
                     fontVariantLigatures == original.fontVariantLigatures &&
                     fontVariantPosition == original.fontVariantPosition &&
@@ -848,7 +856,8 @@ internal class Style internal constructor(
     @LongDef(
         flag = true,
         value = [
-            SPECIFIED_PAINT_ORDER
+            SPECIFIED_PAINT_ORDER,
+            SPECIFIED_ENABLE_BACKGROUND
         ]
     )
     annotation class SpecifiedFlags2
@@ -930,6 +939,7 @@ internal class Style internal constructor(
         imageRendering: RenderQuality? = this.imageRendering,
         isolation: Isolation? = this.isolation,
         mixBlendMode: CSSBlendMode? = this.mixBlendMode,
+        enableBackground: EnableBackground? = this.enableBackground,
         fontKerning: FontKerning? = this.fontKerning,
         fontVariantLigatures: CSSFontFeatureSettings? = this.fontVariantLigatures,
         fontVariantPosition: CSSFontFeatureSettings? = this.fontVariantPosition,
@@ -1003,6 +1013,7 @@ internal class Style internal constructor(
             imageRendering = imageRendering,
             isolation = isolation,
             mixBlendMode = mixBlendMode,
+            enableBackground = enableBackground,
             fontKerning = fontKerning,
             fontVariantLigatures = fontVariantLigatures,
             fontVariantPosition = fontVariantPosition,
@@ -1129,6 +1140,8 @@ internal class Style internal constructor(
             append(isolation)
             append(", mixBlendMode=")
             append(mixBlendMode)
+            append(", enableBackground=")
+            append(enableBackground)
             append(", fontKerning=")
             append(fontKerning)
             append(", fontVariantLigatures=")
@@ -1242,6 +1255,7 @@ internal class Style internal constructor(
 
         // Second flag group (specifiedFlags2) — the first 64 bits are exhausted.
         const val SPECIFIED_PAINT_ORDER: Long = 1L shl 0
+        const val SPECIFIED_ENABLE_BACKGROUND: Long = 1L shl 1
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1300,6 +1314,7 @@ internal class Style internal constructor(
             def.imageRendering = RenderQuality.auto
             def.isolation = Isolation.auto
             def.mixBlendMode = CSSBlendMode.normal
+            def.enableBackground = EnableBackground.Accumulate
             def.fontKerning = FontKerning.auto
             def.fontVariantLigatures = CSSFontFeatureSettings.LIGATURES_NORMAL
             def.fontVariantPosition = CSSFontFeatureSettings.POSITION_ALL_OFF
@@ -1725,6 +1740,14 @@ internal class Style internal constructor(
                     }
                 }
 
+                SVGAttr.enable_background -> {
+                    // Unlike isolation/mix-blend-mode, enable-background IS a
+                    // presentation attribute (SVG 1.1), so both paths parse it.
+                    val enableBackground = parseEnableBackground(value)
+                    builder.enableBackground = enableBackground
+                    if (enableBackground != null) builder.addSpecifiedFlag2(SPECIFIED_ENABLE_BACKGROUND)
+                }
+
                 SVGAttr.font_kerning -> {
                     if (!isFromAttribute) {
                         val fontKerning = CSSFontFeatureSettings.parseFontKerning(value)
@@ -1839,6 +1862,7 @@ internal class Style internal constructor(
             SVGAttr.direction -> SPECIFIED_DIRECTION
             SVGAttr.display -> SPECIFIED_DISPLAY
             SVGAttr.dominant_baseline -> SPECIFIED_DOMINANT_BASELINE
+            SVGAttr.enable_background -> SPECIFIED_ENABLE_BACKGROUND
             SVGAttr.fill -> SPECIFIED_FILL
             SVGAttr.fill_opacity -> SPECIFIED_FILL_OPACITY
             SVGAttr.fill_rule -> SPECIFIED_FILL_RULE

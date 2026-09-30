@@ -1115,6 +1115,61 @@ class StylePropertyParsingTest {
         assertEquals(Isolation.auto, s.isolation)
     }
 
+    // --- enable-background (presentation attribute AND style) ---
+
+    @Test
+    fun testEnableBackgroundAccumulate() {
+        val s = process("enable-background", "accumulate").buildAndGet()
+        assertEquals(EnableBackground.Accumulate, s.enableBackground)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_ENABLE_BACKGROUND))
+    }
+
+    @Test
+    fun testEnableBackgroundAccumulateFromAttribute() {
+        // Unlike isolation, enable-background IS a presentation attribute.
+        val s = process("enable-background", "accumulate", isFromAttribute = true).buildAndGet()
+        assertEquals(EnableBackground.Accumulate, s.enableBackground)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_ENABLE_BACKGROUND))
+    }
+
+    @Test
+    fun testEnableBackgroundNew() {
+        val s = process("enable-background", "new", isFromAttribute = true).buildAndGet()
+        assertEquals(EnableBackground.New(null, null, null, null), s.enableBackground)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_ENABLE_BACKGROUND))
+    }
+
+    @Test
+    fun testEnableBackgroundNewWithBounds() {
+        val s = process("enable-background", "new 10 20 30 40").buildAndGet()
+        assertEquals(EnableBackground.New(10f, 20f, 30f, 40f), s.enableBackground)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_ENABLE_BACKGROUND))
+    }
+
+    @Test
+    fun testEnableBackgroundCaseInsensitiveAndCommaSeparated() {
+        val s = process("enable-background", "NEW 0, 0, 100, 50").buildAndGet()
+        assertEquals(EnableBackground.New(0f, 0f, 100f, 50f), s.enableBackground)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_ENABLE_BACKGROUND))
+    }
+
+    @Test
+    fun testEnableBackgroundInvalid() {
+        for (value in listOf("banana", "new 10 20", "new 10 20 30", "accumulate new", "new 1 2 3 x", "new 1 2 3 4 5")) {
+            val s = process("enable-background", value).buildAndGet()
+            assertFalse(specified(s.specifiedFlags2, Style.SPECIFIED_ENABLE_BACKGROUND))
+            assertNull(s.enableBackground)
+        }
+    }
+
+    @Test
+    fun testEnableBackgroundResetDefault() {
+        val builder = Style.Builder()
+        builder.reset(Style())
+        builder.resetNonInheritingProperties(isRootSVG = false)
+        assertEquals(EnableBackground.Accumulate, builder.enableBackground)
+    }
+
     // --- mask-type ---
 
     @Test

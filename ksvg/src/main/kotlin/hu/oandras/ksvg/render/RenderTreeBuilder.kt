@@ -1913,6 +1913,12 @@ internal class RenderTreeBuilder(
             }
 
             val node = FilterRenderNode(filter, primitives)
+            if (node.usesBackgroundImage || node.usesBackgroundAlpha) {
+                // Build-time, once per cached filter: the software backend
+                // resolves both inputs to transparent (no backdrop capture
+                // yet), so warn instead of silently misrendering.
+                logW("KSVG") { "Filter '${filter.id}' uses BackgroundImage/BackgroundAlpha, which resolve to transparent (backdrop capture not implemented yet)" }
+            }
             node.renderState.apply(state)
             val filterMode = filter.style?.colorInterpolationFilters
                 ?.takeIf { it != ColorInterpolation.UNSPECIFIED }

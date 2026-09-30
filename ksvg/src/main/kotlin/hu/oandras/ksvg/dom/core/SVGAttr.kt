@@ -83,6 +83,7 @@ internal enum class SVGAttr {
 
     // id,
     image_rendering,
+    enable_background,
     isolation,
     k1, k2, k3, k4,
     letter_spacing,
@@ -253,6 +254,7 @@ internal enum class SVGAttr {
             "in2" -> in2
             "intercept" -> intercept
             "image-rendering" -> image_rendering
+            "enable-background" -> enable_background
             "isolation" -> isolation
             "k1" -> k1
             "k2" -> k2
