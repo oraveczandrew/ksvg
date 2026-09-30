@@ -92,6 +92,9 @@ internal object ColorParser {
                 if (scan.skipCommaWhitespace()) {
                     alpha = scan.nextFloat()
                     require(!alpha.isNaN()) { "Invalid alpha component in legacy rgb color: $value" }
+                    if (scan.consume('%')) {
+                        alpha /= 100f
+                    }
                 }
             } else {
                 scan.skipWhitespace()
@@ -99,6 +102,9 @@ internal object ColorParser {
                     scan.skipWhitespace()
                     alpha = scan.nextFloat()
                     require(!alpha.isNaN()) { "Invalid alpha component in rgb color: $value" }
+                    if (scan.consume('%')) {
+                        alpha /= 100f
+                    }
                 }
             }
             scan.skipWhitespace()
@@ -141,6 +147,9 @@ internal object ColorParser {
                     if (scan.skipCommaWhitespace()) {
                         alpha = scan.nextFloat()
                         require(!alpha.isNaN()) { "Invalid alpha component in legacy hsl color: $value" }
+                        if (scan.consume('%')) {
+                            alpha /= 100f
+                        }
                     }
                 } else {
                     scan.skipWhitespace()
@@ -148,6 +157,9 @@ internal object ColorParser {
                         scan.skipWhitespace()
                         alpha = scan.nextFloat()
                         require(!alpha.isNaN()) { "Invalid alpha component in hsl color: $value" }
+                        if (scan.consume('%')) {
+                            alpha /= 100f
+                        }
                     }
                 }
                 scan.skipWhitespace()
