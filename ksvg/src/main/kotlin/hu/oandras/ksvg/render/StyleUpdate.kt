@@ -544,6 +544,10 @@ internal fun updateStyle(
         builder.colorRendering = sourceStyle.colorRendering
     }
 
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_FONT_SIZE_ADJUST)) {
+        builder.fontSizeAdjust = sourceStyle.fontSizeAdjust
+    }
+
     if (sourceStyle.isSpecified2(Style.SPECIFIED_TRANSFORM_ORIGIN)) {
         builder.transformOrigin = sourceStyle.transformOrigin
     }

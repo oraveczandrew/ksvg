@@ -1450,6 +1450,47 @@ class StylePropertyParsingTest {
         assertNull(builder.transformBox)
     }
 
+    // --- font-size-adjust (inherited) ---
+
+    @Test
+    fun testFontSizeAdjustNumber() {
+        val s = process("font-size-adjust", "0.5", isFromAttribute = true).buildAndGet()
+        assertEquals(0.5f, s.fontSizeAdjust)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_FONT_SIZE_ADJUST))
+    }
+
+    @Test
+    fun testFontSizeAdjustNoneAndAuto() {
+        assertTrue(process("font-size-adjust", "none").buildAndGet().fontSizeAdjust.isNaN())
+        assertTrue(process("font-size-adjust", "auto").buildAndGet().fontSizeAdjust.isNaN())
+        assertTrue(
+            specified(
+                process("font-size-adjust", "none").buildAndGet().specifiedFlags2,
+                Style.SPECIFIED_FONT_SIZE_ADJUST
+            )
+        )
+    }
+
+    @Test
+    fun testFontSizeAdjustInvalid() {
+        for (value in listOf("banana", "-0.5", "")) {
+            val s = process("font-size-adjust", value).buildAndGet()
+            assertFalse(specified(s.specifiedFlags2, Style.SPECIFIED_FONT_SIZE_ADJUST))
+            assertTrue(s.fontSizeAdjust.isNaN())
+        }
+    }
+
+    @Test
+    fun testFontSizeAdjustInheritedByDefault() {
+        // Inherited: reset keeps the parent value (no reset in
+        // resetNonInheritingProperties).
+        val builder = Style.Builder()
+        builder.reset(Style())
+        builder.fontSizeAdjust = 0.5f
+        builder.resetNonInheritingProperties(isRootSVG = false)
+        assertEquals(0.5f, builder.fontSizeAdjust)
+    }
+
     // --- mask-type ---
 
     @Test

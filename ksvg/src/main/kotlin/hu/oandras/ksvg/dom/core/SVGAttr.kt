@@ -64,7 +64,7 @@ internal enum class SVGAttr {
     font_weight,
     from,
 
-    // font_size_adjust
+    font_size_adjust,
     font_kerning,
     font_variant,
     font_variant_ligatures,
@@ -251,6 +251,7 @@ internal enum class SVGAttr {
             "font-weight" -> font_weight
             "from" -> from
             "font-kerning" -> font_kerning
+            "font-size-adjust" -> font_size_adjust
             "font-variant" -> font_variant
             "font-variant-ligatures" -> font_variant_ligatures
             "font-variant-position" -> font_variant_position

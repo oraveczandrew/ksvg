@@ -104,6 +104,7 @@ internal class Style internal constructor(
 
     @JvmField val fontFamily: List<String>?,
     @JvmField val fontSize: CSSLength?,
+    @JvmField val fontSizeAdjust: Float,
     @JvmField val fontWeight: Float,
     @JvmField val fontStyle: FontStyle?,
     @JvmField val fontWidth: Float,
@@ -228,6 +229,7 @@ internal class Style internal constructor(
         color = null,
         fontFamily = null,
         fontSize = null,
+        fontSizeAdjust = Float.NaN,
         fontWeight = Float.NaN,
         fontStyle = null,
         fontWidth = Float.NaN,
@@ -340,6 +342,8 @@ internal class Style internal constructor(
         var fontFamily: List<String>? = null
         @JvmField
         var fontSize: CSSLength? = null
+        @JvmField
+        var fontSizeAdjust: Float = Float.NaN
         @JvmField
         var fontWeight: Float = Float.NaN
         @JvmField
@@ -584,6 +588,7 @@ internal class Style internal constructor(
             this.color = original.color
             this.fontFamily = original.fontFamily
             this.fontSize = original.fontSize
+            this.fontSizeAdjust = original.fontSizeAdjust
             this.fontWeight = original.fontWeight
             this.fontStyle = original.fontStyle
             this.fontWidth = original.fontWidth
@@ -680,6 +685,7 @@ internal class Style internal constructor(
                 color = color,
                 fontFamily = fontFamily,
                 fontSize = fontSize,
+                fontSizeAdjust = fontSizeAdjust,
                 fontWeight = fontWeight,
                 fontStyle = fontStyle,
                 fontWidth = fontWidth,
@@ -773,6 +779,7 @@ internal class Style internal constructor(
                     color == original.color &&
                     fontFamily == original.fontFamily &&
                     fontSize == original.fontSize &&
+                    (fontSizeAdjust == original.fontSizeAdjust || (fontSizeAdjust.isNaN() && original.fontSizeAdjust.isNaN())) &&
                     (fontWeight == original.fontWeight || (fontWeight.isNaN() && original.fontWeight.isNaN())) &&
                     fontStyle == original.fontStyle &&
                     (fontWidth == original.fontWidth || (fontWidth.isNaN() && original.fontWidth.isNaN())) &&
@@ -915,7 +922,8 @@ internal class Style internal constructor(
             SPECIFIED_TEXT_RENDERING,
             SPECIFIED_COLOR_RENDERING,
             SPECIFIED_TRANSFORM_ORIGIN,
-            SPECIFIED_TRANSFORM_BOX
+            SPECIFIED_TRANSFORM_BOX,
+            SPECIFIED_FONT_SIZE_ADJUST
         ]
     )
     annotation class SpecifiedFlags2
@@ -961,6 +969,7 @@ internal class Style internal constructor(
         color: ColorValue? = this.color,
         fontFamily: List<String>? = this.fontFamily,
         fontSize: CSSLength? = this.fontSize,
+        fontSizeAdjust: Float = this.fontSizeAdjust,
         fontWeight: Float = this.fontWeight,
         fontStyle: FontStyle? = this.fontStyle,
         fontWidth: Float = this.fontWidth,
@@ -1043,6 +1052,7 @@ internal class Style internal constructor(
             color = color,
             fontFamily = fontFamily,
             fontSize = fontSize,
+            fontSizeAdjust = fontSizeAdjust,
             fontWeight = fontWeight,
             fontStyle = fontStyle,
             fontWidth = fontWidth,
@@ -1143,6 +1153,8 @@ internal class Style internal constructor(
             append(fontFamily)
             append(", fontSize=")
             append(fontSize)
+            append(", fontSizeAdjust=")
+            append(fontSizeAdjust)
             append(", fontWeight=")
             append(fontWeight)
             append(", fontStyle=")
@@ -1345,6 +1357,7 @@ internal class Style internal constructor(
         const val SPECIFIED_COLOR_RENDERING: Long = 1L shl 5
         const val SPECIFIED_TRANSFORM_ORIGIN: Long = 1L shl 6
         const val SPECIFIED_TRANSFORM_BOX: Long = 1L shl 7
+        const val SPECIFIED_FONT_SIZE_ADJUST: Long = 1L shl 8
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1560,6 +1573,22 @@ internal class Style internal constructor(
                     val fontSize = parseFontSize(value)
                     builder.fontSize = fontSize
                     if (fontSize != null) builder.addSpecifiedFlag(SPECIFIED_FONT_SIZE)
+                }
+
+                SVGAttr.font_size_adjust -> {
+                    // Presentation attribute (SVG 1.1): both paths parse it.
+                    // "none" (and "auto", which needs no adjustment for the
+                    // used font) means no adjustment; a non-negative number
+                    // is the desired aspect value. Anything else is ignored.
+                    val adjust: Float? = when {
+                        value.equals("none", ignoreCase = true) -> Float.NaN
+                        value.equals("auto", ignoreCase = true) -> Float.NaN
+                        else -> value.toFloatOrNull()?.takeIf { it >= 0f }
+                    }
+                    if (adjust != null) {
+                        builder.fontSizeAdjust = adjust
+                        builder.addSpecifiedFlag2(SPECIFIED_FONT_SIZE_ADJUST)
+                    }
                 }
 
                 SVGAttr.font_weight -> {
@@ -2048,6 +2077,7 @@ internal class Style internal constructor(
             SVGAttr.font_feature_settings -> SPECIFIED_FONT_FEATURE_SETTINGS
             SVGAttr.font_kerning -> SPECIFIED_FONT_KERNING
             SVGAttr.font_size -> SPECIFIED_FONT_SIZE
+            SVGAttr.font_size_adjust -> SPECIFIED_FONT_SIZE_ADJUST
             SVGAttr.font_stretch -> SPECIFIED_FONT_WIDTH
             SVGAttr.font_style -> SPECIFIED_FONT_STYLE
             SVGAttr.font_variant_caps -> SPECIFIED_FONT_VARIANT_CAPS

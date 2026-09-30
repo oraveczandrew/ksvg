@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.render.text
 
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.util.LruCache
 import hu.oandras.ksvg.ExternalFileResolver
@@ -57,8 +58,23 @@ internal fun RendererState.selectTypefaceAndFontStyling(
     fillConfig.setTypeface(font)
     strokeConfig.setTypeface(font)
 
+    // font-size-adjust: scale the (already resolved) text size so the used
+    // font's x-height matches the declared aspect value (size * adjust /
+    // aspect). Aspect is measured once per typeface and cached; a degenerate
+    // aspect (e.g., no x glyph) skips the adjustment. Animated font-size
+    // changes at render time do not re-apply this (build-time only).
+    val adjust = style.fontSizeAdjust
+    if (!adjust.isNaN() && adjust > 0f) {
+        val aspect = xHeightAspect(font)
+        if (aspect > 0f) {
+            val scaled = fillConfig.textSize * (adjust / aspect)
+            fillConfig.setTextSize(scaled)
+            strokeConfig.setTextSize(scaled)
+        }
+    }
+
     // Just in case this is a variable font, let's also set the fontVariationSettings
-    // In order to get the desired font weight, style and width.
+    //  to get the desired font weight, style and width.
     val fvsBuilder = getFontVariationSetBuilder()
     fvsBuilder.addSetting(
         CSSFontVariationSettings.VARIATION_WEIGHT,
@@ -137,6 +153,25 @@ private fun resolveFontFromFontFamily(
 
 /** Build-time cache for synthesized generic typefaces (family + style). LruCache is internally synchronized. */
 private val genericTypefaceCache: LruCache<String, Typeface> = LruCache(16)
+
+/**
+ * x-height aspect (`x-height / font-size`) per typeface, measured once at
+ * 100px for sub-pixel precision and cached. A missing/empty `x` glyph
+ * yields 0 (callers skip the adjustment then).
+ */
+private val xHeightAspectCache: LruCache<Typeface, Float> = LruCache(32)
+
+private fun xHeightAspect(font: Typeface): Float {
+    xHeightAspectCache.get(font)?.let { return it }
+    val probe = Paint()
+    probe.typeface = font
+    probe.textSize = 100f
+    val bounds = Rect()
+    probe.getTextBounds("x", 0, 1, bounds)
+    val aspect = bounds.height() / 100f
+    xHeightAspectCache.put(font, aspect)
+    return aspect
+}
 
 internal fun checkGenericFont(
     fontName: String,
