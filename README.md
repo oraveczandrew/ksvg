@@ -1,6 +1,8 @@
 # KSVG
 
-KSVG is a high-performance SVG parser and renderer for Android. The framework is **100% Kotlin**; filters run through a GPU pipeline on API 33+ (AGSL shaders; `RenderEffect` chain on API 31+) with automatic decline to the CPU software path, backed by a native SIMD engine (x86_64/x86 SSSE3 baselines with AVX2 rows; ARMv7/ARM64 NEON) and a bit-exact pure-Kotlin CPU fallback. It is an optimized fork and evolution of the original [AndroidSVG](https://github.com/BigBadaboom/androidsvg) library, designed for modern Android development with a focus on memory efficiency, immutability, and expanded feature support.
+KSVG is a high-performance SVG parser and renderer for Android. It is an optimized fork and evolution of the original [AndroidSVG](https://github.com/BigBadaboom/androidsvg) library, designed for modern Android development with a focus on memory efficiency, immutability, and expanded feature support.
+
+The framework is **100% Kotlin**; filters run through a GPU pipeline on API 33+ (AGSL shaders; `RenderEffect` chain on API 31+) with automatic decline to the CPU software path, backed by a native SIMD engine (x86_64/x86 SSSE3 baselines with AVX2 rows; ARMv7/ARM64 NEON) and a bit-exact pure-Kotlin CPU fallback.
 
 *KSVG is licensed under the [Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0)*.
 
