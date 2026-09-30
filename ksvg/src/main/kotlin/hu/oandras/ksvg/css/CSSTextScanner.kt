@@ -24,6 +24,7 @@ import hu.oandras.ksvg.parser.TextScanner
 import hu.oandras.ksvg.parser.checkCssState
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.toPattern
+import java.util.Locale
 import java.util.regex.Pattern
 
 private typealias AnPlusB = Long
@@ -494,7 +495,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
 
             PseudoClassIdentifiers.lang -> {
                 val _ = nextIdentListParam()
-                pseudo = PseudoClassNotSupported(identifier)
+                pseudo = PseudoClassNotSupported(identifier.lowercase(Locale.US))
                 selector.addedAttributeOrPseudo()
             }
 
@@ -506,9 +507,53 @@ internal class CSSTextScanner(input: String) : TextScanner(
             PseudoClassIdentifiers.enabled,
             PseudoClassIdentifiers.disabled,
             PseudoClassIdentifiers.checked,
-            PseudoClassIdentifiers.indeterminate -> {
-                pseudo = PseudoClassNotSupported(identifier)
+            PseudoClassIdentifiers.indeterminate,
+            PseudoClassIdentifiers.any_link,
+            PseudoClassIdentifiers.local_link,
+            PseudoClassIdentifiers.scope,
+            PseudoClassIdentifiers.focus_visible,
+            PseudoClassIdentifiers.focus_within,
+            PseudoClassIdentifiers.drop,
+            PseudoClassIdentifiers.current,
+            PseudoClassIdentifiers.past,
+            PseudoClassIdentifiers.future,
+            PseudoClassIdentifiers.playing,
+            PseudoClassIdentifiers.paused,
+            PseudoClassIdentifiers.read_only,
+            PseudoClassIdentifiers.read_write,
+            PseudoClassIdentifiers.placeholder_shown,
+            PseudoClassIdentifiers.default,
+            PseudoClassIdentifiers.valid,
+            PseudoClassIdentifiers.invalid,
+            PseudoClassIdentifiers.in_range,
+            PseudoClassIdentifiers.out_of_range,
+            PseudoClassIdentifiers.required,
+            PseudoClassIdentifiers.optional,
+            PseudoClassIdentifiers.user_invalid,
+            PseudoClassIdentifiers.nth_col,
+            PseudoClassIdentifiers.nth_last_col,
+            PseudoClassIdentifiers.matches,
+            PseudoClassIdentifiers.`is`,
+            PseudoClassIdentifiers.where,
+            PseudoClassIdentifiers.has,
+            PseudoClassIdentifiers.dir,
+            PseudoClassIdentifiers.target_within,
+            PseudoClassIdentifiers.blank -> {
+                pseudo = PseudoClassNotSupported(identifier.lowercase(Locale.US))
                 selector.addedAttributeOrPseudo()
+                // The functional ones take parameters we don't implement either
+                // (e.g. :nth-col(2n), :current(...)): skip the parameter block so
+                // the rest of the selector still parses instead of the whole
+                // rule being dropped as malformed.
+                if (consume('(')) {
+                    var depth = 1
+                    while (!empty() && depth > 0) {
+                        when (nextChar()) {
+                            '(' -> depth++
+                            ')' -> depth--
+                        }
+                    }
+                }
             }
 
             else -> throw CSSParseException("Unsupported pseudo class: $identifier")

@@ -25,6 +25,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
+import hu.oandras.ksvg.DelegatingLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.HitRegion
 import hu.oandras.ksvg.KSVGAnimatedDrawable
@@ -54,7 +55,7 @@ import hu.oandras.ksvg.render.collectHitRegions
 import hu.oandras.ksvg.render.inverseRootMapping
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
-import hu.oandras.ksvg.wrapAsUnsupportedFeatureLoggerContext
+import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -94,9 +95,15 @@ internal class SVGImpl internal constructor(
     override val externalFileResolver: ExternalFileResolver?,
     /**
      * The [LoggerContext] used for parser and renderer logging for this document.
+     * The parser hands over the context it was given, already wrapped so that
+     * unsupported-feature warnings dedup once per parse; the document exposes it
+     * as [delegate] so DOM objects delegating here reach that state too.
      */
-    loggerContext: LoggerContext,
-) : SVG, LoggerContext by loggerContext {
+    private val loggerContext: LoggerContext,
+) : SVG, DelegatingLoggerContext, LoggerContext by loggerContext {
+
+    override val delegate: LoggerContext
+        get() = loggerContext
 
     @JvmField
     internal var animationsEnabled: Boolean = false
@@ -586,6 +593,7 @@ internal class SVGImpl internal constructor(
     private var cachedDocumentDimensions: Box? = null
     private var cachedDocumentDimensionsMod: Int = -1
 
+    @Suppress("SameParameterValue")
     private fun getDocumentDimensions(dpi: Float): Box {
         val cached = cachedDocumentDimensions
         if (cachedDocumentDimensionsMod == modificationCount && cached != null) {
@@ -868,7 +876,7 @@ internal class SVGImpl internal constructor(
                     enableInternalEntities = isInternalEntitiesEnabled,
                     externalFileResolver = externalFileResolver,
                     animationsEnabled = parseAnimations,
-                    logger = loggerContext.wrapAsUnsupportedFeatureLoggerContext(),
+                    logger = loggerContext.wrapAsUnsupportedFeatureScope(),
                 ).parseStream(inputStream)
             } finally {
                 try {

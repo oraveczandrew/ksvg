@@ -38,7 +38,7 @@ class LabeledLoggerContextTest {
     @Test
     fun testPrefixesMessageWithLabelInParentheses() {
         val delegate = RecordingLogger()
-        val labeled = LabeledLoggerContext(delegate, "https://example.com/icon.svg")
+        val labeled = delegate.labeledWith("https://example.com/icon.svg")
         labeled.log(LoggerContext.WARN, "KSVG", "unsupported element")
         assertEquals(1, delegate.messages.size)
         assertEquals("(https://example.com/icon.svg) unsupported element", delegate.messages[0].third)
@@ -47,7 +47,7 @@ class LabeledLoggerContextTest {
     @Test
     fun testEmptyLabelForwardsUnchanged() {
         val delegate = RecordingLogger()
-        val labeled = LabeledLoggerContext(delegate, "")
+        val labeled = delegate.labeledWith("")
         labeled.log(LoggerContext.WARN, "KSVG", "plain message")
         assertEquals("plain message", delegate.messages[0].third)
     }
@@ -55,7 +55,7 @@ class LabeledLoggerContextTest {
     @Test
     fun testIsLoggableDelegates() {
         val delegate = RecordingLogger().apply { loggable = false }
-        val labeled = LabeledLoggerContext(delegate, "label")
+        val labeled = delegate.labeledWith("label")
         assertTrue(!labeled.isLoggable("KSVG", LoggerContext.WARN))
     }
 }

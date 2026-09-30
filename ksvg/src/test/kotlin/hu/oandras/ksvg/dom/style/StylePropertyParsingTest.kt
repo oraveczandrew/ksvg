@@ -17,10 +17,10 @@
 package hu.oandras.ksvg.dom.style
 
 import hu.oandras.ksvg.NoopLoggerContext
-import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.RecordingLoggerContext
-import hu.oandras.ksvg.UnsupportedFeatureLoggerContext
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.assertIs
+import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.text.TextAnchor
@@ -62,9 +62,9 @@ class StylePropertyParsingTest {
         return builder
     }
 
-    private fun wrappedRecording(): Pair<UnsupportedFeatureLoggerContext, RecordingLoggerContext> {
+    private fun wrappedRecording(): Pair<LoggerContext, RecordingLoggerContext> {
         val delegate = RecordingLoggerContext()
-        return UnsupportedFeatureLoggerContext(delegate) to delegate
+        return delegate.wrapAsUnsupportedFeatureScope() to delegate
     }
 
     // --- deferred G6 properties: warn once per parse, silent when harmless ---
@@ -120,6 +120,47 @@ class StylePropertyParsingTest {
     fun testTextOverflowClipSilent() {
         val (ctx, delegate) = wrappedRecording()
         processWith("text-overflow", "clip", ctx)
+        assertTrue(delegate.messages.isEmpty())
+    }
+
+    @Test
+    fun testMixBlendModePlusWarnsOnce() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("mix-blend-mode", "plus-darker", ctx)
+        assertEquals(1, delegate.messages.size)
+        processWith("mix-blend-mode", "plus-lighter", ctx)
+        assertEquals("second hit in the same parse stays silent", 1, delegate.messages.size)
+    }
+
+    @Test
+    fun testMixBlendModeKnownAndGarbageSilent() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("mix-blend-mode", "multiply", ctx)
+        processWith("mix-blend-mode", "banana", ctx)
+        assertTrue(delegate.messages.isEmpty())
+    }
+
+    @Test
+    fun testClipPathRoundCornersWarnsOnce() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("clip-path", "xywh(0 0 10 10 round 1px 2px 3px 4px)", ctx)
+        assertEquals(1, delegate.messages.size)
+        assertTrue(delegate.messages[0], delegate.messages[0].contains("round"))
+        processWith("clip-path", "inset(0 round 1px 2px)", ctx)
+        assertEquals("second hit in the same parse stays silent", 1, delegate.messages.size)
+    }
+
+    @Test
+    fun testClipPathSingleRoundSilent() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("clip-path", "xywh(0 0 10 10 round 5px)", ctx)
+        assertTrue(delegate.messages.isEmpty())
+    }
+
+    @Test
+    fun testClipPathMalformedRoundSilent() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("clip-path", "xywh(0 0 10 10 round banana)", ctx)
         assertTrue(delegate.messages.isEmpty())
     }
 

@@ -26,6 +26,7 @@ import androidx.collection.ArraySet
 import androidx.collection.FloatList
 import androidx.collection.MutableFloatList
 import androidx.collection.MutableIntList
+import hu.oandras.ksvg.DelegatingLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.PreserveAspectRatio
@@ -173,8 +174,13 @@ internal class RenderTreeBuilder(
     override val dPI: Float,
     private val externalFileResolver: ExternalFileResolver?,
     pools: PoolOwner,
-    logger: LoggerContext,
-) : DisplayContext, PoolOwner by pools, LoggerContext by logger {
+    private val logger: LoggerContext,
+) : DisplayContext, PoolOwner by pools, DelegatingLoggerContext, LoggerContext by logger {
+
+    // Renders through the document, which is where the per-parse state lives:
+    // staying in the chain dedups render-time warnings against the parse-time ones.
+    override val delegate: LoggerContext
+        get() = logger
 
     private var state: RendererState = RendererState()
     private val stateStack: Stack<RendererState> = Stack()

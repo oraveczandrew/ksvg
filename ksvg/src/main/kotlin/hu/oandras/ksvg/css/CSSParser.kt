@@ -16,7 +16,6 @@
  */
 package hu.oandras.ksvg.css
 
-import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.LoggerContext
@@ -25,9 +24,12 @@ import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.logE
+import hu.oandras.ksvg.logUnsupportedAtRule
+import hu.oandras.ksvg.logUnsupportedPseudoClass
 import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.parser.checkCssState
 import hu.oandras.ksvg.utils.forEachElement
+import java.util.Locale
 
 /**
  * A very simple CSS parser that is not entirely compliant with the CSS spec but
@@ -37,7 +39,7 @@ internal class CSSParser internal constructor(
     private val deviceMediaType: MediaType = MediaType.screen, // Where these rules came from (Parser or RenderOptions)
     private val source: Source = Source.Document,
     private val externalFileResolver: ExternalFileResolver? = null,
-    private val logger: LoggerContext = AndroidLoggerContext
+    private val loggerContext: LoggerContext,
 ) {
 
     private var inMediaRule = false
@@ -176,11 +178,13 @@ internal class CSSParser internal constructor(
 
     internal constructor(
         source: Source,
-        externalFileResolver: ExternalFileResolver?
+        externalFileResolver: ExternalFileResolver?,
+        loggerContext: LoggerContext,
     ) : this(
         deviceMediaType = MediaType.screen,
         source = source,
-        externalFileResolver = externalFileResolver
+        externalFileResolver = externalFileResolver,
+        loggerContext = loggerContext
     )
 
 
@@ -221,12 +225,16 @@ internal class CSSParser internal constructor(
             if (!scan.empty()) checkCssState(scan.consume(';')) { "Invalid @media rule: expected '}' at end of rule set" }
 
             if (externalFileResolver != null && mediaMatches(mediaList, deviceMediaType)) {
-                val css = externalFileResolver.resolveCSSStyleSheet(file) ?: return
+                val css = externalFileResolver.resolveCSSStyleSheet(file)
+                if (css == null) {
+                    loggerContext.logW(TAG) { "Could not resolve @import '$file'; ignoring" }
+                    return
+                }
                 ruleset.addAll(parse(css))
             }
         } else {
             // Unknown/unsupported at-rule
-            logger.logW(TAG) { String.format("Ignoring @%s rule", atKeyword) }
+            loggerContext.logUnsupportedAtRule(atKeyword.lowercase(Locale.US))
             skipAtRule(scan)
         }
         scan.skipWhitespace()
@@ -285,8 +293,8 @@ internal class CSSParser internal constructor(
                 // Nothing recognizable found. Could be end of rule set. Return.
                 break
             } catch (e: CSSParseException) {
-                logger.logE(TAG) { "CSS statement dropped due to error: " + e.message.orEmpty() }
-                if (BuildConfig.DEBUG) logger.logE(TAG) { "Stacktrace:\n" + e.stackTraceToString() }
+                loggerContext.logE(TAG) { "CSS statement dropped due to error: " + e.message.orEmpty() }
+                if (BuildConfig.DEBUG) loggerContext.logE(TAG) { "Stacktrace:\n" + e.stackTraceToString() }
                 skipToNextStatement(scan)
             }
         }
@@ -297,17 +305,37 @@ internal class CSSParser internal constructor(
     @Throws(CSSParseException::class)
     private fun parseRule(ruleset: CSSRuleset, scan: CSSTextScanner): Boolean {
         val selectors = scan.nextSelectorGroup()
-        return if (!selectors.isNullOrEmpty()) {
-            checkCssState(scan.consume('{')) { "Malformed rule block: expected '{'" }
-            scan.skipWhitespace()
-            val ruleStyle = parseDeclarations(scan)
-            scan.skipWhitespace()
-            selectors.forEachElement { selector ->
-                ruleset.add(CSSRule(selector, ruleStyle, source))
-            }
-            true
-        } else {
-            false
+        if (selectors.isNullOrEmpty()) return false
+        warnUnsupportedPseudoClasses(selectors)
+        checkCssState(scan.consume('{')) { "Malformed rule block: expected '{'" }
+        scan.skipWhitespace()
+        val ruleStyle = parseDeclarations(scan)
+        scan.skipWhitespace()
+        selectors.forEachElement { selector ->
+            ruleset.add(CSSRule(selector, ruleStyle, source))
+        }
+        return true
+    }
+
+    // Warn once per parse about selector pseudo-classes we recognize but never
+    // match (see PseudoClassNotSupported): without this their rules fail
+    // without a trace. Only successfully parsed selectors are walked, so a
+    // rule dropped as malformed never warns for half-scanned input.
+    private fun warnUnsupportedPseudoClasses(selectors: List<Selector>) {
+        selectors.forEachElement { selector -> warnUnsupportedPseudoClasses(selector) }
+    }
+
+    private fun warnUnsupportedPseudoClasses(selector: Selector) {
+        selector.simpleSelectors?.forEachElement { part ->
+            part.pseudos?.forEachElement { pseudo -> warnUnsupportedPseudo(pseudo) }
+        }
+    }
+
+    private fun warnUnsupportedPseudo(pseudo: PseudoClass) {
+        when (pseudo) {
+            is PseudoClassNotSupported -> loggerContext.logUnsupportedPseudoClass(pseudo.name)
+            is PseudoClassNot -> pseudo.selectorGroup.forEachElement { warnUnsupportedPseudoClasses(it) }
+            else -> {}
         }
     }
 
@@ -334,7 +362,7 @@ internal class CSSParser internal constructor(
             scan.consume(';')
             // 'inherit', 'unset' and 'initial' are handled in Style.processStyleProperty.
             styleBuilder.lastTouchedFlag = 0L
-            with(logger) {
+            with(loggerContext) {
                 Style.processStyleProperty(styleBuilder, propertyName, propertyValue, false)
             }
             if (important && styleBuilder.lastTouchedFlag != 0L) {

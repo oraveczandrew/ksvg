@@ -19,6 +19,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.MediaType
+import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.mocks.MockCanvas
 import hu.oandras.ksvg.mocks.MockPaint
 import hu.oandras.ksvg.mocks.MockPath
@@ -95,6 +96,50 @@ class CssAtRuleTest {
             "#ff00ff00",
             rectFillWithCss("@foobar { nonsense; } rect { fill: #0f0; }")
         )
+    }
+
+    private fun parseWithRecording(css: String): RecordingLoggerContext {
+        val logger = RecordingLoggerContext()
+        SVGImpl.getFromString(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"><style>$css</style></svg>",
+            loggerContext = logger
+        )
+        return logger
+    }
+
+    @Test
+    fun unknownAtRuleWarnsOncePerParse() {
+        val logger = parseWithRecording("@foobar { nonsense; } @foobar { nonsense; }")
+        val matching = logger.messages.filter { it.contains("@foobar") }
+        assertEquals(logger.messages.toString(), 1, matching.size)
+    }
+
+    @Test
+    fun distinctAtRulesWarnSeparately() {
+        val logger = parseWithRecording("@foo { a: b; } @bar { c: d; }")
+        assertEquals(1, logger.messages.filter { it.contains("@foo") }.size)
+        assertEquals(1, logger.messages.filter { it.contains("@bar") }.size)
+    }
+
+    @Test
+    fun atRuleKeywordCaseDedupsTogether() {
+        val logger = parseWithRecording("@FOOBAR { nonsense; } @foobar { nonsense; }")
+        assertEquals(logger.messages.toString(), 1, logger.messages.size)
+    }
+
+    @Test
+    fun freshParseLogsAfresh() {
+        val css = "@foobar { nonsense; }"
+        assertEquals(1, parseWithRecording(css).messages.size)
+        assertEquals(1, parseWithRecording(css).messages.size)
+    }
+
+    @Test
+    fun bareContextLogsEveryTime() {
+        val logger = RecordingLoggerContext()
+        logger.logUnsupportedAtRule("foobar")
+        logger.logUnsupportedAtRule("foobar")
+        assertEquals(2, logger.messages.size)
     }
 
     @Test

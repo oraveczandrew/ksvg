@@ -21,6 +21,7 @@ import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.SVGAttr
+import hu.oandras.ksvg.logUnsupportedAttribute
 import hu.oandras.ksvg.render.animation.parseClockValueMillis
 import hu.oandras.ksvg.render.animation.parseClockValueMillisOrNull
 import hu.oandras.ksvg.render.animation.parseSemicolonFloatList
@@ -130,7 +131,12 @@ internal sealed class Animation(
             value: String
         ): Boolean {
             when (attr) {
-                SVGAttr.attributeName -> attributeName = SVGAttr.fromString(value)
+                SVGAttr.attributeName -> {
+                    attributeName = SVGAttr.fromString(value)
+                    if (attributeName == SVGAttr.UNSUPPORTED) {
+                        logUnsupportedAttribute(value)
+                    }
+                }
                 SVGAttr.dur -> {
                     // SMIL: dur="indefinite" means an indefinite simple duration.
                     // Map it to Long.MAX_VALUE so isValid() keeps the animation;

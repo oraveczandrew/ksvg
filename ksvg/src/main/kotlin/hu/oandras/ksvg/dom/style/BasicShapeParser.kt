@@ -17,7 +17,9 @@
 package hu.oandras.ksvg.dom.style
 
 import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.UnsupportedFeature
 import hu.oandras.ksvg.css.CSSLength
+import hu.oandras.ksvg.logUnsupportedFeature
 import hu.oandras.ksvg.parser.TextScanner
 import hu.oandras.ksvg.parser.parsePath
 
@@ -117,6 +119,7 @@ private fun parseEllipse(body: String): Shaped<BasicShape.Ellipse>? {
     return Shaped(BasicShape.Ellipse(rx, ry, cx, cy), refBox)
 }
 
+context(loggerContext: LoggerContext)
 private fun parseInset(body: String): Shaped<BasicShape.Inset>? {
     val scan = TextScanner(body)
     scan.skipWhitespace()
@@ -178,6 +181,7 @@ private fun parseClipRadius(scan: TextScanner): ClipRadius? {
     return ClipRadius.Len(len)
 }
 
+context(loggerContext: LoggerContext)
 private fun parseRect(body: String): Shaped<BasicShape.Rect>? {
     val scan = TextScanner(body)
     scan.skipWhitespace()
@@ -213,6 +217,7 @@ private fun parseRect(body: String): Shaped<BasicShape.Rect>? {
     )
 }
 
+context(loggerContext: LoggerContext)
 private fun parseXywh(body: String): Shaped<BasicShape.Xywh>? {
     val scan = TextScanner(body)
     scan.skipWhitespace()
@@ -256,6 +261,7 @@ private fun parseXywh(body: String): Shaped<BasicShape.Xywh>? {
  * other malformed `clip-path`, rather than being mis-shaped.
  * Returns null only when the `round` keyword is present but malformed.
  */
+context(loggerContext: LoggerContext)
 private fun parseRoundRadii(scan: TextScanner): Pair<CSSLength?, CSSLength?>? {
     scan.skipWhitespace()
     if (!scan.consumeKeyword("round")) return Pair(null, null)
@@ -269,6 +275,19 @@ private fun parseRoundRadii(scan: TextScanner): Pair<CSSLength?, CSSLength?>? {
         if (second.isNegative) return null
         return Pair(first, second)
     }
+    // A second length starts a per-corner radius list (CSS Borders 4), which we
+    // don't implement: warn once and reject, so it falls back to "no clip" like
+    // any other malformed clip-path. Anything else trailing (a refBox word,
+    // garbage) keeps the old silent-malformed path: rewind and let the caller
+    // decide.
+    val save = scan.getPosition()
+    scan.skipCommaWhitespace()
+    scan.skipWhitespace()
+    if (scan.nextLength() != null) {
+        loggerContext.logUnsupportedFeature(UnsupportedFeature.CLIP_PATH_ROUND_CORNERS)
+        return null
+    }
+    scan.setPosition(save)
     return Pair(first, first)
 }
 

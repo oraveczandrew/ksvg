@@ -38,6 +38,7 @@ import android.graphics.Shader
 import android.graphics.Shader.TileMode
 import android.os.Build
 import hu.oandras.ksvg.BuildConfig
+import hu.oandras.ksvg.DelegatingLoggerContext
 import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
@@ -136,7 +137,12 @@ internal class Renderer internal constructor(
     // Filter-backend factory (API-routed by default, injectable for tests so the
     // Impl31 path runs on any API 31+ device).
     private val gpuBackendFactory: FilterBackendFactory = FilterBackendFactory.forApi(),
-): AnimationContext, PoolOwner by pools, LoggerContext by document {
+): AnimationContext, PoolOwner by pools, DelegatingLoggerContext, LoggerContext by document {
+
+    // Render-time log calls (e.g. animation warnings) reach the per-parse scope
+    // through the document instead of logging unconditionally.
+    override val delegate: LoggerContext
+        get() = document
     // Renderer state
     private var state: RendererState = RendererState()
 

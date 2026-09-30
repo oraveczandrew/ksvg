@@ -18,6 +18,7 @@
 package hu.oandras.ksvg.dom.core
 
 import androidx.annotation.CallSuper
+import hu.oandras.ksvg.DelegatingLoggerContext
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.dom.SVGImpl
@@ -53,7 +54,12 @@ internal open class SvgObjectImpl(
     ): SvgObject.Builder<SvgObjectImpl>(
         document,
         parent,
-    ), LoggerContext by document {
+    ), DelegatingLoggerContext, LoggerContext by document {
+
+        // Element attributes are processed here, so the builder has to stay part
+        // of the chain to reach the document's, and thus the parse's, log state.
+        override val delegate: LoggerContext
+            get() = document
 
         private var id: String? = null
 

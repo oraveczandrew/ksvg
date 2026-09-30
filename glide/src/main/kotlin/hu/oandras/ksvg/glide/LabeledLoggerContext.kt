@@ -16,6 +16,7 @@
 
 package hu.oandras.ksvg.glide
 
+import hu.oandras.ksvg.DelegatingLoggerContext
 import hu.oandras.ksvg.LoggerContext
 
 /**
@@ -26,11 +27,10 @@ import hu.oandras.ksvg.LoggerContext
  * no-op and the message is forwarded unchanged.
  */
 private class LabeledLoggerContext(
-    @JvmField
-    val delegate: LoggerContext,
+    override val delegate: LoggerContext,
     @JvmField
     val label: String,
-) : LoggerContext {
+) : DelegatingLoggerContext {
     override fun log(level: Int, tag: String, message: String) {
         delegate.log(
             level = level,

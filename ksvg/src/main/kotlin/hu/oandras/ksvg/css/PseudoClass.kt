@@ -153,7 +153,8 @@ internal data object PseudoClassEmpty : PseudoClass {
 }
 
 internal class PseudoClassNot(
-    private val selectorGroup: List<CSSParser.Selector>
+    @JvmField
+    internal val selectorGroup: List<CSSParser.Selector>
 ) : PseudoClass {
 
     override fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean {
@@ -199,12 +200,15 @@ internal data object PseudoClassTarget : PseudoClass {
 }
 
 
-internal class PseudoClassNotSupported(private val clazz: String) : PseudoClass {
+internal class PseudoClassNotSupported(
+    @JvmField
+    internal val name: String
+) : PseudoClass {
     override fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean {
         return false
     }
 
     override fun toString(): String {
-        return clazz
+        return name
     }
 }

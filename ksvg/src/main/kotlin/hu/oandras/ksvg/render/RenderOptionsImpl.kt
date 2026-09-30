@@ -16,7 +16,10 @@
  */
 package hu.oandras.ksvg.render
 
+import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
+import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.css.CSS
@@ -44,6 +47,7 @@ internal class RenderOptionsImpl internal constructor(
      * content is backend-independent).
      */
     internal var gpuBackendFactory: FilterBackendFactory = FilterBackendFactory.forApi(),
+    private val loggerContext: LoggerContext,
 ) : RenderOptions {
 
     override val css: CSS?
@@ -77,6 +81,7 @@ internal class RenderOptionsImpl internal constructor(
         _viewId = null,
         _viewPort = null,
         _softwareFiltering = false,
+        loggerContext = AndroidLoggerContext,
     )
 
     /**
@@ -94,6 +99,7 @@ internal class RenderOptionsImpl internal constructor(
         // Test seam travels with the copy; foreign impls fall back to API routing.
         gpuBackendFactory = (other as? RenderOptionsImpl)?.gpuBackendFactory
             ?: FilterBackendFactory.forApi(),
+        loggerContext = (other as? RenderOptionsImpl)?.loggerContext ?: AndroidLoggerContext,
     )
 
     /**
@@ -117,9 +123,13 @@ internal class RenderOptionsImpl internal constructor(
         } else {
             val parser = CSSParser(
                 source = Source.RenderOptions,
-                externalFileResolver = externalFileResolver
+                externalFileResolver = externalFileResolver,
+                loggerContext = loggerContext.wrapAsUnsupportedFeatureScope()
             )
-            CSS(parser.parse(css))
+            CSS(
+                cssRuleSet = parser.parse(css),
+                loggerContext = loggerContext
+            )
         }
         return this
     }

@@ -17,6 +17,10 @@
 
 package hu.oandras.ksvg.css
 
+import hu.oandras.ksvg.AndroidLoggerContext
+import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
+
 /**
  * This is a container for pre-parsed CSS that can be used to avoid parsing raw CSS string on each
  * render. It can be passed to [RenderOptions][hu.oandras.ksvg.RenderOptions] to reuse the parsed
@@ -25,13 +29,17 @@ package hu.oandras.ksvg.css
 public class CSS internal constructor(
     @JvmField
     internal val cssRuleSet: CSSRuleset,
+    @JvmField
+    internal val loggerContext: LoggerContext,
     private val rawCss: String? = null
 ) {
 
-    internal constructor(css: String) : this(
+    internal constructor(css: String, loggerContext: LoggerContext) : this(
         cssRuleSet = CSSParser(
             source = Source.RenderOptions,
+            loggerContext = loggerContext.wrapAsUnsupportedFeatureScope(),
         ).parse(css),
+        loggerContext = loggerContext,
         rawCss = css
     )
 
@@ -48,11 +56,16 @@ public class CSS internal constructor(
     public companion object {
         /**
          * @param css CSS string to parse
+         * @param loggerContext Logger context to use for logging
          * @return pre-parsed CSS
          */
+        @JvmOverloads
         @JvmStatic
-        public fun getFromString(css: String): CSS {
-            return CSS(css)
+        public fun getFromString(
+            css: String,
+            loggerContext: LoggerContext = AndroidLoggerContext
+        ): CSS {
+            return CSS(css, loggerContext)
         }
     }
 }

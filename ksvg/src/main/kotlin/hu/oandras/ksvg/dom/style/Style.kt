@@ -22,6 +22,7 @@ import androidx.annotation.LongDef
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.UnsupportedFeature
+import hu.oandras.ksvg.logUnsupportedAttribute
 import hu.oandras.ksvg.logUnsupportedFeature
 import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
@@ -1802,6 +1803,11 @@ internal class Style internal constructor(
 
                 SVGAttr.mix_blend_mode -> {
                     if (!isFromAttribute) {
+                        if (value.equals("plus-darker", ignoreCase = true) ||
+                            value.equals("plus-lighter", ignoreCase = true)
+                        ) {
+                            loggerContext.logUnsupportedFeature(UnsupportedFeature.MIX_BLEND_MODE_PLUS)
+                        }
                         builder.mixBlendMode = CSSBlendMode.fromString(value)
                         builder.addSpecifiedFlag(SPECIFIED_MIX_BLEND_MODE)
                     }
@@ -1953,7 +1959,19 @@ internal class Style internal constructor(
                     if (paintOrder != 0) builder.addSpecifiedFlag2(SPECIFIED_PAINT_ORDER)
                 }
 
-                else -> {}
+                else -> {
+                    // Presentation attribute we have no style property for. Names we
+                    // don't know at all arrive here too, so match on UNSUPPORTED
+                    // only: a known property that this element doesn't apply (or that
+                    // we don't implement) is not a naming problem and stays silent.
+                    // CSS declarations share this branch, but with isFromAttribute
+                    // unset, and stay silent as well.
+                    if (isFromAttribute && localName != null &&
+                        SVGAttr.fromString(localName) == SVGAttr.UNSUPPORTED
+                    ) {
+                        loggerContext.logUnsupportedAttribute(localName)
+                    }
+                }
             }
         }
 

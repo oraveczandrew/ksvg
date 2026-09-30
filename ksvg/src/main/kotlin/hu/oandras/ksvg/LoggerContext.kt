@@ -20,10 +20,10 @@ import android.util.Log
 
 /**
  * Abstraction over a logging backend so the library can log without depending on
- * a concrete implementation (e.g. Android's [Log]).
+ * a concrete implementation (e.g., Android's [Log]).
  *
  * Provide your own implementation and pass it to one of the `SVG.getFrom*`
- * methods to route all parser and renderer logging through it.
+ * methods to route all parsers and renderer logging through it.
  */
 public interface LoggerContext {
     /**
@@ -45,6 +45,65 @@ public interface LoggerContext {
         public const val INFO: Int = Log.INFO
         public const val WARN: Int = Log.WARN
         public const val ERROR: Int = Log.ERROR
+    }
+}
+
+/**
+ * A [LoggerContext] that forwards every log call to another context, [delegate].
+ *
+ * Keeping the target reachable lets the library walk a chain of contexts to find
+ * state that is shared along it, so a decorator must expose what it wraps instead
+ * of hiding it. Pair it with `LoggerContext by delegate`:
+ *
+ * ```
+ * class MyContext(override val delegate: LoggerContext) :
+ *     DelegatingLoggerContext, LoggerContext by delegate
+ * ```
+ */
+public interface DelegatingLoggerContext : LoggerContext {
+    /** The context this one forwards every log call to. */
+    public val delegate: LoggerContext
+}
+
+/**
+ * A named bag of state shared by the log messages of a single parse, e.g., the
+ * "already warned" sets behind `UnsupportedFeatureScope`. Library-internal:
+ * reach it through [findScope] instead of holding one.
+ */
+internal interface LoggerScope
+
+/**
+ * A link of a [LoggerContext] delegation chain that may also own a
+ * [LoggerScope]: [getScope] answers for the scopes this very context owns, while
+ * the inherited [delegate] is where [findScope] walks next.
+ *
+ * Every context between a scope owner and a log call implements this, so state
+ * created once per parse (the unsupported-warning dedup scope) is reachable from
+ * everywhere below it — without every log call having to be handed a scoped
+ * context. The per-parse wrapper owns the scope and delegates to the caller's
+ * context; the document (delegate = that wrapper), the DOM builders (delegate =
+ * the document) and the render tree (delegate = the document) are pure links.
+ */
+internal interface ScopedLoggerContext : DelegatingLoggerContext {
+    /** The scope owned by this very context as [name], or null when it owns none. */
+    fun getScope(name: String): LoggerScope?
+}
+
+/**
+ * Returns the [LoggerScope] registered as [name] anywhere in this context's
+ * delegation chain, or null when there is none (in which case the caller has to
+ * log unconditionally). Recurses through [DelegatingLoggerContext.delegate] until a
+ * scope is found or the chain ends at a context that does not take part in it.
+ */
+internal fun LoggerContext.findScope(name: String): LoggerScope? {
+    if (this is ScopedLoggerContext) {
+        getScope(name)?.let { return it }
+    }
+
+    return if (this is DelegatingLoggerContext) {
+        delegate.findScope(name)
+    } else {
+        null
     }
 }
 

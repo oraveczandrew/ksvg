@@ -18,7 +18,6 @@ package hu.oandras.ksvg.render.animation
 
 import android.graphics.Matrix
 import android.graphics.Path
-import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.compat.supportsWordSpacing
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.animation.CalcMode
@@ -39,7 +38,7 @@ import hu.oandras.ksvg.dom.style.ColorValue
 import hu.oandras.ksvg.dom.style.BasicShape
 import hu.oandras.ksvg.dom.style.CSSClipPath
 import hu.oandras.ksvg.dom.style.Style
-import hu.oandras.ksvg.logW
+import hu.oandras.ksvg.logUnsupportedAnimatedAttribute
 import hu.oandras.ksvg.render.ClipPathRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
@@ -706,8 +705,12 @@ private fun applyFloatAnimation(
         }
 
         else -> {
-            if (BuildConfig.DEBUG) {
-                renderContext.logW("KSVG") { "Unknown animated attribute: $attributeName" }
+            // Known names the animator cannot drive (out-of-vocabulary ones are
+            // reported at parse time): warn once per parse instead of on every
+            // animation sample. The enum name is passed as-is to stay
+            // allocation-free on this hot path.
+            if (attributeName != SVGAttr.UNSUPPORTED) {
+                renderContext.logUnsupportedAnimatedAttribute(attributeName.name)
             }
         }
     }
@@ -782,8 +785,11 @@ private fun applyColorAnimation(
         }
 
         else -> {
-            if (BuildConfig.DEBUG) {
-                renderContext.logW("KSVG") { "Unknown animated attribute: $attributeName" }
+            // Same as in applyFloatAnimation above: known-but-undrivable names
+            // warn once per parse; out-of-vocabulary ones were reported at
+            // parse time.
+            if (attributeName != SVGAttr.UNSUPPORTED) {
+                renderContext.logUnsupportedAnimatedAttribute(attributeName.name)
             }
         }
     }

@@ -21,17 +21,17 @@ package hu.oandras.ksvg.parser
 
 import android.util.Xml
 import androidx.collection.ArrayMap
-import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.UnsupportedFeature
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.MediaType
 import hu.oandras.ksvg.css.Source
 import hu.oandras.ksvg.dom.SVGImpl
-import hu.oandras.ksvg.dom.animation.AnimateColor
 import hu.oandras.ksvg.dom.animation.AnimateClipPath
+import hu.oandras.ksvg.dom.animation.AnimateColor
 import hu.oandras.ksvg.dom.animation.AnimateDashArray
 import hu.oandras.ksvg.dom.animation.AnimateFloat
 import hu.oandras.ksvg.dom.animation.AnimateMotion
@@ -105,6 +105,9 @@ import hu.oandras.ksvg.dom.text.TextRoot
 import hu.oandras.ksvg.dom.text.TextSequence
 import hu.oandras.ksvg.logD
 import hu.oandras.ksvg.logE
+import hu.oandras.ksvg.logUnsupportedElement
+import hu.oandras.ksvg.logUnsupportedFeature
+import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.render.animation.isColorAttribute
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.trimLowerThanSpace
@@ -128,7 +131,7 @@ internal class SVGParserImpl(
     private val enableInternalEntities: Boolean = true,
     private val externalFileResolver: ExternalFileResolver? = null,
     private val animationsEnabled: Boolean = false,
-    private val logger: LoggerContext = AndroidLoggerContext,
+    private val logger: LoggerContext,
 ) : SVGParser {
     // SVG parser
     private var svgDocument: SVGImpl? = null
@@ -592,7 +595,8 @@ internal class SVGParserImpl(
             SVGTag.mask -> mask(attributes)
             SVGTag.style -> style(attributes)
             SVGTag.solidColor -> solidColor(attributes)
-            else -> {
+            SVGTag.UNSUPPORTED -> {
+                logger.logUnsupportedElement(tag ?: "unknown")
                 ignoring = true
                 ignoreDepth = 1
             }
@@ -831,11 +835,18 @@ internal class SVGParserImpl(
             if (attr != null && CSSParser.CSS_MIME_TYPE != attributes["type"]) return
             // Alternate stylesheets are not supported
             attr = attributes[XML_STYLESHEET_ATTR_ALTERNATE]
-            if (attr != null && XML_STYLESHEET_ATTR_ALTERNATE_NO != attributes["alternate"]) return
+            if (attr != null && XML_STYLESHEET_ATTR_ALTERNATE_NO != attributes["alternate"]) {
+                logger.logUnsupportedFeature(UnsupportedFeature.ALTERNATE_STYLESHEET)
+                return
+            }
 
             attr = attributes[XML_STYLESHEET_ATTR_HREF]
             if (attr != null) {
-                var css = externalFileResolver.resolveCSSStyleSheet(attr) ?: return
+                var css = externalFileResolver.resolveCSSStyleSheet(attr)
+                if (css == null) {
+                    logger.logW(TAG) { "Could not resolve stylesheet href='$attr'; ignoring" }
+                    return
+                }
 
                 val mediaAttr = attributes[XML_STYLESHEET_ATTR_MEDIA]
                 if (mediaAttr != null && XML_STYLESHEET_ATTR_MEDIA_ALL != mediaAttr.trimLowerThanSpace()) {
@@ -895,8 +906,8 @@ internal class SVGParserImpl(
 
         val currentElement = currentElement
         val builder = Svg.Builder(
-            requireSvgDocument(),
-            currentElement
+            document = requireSvgDocument(),
+            parent = currentElement
         )
         builder.parseAttributes(attributes)
         val obj = builder.build()
@@ -1517,7 +1528,7 @@ internal class SVGParserImpl(
             deviceMediaType = MediaType.screen,
             source = Source.Document,
             externalFileResolver = externalFileResolver,
-            logger = logger
+            loggerContext = logger
         )
         requireSvgDocument().addCSSRules(ruleset = parser.parse(sheet))
     }

@@ -17,7 +17,7 @@ package hu.oandras.ksvg
 
 /**
  * [LoggerContext] test fake that records every logged message (all levels
- * loggable). Wrap it in [UnsupportedFeatureLoggerContext] to assert
+ * loggable). Wrap it with [wrapAsUnsupportedFeatureScope] to assert
  * per-parse warning dedup.
  */
 class RecordingLoggerContext : LoggerContext {

@@ -20,7 +20,7 @@ package hu.oandras.ksvg.css
 import android.util.ArrayMap
 import java.util.Locale
 
-// Supported SVG attributes
+// Supported pseudo-classes
 @Suppress("EnumEntryName")
 internal enum class PseudoClassIdentifiers {
     target,
@@ -39,21 +39,24 @@ internal enum class PseudoClassIdentifiers {
     not,
 
     // Others from  Selectors 3 (and earlier)
-    // Supported but always fail to match.
+    // Parsed, but always fail to match; each use warns once per parse.
     lang,  // might support later
     link, visited, hover, active, focus, enabled, disabled, checked, indeterminate,  // Added in Selectors 4 spec
     // Might support these later
-    //matches,
-    //something,  // Not final name(?)
-    //has,
-    //dir,  might support later
-    //target_within,
-    //blank,
+    matches,  // old name of :is()
+    `is`,
+    where,
+    has,
+    dir,  // might support later
+    target_within,
+    blank,
 
-    // Operators from Selectors 4
-    // any-link, local-link, scope, focus-visible, focus-within, drop, current, past,
-    // future, playing, paused, read-only, read-write, placeholder-shown, default, valid, invalid,
-    // in-range, out-of-range, required, optional, user-invalid, nth-col, nth-last-col
+    // Selectors 4 and later: parsed, but always fail to match; each use warns
+    // once per parse.
+    any_link, local_link, scope, focus_visible, focus_within, drop, current,
+    past, future, playing, paused, read_only, read_write, placeholder_shown,
+    default, valid, invalid, in_range, out_of_range, required, optional,
+    user_invalid, nth_col, nth_last_col,
     UNSUPPORTED;
 
     companion object {
