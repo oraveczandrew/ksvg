@@ -36,8 +36,8 @@ import hu.oandras.ksvg.css.CSSRule
 import hu.oandras.ksvg.css.CssUnit
 import hu.oandras.ksvg.css.mergeRulesInCascadeOrder
 import hu.oandras.ksvg.dom.SVGImpl
-import hu.oandras.ksvg.dom.animation.AnimateColor
 import hu.oandras.ksvg.dom.animation.AnimateClipPath
+import hu.oandras.ksvg.dom.animation.AnimateColor
 import hu.oandras.ksvg.dom.animation.AnimateDashArray
 import hu.oandras.ksvg.dom.animation.AnimateFloat
 import hu.oandras.ksvg.dom.animation.AnimateMotion
@@ -94,8 +94,8 @@ import hu.oandras.ksvg.dom.shapes.CircleShape
 import hu.oandras.ksvg.dom.shapes.EllipseShape
 import hu.oandras.ksvg.dom.shapes.LineShape
 import hu.oandras.ksvg.dom.shapes.PathShape
-import hu.oandras.ksvg.dom.shapes.PolygonShape
 import hu.oandras.ksvg.dom.shapes.PolyLineShape
+import hu.oandras.ksvg.dom.shapes.PolygonShape
 import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.dom.shapes.Shape
 import hu.oandras.ksvg.dom.style.BasicShape
@@ -112,9 +112,11 @@ import hu.oandras.ksvg.dom.text.TextAnchor
 import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.dom.text.TextSequence
+import hu.oandras.ksvg.filtering.LcgRandom
+import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.logW
-import hu.oandras.ksvg.render.animation.AnimateColorNode
 import hu.oandras.ksvg.render.animation.AnimateClipPathNode
+import hu.oandras.ksvg.render.animation.AnimateColorNode
 import hu.oandras.ksvg.render.animation.AnimateDashArrayNode
 import hu.oandras.ksvg.render.animation.AnimateFloatNode
 import hu.oandras.ksvg.render.animation.AnimateMotionNode
@@ -136,8 +138,6 @@ import hu.oandras.ksvg.render.text.calculateTextWidth
 import hu.oandras.ksvg.render.text.extractRawText
 import hu.oandras.ksvg.render.text.getAnchorPosition
 import hu.oandras.ksvg.render.text.selectTypefaceAndFontStyling
-import hu.oandras.ksvg.filtering.LcgRandom
-import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.anyElement
 import hu.oandras.ksvg.utils.argb
@@ -155,9 +155,9 @@ import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.takeIfNonZeroOrElse
 import hu.oandras.ksvg.utils.textXMLSpaceTransform
 import java.util.*
+import kotlin.math.PI
 import kotlin.math.hypot
 import kotlin.math.max
-import kotlin.math.PI
 import kotlin.math.sqrt
 
 /**
@@ -270,7 +270,7 @@ internal class RenderTreeBuilder(
             // The established (external) viewport is decisive. Root width/height only refine it
             // when expressed relative to that viewport (percentages); absolute lengths belong to
             // the document's own coordinate space and must not shrink the container - matching the
-            // standard embedding model (and rsvg/browser behaviour) where the outer size wins.
+            // standard embedding model (and rsvg/browser behavior) where the outer size wins.
             rootObj.width?.let {
                 if (it.unit == CssUnit.percent) {
                     viewPort = viewPort.copy(width = it.floatValueInContext(viewPort.width))
@@ -322,91 +322,105 @@ internal class RenderTreeBuilder(
         }
         buildDepth++
         try {
-        // A DOM element may be referenced by several <use> instances; its cached
-        // bounding box must be recomputed fresh for each build instead of
-        // accumulating stale values across instances (SVG-SUPPORT.md, <use>).
-        (obj as? Element)?.boundingBox = null
-        statePush()
-        checkXMLSpaceAttribute(obj)
+            // A DOM element may be referenced by several <use> instances; its cached
+            // bounding box must be recomputed fresh for each build instead of
+            // accumulating stale values across instances (SVG-SUPPORT.md, <use>).
+            (obj as? Element)?.boundingBox = null
+            statePush()
+            checkXMLSpaceAttribute(obj)
 
-        val node = when (obj) {
-            is Svg -> buildSvg(obj)
-            is Use -> buildUse(obj)
-            is Switch -> buildSwitch(obj)
-            is Group -> buildGroup(obj)
-            is Image -> buildImage(obj)
-            is PathShape -> buildPath(obj)
-            is Shape -> buildGraphicsPathNode(obj)
-            is Text -> buildText(obj)
-            else -> null
-        }
-
-        // Per SVG 1.1, a clip-path or mask property that references a missing or
-        // non-matching element is an error: the element must not be rendered.
-        var hideInvalidReference = false
-        if (node != null && obj is ElementBase) {
-            val state = state
-            state.style.filter?.let {
-                val filter = document.resolveIRI(it) as? Filter
-                if (filter != null) {
-                    node.filterNode = buildFilter(filter)
-                }
+            val node = when (obj) {
+                is Svg -> buildSvg(obj)
+                is Use -> buildUse(obj)
+                is Switch -> buildSwitch(obj)
+                is Group -> buildGroup(obj)
+                is Image -> buildImage(obj)
+                is PathShape -> buildPath(obj)
+                is Shape -> buildGraphicsPathNode(obj)
+                is Text -> buildText(obj)
+                else -> null
             }
-            state.style.clipPath?.let {
-                when (it) {
-                    is CSSClipPath.UrlClip -> {
-                        val clipPath = document.resolveIRI(it.iri) as? ClipPath
-                        if (clipPath != null) {
-                            node.clipPathNode = buildClipPath(clipPath)
-                        } else {
-                            logW("KSVG") { "Clip-path reference '${it.iri}' is missing or invalid; hiding element" }
-                            hideInvalidReference = true
+
+            // Per SVG 1.1, a clip-path or mask property that references a missing or
+            // non-matching element is an error: the element must not be rendered.
+            var hideInvalidReference = false
+            if (node != null && obj is ElementBase) {
+                val state = state
+                state.style.filter?.let {
+                    val filter = document.resolveIRI(it) as? Filter
+                    if (filter != null) {
+                        node.filterNode = buildFilter(filter)
+                    }
+                }
+                state.style.clipPath?.let {
+                    when (it) {
+                        is CSSClipPath.UrlClip -> {
+                            val clipPath = document.resolveIRI(it.iri) as? ClipPath
+                            if (clipPath != null) {
+                                node.clipPathNode = buildClipPath(clipPath)
+                            } else {
+                                logW("KSVG") { "Clip-path reference '${it.iri}' is missing or invalid; hiding element" }
+                                hideInvalidReference = true
+                            }
+                        }
+
+                        is CSSClipPath.ShapeClip -> {
+                            node.clipShape = resolveShapeClip(it.shape, resolveGeometryBox(it.refBox, node))
+                        }
+
+                        is CSSClipPath.NoClip -> {}
+                    }
+                }
+                state.style.mask?.let {
+                    val mask = document.resolveIRI(it) as? Mask
+                    val maskNode = mask?.let { maskIri -> buildMask(maskIri) }
+                    if (maskNode != null) {
+                        node.maskNode = maskNode
+                    } else {
+                        logW("KSVG") { "Mask reference '$it' is missing or invalid; hiding element" }
+                        hideInvalidReference = true
+                    }
+                }
+
+                if (obj is Shape) {
+                    state.style.markerStart?.let {
+                        (document.resolveIRI(it) as? Marker)?.let { m ->
+                            node.markerStartNode = buildMarker(m)
                         }
                     }
-                    is CSSClipPath.ShapeClip -> {
-                        node.clipShape = resolveShapeClip(it.shape, resolveGeometryBox(it.refBox, node))
+                    state.style.markerMid?.let {
+                        (document.resolveIRI(it) as? Marker)?.let { m ->
+                            node.markerMidNode = buildMarker(m)
+                        }
                     }
-                    is CSSClipPath.NoClip -> {}
+                    state.style.markerEnd?.let {
+                        (document.resolveIRI(it) as? Marker)?.let { m ->
+                            node.markerEndNode = buildMarker(m)
+                        }
+                    }
                 }
-            }
-            state.style.mask?.let {
-                val mask = document.resolveIRI(it) as? Mask
-                val maskNode = mask?.let { buildMask(it) }
-                if (maskNode != null) {
-                    node.maskNode = maskNode
-                } else {
-                    logW("KSVG") { "Mask reference '$it' is missing or invalid; hiding element" }
-                    hideInvalidReference = true
+
+                resolvePatternReference(state.style.fill as? PaintReference)?.let { p ->
+                    node.fillPatternNode = p
                 }
-            }
-
-            if (obj is Shape) {
-                state.style.markerStart?.let { (document.resolveIRI(it) as? Marker)?.let { m -> node.markerStartNode = buildMarker(m) } }
-                state.style.markerMid?.let { (document.resolveIRI(it) as? Marker)?.let { m -> node.markerMidNode = buildMarker(m) } }
-                state.style.markerEnd?.let { (document.resolveIRI(it) as? Marker)?.let { m -> node.markerEndNode = buildMarker(m) } }
-            }
-
-            resolvePatternReference(state.style.fill as? PaintReference)?.let { p ->
-                node.fillPatternNode = p
-            }
-            resolvePatternReference(state.style.stroke as? PaintReference)?.let { p ->
-                node.strokePatternNode = p
-            }
-            node.fillPaintRef = resolvePaint(state.style.fill)
-            node.strokePaintRef = resolvePaint(state.style.stroke)
-
-            obj.animations?.let { animations ->
-                node.animationNodes = animations.mapNotNullElements {
-                    buildAnimationNode(it)
+                resolvePatternReference(state.style.stroke as? PaintReference)?.let { p ->
+                    node.strokePatternNode = p
                 }
-            }
-            node.hasAnimationsInSubtree = node.computeHasAnimations()
-            node.hasFilterInSubtree = node.hasFilters()
-            node.subtreeContainsBlendMode = node.computeSubtreeContainsBlendMode()
-        }
+                node.fillPaintRef = resolvePaint(state.style.fill)
+                node.strokePaintRef = resolvePaint(state.style.stroke)
 
-        statePop()
-        return if (hideInvalidReference) null else node
+                obj.animations?.let { animations ->
+                    node.animationNodes = animations.mapNotNullElements {
+                        buildAnimationNode(it)
+                    }
+                }
+                node.hasAnimationsInSubtree = node.computeHasAnimations()
+                node.hasFilterInSubtree = node.hasFilters()
+                node.subtreeContainsBlendMode = node.computeSubtreeContainsBlendMode()
+            }
+
+            statePop()
+            return if (hideInvalidReference) null else node
         } finally {
             buildDepth--
             if (id != null) buildingIds.remove(id)
@@ -438,10 +452,12 @@ internal class RenderTreeBuilder(
                 resolved.ancestorAnimationNodes = buildAncestorAnimationNodes(resolved.gradient)
                 resolved.stopNodes = buildStopNodes(resolved.gradient)
             }
+
             is ResolvedPaint.Radial -> {
                 resolved.ancestorAnimationNodes = buildAncestorAnimationNodes(resolved.gradient)
                 resolved.stopNodes = buildStopNodes(resolved.gradient)
             }
+
             else -> {}
         }
     }
@@ -507,6 +523,7 @@ internal class RenderTreeBuilder(
                 if (ref.size > 1) ref[1] else 0f,
                 if (ref.size > 2) ref[2] else 0f
             )
+
             TransformType.skewX, TransformType.skewY -> floatArrayOf(0f)
         }
     }
@@ -720,6 +737,7 @@ internal class RenderTreeBuilder(
                             baseRelative = true
                             listOf(toVal, toVal)
                         }
+
                         toVal != null -> listOf(toVal, toVal)
                         else -> null
                     }
@@ -747,6 +765,7 @@ internal class RenderTreeBuilder(
                             baseRelative = true
                             listOf(toVal, toVal)
                         }
+
                         toVal != null -> listOf(toVal, toVal)
                         else -> null
                     }
@@ -929,11 +948,11 @@ internal class RenderTreeBuilder(
         val oldViewBox = state.viewBox
 
         state.viewPort = viewPort
-        
+
         val transform = Matrix()
         val viewBox = viewBoxOverride ?: obj.viewBox
         val positioning = preserveAspectRatioOverride ?: obj.preserveAspectRatio ?: PreserveAspectRatio.LETTERBOX
-        
+
         if (viewBox != null) {
             calculateViewBoxTransform(viewPort, viewBox, positioning, transform)
             state.viewBox = viewBox
@@ -1125,15 +1144,34 @@ internal class RenderTreeBuilder(
     }
 
     /**
-     * Builds a directly-referenced viewport element (`<symbol>`/`<svg>` from `<use>`)
+     * Builds a directly referenced viewport element (`<symbol>`/`<svg>` from `<use>`)
      * under the cycle guard. These bypass `build()` (and its guard), so an anonymous
-     * inner `<use>` would otherwise recurse without bound: the guard
+     * inner `<use>` would otherwise recurse without a bound: the guard
      * keys on the *referenced* element's id instead.
      */
     private inline fun <T> buildGuarded(ref: Element, build: () -> T): T? {
         val id = (ref as? ElementBase)?.id
         if (id != null && !buildingIds.add(id)) {
             logW("KSVG") { "Cyclic reference detected for id '$id'; treating as empty" }
+            return null
+        }
+        try {
+            return build()
+        } finally {
+            if (id != null) buildingIds.remove(id)
+        }
+    }
+
+    /**
+     * Id-keyed re-entry guard for builders that bypass `build()` (and its guard):
+     * a builder re-entered for the same id while still on the stack is a reference
+     * cycle, so the inner reference is treated as empty. The id is always released,
+     * including on early exits — use a labeled `return@withCycleGuard` (or fall
+     * through to the last expression) inside [build], never a bare `return`.
+     */
+    private inline fun <T> withCycleGuard(id: String?, label: String, build: () -> T): T? {
+        if (id != null && !buildingIds.add(id)) {
+            logW("KSVG") { "Cyclic $label reference detected for id '$id'; treating as empty" }
             return null
         }
         try {
@@ -1157,7 +1195,18 @@ internal class RenderTreeBuilder(
         parentPush(obj)
         val refNode = when (ref) {
             is Symbol -> buildGuarded(ref) { buildSymbol(ref, obj.width, obj.height) }
-            is Svg -> buildGuarded(ref) { buildSvg(ref, effectiveViewport = makeViewPort(null, null, obj.width, obj.height)) }
+            is Svg -> buildGuarded(ref) {
+                buildSvg(
+                    obj = ref,
+                    effectiveViewport = makeViewPort(
+                        x = null,
+                        y = null,
+                        width = obj.width,
+                        height = obj.height
+                    )
+                )
+            }
+
             else -> build(ref)
         }
 
@@ -1205,7 +1254,7 @@ internal class RenderTreeBuilder(
 
         val pathDefinition = obj.d ?: return null
         val path = PathConverter(pathDefinition).path
-        
+
         if (obj.boundingBox == null) {
             obj.boundingBox = calculatePathBounds(path, null)
         }
@@ -1565,80 +1614,66 @@ internal class RenderTreeBuilder(
     }
 
     private fun buildClipPath(clipPath: ClipPath): ClipPathRenderNode? {
-        val id = clipPath.id
-        if (id != null && !buildingIds.add(id)) {
-            logW("KSVG") { "Cyclic clip-path reference detected for id '$id'; treating as empty" }
-            return null
-        }
-        try {
-        clipPathNodeCache[clipPath]?.let { return it }
+        return withCycleGuard(clipPath.id, "clip-path") {
+            clipPathNodeCache[clipPath]?.let { return@withCycleGuard it }
 
-        val oldState = state
-        val oldStateStack = stateStack.toList()
-        stateStack.clear()
+            val oldState = state
+            val oldStateStack = stateStack.toList()
+            stateStack.clear()
 
-        state = findInheritFromAncestorState(clipPath)
-        if (clipPath.clipPathUnitsAreUser == false) {
-            state.viewBox = null
-            state.viewPort = Box._1X1
-        }
-
-        val children = buildChildren(clipPath)
-        val node = ClipPathRenderNode(clipPath, children)
-        node.renderState.apply(state)
-
-        state.style.clipPath?.let {
-            val nestedIri = (it as? CSSClipPath.UrlClip)?.iri
-            val nestedClipPath = nestedIri?.let { iri -> document.resolveIRI(iri) as? ClipPath }
-            if (nestedClipPath != null && nestedClipPath !== clipPath) {
-                node.clipPathNode = buildClipPath(nestedClipPath)
+            state = findInheritFromAncestorState(clipPath)
+            if (clipPath.clipPathUnitsAreUser == false) {
+                state.viewBox = null
+                state.viewPort = Box._1X1
             }
-        }
 
-        state = oldState
-        stateStack.clear()
-        stateStack.addAll(oldStateStack)
+            val children = buildChildren(clipPath)
+            val node = ClipPathRenderNode(clipPath, children)
+            node.renderState.apply(state)
 
-        clipPathNodeCache[clipPath] = node
-        return node
-        } finally {
-            if (id != null) buildingIds.remove(id)
+            state.style.clipPath?.let {
+                val nestedIri = (it as? CSSClipPath.UrlClip)?.iri
+                val nestedClipPath = nestedIri?.let { iri -> document.resolveIRI(iri) as? ClipPath }
+                if (nestedClipPath != null && nestedClipPath !== clipPath) {
+                    node.clipPathNode = buildClipPath(nestedClipPath)
+                }
+            }
+
+            state = oldState
+            stateStack.clear()
+            stateStack.addAll(oldStateStack)
+
+            clipPathNodeCache[clipPath] = node
+            node
         }
     }
 
     private fun buildMask(mask: Mask): MaskRenderNode? {
-        val id = mask.id
-        if (id != null && !buildingIds.add(id)) {
-            logW("KSVG") { "Cyclic mask reference detected for id '$id'; treating as empty" }
-            return null
-        }
-        try {
-        maskNodeCache[mask]?.let { return it }
+        return withCycleGuard(mask.id, "mask") {
+            maskNodeCache[mask]?.let { return@withCycleGuard it }
 
-        val oldState = state
-        val oldStateStack = stateStack.toList()
-        stateStack.clear()
+            val oldState = state
+            val oldStateStack = stateStack.toList()
+            stateStack.clear()
 
-        state = findInheritFromAncestorState(mask)
-        // The 'opacity', 'filter' and 'display' properties do not apply to the 'mask' element" (sect 14.4)
-        if (state.style.opacity != 1f) {
-            state.style = state.style.copy(opacity = 1f)
-        }
-        // state.style.filter = null
+            state = findInheritFromAncestorState(mask)
+            // The 'opacity', 'filter' and 'display' properties do not apply to the 'mask' element" (sect 14.4)
+            if (state.style.opacity != 1f) {
+                state.style = state.style.copy(opacity = 1f)
+            }
+            // state.style.filter = null
 
-        val children = buildChildren(mask)
-        val node = MaskRenderNode(mask, children)
-        node.renderState.apply(state)
+            val children = buildChildren(mask)
+            val node = MaskRenderNode(mask, children)
+            node.renderState.apply(state)
 
-        maskNodeCache[mask] = node
+            maskNodeCache[mask] = node
 
-        state = oldState
-        stateStack.clear()
-        stateStack.addAll(oldStateStack)
+            state = oldState
+            stateStack.clear()
+            stateStack.addAll(oldStateStack)
 
-        return node
-        } finally {
-            if (id != null) buildingIds.remove(id)
+            node
         }
     }
 
@@ -1677,95 +1712,99 @@ internal class RenderTreeBuilder(
         return newState
     }
 
-    private fun buildMarker(marker: Marker): MarkerRenderNode {
-        markerNodeCache[marker]?.let { return it }
+    private fun buildMarker(marker: Marker): MarkerRenderNode? {
+        return withCycleGuard(marker.id, "marker") {
+            markerNodeCache[marker]?.let { return@withCycleGuard it }
 
-        val oldState = state
-        val oldStateStack = stateStack.toList()
-        stateStack.clear()
+            val oldState = state
+            val oldStateStack = stateStack.toList()
+            stateStack.clear()
 
-        state = findInheritFromAncestorState(marker)
+            state = findInheritFromAncestorState(marker)
 
-        val children = buildChildren(marker)
-        val node = MarkerRenderNode(marker, children)
-        node.renderState.apply(state)
+            val children = buildChildren(marker)
+            val node = MarkerRenderNode(marker, children)
+            node.renderState.apply(state)
 
-        markerNodeCache[marker] = node
+            markerNodeCache[marker] = node
 
-        state = oldState
-        stateStack.clear()
-        stateStack.addAll(oldStateStack)
+            state = oldState
+            stateStack.clear()
+            stateStack.addAll(oldStateStack)
 
-        return node
+            node
+        }
     }
 
-    private fun buildPattern(pattern: Pattern): PatternRenderNode {
-        patternNodeCache[pattern]?.let { return it }
+    private fun buildPattern(pattern: Pattern): PatternRenderNode? {
+        return withCycleGuard(pattern.id, "pattern") {
+            patternNodeCache[pattern]?.let { return@withCycleGuard it }
 
-        pattern.href?.let {
-            fillInChainedPatternFields(pattern, it)
-        }
-
-        val oldState = state
-        val oldStateStack = stateStack.toList()
-        stateStack.clear()
-
-        state = findInheritFromAncestorState(pattern)
-        if (state.style.overflow != false) {
-            state.style = state.style.copy(overflow = false) // By default, patterns do not overflow
-        }
-
-        val children = buildChildren(pattern)
-        val node = PatternRenderNode(pattern, children)
-        node.renderState.apply(state)
-
-        val viewBox = pattern.viewBox
-        val tileWidth = viewBox?.width
-            ?: if (pattern.patternContentUnitsAreUser != false) {
-                pattern.width?.floatValueXInContext() ?: 0f
-            } else {
-                1f
-            }
-        val tileHeight = viewBox?.height
-            ?: if (pattern.patternContentUnitsAreUser != false) {
-                pattern.height?.floatValueYInContext() ?: 0f
-            } else {
-                1f
+            pattern.href?.let {
+                fillInChainedPatternFields(pattern, it)
             }
 
-        if (tileWidth > 0f && tileHeight > 0f) {
-            var contentBox: Box? = null
-            children.forEachElement {
-                it.boundingBox?.let { childBox ->
-                    contentBox = contentBox?.union(childBox) ?: childBox
+            val oldState = state
+            val oldStateStack = stateStack.toList()
+            stateStack.clear()
+
+            state = findInheritFromAncestorState(pattern)
+            if (state.style.overflow != false) {
+                state.style = state.style.copy(overflow = false) // By default, patterns do not overflow
+            }
+
+            val children = buildChildren(pattern)
+            val node = PatternRenderNode(pattern, children)
+            node.renderState.apply(state)
+
+            val viewBox = pattern.viewBox
+            val tileWidth = viewBox?.width
+                ?: if (pattern.patternContentUnitsAreUser != false) {
+                    pattern.width?.floatValueXInContext() ?: 0f
+                } else {
+                    1f
+                }
+            val tileHeight = viewBox?.height
+                ?: if (pattern.patternContentUnitsAreUser != false) {
+                    pattern.height?.floatValueYInContext() ?: 0f
+                } else {
+                    1f
+                }
+
+            if (tileWidth > 0f && tileHeight > 0f) {
+                var contentBox: Box? = null
+                children.forEachElement {
+                    it.boundingBox?.let { childBox ->
+                        contentBox = contentBox?.union(childBox) ?: childBox
+                    }
+                }
+                if (contentBox != null) {
+                    node.hasOverflow = contentBox.minX < -0.01f || contentBox.minY < -0.01f ||
+                            contentBox.maxX() > tileWidth + 0.01f || contentBox.maxY() > tileHeight + 0.01f
                 }
             }
-            if (contentBox != null) {
-                node.hasOverflow = contentBox.minX < -0.01f || contentBox.minY < -0.01f ||
-                        contentBox.maxX() > tileWidth + 0.01f || contentBox.maxY() > tileHeight + 0.01f
-            }
+
+            node.hasAnimations = pattern.animations?.isNotEmpty() == true ||
+                    children.anyElement { it.hasAnimations() }
+
+            node.hasTextContent = children.anyElement { it.containsText() }
+
+            // Pattern tile content is stamped once per tile under a different canvas
+            // transform, but the display-list cache key (contentVersion + paints) knows
+            // nothing about the tile position, so per-tile captures would be unsound.
+            // Disable caching for the whole pattern subtree; direct drawing is always
+            // correct. Note this also touches nodes shared with non-pattern uses
+            // (markers, <use> targets) — those only lose caching, never correctness.
+            children.forEachElement { it.disableSubtreeDisplayListCache() }
+
+            patternNodeCache[pattern] = node
+
+            state = oldState
+            stateStack.clear()
+            stateStack.addAll(oldStateStack)
+
+            node
         }
-
-        node.hasAnimations = pattern.animations?.isNotEmpty() == true ||
-                children.anyElement { it.hasAnimations() }
-
-        node.hasTextContent = children.anyElement { it.containsText() }
-
-        // Pattern tile content is stamped once per tile under a different canvas
-        // transform, but the display-list cache key (contentVersion + paints) knows
-        // nothing about the tile position, so per-tile captures would be unsound.
-        // Disable caching for the whole pattern subtree; direct drawing is always
-        // correct. Note this also touches nodes shared with non-pattern uses
-        // (markers, <use> targets) — those only lose caching, never correctness.
-        children.forEachElement { it.disableSubtreeDisplayListCache() }
-
-        patternNodeCache[pattern] = node
-
-        state = oldState
-        stateStack.clear()
-        stateStack.addAll(oldStateStack)
-
-        return node
     }
 
     private fun RenderNode<*>.containsText(): Boolean = when (this) {
@@ -1784,6 +1823,7 @@ internal class RenderTreeBuilder(
             is SwitchRenderNode -> selectedChild?.disableSubtreeDisplayListCache()
             is KSVGTextContainerRenderNode<*> ->
                 children.forEachElement { (it as? RenderNode<*>)?.disableSubtreeDisplayListCache() }
+
             else -> {}
         }
     }
@@ -1853,49 +1893,51 @@ internal class RenderTreeBuilder(
         }
     }
 
-    private fun buildFilter(filter: Filter): FilterRenderNode {
-        filterNodeCache[filter]?.let { return it }
+    private fun buildFilter(filter: Filter): FilterRenderNode? {
+        return withCycleGuard(filter.id, "filter") {
+            filterNodeCache[filter]?.let { return@withCycleGuard it }
 
-        val oldState = state
-        val oldStateStack = stateStack.toList()
-        stateStack.clear()
+            val oldState = state
+            val oldStateStack = stateStack.toList()
+            stateStack.clear()
 
-        // Filter state initialization if needed
-        // For now just keep current state
-        
-        val primitives = filter.getChildren().mapNotNullElements { child ->
-             if (child is FilterPrimitive) {
-                 buildFilterPrimitive(child)
-             } else {
-                 null
-             }
-        }
+            // Filter state initialization if needed
+            // For now just keep current state
 
-        val node = FilterRenderNode(filter, primitives)
-        node.renderState.apply(state)
-        val filterMode = filter.style?.colorInterpolationFilters
-            ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
-            ?: filter.baseStyle?.colorInterpolationFilters
+            val primitives = filter.getChildren().mapNotNullElements { child ->
+                if (child is FilterPrimitive) {
+                    buildFilterPrimitive(child)
+                } else {
+                    null
+                }
+            }
+
+            val node = FilterRenderNode(filter, primitives)
+            node.renderState.apply(state)
+            val filterMode = filter.style?.colorInterpolationFilters
                 ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
-            ?: state.style.colorInterpolationFilters
-                .takeIf { it != ColorInterpolation.UNSPECIFIED }
-            ?: ColorInterpolation.LINEAR_RGB
-        node.colorInterpolationFilters = filterMode
-        primitives.forEachElement { primitive ->
-            val source = primitive.sourceElement
-            primitive.colorInterpolationFilters = source.style?.colorInterpolationFilters
-                ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
-                ?: source.baseStyle?.colorInterpolationFilters
+                ?: filter.baseStyle?.colorInterpolationFilters
                     ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
-                ?: filterMode
+                ?: state.style.colorInterpolationFilters
+                    .takeIf { it != ColorInterpolation.UNSPECIFIED }
+                ?: ColorInterpolation.LINEAR_RGB
+            node.colorInterpolationFilters = filterMode
+            primitives.forEachElement { primitive ->
+                val source = primitive.sourceElement
+                primitive.colorInterpolationFilters = source.style?.colorInterpolationFilters
+                    ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
+                    ?: source.baseStyle?.colorInterpolationFilters
+                        ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
+                            ?: filterMode
+            }
+            filterNodeCache[filter] = node
+
+            state = oldState
+            stateStack.clear()
+            stateStack.addAll(oldStateStack)
+
+            node
         }
-        filterNodeCache[filter] = node
-
-        state = oldState
-        stateStack.clear()
-        stateStack.addAll(oldStateStack)
-
-        return node
     }
 
     private fun buildFilterPrimitive(primitive: FilterPrimitive): FilterPrimitiveRenderNode<*> {
@@ -1905,16 +1947,19 @@ internal class RenderTreeBuilder(
                 stdDeviationX = primitive.stdDeviationX,
                 stdDeviationY = primitive.stdDeviationY
             )
+
             is FeColorMatrix -> FeColorMatrixRenderNode(
                 sourceElement = primitive,
                 type = primitive.type,
                 values = primitive.values
             )
+
             is FeOffset -> FeOffsetRenderNode(
                 sourceElement = primitive,
                 dx = primitive.dx?.floatValueInContext() ?: 0f,
                 dy = primitive.dy?.floatValueInContext() ?: 0f
             )
+
             is FeConvolveMatrix -> {
                 val orderX = max(primitive.orderX, 1)
                 val orderY = max(primitive.orderY, 1)
@@ -1937,10 +1982,12 @@ internal class RenderTreeBuilder(
                     kernelUnitLengthY = primitive.kernelUnitLengthY,
                 )
             }
+
             is FeMorphology -> FeMorphologyRenderNode(
                 sourceElement = primitive,
                 erode = primitive.operator == FeMorphologyOperator.erode
             )
+
             is FeComponentTransfer -> FeComponentTransferRenderNode(
                 sourceElement = primitive,
                 transferFunctions = run {
@@ -1961,17 +2008,19 @@ internal class RenderTreeBuilder(
                     ComponentTransferFunctions(r, g, b, a)
                 },
             )
+
             is FeComposite -> FeCompositeRenderNode(
                 primitive,
                 paint = createCompositePaint(primitive.operator),
             )
+
             is FeTurbulence -> FeTurbulenceRenderNode(
                 primitive,
                 generators = run {
                     val lcg = LcgRandom(if (primitive.seed <= 0) 1 else primitive.seed.toInt())
                     val permutation = IntArray(SvgPathNoise.LATTICE_SIZE)
                     // Gradients are drawn per channel (in order) by the SvgPathNoise
-                    // constructors sharing `lcg`; only afterwards is the single lattice
+                    // constructors sharing `lcg`; only afterward is the single lattice
                     // permutation built/shuffled — matching the librsvg draw order so the
                     // output is byte-identical to the reference implementation.
                     val generators = Array(4) { SvgPathNoise(lcg, permutation) }
@@ -1979,6 +2028,7 @@ internal class RenderTreeBuilder(
                     generators
                 },
             )
+
             is FeDisplacementMap -> FeDisplacementMapRenderNode(primitive)
             is FeDiffuseLighting -> FeDiffuseLightingRenderNode(primitive)
             is FeSpecularLighting -> FeSpecularLightingRenderNode(primitive)
@@ -1994,6 +2044,7 @@ internal class RenderTreeBuilder(
                 }
                 FeMergeRenderNode(primitive, mergeNodes)
             }
+
             is FeImage -> {
                 val href = primitive.href
                 val image = href?.let {
@@ -2012,6 +2063,7 @@ internal class RenderTreeBuilder(
                 }
                 FeImageRenderNode(sourceElement = primitive, image = image, referencedNode = referencedNode)
             }
+
             is FeFlood -> FeFloodRenderNode(primitive)
             is FeBlend -> FeBlendRenderNode(
                 sourceElement = primitive,
@@ -2019,6 +2071,7 @@ internal class RenderTreeBuilder(
                 in2 = primitive.in2,
                 paint = createBlendPaint(primitive.mode),
             )
+
             is FeTile -> FeTileRenderNode(primitive)
             is FeDropShadow -> {
                 val bp = primitive.baseParams
@@ -2061,6 +2114,7 @@ internal class RenderTreeBuilder(
                     offsetNode = offsetNode,
                 )
             }
+
             else -> GenericFilterPrimitiveRenderNode(primitive)
         }
 
@@ -2080,7 +2134,7 @@ internal class RenderTreeBuilder(
 
     private fun updateStyleForElement(state: RendererState, obj: ElementBase) {
         // Derive the stroke-dash scaling implied by a declared `pathLength` so that
-        // RendererState.updateStrokeDash can honour it. Scale = actualLength / pathLength.
+        // RendererState.updateStrokeDash can honor it. Scale = actualLength / pathLength.
         state.dashLengthScale = computePathLengthScale(obj)
 
         obj.styleBuilder.also { builder ->
@@ -2102,6 +2156,7 @@ internal class RenderTreeBuilder(
                 measure.setPath(PathConverter(d).path, false)
                 measure.length
             }
+
             is RectShape -> {
                 val w = obj.width?.floatValueXInContext() ?: return 1f
                 val h = obj.height?.floatValueYInContext() ?: return 1f
@@ -2110,16 +2165,19 @@ internal class RenderTreeBuilder(
                 val r = minOf(rx.coerceAtLeast(0f), ry.coerceAtLeast(0f), w / 2f, h / 2f)
                 2f * (w + h - 4f * r) + (2f * PI.toFloat() * r)
             }
+
             is CircleShape -> {
                 val r = obj.r?.floatValueInContext() ?: return 1f
                 2f * PI.toFloat() * r
             }
+
             is EllipseShape -> {
                 val rx = obj.rx?.floatValueXInContext() ?: return 1f
                 val ry = obj.ry?.floatValueYInContext() ?: return 1f
                 // Ramanujan's second approximation (dash scaling only needs it close).
                 (PI * (3f * (rx + ry) - sqrt((3f * rx + ry) * (rx + 3f * ry)))).toFloat()
             }
+
             is LineShape -> {
                 val x1 = obj.x1?.floatValueXInContext() ?: 0f
                 val y1 = obj.y1?.floatValueYInContext() ?: 0f
@@ -2127,6 +2185,7 @@ internal class RenderTreeBuilder(
                 val y2 = obj.y2?.floatValueYInContext() ?: 0f
                 hypot(x2 - x1, y2 - y1)
             }
+
             is PolyLineShape -> {
                 val points = obj.points ?: return 1f
                 var length = 0f
@@ -2140,6 +2199,7 @@ internal class RenderTreeBuilder(
                 }
                 length
             }
+
             else -> return 1f
         }
 

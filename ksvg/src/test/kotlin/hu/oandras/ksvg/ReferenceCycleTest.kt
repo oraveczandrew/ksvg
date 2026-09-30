@@ -17,8 +17,21 @@
 package hu.oandras.ksvg
 
 import android.graphics.Bitmap
+import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.core.ElementBase
+import hu.oandras.ksvg.render.GroupRenderNode
+import hu.oandras.ksvg.render.MarkerRenderNode
+import hu.oandras.ksvg.render.FeImageRenderNode
+import hu.oandras.ksvg.render.PathRenderNode
+import hu.oandras.ksvg.render.PatternRenderNode
+import hu.oandras.ksvg.render.RenderNode
+import hu.oandras.ksvg.render.RenderTreeBuilder
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.test.renderWithLibrary
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -137,5 +150,196 @@ class ReferenceCycleTest {
             </svg>
             """.trimIndent()
         )
+    }
+
+    @Test(timeout = HANG_BUDGET_MS)
+    fun markerSelfReferenceTerminates() {
+        renders(
+            """
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+              <defs>
+                <marker id="m" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                  <path d="M0,0 L10,10" marker-start="url(#m)"/>
+                </marker>
+              </defs>
+              <path d="M10,10 L190,190" fill="none" stroke="red" stroke-width="4" marker-start="url(#m)"/>
+            </svg>
+            """.trimIndent()
+        )
+    }
+
+    @Test(timeout = HANG_BUDGET_MS)
+    fun patternContentSelfReferenceTerminates() {
+        renders(
+            """
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+              <defs>
+                <pattern id="P" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <rect width="20" height="20" fill="url(#P)"/>
+                </pattern>
+              </defs>
+              <rect width="200" height="200" fill="url(#P)"/>
+            </svg>
+            """.trimIndent()
+        )
+    }
+
+    @Test(timeout = HANG_BUDGET_MS)
+    fun feImageFilteredElementCycleTerminates() {
+        renders(
+            """
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+              <defs>
+                <filter id="F" x="0" y="0" width="200" height="200" filterUnits="userSpaceOnUse">
+                  <feImage href="#el"/>
+                </filter>
+              </defs>
+              <rect id="el" width="200" height="200" fill="red" filter="url(#F)"/>
+            </svg>
+            """.trimIndent()
+        )
+    }
+
+    @Test(timeout = HANG_BUDGET_MS)
+    fun clipChildSelfReferenceTerminates() {
+        renders(
+            """
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+              <defs>
+                <clipPath id="c">
+                  <rect width="200" height="200" clip-path="url(#c)"/>
+                </clipPath>
+              </defs>
+              <rect width="200" height="200" fill="red" clip-path="url(#c)"/>
+            </svg>
+            """.trimIndent()
+        )
+    }
+
+    // --- Cycle fallbacks: the cyclic (inner) reference is dropped, the outer user is intact. ---
+
+    private fun buildTree(svg: String): RenderNode<*>? {
+        val doc = SVGImpl.getFromString(svg, logger = NoopLoggerContext)
+        val builder = RenderTreeBuilder(doc, 160f, null, PoolOwner(), doc)
+        return builder.build(Box(0f, 0f, 200f, 200f))
+    }
+
+    private fun RenderNode<*>.allNodes(): List<RenderNode<*>> {
+        val out = ArrayList<RenderNode<*>>()
+        val seen = HashSet<RenderNode<*>>()
+        fun visit(n: RenderNode<*>) {
+            if (!seen.add(n)) return
+            out.add(n)
+            when (n) {
+                is GroupRenderNode<*> -> n.children.forEach(::visit)
+                is PatternRenderNode -> n.children.forEach(::visit)
+                else -> {}
+            }
+            // Paint/marker/clip references live in fields, not in children.
+            n.markerStartNode?.let(::visit)
+            n.markerMidNode?.let(::visit)
+            n.markerEndNode?.let(::visit)
+            n.fillPatternNode?.let(::visit)
+            n.strokePatternNode?.let(::visit)
+        }
+        visit(this)
+        return out
+    }
+
+    @Test
+    fun markerCycleDropsInnerReference() {
+        val root = checkNotNull(
+            buildTree(
+                """
+                <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+                  <defs>
+                    <marker id="m" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                      <path d="M0,0 L10,10" marker-start="url(#m)"/>
+                    </marker>
+                  </defs>
+                  <path d="M10,10 L190,190" fill="none" stroke="red" stroke-width="4" marker-start="url(#m)"/>
+                </svg>
+                """.trimIndent()
+            )
+        )
+        val nodes = root.allNodes()
+        val markers = nodes.filterIsInstance<MarkerRenderNode>()
+        assert(markers.isNotEmpty()) { "outer marker missing" }
+        val inMarker = markers.flatMap { it.allNodes().toSet() }.toSet()
+        // The outer path keeps its marker …
+        val outerPaths = nodes.filterIsInstance<PathRenderNode>().filter { it !in inMarker }
+        assert(outerPaths.size == 1) { "expected one outer path, got ${outerPaths.size}" }
+        assertNotNull(outerPaths.single().markerStartNode)
+        // … but the cyclic reference inside the marker content is dropped.
+        val innerPaths = markers.flatMap { it.children.filterIsInstance<PathRenderNode>() }
+        assert(innerPaths.isNotEmpty()) { "marker content missing" }
+        innerPaths.forEach {
+            assertNull(it.markerStartNode)
+            assertNull(it.markerMidNode)
+            assertNull(it.markerEndNode)
+        }
+    }
+
+    @Test
+    fun patternCycleDropsInnerReference() {
+        val root = checkNotNull(
+            buildTree(
+                """
+                <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+                  <defs>
+                    <pattern id="P" width="20" height="20" patternUnits="userSpaceOnUse">
+                      <rect width="20" height="20" fill="url(#P)"/>
+                    </pattern>
+                  </defs>
+                  <rect width="200" height="200" fill="url(#P)"/>
+                </svg>
+                """.trimIndent()
+            )
+        )
+        val nodes = root.allNodes()
+        val patterns = nodes.filterIsInstance<PatternRenderNode>()
+        assert(patterns.isNotEmpty()) { "outer pattern missing" }
+        val inPattern = patterns.flatMap { it.allNodes().toSet() }.toSet()
+        // The outer rect keeps its pattern …
+        val outerRects = nodes.filterIsInstance<PathRenderNode>()
+            .filter { it !in inPattern && it.fillPatternNode != null }
+        assert(outerRects.size == 1) { "expected one outer rect, got ${outerRects.size}" }
+        // … but the cyclic fill inside the pattern content falls back to none.
+        val innerRects = patterns.flatMap { it.children.filterIsInstance<PathRenderNode>() }
+        assert(innerRects.isNotEmpty()) { "pattern content missing" }
+        innerRects.forEach {
+            assertNull(it.fillPatternNode)
+            assertNull(it.strokePatternNode)
+        }
+    }
+
+    @Test
+    fun sharedFilterCycleSkipsInnerFilter() {
+        val root = checkNotNull(
+            buildTree(
+                """
+                <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+                  <defs>
+                    <filter id="F" x="0" y="0" width="200" height="200" filterUnits="userSpaceOnUse">
+                      <feImage href="#el2"/>
+                    </filter>
+                  </defs>
+                  <rect id="el1" width="100" height="200" fill="red" filter="url(#F)"/>
+                  <rect id="el2" x="100" width="100" height="200" fill="blue" filter="url(#F)"/>
+                </svg>
+                """.trimIndent()
+            )
+        )
+        fun nodeById(id: String): RenderNode<*> {
+            return root.allNodes().single { (it.sourceElement as? ElementBase)?.id == id }
+        }
+        // The outer element keeps its filter …
+        val filterNode = nodeById("el1").filterNode
+        assertNotNull(filterNode)
+        // … but the re-entrant filter application on the feImage target is skipped:
+        // the element copy rendered inside the filter draws unfiltered.
+        val feImage = checkNotNull(filterNode!!.primitives.singleOrNull()) as FeImageRenderNode
+        val innerTarget = checkNotNull(feImage.referencedNode)
+        assertNull(innerTarget.filterNode)
     }
 }
