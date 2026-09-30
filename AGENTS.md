@@ -91,7 +91,7 @@ If static audit is inconclusive, trace one instruction live with qemu-trace-brid
 *   **`Paint.setFontVariationSettings`**: Throws `NoSuchMethodError` in Robolectric; avoid testing complex text layouts in unit tests if they rely on variable fonts.
 *   **`stroke-dasharray`**: Requires normalization (doubling the array if length is odd) before it can be used with Android's `DashPathEffect`.
 *   **`accumulate="sum"`**: For colors (ARGB), "sum" is ignored per SVG spec.
-*   **CSS keyword matching is case-insensitive**: use `equals(KEYWORD, ignoreCase = true)` (or `Locale.US` lowercase tokens) in `parse*` funcs, never `==`/`when(value)`. Exception: `parseFontFeatureSettings` 4-char feature tags stay case-sensitive.
+*   **CSS keyword matching is case-insensitive**: use `equals(KEYWORD, ignoreCase = true)` (or `Locale.US` lowercase tokens) in `parse*` funcs, never `==`/`when(value)`.
 
 ## AI Helper Test Package (`hu.oandras.ksvg.aihelpers`)
 Reusable image-diff/diagnostic tests for investigating rendering fidelity live here. Keep them in the codebase so future sessions can reuse them.

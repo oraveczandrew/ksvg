@@ -785,11 +785,12 @@ internal data class CSSFontFeatureSettings internal constructor(
         ): Boolean {
             scan.skipWhitespace()
 
-            val name = scan.nextQuotedString()
+            val rawName = scan.nextQuotedString()
 
-            if (name == null || name.length != 4) {
+            if (rawName == null || rawName.length != 4) {
                 return false
             }
+            val name = rawName.lowercase(Locale.US)
 
             scan.skipWhitespace()
 
@@ -799,10 +800,10 @@ internal data class CSSFontFeatureSettings internal constructor(
                 val num = scan.nextInteger(false)
 
                 if (num == null) {
-                    if (scan.consume(FEATURE_OFF)) {
+                    if (scan.consumeIgnoreCase(FEATURE_OFF)) {
                         value = VALUE_OFF
                     } else {
-                        scan.consume(FEATURE_ON)
+                        scan.consumeIgnoreCase(FEATURE_ON)
                     }
                 } else {
                     value = num
