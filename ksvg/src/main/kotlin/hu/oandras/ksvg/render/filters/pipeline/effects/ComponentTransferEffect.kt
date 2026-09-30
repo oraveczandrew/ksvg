@@ -29,6 +29,7 @@ import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.render.FeComponentTransferRenderNode
 import hu.oandras.ksvg.render.filters.buildTransferLutTables
+import hu.oandras.ksvg.utils.alpha
 
 /**
  * Straight-then-premult transfer lookup. Out-of-`uPrimitiveRegion` pixels
@@ -104,7 +105,7 @@ internal fun createComponentTransferShaderEffect(
     val rgbPixels = IntArray(256)
     val alphaPixels = IntArray(256)
     for (i in 0 until 256) {
-        val a = (lut[0][i] ushr 24) and 0xFF
+        val a = lut[0][i].alpha
         rgbPixels[i] = -0x1000000 or lut[1][i] or lut[2][i] or lut[3][i]
         alphaPixels[i] = -0x1000000 or (a shl 16) or (a shl 8) or a
     }

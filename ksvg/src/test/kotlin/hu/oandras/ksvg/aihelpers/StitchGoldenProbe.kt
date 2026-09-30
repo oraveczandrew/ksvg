@@ -19,6 +19,9 @@ package hu.oandras.ksvg.aihelpers
 import hu.oandras.ksvg.filtering.LcgRandom
 import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.test.decodePng
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -129,9 +132,9 @@ class StitchGoldenProbe {
                     val cb = (b * a / 255.0 + 255 * (1 - a / 255.0))
 
                     val gv = gPx[cy * 256 + cx]
-                    val gr = (gv shr 16) and 0xff
-                    val gg2 = (gv shr 8) and 0xff
-                    val gb = gv and 0xff
+                    val gr = gv.red
+                    val gg2 = gv.green
+                    val gb = gv.blue
 
                     val dr = abs(cr.roundToInt() - gr)
                     val dg = abs(cg.roundToInt() - gg2)

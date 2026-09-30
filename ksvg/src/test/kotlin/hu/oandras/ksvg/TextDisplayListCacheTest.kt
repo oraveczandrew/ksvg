@@ -17,6 +17,7 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.dom.style.WritingMode
 import hu.oandras.ksvg.dom.text.BaselineShift
 import hu.oandras.ksvg.dom.text.DominantBaseline
@@ -67,7 +68,7 @@ class TextDisplayListCacheTest(
     fun rendersNonEmptyText() {
         val bm = renderWithLibrary(svg, createBitmap(120, 120))
         // Text must actually be rasterized (at least one opaque pixel).
-        val opaque = countPixels(bm) { (it ushr 24) != 0 }
+        val opaque = countPixels(bm) { it.alpha != 0 }
         assertTrue("expected rasterized text pixels (got $opaque opaque)", opaque > 0)
     }
 

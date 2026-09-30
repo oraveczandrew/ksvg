@@ -18,6 +18,7 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import hu.oandras.ksvg.filtering.LcgRandom
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.test.renderWithLibrary
@@ -99,7 +100,7 @@ class D10StitchTilesTest {
             var variance = 0.0
             var last = -1
             for (x in 0 until 100) {
-                val v = (bitmap.getPixel(x, 50) shr 16) and 0xff
+                val v = bitmap.getPixel(x, 50).red
                 if (last >= 0) variance += abs(v - last)
                 last = v
             }

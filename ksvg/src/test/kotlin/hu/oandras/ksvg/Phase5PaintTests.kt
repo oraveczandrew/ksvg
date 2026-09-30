@@ -18,6 +18,9 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.test.renderWithLibrary
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -111,7 +114,7 @@ class Phase5PaintTests {
         val p = b.getPixel(60, 60)
         assertTrue(
             "Expected lime via currentColor",
-            (p shr 16 and 0xff) < 60 && (p shr 8 and 0xff) > 200 && (p and 0xff) < 60
+            p.red < 60 && p.green > 200 && p.blue < 60
         )
     }
 }

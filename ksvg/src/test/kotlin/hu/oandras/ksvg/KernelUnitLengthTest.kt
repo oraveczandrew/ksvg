@@ -17,6 +17,7 @@ package hu.oandras.ksvg
 
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.test.renderWithLibrary
+import hu.oandras.ksvg.utils.red
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,7 +54,7 @@ class KernelUnitLengthTest {
             </svg>
         """.trimIndent()
         val bitmap = renderWithLibrary(svg, createBitmap(60, 20), softwareFiltering = true)
-        return IntArray(60) { x -> (bitmap.getPixel(x, 10) shr 16) and 0xff }
+        return IntArray(60) { x -> bitmap.getPixel(x, 10).red }
     }
 
     @Test
@@ -105,7 +106,7 @@ class KernelUnitLengthTest {
             </svg>
         """.trimIndent()
         val bitmap = renderWithLibrary(svg, createBitmap(60, 20), softwareFiltering = true)
-        return IntArray(60) { x -> (bitmap.getPixel(x, 10) shr 16) and 0xff }
+        return IntArray(60) { x -> bitmap.getPixel(x, 10).red }
     }
 
     @Test

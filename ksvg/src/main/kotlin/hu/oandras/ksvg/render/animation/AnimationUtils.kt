@@ -25,10 +25,13 @@ import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.NumberParser
 import hu.oandras.ksvg.parser.TextScanner
 import hu.oandras.ksvg.utils.CubicBezier
+import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.charCount
 import hu.oandras.ksvg.utils.clamp
 import hu.oandras.ksvg.utils.forEachElement
+import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.optimizeReadOnlyList
+import hu.oandras.ksvg.utils.red
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.sqrt
@@ -435,9 +438,9 @@ internal fun computePacedKeyTimesColor(values: IntList): FloatList? {
     for (i in 0 until segmentCount) {
         val c1 = values[i]
         val c2 = values[i + 1]
-        val dr = ((c1 shr 16) and 0xFF) - ((c2 shr 16) and 0xFF)
-        val dg = ((c1 shr 8) and 0xFF) - ((c2 shr 8) and 0xFF)
-        val db = (c1 and 0xFF) - (c2 and 0xFF)
+        val dr = c1.red - c2.red
+        val dg = c1.green - c2.green
+        val db = c1.blue - c2.blue
         total += sqrt((dr * dr + dg * dg + db * db).toDouble()).toFloat()
         distances.add(total)
     }

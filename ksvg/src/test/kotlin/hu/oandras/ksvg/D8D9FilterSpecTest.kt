@@ -18,6 +18,10 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.test.renderWithLibrary
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,7 +51,7 @@ class D8D9FilterSpecTest {
 }
 
     private fun alpha(bitmap: Bitmap, x: Int, y: Int): Int =
-        (bitmap.getPixel(x, y) ushr 24) and 0xff
+        bitmap.getPixel(x, y).alpha
 
     // --- Terminal feSpecularLighting emits the cairo form ---
     //
@@ -71,10 +75,10 @@ class D8D9FilterSpecTest {
         // carries full-strength white with the rsvg intensity (116).
         for (y in 26 until 74) for (x in 26 until 74) {
             val p = bitmap.getPixel(x, y)
-            val a = (p ushr 24) and 0xff
-            val r = (p shr 16) and 0xff
-            val g = (p shr 8) and 0xff
-            val b = p and 0xff
+            val a = p.alpha
+            val r = p.red
+            val g = p.green
+            val b = p.blue
             if (r > 0 || g > 0 || b > 0) {
                 // Terminal cairo form: full-strength light color; intensity in alpha.
                 assertTrue("lit pixel must carry full white at $x,$y, was ($r,$g,$b)", r == 255 && g == 255 && b == 255)
@@ -101,7 +105,7 @@ class D8D9FilterSpecTest {
         for (y in 0 until 100) for (x in 0 until 100) {
             val p = bitmap.getPixel(x, y)
             if ((p and 0xffffff) != 0) {
-                assertTrue("diffuse output must stay opaque", ((p ushr 24) and 0xff) == 255)
+                assertTrue("diffuse output must stay opaque", p.alpha == 255)
                 checked++
             }
         }

@@ -18,6 +18,8 @@ package hu.oandras.ksvg
 
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.alpha
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,7 +47,7 @@ class C7PathLengthTest {
         val canvas = Canvas(bitmap)
         document.renderToCanvas(canvas)
 
-        val drawn = { x: Int -> bitmap.getPixel(x, 50).ushr(24) and 0xff > 100 }
+        val drawn = { x: Int -> bitmap.getPixel(x, 50).alpha > 100 }
         // pathLength=50 on a 100px path doubles the dash array: [10,10] -> [20,20].
         // Pattern on a 100px stroke: on [0,20), off [20,40), on [40,60), off [60,80), on [80,100).
         // Without pathLength scaling the dash stays [10,10] -> x=25 would be ON.

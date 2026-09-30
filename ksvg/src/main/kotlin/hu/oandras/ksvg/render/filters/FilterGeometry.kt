@@ -31,8 +31,12 @@ import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withClip
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import kotlin.math.roundToInt
 
 context(renderContext: RenderContext)
@@ -118,11 +122,11 @@ internal val bitmapReadsAreStraight: Boolean by lazy(LazyThreadSafetyMode.PUBLIC
 @SuppressLint("UseKtx")
 private fun probeBitmapReadsAreStraight(): Boolean {
     val probe = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-    val straight = (128 shl 24) or (255 shl 16) or (165 shl 8)
+    val straight = 128 shl 24 or (255 shl 16) or (165 shl 8)
     probe.setPixels(intArrayOf(straight), 0, 1, 0, 0, 1, 1)
     val back = IntArray(1)
     probe.getPixels(back, 0, 1, 0, 0, 1, 1)
-    return ((back[0] shr 8) and 0xff) > 128
+    return back[0].green > 128
 }
 
 /**
@@ -283,16 +287,16 @@ internal fun doFeGaussianBlurFilter(
 private fun premultiplyInPlace(pixels: IntArray) {
     for (i in pixels.indices) {
         val p = pixels[i]
-        val a = p ushr 24
+        val a = p.alpha
         if (a == 0) {
             pixels[i] = 0
             continue
         }
         if (a == 255) continue
-        val r = ((p shr 16 and 0xff) * a + 127) / 255
-        val g = ((p shr 8 and 0xff) * a + 127) / 255
-        val b = ((p and 0xff) * a + 127) / 255
-        pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
+        val r = (p.red * a + 127) / 255
+        val g = (p.green * a + 127) / 255
+        val b = (p.blue * a + 127) / 255
+        pixels[i] = a shl 24 or (r shl 16) or (g shl 8) or b
     }
 }
 
@@ -306,12 +310,12 @@ private fun premultiplyInPlace(pixels: IntArray) {
 private fun unpremultiplyInPlace(pixels: IntArray) {
     for (i in pixels.indices) {
         val p = pixels[i]
-        val a = p ushr 24
+        val a = p.alpha
         if (a == 0 || a == 255) continue
-        val r = clamp(((p shr 16 and 0xff) * 255 + (a shr 1)) / a, 0, 255)
-        val g = clamp(((p shr 8 and 0xff) * 255 + (a shr 1)) / a, 0, 255)
-        val b = clamp(((p and 0xff) * 255 + (a shr 1)) / a, 0, 255)
-        pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
+        val r = clamp((p.red * 255 + (a shr 1)) / a, 0, 255)
+        val g = clamp((p.green * 255 + (a shr 1)) / a, 0, 255)
+        val b = clamp((p.blue * 255 + (a shr 1)) / a, 0, 255)
+        pixels[i] = a shl 24 or (r shl 16) or (g shl 8) or b
     }
 }
 

@@ -18,6 +18,7 @@ package hu.oandras.ksvg.aihelpers
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
 import hu.oandras.ksvg.SlowSoftwareFiltering
@@ -83,14 +84,14 @@ class MaskStripPhaseProbeTest {
             for (t in TIMES) {
                 val px = pixels(renderAt(stripped, t))
                 for (i in px.indices) {
-                    if ((px[i] ushr 24) != 0) legit[i] = true
+                    if (px[i].alpha != 0) legit[i] = true
                 }
             }
             for (t in TIMES) {
                 val px = pixels(renderAt(withMask, t))
                 var leak = 0
                 for (i in px.indices) {
-                    if ((px[i] ushr 24) != 0 && !legit[i]) leak++
+                    if (px[i].alpha != 0 && !legit[i]) leak++
                 }
                 println("$variant/$name t=$t leak=$leak")
                 assertEquals("$variant/$name leaks $leak outside-content pixels at t=$t", 0, leak)

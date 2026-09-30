@@ -18,6 +18,10 @@ package hu.oandras.ksvg.aihelpers
 
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.test.decodePng
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -76,13 +80,13 @@ class KernelVsImagesProbe {
                             val kxx = (cx * scale + offX).toInt()
                             if (kxx < 0 || kxx >= kw) continue
                             val kv = kPx[kyy * kw + kxx]
-                            val a = (kv shr 24) and 0xff
+                            val a = kv.alpha
                             val ac = a / 255.0
-                            val cri = (((kv shr 16) and 0xff) * ac + 255 * (1 - ac)).toInt()
-                            val cgi = (((kv shr 8) and 0xff) * ac + 255 * (1 - ac)).toInt()
-                            val cbi = ((kv and 0xff) * ac + 255 * (1 - ac)).toInt()
+                            val cri = (kv.red * ac + 255 * (1 - ac)).toInt()
+                            val cgi = (kv.green * ac + 255 * (1 - ac)).toInt()
+                            val cbi = (kv.blue * ac + 255 * (1 - ac)).toInt()
                             val ov = oPx[cy * 256 + cx]
-                            outErr += abs(((ov shr 16) and 0xff) - cri) + abs(((ov shr 8) and 0xff) - cgi) + abs((ov and 0xff) - cbi)
+                            outErr += abs(ov.red - cri) + abs(ov.green - cgi) + abs(ov.blue - cbi)
                             n++
                         }
                     }
@@ -100,12 +104,12 @@ class KernelVsImagesProbe {
                     val kxx = (cx * scale + bestOx).toInt()
                     if (kxx < 0 || kxx >= kw) continue
                     val kv = kPx[kyy * kw + kxx]
-                    val a = (kv shr 24) and 0xff; val ac = a / 255.0
-                    val cri = (((kv shr 16) and 0xff) * ac + 255 * (1 - ac)).toInt()
-                    val cgi = (((kv shr 8) and 0xff) * ac + 255 * (1 - ac)).toInt()
-                    val cbi = ((kv and 0xff) * ac + 255 * (1 - ac)).toInt()
+                    val a = kv.alpha; val ac = a / 255.0
+                    val cri = (kv.red * ac + 255 * (1 - ac)).toInt()
+                    val cgi = (kv.green * ac + 255 * (1 - ac)).toInt()
+                    val cbi = (kv.blue * ac + 255 * (1 - ac)).toInt()
                     val gv = gPx[cy * 256 + cx]
-                    gErr += abs(((gv shr 16) and 0xff) - cri) + abs(((gv shr 8) and 0xff) - cgi) + abs((gv and 0xff) - cbi); m++
+                    gErr += abs(gv.red - cri) + abs(gv.green - cgi) + abs(gv.blue - cbi); m++
                 }
             }
             println("scale=$scale BEST out=${bestE.toString().take(7)} off=(${bestOx},${bestOy})  golden@thatoff=${(gErr / m / 3).toString().take(7)}")

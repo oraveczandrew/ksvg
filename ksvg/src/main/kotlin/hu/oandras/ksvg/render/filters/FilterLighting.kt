@@ -180,9 +180,9 @@ private fun linearToSrgbInPlace(bitmap: Bitmap) {
     for (i in pixels.indices) {
         val p = pixels[i]
         pixels[i] = (p and -0x1000000) or
-            (table[(p shr 16) and 0xff] shl 16) or
-            (table[(p shr 8) and 0xff] shl 8) or
-            table[p and 0xff]
+            (table[p.red] shl 16) or
+            (table[p.green] shl 8) or
+            table[p.blue]
     }
     bitmap.setPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
 }

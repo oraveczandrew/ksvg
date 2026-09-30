@@ -19,6 +19,7 @@ package hu.oandras.ksvg.aihelpers
 import hu.oandras.ksvg.filtering.LcgRandom
 import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.test.decodePng
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -108,7 +109,7 @@ class TurbulencePhaseProbeTest {
                 }
                 val v = (sum * 255.0 + 255.0) / 2.0
                 val a = ((v.coerceIn(0.0, 255.0)) + 0.5).toInt()
-                if (a == (gPx[y * 256 + x] ushr 24) and 0xff) match++
+                if (a == gPx[y * 256 + x].alpha) match++
             }
         }
         return match

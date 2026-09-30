@@ -17,6 +17,10 @@
 package hu.oandras.ksvg.aihelpers
 
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.test.decodePng
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,16 +74,16 @@ class GoldenModelProbe {
                 val kxx = (cx + offX).toInt()
                 if (kxx < 0 || kxx >= kw) continue
                 val kv = kPx[kyy * kw + kxx]
-                val aa = (kv shr 24) and 0xff
+                val aa = kv.alpha
                 if (aa == 0) continue
-                val rr = (kv shr 16) and 0xff
-                val gg2 = (kv shr 8) and 0xff
-                val bb = kv and 0xff
+                val rr = kv.red
+                val gg2 = kv.green
+                val bb = kv.blue
                 val gv = gPx[cy * 256 + cx]
-                val gr = (gv shr 16) and 0xff
-                val gg = (gv shr 8) and 0xff
-                val gb = gv and 0xff
-                val gaCh = (gv shr 24) and 0xff
+                val gr = gv.red
+                val gg = gv.green
+                val gb = gv.blue
+                val gaCh = gv.alpha
                 // only the noise region: golden not pure white and dump not pure white
                 if (gr < 250 || gg < 250 || gb < 250) pts.add(Px(gr, gg, gb, rr, gg2, bb, aa, gaCh))
             }

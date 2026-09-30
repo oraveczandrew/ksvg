@@ -18,6 +18,7 @@ package hu.oandras.ksvg
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertTrue
@@ -71,7 +72,7 @@ class Phase5AnimationTests {
             </svg>
         """.trimIndent()
 
-        fun alpha(b: Bitmap) = (b.getPixel(60, 60) ushr 24) and 0xff
+        fun alpha(b: Bitmap) = b.getPixel(60, 60).alpha
         val start = alpha(renderAt(svg, 0))
         val mid = alpha(renderAt(svg, 100))
         val end = alpha(renderAt(svg, 250))
@@ -148,7 +149,7 @@ class Phase5AnimationTests {
             </svg>
         """.trimIndent()
 
-        fun alpha(b: Bitmap) = (b.getPixel(60, 60) ushr 24) and 0xff
+        fun alpha(b: Bitmap) = b.getPixel(60, 60).alpha
         // t=150ms is inside the SECOND repetition, halfway -> ~0.5.
         val secondPass = alpha(renderAt(svg, 150))
         assertInRange("Second repetition must restart interpolation", 90, 165, secondPass)

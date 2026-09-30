@@ -18,6 +18,9 @@ package hu.oandras.ksvg
 
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,7 +57,7 @@ class D2RadialFxFyDefaultTest {
         // Center is (25,50); both points are 30px away -> identical gray level.
         val lum = { x: Int, y: Int ->
             val p = bitmap.getPixel(x, y)
-            ((p shr 16 and 0xff) + (p shr 8 and 0xff) + (p and 0xff)) / 3f
+            (p.red + p.green + p.blue) / 3f
         }
         val a = lum(25, 20)
         val b = lum(55, 50)

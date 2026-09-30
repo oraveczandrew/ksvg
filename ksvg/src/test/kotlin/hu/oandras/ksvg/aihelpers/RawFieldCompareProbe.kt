@@ -17,6 +17,9 @@
 package hu.oandras.ksvg.aihelpers
 
 import hu.oandras.ksvg.filtering.LcgRandom
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.filtering.SvgPathNoise
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.test.decodePng
@@ -143,12 +146,12 @@ class RawFieldCompareProbe {
 
                 val ov = oPx[cy * 256 + cx]
                 val gv = gPx[cy * 256 + cx]
-                val or_ = (ov shr 16) and 0xff
-                val og = (ov shr 8) and 0xff
-                val ob = ov and 0xff
-                val gr = (gv shr 16) and 0xff
-                val gg2 = (gv shr 8) and 0xff
-                val gb = gv and 0xff
+                val or_ = ov.red
+                val og = ov.green
+                val ob = ov.blue
+                val gr = gv.red
+                val gg2 = gv.green
+                val gb = gv.blue
 
                 outVsRaw += abs(or_ - rr) + abs(og - gg) + abs(ob - bb)
                 outVsComp += abs(or_ - cri) + abs(og - cgi) + abs(ob - cbi)

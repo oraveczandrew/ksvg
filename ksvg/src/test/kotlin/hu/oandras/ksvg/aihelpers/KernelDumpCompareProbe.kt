@@ -17,6 +17,10 @@
 package hu.oandras.ksvg.aihelpers
 
 import hu.oandras.ksvg.filtering.LcgRandom
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.filtering.SvgPathNoise
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -112,10 +116,10 @@ class KernelDumpCompareProbe {
                 val aa = clamp255(sums[3] * 255.0)
 
                 val dv = px[y * w + x]
-                val dra = (dv shr 24) and 0xff
-                val dr_ = (dv shr 16) and 0xff
-                val dg = (dv shr 8) and 0xff
-                val db = dv and 0xff
+                val dra = dv.alpha
+                val dr_ = dv.red
+                val dg = dv.green
+                val db = dv.blue
 
                 total += abs(dr_ - rr) + abs(dg - gg) + abs(db - bb)
                 n++

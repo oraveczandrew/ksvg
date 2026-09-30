@@ -18,6 +18,10 @@ package hu.oandras.ksvg
 
 import android.graphics.Canvas
 import hu.oandras.ksvg.render.createBitmap
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,10 +55,10 @@ class D7FeColorMatrixOffsetTest {
         document.renderToCanvas(canvas)
 
         val pixel = bitmap.getPixel(5, 5)
-        val r = (pixel shr 16) and 0xff
-        val g = (pixel shr 8) and 0xff
-        val b = pixel and 0xff
-        val a = (pixel shr 24) and 0xff
+        val r = pixel.red
+        val g = pixel.green
+        val b = pixel.blue
+        val a = pixel.alpha
 
         // SVG: offset 0.5 adds 0.5 to R in [0,1] space -> ~128.
         // Bug (offset * 255 = 127.5): R' clamps to 255 (full white).

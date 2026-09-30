@@ -17,6 +17,8 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.comparisons.VISUAL_GOLDEN_ROOT_PATH
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.comparisons.VISUAL_ROOT_PATH
 import hu.oandras.ksvg.comparisons.VISUAL_TARGET_SIZE
 import hu.oandras.ksvg.dom.gradient.GradientSpread
@@ -156,8 +158,8 @@ class RadialFocalFallbackTest {
         assertEquals(0xff000000.toInt(), sampleGradientStops(colors, positions, 2, -0.5f))
         assertEquals(0xffffffff.toInt(), sampleGradientStops(colors, positions, 2, 1.5f))
         val mid = sampleGradientStops(colors, positions, 2, 0.5f)
-        assertTrue("mid grey alpha must stay opaque", (mid ushr 24) == 0xff)
-        val lum = ((mid shr 16) and 0xff)
+        assertTrue("mid grey alpha must stay opaque", mid.alpha == 0xff)
+        val lum = mid.red
         assertTrue("mid grey must be ~half, was $lum", abs(lum - 127) <= 2)
     }
 
