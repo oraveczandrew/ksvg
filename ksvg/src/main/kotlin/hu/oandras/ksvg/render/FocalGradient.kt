@@ -17,6 +17,11 @@
 package hu.oandras.ksvg.render
 
 import hu.oandras.ksvg.dom.gradient.GradientSpread
+import hu.oandras.ksvg.utils.alpha
+import hu.oandras.ksvg.utils.argb
+import hu.oandras.ksvg.utils.blue
+import hu.oandras.ksvg.utils.green
+import hu.oandras.ksvg.utils.red
 import kotlin.math.sqrt
 
 /**
@@ -35,9 +40,19 @@ import kotlin.math.sqrt
  * (focal) circle and `C`/`r` the end circle.
  *
  * Returns `t` in gradient units (`0` = start circle, `1` = end circle); the
- * value may lie outside `[0,1]` — spread handling is the caller's job (see
- * [applyGradientSpread]). Degenerate inputs (zero growth, no real root) fall
- * back to end-circle behavior (`1f`).
+ * value may lie outside `[0,1]` on the covered side (`t > 1` beyond the end
+ * circle) — spread handling is the caller's job (see [applyGradientSpread]).
+ * Points inside the start circle solve naturally to a `t > 0` through the
+ * cone (no special-casing: this is what the platform two-point
+ * `RadialGradient` and rsvg do).
+ *
+ * Returns `NaN` when the point is not covered by any forward (`t ≥ 0`) circle
+ * — the region behind the focal apex that the cone never reaches. Callers must
+ * paint `NaN` as transparent (again matching the platform constructor and rsvg
+ * on every tile mode); feeding it into [applyGradientSpread] is meaningless.
+ *
+ * Degenerate inputs (zero growth, no real root) fall back to end-circle
+ * behavior (`1f`), except when they also imply no coverage (`NaN`).
  */
 internal fun focalGradientT(
     px: Float,
@@ -62,17 +77,24 @@ internal fun focalGradientT(
         // Tangent-cone degenerate: uniform growth, linear fallback.
         val denom = 2f * b
         if (denom > -1e-9f && denom < 1e-9f) return 1f
-        return c / denom
+        val t = c / denom
+        // A negative single root means the (single) solution circle lies
+        // behind the start: no forward coverage.
+        return if (t < 0f) Float.NaN else t
     }
     val discriminant = b * b - a * c
-    if (discriminant < 0f) return 1f
+    if (discriminant < 0f) return Float.NaN
     // Root selection is sign-dependent (verified against centered on-circle /
-    // interior, off-center interior and exterior on-circle points).
-    return if (a > 0f) {
+    // interior, off-center interior and exterior on-circle points, and against
+    // the platform two-point constructor inside the start circle). A negative
+    // selected root implies no forward coverage: for `a > 0` the pair is
+    // same-sign (both negative); the `a < 0` selection is always non-negative.
+    val t = if (a > 0f) {
         (b + sqrt(discriminant)) / a
     } else {
         (b - sqrt(discriminant)) / a
     }
+    return if (t < 0f) Float.NaN else t
 }
 
 /**
@@ -153,9 +175,10 @@ internal fun sampleGradientStops(
     val f = (t - p0) / (p1 - p0)
     val c0 = colors[lo]
     val c1 = colors[hi]
-    val a = ((c0 ushr 24) + (((c1 ushr 24) - (c0 ushr 24)) * f + 0.5f).toInt()) shl 24
-    val r = (((c0 shr 16) and 0xff) + ((((c1 shr 16) and 0xff) - ((c0 shr 16) and 0xff)) * f + 0.5f).toInt()) shl 16
-    val g = (((c0 shr 8) and 0xff) + ((((c1 shr 8) and 0xff) - ((c0 shr 8) and 0xff)) * f + 0.5f).toInt()) shl 8
-    val b = ((c0 and 0xff) + (((c1 and 0xff) - (c0 and 0xff)) * f + 0.5f).toInt())
-    return a or r or g or b
+    return argb(
+        alpha = c0.alpha + ((c1.alpha - c0.alpha) * f + 0.5f).toInt(),
+        red = c0.red + ((c1.red - c0.red) * f + 0.5f).toInt(),
+        green = c0.green + ((c1.green - c0.green) * f + 0.5f).toInt(),
+        blue = c0.blue + ((c1.blue - c0.blue) * f + 0.5f).toInt(),
+    )
 }

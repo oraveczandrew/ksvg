@@ -144,20 +144,30 @@ internal sealed class ResolvedPaint {
         @JvmField
         var shader: Shader? = null
         /**
-         * Focal-bake raster (API < 31 only): the unit-space [0,1]² gradient
-         * rasterized by [focalGradientT], sized to the referencing element's
-         * bounding box (capped). Reused across frames; re-baked only when
-         * [bakeSizeChanged] reports a size change (geometry/colors go through
-         * [updateGeometry]/[colorsChanged] as before). Never null while the
-         * fallback is active.
+         * Focal-bake raster (API < 31 only): the gradient rasterized by
+         * [focalGradientT] over the referencing element's bounding box
+         * (capped), one texel per [0,1]² unit step of that box. Reused across
+         * frames; re-baked only when [bakeRegionChanged] reports a different
+         * region (geometry/colors go through [updateGeometry]/[colorsChanged]
+         * as before). Never null while the fallback is active.
          */
         @JvmField
         var bakeBitmap: Bitmap? = null
         /** Scratch row for the bake loop; reallocated only on width change. */
         @JvmField
         var bakeRow: IntArray = IntArray(0)
+        /**
+         * Scratch 2×3 affine (`Matrix.getValues` layout) mapping a bake texel's
+         * bbox unit coordinates into gradient space; only
+         * `userSpaceOnUse` bakes need it (objectBoundingBox texels are already
+         * gradient space). Reused across bakes, never reallocated.
+         */
+        @JvmField
+        var bakeAffine: FloatArray = FloatArray(9)
         private var _bakeW = 0
         private var _bakeH = 0
+        private var _bakeX = 0f
+        private var _bakeY = 0f
         private var colorsHash = 0
         private var positionsHash = 0
         private var _cx = 0f
@@ -200,14 +210,22 @@ internal sealed class ResolvedPaint {
         }
 
         /**
-         * True when the focal-bake raster size differs from the last bake;
-         * part of the shader rebuild gate in `makeRadialGradient` (API < 31
-         * focal path only). The platform-shader path ignores bake size.
+         * True when the focal-bake region differs from the last bake; part of
+         * the shader rebuild gate in `makeRadialGradient` (API < 31 focal path
+         * only). The platform-shader path ignores the bake region.
+         *
+         * [x]/[y] is the referencing element's bbox origin, which
+         * `userSpaceOnUse` baking depends on (its texels are absolute user
+         * coordinates) but objectBoundingBox baking does not (its texels are
+         * position-invariant), so the objectBoundingBox path passes 0 and
+         * keeps a moving element's cache stable.
          */
-        fun bakeSizeChanged(w: Int, h: Int): Boolean {
-            return if (_bakeW != w || _bakeH != h) {
+        fun bakeRegionChanged(w: Int, h: Int, x: Float, y: Float): Boolean {
+            return if (_bakeW != w || _bakeH != h || _bakeX != x || _bakeY != y) {
                 _bakeW = w
                 _bakeH = h
+                _bakeX = x
+                _bakeY = y
                 true
             } else {
                 false

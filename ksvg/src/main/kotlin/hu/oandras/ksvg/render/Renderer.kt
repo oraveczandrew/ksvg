@@ -2011,11 +2011,14 @@ internal class Renderer internal constructor(
 
         // API < 31 focal fallback: the platform single-center RadialGradient
         // cannot express an off-center focal point (or focal radius), so such
-        // objectBoundingBox gradients are rasterized into a bitmap once per
-        // change (bakeFocalGradient) instead of falling back to centered.
+        // gradients are rasterized into a bitmap once per change
+        // (bakeFocalGradient) instead of falling back to centered. Applies to
+        // both gradient units: in userSpaceOnUse the focal circle is just
+        // given in absolute user coordinates instead of bbox fractions.
         // Centered gradients keep the fast platform path on every API level.
-        val needsFocalBake = !SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS && !userUnits &&
-            (_fx != _cx || _fy != _cy || _fr != 0f)
+        // Resolved inside the matrix block below, because the userSpaceOnUse
+        // bake additionally needs an invertible gradientTransform.
+        var needsFocalBake = false
 
         // Push the state
         statePush(canvas)
@@ -2033,6 +2036,27 @@ internal class Renderer internal constructor(
 
                 gradient.gradientTransform?.let {
                     m.preConcat(it)
+                }
+
+                // The focal bake samples in gradient space by undoing the shader
+                // matrix (gradientTransform included). A non-invertible matrix
+                // cannot be undone that way, so such a gradient keeps the
+                // centered platform fallback. Plain objectBoundingBox gradients
+                // always bake (their matrix is just the bbox placement). The
+                // probe is released right away; the bake derives its own
+                // inverse on the (much rarer) shader rebuild, where the cost
+                // does not matter.
+                if (!SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS &&
+                    (_fx != _cx || _fy != _cy || _fr != 0f)
+                ) {
+                    val needsInverse = userUnits || gradient.gradientTransform != null
+                    if (needsInverse) {
+                        matrixPool.withPooledObject { probe ->
+                            needsFocalBake = m.invert(probe)
+                        }
+                    } else {
+                        needsFocalBake = true
+                    }
                 }
 
                 // Create the color and position arrays for the shader
@@ -2151,17 +2175,29 @@ internal class Renderer internal constructor(
                 } else {
                     0
                 }
+                // The bake raster is cached per paint, so the rebuild gate has
+                // to notice a change of the region it was sampled over, not
+                // just of its size. userSpaceOnUse texels are absolute user
+                // coordinates, so the bbox origin is part of their content;
+                // objectBoundingBox texels are position-invariant, so 0 keeps
+                // a moving element's cache stable there.
+                val bakeX = if (userUnits) boundingBox.minX else 0f
+                val bakeY = if (userUnits) boundingBox.minY else 0f
+                // The sampling affine below must additionally undo the
+                // gradientTransform whenever there is one (either units); a
+                // plain objectBoundingBox bake keeps the fast unmapped path.
+                val applyTransform = userUnits || gradient.gradientTransform != null
                 val gr = if (
                     resolved.updateGeometry(_cx, _cy, _r, _fx, _fy, _fr, tileMode) ||
                     prevGradient == null ||
                     resolved.colorsChanged() ||
-                    (needsFocalBake && resolved.bakeSizeChanged(bakeW, bakeH))
+                    (needsFocalBake && resolved.bakeRegionChanged(bakeW, bakeH, bakeX, bakeY))
                 ) {
                     if (needsFocalBake) {
                         bakeFocalGradient(
                             resolved, _fx, _fy, _fr, _cx, _cy, _r, tileMode,
                             densified, straightColors, positions, numStops,
-                            bakeW, bakeH,
+                            bakeW, bakeH, applyTransform, m, boundingBox,
                         )
                     } else {
                         when (effColors) {
@@ -2229,12 +2265,24 @@ internal class Renderer internal constructor(
     //==============================================================================
 
     /**
-     * Rasterizes an objectBoundingBox focal radial gradient ([focalGradientT])
-     * into the cached unit-space bitmap and wraps it in a `BitmapShader`
-     * (always `CLAMP`: the bake region covers every painted sample, spread is
-     * applied per texel).
+     * Rasterizes a focal radial gradient ([focalGradientT]) into the cached
+     * bitmap and wraps it in a `BitmapShader` (always `CLAMP`: the bake region
+     * covers every painted sample, spread is applied per texel).
      *
-     * Runs only on shader rebuild (geometry/colors/bake-size change), never
+     * One texel is one `[0,1]²` unit step of the referencing element's
+     * bounding box, which is also the space the shader's local matrix maps onto
+     * that box. Where the focal circle is expressed depends on the units and
+     * the transform: plain objectBoundingBox texels are already gradient
+     * space, otherwise each texel is pushed back through the inverted
+     * [gradientSpaceMatrix] (the `gradientTransform`, which maps gradient
+     * space to user space, plus the box mapping for `userSpaceOnUse`) before
+     * the focal cone can be solved. In matrix terms the affine is always
+     * `m⁻¹ · T · S`, which collapses to `G⁻¹` for objectBoundingBox and to
+     * `G⁻¹ · T · S` for `userSpaceOnUse`. Callers guarantee that matrix is
+     * invertible whenever [applyTransform] is set, otherwise the centered
+     * platform path is used.
+     *
+     * Runs only on shader rebuild (geometry/colors/bake-region change), never
      * per frame: `bitmap[row]` storage is reused via [ResolvedPaint.Radial].
      * Only the returned `BitmapShader` is fresh per rebuild — the same alloc
      * profile as the platform `RadialGradient` path.
@@ -2254,6 +2302,9 @@ internal class Renderer internal constructor(
         numStops: Int,
         bakeW: Int,
         bakeH: Int,
+        applyTransform: Boolean,
+        gradientSpaceMatrix: Matrix,
+        boundingBox: Box,
     ): Shader {
         val bakeColors: IntArray
         val bakePositions: FloatArray
@@ -2292,14 +2343,59 @@ internal class Renderer internal constructor(
             TileMode.REPEAT -> GradientSpread.repeat
             else -> GradientSpread.pad
         }
-        for (j in 0 until bakeH) {
-            val gy = (j + 0.5f) / bakeH
-            for (i in 0 until bakeW) {
-                val gx = (i + 0.5f) / bakeW
-                val t = applyGradientSpread(focalGradientT(gx, gy, cfx, cfy, fr, cx, cy, r), spread)
-                row[i] = sampleGradientStops(bakeColors, bakePositions, bakeCount, t)
+        // Texel unit step -> gradient space, unless the texels are already
+        // there (plain objectBoundingBox bake). The shader's local matrix
+        // applies the box mapping first, so the affine is the inverted shader
+        // matrix with that mapping appended on the right, i.e. m⁻¹ · T · S
+        // (`pre*` right-appends, so preTranslate then preScale in source order
+        // yields exactly that). Reused via the paint, so no allocation; a null
+        // affine means "texels are already gradient space".
+        val affine: FloatArray? = if (applyTransform) {
+            val inverse = matrixPool.pull()
+            try {
+                gradientSpaceMatrix.invert(inverse)
+                inverse.preTranslate(boundingBox.minX, boundingBox.minY)
+                inverse.preScale(boundingBox.width, boundingBox.height)
+                resolved.bakeAffine.also { inverse.getValues(it) }
+            } finally {
+                matrixPool.release(inverse)
             }
-            bitmap.setPixels(row, 0, bakeW, 0, j, bakeW, 1)
+        } else {
+            null
+        }
+        if (affine == null) {
+            for (j in 0 until bakeH) {
+                val gy = (j + 0.5f) / bakeH
+                for (i in 0 until bakeW) {
+                    val gx = (i + 0.5f) / bakeW
+                    val t = focalGradientT(gx, gy, cfx, cfy, fr, cx, cy, r)
+                    // Uncovered texels (behind the focal apex, reached by no
+                    // forward circle) stay transparent, like the platform
+                    // two-point RadialGradient and rsvg do on every tile mode.
+                    row[i] = if (t.isNaN()) {
+                        0
+                    } else {
+                        sampleGradientStops(bakeColors, bakePositions, bakeCount, applyGradientSpread(t, spread))
+                    }
+                }
+                bitmap.setPixels(row, 0, bakeW, 0, j, bakeW, 1)
+            }
+        } else {
+            for (j in 0 until bakeH) {
+                val gy = (j + 0.5f) / bakeH
+                for (i in 0 until bakeW) {
+                    val gx = (i + 0.5f) / bakeW
+                    val px = affine[0] * gx + affine[1] * gy + affine[2]
+                    val py = affine[3] * gx + affine[4] * gy + affine[5]
+                    val t = focalGradientT(px, py, cfx, cfy, fr, cx, cy, r)
+                    row[i] = if (t.isNaN()) {
+                        0
+                    } else {
+                        sampleGradientStops(bakeColors, bakePositions, bakeCount, applyGradientSpread(t, spread))
+                    }
+                }
+                bitmap.setPixels(row, 0, bakeW, 0, j, bakeW, 1)
+            }
         }
         return BitmapShader(bitmap, TileMode.CLAMP, TileMode.CLAMP)
     }

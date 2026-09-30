@@ -70,6 +70,14 @@ class RadialFocalFallbackTest {
     }
 
     @Test
+    fun objectBoundingBoxFocal_gradientTransformAppliesBelowApi31() {
+        // The bake used to drop the gradientTransform (objectBoundingBox
+        // branch kept the pure bbox local matrix), so a transformed focal
+        // gradient rendered unshifted. The sampling affine now carries G⁻¹.
+        assertGolden("gradient_radial_obbox_transform.svg")
+    }
+
+    @Test
     fun focalT_centeredGradientMatchesRadius() {
         // Centered: t must equal normalized distance from the center.
         assertEquals(0f, focalGradientT(0.5f, 0.5f, 0.5f, 0.5f, 0f, 0.5f, 0.5f, 0.5f), 1e-6f)
@@ -93,6 +101,34 @@ class RadialFocalFallbackTest {
         // End-circle center sits between apex and rim for an on-circle focal.
         val mid = focalGradientT(0.5f, 0.5f, 0.25f, 0.25f, 0f, 0.5f, 0.5f, 0.5f)
         assertTrue("mid must be inside (0,1), was $mid", mid > 0f && mid < 1f)
+    }
+
+    @Test
+    fun focalT_insideStartCircleSolvesThroughCone() {
+        // No "inside -> start" special case: the platform two-point
+        // RadialGradient (SDK 34 probe) paints the start disc through the cone
+        // solution (blue-ish here, verified against Skia pixel reads), so the
+        // bake must return the numeric cone t, neither 0 nor NaN.
+        val centerT = focalGradientT(70f, 60f, 70f, 60f, 25f, 130f, 110f, 90f)
+        assertTrue("start center must solve numeric, was $centerT", !centerT.isNaN())
+        val innerT = focalGradientT(80f, 70f, 70f, 60f, 25f, 130f, 110f, 90f)
+        assertTrue("inner start disc must solve numeric, was $innerT", !innerT.isNaN())
+    }
+
+    @Test
+    fun focalT_behindApexIsUncovered() {
+        // No forward (t >= 0) circle reaches the region behind the focal apex:
+        // the bake must paint these texels transparent (platform two-point
+        // RadialGradient and rsvg behavior on every tile mode), so NaN.
+        assertTrue(focalGradientT(0.5f, 0.5f, 70f, 60f, 25f, 130f, 110f, 90f).isNaN())
+        assertTrue(focalGradientT(10f, 10f, 70f, 60f, 25f, 130f, 110f, 90f).isNaN())
+    }
+
+    @Test
+    fun focalT_coveredExteriorIsBeyondOne() {
+        // Beyond the end circle but on a forward circle: t > 1 (pad -> last stop).
+        val t = focalGradientT(200f, 200f, 70f, 60f, 25f, 130f, 110f, 90f)
+        assertTrue("covered exterior must stay numeric and > 1, was $t", !t.isNaN() && t > 1f)
     }
 
     @Test
