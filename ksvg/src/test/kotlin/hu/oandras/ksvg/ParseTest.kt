@@ -48,7 +48,7 @@ class ParseTest {
         // XmlPullParser
         val test = "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "</svg>"
-        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
+        val svg: SVGImpl = SVGImpl.getFromString(test, loggerContext = NoopLoggerContext)
         assertNotNull(svg.rootElement)
     }
 
@@ -63,7 +63,7 @@ class ParseTest {
                     "]>" +
                     "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                     "</svg>"
-        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
+        val svg: SVGImpl = SVGImpl.getFromString(test, loggerContext = NoopLoggerContext)
         assertNotNull(svg.rootElement)
     }
 
@@ -76,7 +76,7 @@ class ParseTest {
                     "]>" +
                     "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                     "</svg>"
-        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext, enableInternalEntities = false)
+        val svg: SVGImpl = SVGImpl.getFromString(test, loggerContext = NoopLoggerContext, isInternalEntitiesEnabled = false)
         assertNotNull(svg.rootElement)
     }
 
@@ -275,8 +275,8 @@ class ParseTest {
 
         val resolver: ExternalFileResolver = TestAssetResolver()
         val svg2: SVG = SVG.getFromString(
-            test,
-            enableInternalEntities = false,
+            svg = test,
+            isInternalEntitiesEnabled = false,
             externalFileResolver = resolver,
         )
         assertFalse(svg2.isInternalEntitiesEnabled)
@@ -298,7 +298,7 @@ class ParseTest {
                 "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "<text>&b;</text>" +
                 "</svg>"
-        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext)
+        val svg: SVGImpl = SVGImpl.getFromString(test, loggerContext = NoopLoggerContext)
         assertNotNull(svg.rootElement)
     }
 
@@ -316,7 +316,7 @@ class ParseTest {
             "<text>&a1;</text>" +
             "</svg>"
         try {
-            SVGImpl.getFromString(test, logger = NoopLoggerContext)
+            SVGImpl.getFromString(test, loggerContext = NoopLoggerContext)
             throw AssertionError("expected KSVGParseException for billion laughs")
         } catch (e: KSVGParseException) {
             var cursor: Throwable? = e
@@ -342,7 +342,7 @@ class ParseTest {
                 "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "<text>&a;&a;</text>" +
                 "</svg>"
-        val svg: SVGImpl = SVGImpl.getFromString(test, logger = NoopLoggerContext, enableInternalEntities = false)
+        val svg: SVGImpl = SVGImpl.getFromString(test, loggerContext = NoopLoggerContext, isInternalEntitiesEnabled = false)
         assertNotNull(svg.rootElement)
     }
 

@@ -219,7 +219,7 @@ class ReferenceCycleTest {
     // --- Cycle fallbacks: the cyclic (inner) reference is dropped, the outer user is intact. ---
 
     private fun buildTree(svg: String): RenderNode<*>? {
-        val doc = SVGImpl.getFromString(svg, logger = NoopLoggerContext)
+        val doc = SVGImpl.getFromString(svg, loggerContext = NoopLoggerContext)
         val builder = RenderTreeBuilder(doc, 160f, null, PoolOwner(), doc)
         return builder.build(Box(0f, 0f, 200f, 200f))
     }

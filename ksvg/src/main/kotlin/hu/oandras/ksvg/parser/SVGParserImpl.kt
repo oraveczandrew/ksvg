@@ -486,9 +486,9 @@ internal class SVGParserImpl(
     //=========================================================================
     private fun startDocument() {
         svgDocument = SVGImpl(
-            enableInternalEntities,
-            externalFileResolver,
-            logger
+            isInternalEntitiesEnabled = enableInternalEntities,
+            externalFileResolver = externalFileResolver,
+            loggerContext = logger
         ).apply {
             animationsEnabled = this@SVGParserImpl.animationsEnabled
         }

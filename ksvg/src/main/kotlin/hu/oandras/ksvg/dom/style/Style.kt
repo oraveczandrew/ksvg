@@ -21,6 +21,8 @@ package hu.oandras.ksvg.dom.style
 import androidx.annotation.LongDef
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.UnsupportedFeature
+import hu.oandras.ksvg.logUnsupportedFeature
 import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.css.CSSLength
@@ -1832,6 +1834,29 @@ internal class Style internal constructor(
                     val colorRendering = parseColorRendering(value)
                     builder.colorRendering = colorRendering
                     if (colorRendering != null) builder.addSpecifiedFlag2(SPECIFIED_COLOR_RENDERING)
+                }
+
+                // G6 deferred: recognized but not stored. Warn (once per
+                // process) only when the value asks for unimplemented
+                // behavior; values covered by existing paths stay silent.
+                SVGAttr.white_space -> {
+                    val v = value.trim()
+                    if (v.equals("pre-wrap", ignoreCase = true) ||
+                        v.equals("pre-line", ignoreCase = true) ||
+                        v.equals("break-spaces", ignoreCase = true)
+                    ) {
+                        loggerContext.logUnsupportedFeature(UnsupportedFeature.WHITE_SPACE_WRAP)
+                    }
+                }
+                SVGAttr.line_height -> {
+                    if (!value.trim().equals("normal", ignoreCase = true)) {
+                        loggerContext.logUnsupportedFeature(UnsupportedFeature.LINE_HEIGHT)
+                    }
+                }
+                SVGAttr.text_overflow -> {
+                    if (value.trim().equals("ellipsis", ignoreCase = true)) {
+                        loggerContext.logUnsupportedFeature(UnsupportedFeature.TEXT_OVERFLOW)
+                    }
                 }
 
                 SVGAttr.font_kerning -> {

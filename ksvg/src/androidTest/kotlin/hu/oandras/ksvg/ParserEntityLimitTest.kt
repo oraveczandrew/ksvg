@@ -53,7 +53,7 @@ class ParserEntityLimitTest {
                 "<svg xmlns=\"http://www.w3.org/2000/svg\">" +
                 "<text id=\"t\">&a1;</text>" +
                 "</svg>"
-        val probed = SVGImpl.getFromString(probe, logger = NoopLoggerContext)
+        val probed = SVGImpl.getFromString(probe, loggerContext = NoopLoggerContext)
         var total = 0
         fun walk(o: SvgObject) {
             if (o is TextSequence) total += o.text.length
@@ -75,7 +75,7 @@ class ParserEntityLimitTest {
                 "<text>&a1;</text>" +
                 "</svg>"
         try {
-            SVGImpl.getFromString(test, logger = NoopLoggerContext)
+            SVGImpl.getFromString(test, loggerContext = NoopLoggerContext)
             fail("expected KSVGParseException for billion laughs")
         } catch (e: KSVGParseException) {
             var cursor: Throwable? = e

@@ -25,7 +25,9 @@ import com.bumptech.glide.load.engine.Resource
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
 import com.bumptech.glide.load.resource.bitmap.BitmapResource
 import com.bumptech.glide.request.target.Target
+import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.KSVGParseException
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.SVG
 import java.io.IOException
 import java.io.InputStream
@@ -34,7 +36,8 @@ import kotlin.math.roundToInt
 
 /** Decodes an SVG internal representation from an [java.io.InputStream].  */
 public class SvgDecoder(
-    private val pool: BitmapPool
+    private val pool: BitmapPool,
+    private val loggerContext: LoggerContext = AndroidLoggerContext,
 ) : ResourceDecoder<InputStream, Bitmap> {
 
     internal companion object {
@@ -59,13 +62,15 @@ public class SvgDecoder(
         height: Int,
         options: Options
     ): Resource<Bitmap> {
+        val label = options.get(KSVGOptions.SOURCE_LABEL)
         try {
             val parseAnimations = options.get(KSVGOptions.PARSE_ANIMATIONS) ?: false
             val svg = SVG.getFromInputStream(
-                source,
-                parseAnimations,
+                inputStream = source,
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext.labeledWith(label),
                 externalFileResolver = options.get(KSVGOptions.EXTERNAL_FILE_RESOLVER),
-                enableInternalEntities = options.get(KSVGOptions.ENABLE_INTERNAL_ENTITIES) ?: true,
+                isInternalEntitiesEnabled = options.get(KSVGOptions.ENABLE_INTERNAL_ENTITIES) ?: true,
             )
 
             // Intrinsic size fallback (same values the old code wrote into the
@@ -140,8 +145,10 @@ public class SvgDecoder(
             svg.renderToCanvas(canvas)
             return BitmapResource(bitmap, pool)
         } catch (ex: KSVGParseException) {
-            throw IOException("Cannot load SVG from stream", ex)
+            throw IOException(
+                if (label != null) "Cannot load SVG from stream ($label)" else "Cannot load SVG from stream",
+                ex
+            )
         }
     }
 }
-

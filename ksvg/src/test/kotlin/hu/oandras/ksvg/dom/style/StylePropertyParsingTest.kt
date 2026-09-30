@@ -17,6 +17,9 @@
 package hu.oandras.ksvg.dom.style
 
 import hu.oandras.ksvg.NoopLoggerContext
+import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.RecordingLoggerContext
+import hu.oandras.ksvg.UnsupportedFeatureLoggerContext
 import hu.oandras.ksvg.assertIs
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
@@ -44,6 +47,81 @@ class StylePropertyParsingTest {
     private fun Style.Builder.buildAndGet(): Style = build()
 
     private fun specified(flags: Long, flag: Long): Boolean = (flags and flag) != 0L
+
+    private fun processWith(
+        attr: String,
+        value: String,
+        ctx: LoggerContext,
+        isFromAttribute: Boolean = false,
+    ): Style.Builder {
+        val builder = Style.Builder()
+        builder.reset(Style())
+        with(ctx) {
+            Style.processStyleProperty(builder, attr, value, isFromAttribute)
+        }
+        return builder
+    }
+
+    private fun wrappedRecording(): Pair<UnsupportedFeatureLoggerContext, RecordingLoggerContext> {
+        val delegate = RecordingLoggerContext()
+        return UnsupportedFeatureLoggerContext(delegate) to delegate
+    }
+
+    // --- deferred G6 properties: warn once per parse, silent when harmless ---
+
+    @Test
+    fun testWhiteSpaceWrapWarnsOncePerParse() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("white-space", "pre-wrap", ctx)
+        assertEquals(1, delegate.messages.size)
+        processWith("white-space", "pre-line", ctx, isFromAttribute = true)
+        assertEquals("second hit in the same parse stays silent", 1, delegate.messages.size)
+        // A fresh parse (fresh wrapper) logs afresh.
+        val (ctx2, delegate2) = wrappedRecording()
+        processWith("white-space", "pre-wrap", ctx2)
+        assertEquals(1, delegate2.messages.size)
+    }
+
+    @Test
+    fun testWhiteSpaceHarmlessSilent() {
+        val (ctx, delegate) = wrappedRecording()
+        for (v in listOf("normal", "pre", "nowrap")) {
+            processWith("white-space", v, ctx)
+        }
+        assertTrue(delegate.messages.isEmpty())
+    }
+
+    @Test
+    fun testLineHeightWarnsOnce() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("line-height", "24px", ctx)
+        assertEquals(1, delegate.messages.size)
+        processWith("line-height", "150%", ctx)
+        assertEquals(1, delegate.messages.size)
+    }
+
+    @Test
+    fun testLineHeightNormalSilent() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("line-height", "normal", ctx)
+        assertTrue(delegate.messages.isEmpty())
+    }
+
+    @Test
+    fun testTextOverflowEllipsisWarnsOnce() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("text-overflow", "ellipsis", ctx)
+        assertEquals(1, delegate.messages.size)
+        processWith("text-overflow", "ellipsis", ctx)
+        assertEquals(1, delegate.messages.size)
+    }
+
+    @Test
+    fun testTextOverflowClipSilent() {
+        val (ctx, delegate) = wrappedRecording()
+        processWith("text-overflow", "clip", ctx)
+        assertTrue(delegate.messages.isEmpty())
+    }
 
     // --- fill / stroke ---
 

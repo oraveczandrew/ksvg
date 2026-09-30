@@ -19,7 +19,9 @@ package hu.oandras.ksvg.glide
 import com.bumptech.glide.load.Options
 import com.bumptech.glide.load.ResourceDecoder
 import com.bumptech.glide.load.engine.Resource
+import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.KSVGParseException
+import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.SVG
 import java.io.IOException
 import java.io.InputStream
@@ -30,7 +32,9 @@ import java.io.InputStream
  * requested `width`/`height` do not affect decoding and no bounds are assigned
  * here.
  */
-public class KSVGSvgDecoder : ResourceDecoder<InputStream, SVG> {
+public class KSVGSvgDecoder(
+    private val loggerContext: LoggerContext = AndroidLoggerContext,
+) : ResourceDecoder<InputStream, SVG> {
 
     override fun handles(source: InputStream, options: Options): Boolean {
         return isSvg(source)
@@ -43,17 +47,22 @@ public class KSVGSvgDecoder : ResourceDecoder<InputStream, SVG> {
         height: Int,
         options: Options
     ): Resource<SVG> {
+        val label = options.get(KSVGOptions.SOURCE_LABEL)
         try {
             val svg = SVG.getFromInputStream(
                 inputStream = source,
                 parseAnimations = options.get(KSVGOptions.PARSE_ANIMATIONS) ?: false,
+                loggerContext = loggerContext.labeledWith(label = label),
                 externalFileResolver = options.get(KSVGOptions.EXTERNAL_FILE_RESOLVER),
-                enableInternalEntities = options.get(KSVGOptions.ENABLE_INTERNAL_ENTITIES) ?: true,
+                isInternalEntitiesEnabled = options.get(KSVGOptions.ENABLE_INTERNAL_ENTITIES) ?: true,
             )
 
             return KSVGSvgResource(svg)
         } catch (e: KSVGParseException) {
-            throw IOException("Cannot load SVG from stream", e)
+            throw IOException(
+                if (label != null) "Cannot load SVG from stream ($label)" else "Cannot load SVG from stream",
+                e
+            )
         }
     }
 }

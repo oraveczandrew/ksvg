@@ -45,4 +45,23 @@ public object KSVGOptions {
     @JvmField
     public val ENABLE_INTERNAL_ENTITIES: Option<Boolean> =
         Option.memory("hu.oandras.ksvg.glide.EnableInternalEntities", true)
+
+    /**
+     * Optional human-readable label for the decode source (URL, file path,
+     * asset name, ...). Glide's [com.bumptech.glide.load.ResourceDecoder]
+     * only sees the raw `InputStream`, so the decoder cannot recover the
+     * model on its own — pass it explicitly when you need it in logs:
+     *
+     * ```
+     * Glide.with(context)
+     *     .load(url)
+     *     .apply(RequestOptions.option(KSVGOptions.SOURCE_LABEL, url.toString()))
+     * ```
+     *
+    * Used only for diagnostics (parse-error messages, log prefixes).
+     * Default empty (no label).
+     */
+    @JvmField
+    public val SOURCE_LABEL: Option<String> =
+        Option.memory("hu.oandras.ksvg.glide.SourceLabel", "")
 }

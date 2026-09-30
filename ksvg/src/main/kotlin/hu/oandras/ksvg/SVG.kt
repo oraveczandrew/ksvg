@@ -293,17 +293,18 @@ public interface SVG {
          *
          * Ownership transfer: the parser closes `inputStream` in a finally block,
          * whether parsing succeeds or fails. Do not reuse or reset the stream
-         * afterwards (in particular, Glide decoders must not expect a re-readable
+         * afterward (in particular, Glide decoders must not expect a re-readable
          * stream after `handles()` consumed bytes — rewind it themselves first).
          *
          * @param inputStream the input stream from which to read the file.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
          * @param externalFileResolver resolver used for external references (images, fonts,
          * stylesheets) in this parse; null (default) resolves nothing externally.
-         * @param enableInternalEntities whether to expand internal entities in this parse
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
          * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
          */
         @JvmStatic
         @JvmOverloads
@@ -311,16 +312,16 @@ public interface SVG {
         public fun getFromInputStream(
             inputStream: InputStream,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext,
+            loggerContext: LoggerContext = AndroidLoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVG {
             return SVGImpl.getFromInputStream(
-                inputStream,
-                parseAnimations,
-                logger,
-                externalFileResolver,
-                enableInternalEntities
+                inputStream = inputStream,
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled
             )
         }
 
@@ -330,12 +331,13 @@ public interface SVG {
          * 
          * @param svg the String instance containing the SVG document.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
          * @param externalFileResolver resolver used for external references (images, fonts,
          * stylesheets) in this parse; null (default) resolves nothing externally.
-         * @param enableInternalEntities whether to expand internal entities in this parse
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
          * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
          */
         @JvmStatic
         @JvmOverloads
@@ -343,11 +345,17 @@ public interface SVG {
         public fun getFromString(
             svg: String,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext,
+            loggerContext: LoggerContext = AndroidLoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVG {
-            return SVGImpl.getFromString(svg, parseAnimations, logger, externalFileResolver, enableInternalEntities)
+            return SVGImpl.getFromString(
+                svg = svg,
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled
+            )
         }
 
 
@@ -357,8 +365,13 @@ public interface SVG {
          * @param context the Android context of the resource.
          * @param resourceId the resource identifier of the SVG document.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
          */
         @JvmStatic
         @JvmOverloads
@@ -367,17 +380,17 @@ public interface SVG {
             context: Context,
             resourceId: Int,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext,
+            loggerContext: LoggerContext = AndroidLoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVG {
             return getFromResource(
-                context.resources,
-                resourceId,
-                parseAnimations,
-                logger,
-                externalFileResolver,
-                enableInternalEntities
+                resources = context.resources,
+                resourceId = resourceId,
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled
             )
         }
 
@@ -388,8 +401,13 @@ public interface SVG {
          * @param resources the set of Resources in which to locate the file.
          * @param resourceId the resource identifier of the SVG document.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
 
          */
         @JvmStatic
@@ -399,17 +417,17 @@ public interface SVG {
             resources: Resources,
             resourceId: Int,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext,
+            loggerContext: LoggerContext = AndroidLoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVG {
             return SVGImpl.getFromResource(
-                resources,
-                resourceId,
-                parseAnimations,
-                logger,
-                externalFileResolver,
-                enableInternalEntities
+                resources = resources,
+                resourceId = resourceId,
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled
             )
         }
 
@@ -420,8 +438,13 @@ public interface SVG {
          * @param assetManager the AssetManager instance to use when reading the file.
          * @param filename the filename of the SVG document within assets.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
          * @throws IOException if there is some IO error while reading the file.
          */
         @JvmStatic
@@ -431,17 +454,17 @@ public interface SVG {
             assetManager: AssetManager,
             filename: String,
             parseAnimations: Boolean = false,
-            logger: LoggerContext = AndroidLoggerContext,
+            loggerContext: LoggerContext = AndroidLoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVG {
             return SVGImpl.getFromAsset(
-                assetManager,
-                filename,
-                parseAnimations,
-                logger,
-                externalFileResolver,
-                enableInternalEntities
+                assetManager = assetManager,
+                filename = filename,
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled
             )
         }
 
@@ -454,20 +477,15 @@ public interface SVG {
          * path up until the first error is returned.
          *
          * @param pathDefinition an SVG path element definition string
+         * @param logger logging scope used for path parsing warnings and errors.
          * @return an Android `Path`
          */
         @JvmStatic
-        public fun parsePath(pathDefinition: String, logger: LoggerContext = AndroidLoggerContext): Path {
+        public fun parsePath(
+            pathDefinition: String,
+            logger: LoggerContext = AndroidLoggerContext,
+        ): Path {
             return SVGImpl.parsePath(pathDefinition, logger)
         }
-
-
-        //===============================================================================
-        // No process-global parse configuration (pre-1.0 API decision):
-        // pass `externalFileResolver` / `enableInternalEntities` per parse request
-        // on the getFrom* entry points above.
-
-        //===============================================================================
-        // Other document utility API functions
     }
 }

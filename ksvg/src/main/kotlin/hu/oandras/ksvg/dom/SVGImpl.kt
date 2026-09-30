@@ -25,7 +25,6 @@ import android.graphics.Path
 import android.graphics.RectF
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
-import hu.oandras.ksvg.AndroidLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.HitRegion
 import hu.oandras.ksvg.KSVGAnimatedDrawable
@@ -33,10 +32,8 @@ import hu.oandras.ksvg.KSVGDrawable
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.OnSvgClickListener
-import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
-import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CSSRule
 import hu.oandras.ksvg.css.CSSRuleset
 import hu.oandras.ksvg.css.CssUnit
@@ -47,9 +44,7 @@ import hu.oandras.ksvg.dom.core.Svg
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.core.View
 import hu.oandras.ksvg.logW
-import hu.oandras.ksvg.parser.SVGParser
 import hu.oandras.ksvg.parser.SVGParserImpl
-import hu.oandras.ksvg.parser.parseLength
 import hu.oandras.ksvg.render.PathConverter
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RenderOptionsImpl
@@ -59,10 +54,10 @@ import hu.oandras.ksvg.render.collectHitRegions
 import hu.oandras.ksvg.render.inverseRootMapping
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
+import hu.oandras.ksvg.wrapAsUnsupportedFeatureLoggerContext
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
-import kotlin.jvm.Volatile
 
 internal const val COLOR_WHITE: Int = 0xFFFFFFFF.toInt()
 internal const val COLOR_TRANSPARENT: Int = 0
@@ -86,23 +81,23 @@ internal const val COLOR_BLACK: Int = -0x1000000
 internal class SVGImpl internal constructor(
     /**
      * Indicates whether internal entities were enabled when this SVG was parsed.
-
+     *
      */
     override val isInternalEntitiesEnabled: Boolean,
     /**
      * The [ExternalFileResolver] in effect when this SVG was parsed.
-     * 
-
+     *
+     * The parser configuration settings that were used for the current instance
+     * will continue to be used for future parsing by this instance, for example
+     * when parsing additional CSS.
      */
-    // The parser configuration settings that was used for the current instance
-    // Will continue to be used for future parsing by this instance. For example
-    // when parsing addition CSS.
     override val externalFileResolver: ExternalFileResolver?,
     /**
      * The [LoggerContext] used for parser and renderer logging for this document.
      */
-    loggerContext: LoggerContext = AndroidLoggerContext
+    loggerContext: LoggerContext,
 ) : SVG, LoggerContext by loggerContext {
+
     @JvmField
     internal var animationsEnabled: Boolean = false
 
@@ -193,7 +188,7 @@ internal class SVGImpl internal constructor(
     /**
      * The DPI (dots-per-inch) value to use when rendering.
      *
-     * Fixed at parse time (default 96); the document is immutable afterwards.
+     * Fixed at parse time (default 96); the document is immutable afterward.
      */
     override val renderDPI: Float = 96f // default is 96
 
@@ -380,7 +375,7 @@ internal class SVGImpl internal constructor(
      * Renders this SVG document to a Canvas using the specified view defined in the document.
      * 
      * 
-     * A View is a special element in an SVG documents that describes a rectangular area in the document.
+     * A View is a special element in SVG documents that describes a rectangular area in the document.
      * Calling this method with a `viewId` will result in the specified view being positioned and scaled
      * to the viewport.  In other words, use [renderToCanvas] to render the whole document, or use this
      * method instead to render just a part of it.
@@ -399,7 +394,7 @@ internal class SVGImpl internal constructor(
      * Renders this SVG document to a Canvas using the specified view defined in the document.
      * 
      * 
-     * A View is a special element in an SVG documents that describes a rectangular area in the document.
+     * A View is a special element in SVG documents that describes a rectangular area in the document.
      * Calling this method with a `viewId` will result in the specified view being positioned and scaled
      * to the viewport.  In other words, use [renderToCanvas] to render the whole document, or use this
      * method instead to render just a part of it.
@@ -736,19 +731,29 @@ internal class SVGImpl internal constructor(
          * 
          * @param inputStream the input stream from which to read the file.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
          */
         @Throws(KSVGParseException::class)
         fun getFromInputStream(
             inputStream: InputStream,
             parseAnimations: Boolean = false,
-            logger: LoggerContext,
+            loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVGImpl {
-            return createParser(parseAnimations, logger, externalFileResolver, enableInternalEntities)
-                .parseStream(inputStream)
+            return parseInputStream(
+                inputStream = inputStream,
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled,
+            )
         }
 
         /**
@@ -756,19 +761,29 @@ internal class SVGImpl internal constructor(
          * 
          * @param svg the String instance containing the SVG document.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
          */
         @Throws(KSVGParseException::class)
         fun getFromString(
             svg: String,
             parseAnimations: Boolean = false,
-            logger: LoggerContext,
+            loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVGImpl {
-            return createParser(parseAnimations, logger, externalFileResolver, enableInternalEntities)
-                .parseStream(ByteArrayInputStream(svg.toByteArray()))
+            return parseInputStream(
+                inputStream = ByteArrayInputStream(svg.toByteArray()),
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled,
+            )
         }
 
         /**
@@ -777,8 +792,13 @@ internal class SVGImpl internal constructor(
          * @param resources the set of Resources in which to locate the file.
          * @param resourceId the resource identifier of the SVG document.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
 
          */
         @Throws(KSVGParseException::class)
@@ -786,21 +806,17 @@ internal class SVGImpl internal constructor(
             resources: Resources,
             resourceId: Int,
             parseAnimations: Boolean = false,
-            logger: LoggerContext,
+            loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVGImpl {
-            val inputStream = resources.openRawResource(resourceId)
-            try {
-                return createParser(parseAnimations, logger, externalFileResolver, enableInternalEntities)
-                    .parseStream(inputStream)
-            } finally {
-                try {
-                    inputStream.close()
-                } catch (_: IOException) {
-                    // Do nothing
-                }
-            }
+            return parseInputStream(
+                inputStream = resources.openRawResource(resourceId),
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled,
+            )
         }
 
         /**
@@ -809,8 +825,13 @@ internal class SVGImpl internal constructor(
          * @param assetManager the AssetManager instance to use when reading the file.
          * @param filename the filename of the SVG document within assets.
          * @param parseAnimations set true if you want to enable animation parsing by the parser.
+         * @param loggerContext logging scope used for parse warnings and errors.
+         * @param externalFileResolver resolver used for external references (images, fonts,
+         * stylesheets) in this parse; null (default) resolves nothing externally.
+         * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
+         * (default true; disabling only affects this parse).
          * @return an SVG instance on which you can call one of the render methods.
-         * @throws KSVGParseException if there is an error parsing the document.
+         * @throws KSVGParseException if there is an error while parsing the document.
          * @throws IOException if there is some IO error while reading the file.
          */
         @Throws(KSVGParseException::class, IOException::class)
@@ -818,14 +839,37 @@ internal class SVGImpl internal constructor(
             assetManager: AssetManager,
             filename: String,
             parseAnimations: Boolean = false,
-            logger: LoggerContext,
+            loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
-            enableInternalEntities: Boolean = true,
+            isInternalEntitiesEnabled: Boolean = true,
         ): SVGImpl {
-            val inputStream = assetManager.open(filename)
-            try {
-                return createParser(parseAnimations, logger, externalFileResolver, enableInternalEntities)
-                    .parseStream(inputStream)
+            return parseInputStream(
+                inputStream = assetManager.open(filename),
+                parseAnimations = parseAnimations,
+                loggerContext = loggerContext,
+                externalFileResolver = externalFileResolver,
+                isInternalEntitiesEnabled = isInternalEntitiesEnabled,
+            )
+        }
+
+        private fun parseInputStream(
+            inputStream: InputStream,
+            parseAnimations: Boolean = false,
+            loggerContext: LoggerContext,
+            externalFileResolver: ExternalFileResolver? = null,
+            isInternalEntitiesEnabled: Boolean = true,
+        ): SVGImpl {
+            // The parser logs with the wrapped scope, and hands the same
+            // instance to the SVGImpl it builds (pass-through in the
+            // secondary constructor), so parse- and render-time warnings
+            // share one per-document dedup scope.
+            return try {
+                SVGParserImpl(
+                    enableInternalEntities = isInternalEntitiesEnabled,
+                    externalFileResolver = externalFileResolver,
+                    animationsEnabled = parseAnimations,
+                    logger = loggerContext.wrapAsUnsupportedFeatureLoggerContext(),
+                ).parseStream(inputStream)
             } finally {
                 try {
                     inputStream.close()
@@ -843,6 +887,7 @@ internal class SVGImpl internal constructor(
          * path up until the first error is returned.
          *
          * @param pathDefinition an SVG path element definition string
+         * @param logger logging scope used for path parsing warnings and errors.
          * @return an Android `Path`
          */
         fun parsePath(pathDefinition: String, logger: LoggerContext): Path {
@@ -851,20 +896,6 @@ internal class SVGImpl internal constructor(
             }
             val pathConv = PathConverter(pathDef)
             return pathConv.path
-        }
-
-        private fun createParser(
-            parseAnimations: Boolean,
-            logger: LoggerContext,
-            externalFileResolver: ExternalFileResolver?,
-            enableInternalEntities: Boolean,
-        ): SVGParser {
-            return SVGParserImpl(
-                enableInternalEntities = enableInternalEntities,
-                externalFileResolver = externalFileResolver,
-                animationsEnabled = parseAnimations,
-                logger = logger,
-            )
         }
     }
 }
