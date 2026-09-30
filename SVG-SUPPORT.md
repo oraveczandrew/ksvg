@@ -248,7 +248,8 @@ All filter primitives support the common attributes `x`, `y`, `width`, `height` 
 | Property                                                                                                          | Support | Notes                                                      |
 |-------------------------------------------------------------------------------------------------------------------|---------|------------------------------------------------------------|
 | [`transform`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/transform)                     | Full    | `translate`, `scale`, `rotate`, `skewX`, `skewY`, `matrix` |
-| [`transform-origin`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/transform-origin) | None | |
+| [`transform-origin`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/transform-origin) | Partial | Lengths, percentages and `left`/`center`/`right`/`top`/`bottom` (single value means centered other axis; `z` ignored); wraps the `transform` attribute and SMIL-composed transforms; not inherited |
+| [`transform-box`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/transform-box) | Partial | `view-box` (viewport, the initial), `fill-box` (own bounding box); `stroke-box` falls back to fill-box, `border-box`/`content-box` map to the viewport (clip-path precedent) |
 | [`viewBox`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/viewBox)                         | Full    |                                                            |
 | [`preserveAspectRatio`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/preserveAspectRatio) | Full    | All alignment values, `meet`/`slice`                       |
 

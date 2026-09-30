@@ -544,6 +544,14 @@ internal fun updateStyle(
         builder.colorRendering = sourceStyle.colorRendering
     }
 
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_TRANSFORM_ORIGIN)) {
+        builder.transformOrigin = sourceStyle.transformOrigin
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_TRANSFORM_BOX)) {
+        builder.transformBox = sourceStyle.transformBox
+    }
+
     builder.addSpecifiedFlag(sourceStyle.specifiedFlags and sourceStyle.suppressedFlags.inv())
     builder.addSpecifiedFlag2(sourceStyle.specifiedFlags2)
 }

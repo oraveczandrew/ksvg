@@ -485,7 +485,8 @@ private fun parseGeometryBoxWord(trailing: String): GeometryBox? {
     return parseGeometryBoxName(t)
 }
 
-private fun parseGeometryBoxName(word: String): GeometryBox? {
+// Shared with transform-box parsing (same keyword table and SVG fallbacks).
+internal fun parseGeometryBoxName(word: String): GeometryBox? {
     return when (word.lowercase()) {
         "fill-box" -> GeometryBox.FILL_BOX
         "stroke-box" -> GeometryBox.STROKE_BOX

@@ -37,6 +37,7 @@ import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.dom.style.ColorValue
 import hu.oandras.ksvg.dom.style.BasicShape
 import hu.oandras.ksvg.dom.style.CSSClipPath
+import hu.oandras.ksvg.dom.style.GeometryBox
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.logUnsupportedAnimatedAttribute
 import hu.oandras.ksvg.render.ClipPathRenderNode
@@ -50,6 +51,7 @@ import hu.oandras.ksvg.render.PatternRenderNode
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.ResolvedShapeClip
+import hu.oandras.ksvg.render.applyTransformOrigin
 import hu.oandras.ksvg.render.calculatePathBounds
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.updatePathAndBoundingBox
@@ -132,6 +134,22 @@ internal fun RenderNode<*>.updateAnimations(animationTimeMs: Long): Boolean {
         }
 
         if (matrix != tempMatrix) {
+            // transform-origin wraps the whole composed (static +
+            // animated) transform. <use> nodes bake origin into their
+            // animationBaseTransform at build (non-null here), so only the
+            // recompute-from-raw path needs wrapping: origin without a base
+            // would be a no-op there anyway.
+            if (animationBaseTransform == null && obj is ElementBase) {
+                val origin = renderState.style.transformOrigin
+                if (origin != null) {
+                    val refBox = when (renderState.style.transformBox ?: GeometryBox.VIEW_BOX) {
+                        GeometryBox.FILL_BOX -> boundingBox ?: renderState.viewPort ?: Box._1X1
+                        GeometryBox.STROKE_BOX -> boundingBox ?: renderState.viewPort ?: Box._1X1
+                        GeometryBox.VIEW_BOX -> renderState.viewPort ?: boundingBox ?: Box._1X1
+                    }
+                    applyTransformOrigin(tempMatrix, origin, refBox, renderContext.matrixPool)
+                }
+            }
             matrix.set(tempMatrix)
             contentChanged = true
         }

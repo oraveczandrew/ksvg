@@ -1388,6 +1388,68 @@ class StylePropertyParsingTest {
         assertNull(s.colorRendering)
     }
 
+    // --- transform-origin / transform-box ---
+
+    @Test
+    fun testTransformOriginCenter() {
+        val s = process("transform-origin", "center", isFromAttribute = true).buildAndGet()
+        val origin = requireNotNull(s.transformOrigin)
+        assertEquals(50f, origin.x.value)
+        assertEquals(50f, origin.y.value)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_TRANSFORM_ORIGIN))
+    }
+
+    @Test
+    fun testTransformOriginLengths() {
+        val s = process("transform-origin", "10px 20px").buildAndGet()
+        val origin = requireNotNull(s.transformOrigin)
+        assertEquals(10f, origin.x.value)
+        assertEquals(20f, origin.y.value)
+    }
+
+    @Test
+    fun testTransformOriginSingleValueMeansCenterY() {
+        val s = process("transform-origin", "left").buildAndGet()
+        val origin = requireNotNull(s.transformOrigin)
+        assertEquals(0f, origin.x.value)
+        assertEquals(50f, origin.y.value)
+    }
+
+    @Test
+    fun testTransformOriginInvalid() {
+        for (value in listOf("banana", "left top banana extra", "")) {
+            val s = process("transform-origin", value).buildAndGet()
+            if (value.isNotEmpty()) {
+                assertFalse(specified(s.specifiedFlags2, Style.SPECIFIED_TRANSFORM_ORIGIN))
+                assertNull(s.transformOrigin)
+            }
+        }
+    }
+
+    @Test
+    fun testTransformBoxFillBox() {
+        val s = process("transform-box", "fill-box", isFromAttribute = true).buildAndGet()
+        assertEquals(GeometryBox.FILL_BOX, s.transformBox)
+        assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_TRANSFORM_BOX))
+    }
+
+    @Test
+    fun testTransformBoxInvalid() {
+        val s = process("transform-box", "banana").buildAndGet()
+        assertFalse(specified(s.specifiedFlags2, Style.SPECIFIED_TRANSFORM_BOX))
+        assertNull(s.transformBox)
+    }
+
+    @Test
+    fun testTransformOriginNotInheritedByDefault() {
+        // Non-inherited: reset restores null (SVG initial = 0 0 behavior).
+        val builder = Style.Builder()
+        builder.reset(Style())
+        builder.resetNonInheritingProperties(isRootSVG = false)
+        assertNull(builder.transformOrigin)
+        assertNull(builder.transformBox)
+    }
+
     // --- mask-type ---
 
     @Test

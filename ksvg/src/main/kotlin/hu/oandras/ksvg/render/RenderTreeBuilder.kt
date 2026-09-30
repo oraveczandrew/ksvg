@@ -975,7 +975,7 @@ internal class RenderTreeBuilder(
             node.viewportSpec = ViewportSpec(obj.x, obj.y, obj.width, obj.height)
         }
         // node.viewPort / node.viewBoxTransform are owned by RenderScene.applyViewport.
-        node.transform = obj.getTransform()?.copy()
+        assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
         updateParentBoundingBox(obj)
@@ -1034,7 +1034,7 @@ internal class RenderTreeBuilder(
 
         val children = buildChildren(obj)
         val node = GroupRenderNode(obj, children)
-        node.transform = obj.getTransform()?.copy()
+        assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
         updateParentBoundingBox(obj)
@@ -1062,7 +1062,7 @@ internal class RenderTreeBuilder(
         }
 
         val node = SwitchRenderNode(obj, selectedChild)
-        node.transform = obj.getTransform()?.copy()
+        assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
         updateParentBoundingBox(obj)
@@ -1193,7 +1193,8 @@ internal class RenderTreeBuilder(
 
         val ref = document.resolveIRI(obj.href) as? Element ?: return null
 
-        val transform = obj.getTransform()?.copy() ?: Matrix()
+        // <use> x/y appends outside the (origin-wrapped) transform attribute.
+        val transform = effectiveTransform(obj) ?: Matrix()
         val x = obj.x?.floatValueXInContext() ?: 0f
         val y = obj.y?.floatValueYInContext() ?: 0f
         transform.preTranslate(x, y)
@@ -1222,7 +1223,12 @@ internal class RenderTreeBuilder(
             refNode.subtreeContainsBlendMode = refNode.computeSubtreeContainsBlendMode()
         }
 
-        ref.boundingBox?.let { updateParentBoundingBox(ref) }
+        // Built reference: propagate with its effective (origin-wrapped)
+        // transform. On build failure (returns null below) fall back to the
+        // raw transform, exactly like before.
+        ref.boundingBox?.let {
+            updateParentBoundingBox(ref, refNode?.transform ?: (ref as? HasTransform)?.getTransform())
+        }
         parentPop()
 
         if (refNode == null) return null
@@ -1267,7 +1273,7 @@ internal class RenderTreeBuilder(
         updateParentBoundingBox(obj)
 
         val node = PathRenderNode(obj, path, MarkerPositionCalculator(obj.d).markers)
-        node.transform = obj.getTransform()?.copy()
+        assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
         return node
@@ -1282,7 +1288,7 @@ internal class RenderTreeBuilder(
         updateParentBoundingBox(obj)
 
         val node = PathRenderNode(obj, path)
-        node.transform = obj.getTransform()?.copy()
+        assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
         return node
@@ -1341,7 +1347,7 @@ internal class RenderTreeBuilder(
         }
 
         val node = ImageRenderNode(obj, imageBox, image, imageNaturalSize)
-        node.transform = obj.getTransform()?.copy()
+        assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = imageBox
         return node
@@ -1383,7 +1389,7 @@ internal class RenderTreeBuilder(
         }
 
         val node = TextRenderNode(obj, x, y, dx, dy, children)
-        node.transform = obj.getTransform()?.copy()
+        assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
 
@@ -2144,6 +2150,44 @@ internal class RenderTreeBuilder(
         return node
     }
 
+    /**
+     * The element's `transform` with CSS `transform-origin` applied.
+     * Percentages resolve against the `transform-box` reference box
+     * (`view-box` = current viewport, the initial; `fill-box` = own
+     * bounding box, complete here since children are already built;
+     * `stroke-box` falls back to fill, like the clip-path reference
+     * boxes). Null origin (or no transform) keeps the legacy plain copy,
+     * so unspecified documents render bit-identically.
+     *
+     * Callers must run after `updateStyleForElement(state, obj)` with the
+     * element's own state current (true at every `node.transform` site:
+     * each element builds in a pushed state popped only on return).
+     */
+    private fun effectiveTransform(obj: ElementBase): Matrix? {
+        val base = (obj as? HasTransform)?.getTransform() ?: return null
+        val origin = state.style.transformOrigin ?: return base.copy()
+        val refBox = when (state.style.transformBox ?: GeometryBox.VIEW_BOX) {
+            GeometryBox.FILL_BOX -> (obj as? Element)?.boundingBox ?: state.viewPort ?: Box._1X1
+            GeometryBox.STROKE_BOX -> (obj as? Element)?.boundingBox ?: state.viewPort ?: Box._1X1
+            GeometryBox.VIEW_BOX -> state.viewPort ?: (obj as? Element)?.boundingBox ?: Box._1X1
+        }
+        val m = Matrix()
+        m.set(base)
+        applyTransformOrigin(m, origin, refBox, matrixPool)
+        return m
+    }
+
+    /**
+     * Assigns the origin-wrapped transform and snapshots it as the
+     * animation base: animated frames recompose from the base
+     * (AnimationRenderer), so static and animated frames agree. The copy
+     * is build-time only and unused when the subtree has no animations.
+     */
+    private fun assignTransform(node: RenderNode<*>, obj: ElementBase) {
+        node.transform = effectiveTransform(obj)
+        node.animationBaseTransform = node.transform?.copy()
+    }
+
     private fun updateStyleForElement(state: RendererState, obj: ElementBase) {
         // Derive the stroke-dash scaling implied by a declared `pathLength` so that
         // RendererState.updateStrokeDash can honor it. Scale = actualLength / pathLength.
@@ -2295,8 +2339,9 @@ internal class RenderTreeBuilder(
 
         if (parentStack.isEmpty()) return
 
-        // Transform bounding box to parent space
-        (transformOverride ?: (obj as? HasTransform)?.getTransform())?.let { matrix ->
+        // Transform bounding box to parent space (origin-wrapped: the box
+        // must follow the final rendered position, not the raw attribute).
+        (transformOverride ?: effectiveTransform(obj))?.let { matrix ->
             rectFPool.withPooledObject { rect ->
                 rect.set(
                     boundingBox.minX,

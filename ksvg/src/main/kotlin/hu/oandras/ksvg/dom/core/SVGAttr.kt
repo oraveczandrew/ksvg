@@ -168,6 +168,8 @@ internal enum class SVGAttr {
     text_orientation,
     text_transform,
     text_rendering,
+    transform_origin,
+    transform_box,
     white_space,
     line_height,
     text_overflow,
@@ -366,6 +368,8 @@ internal enum class SVGAttr {
             "text-orientation" -> text_orientation
             "text-transform" -> text_transform
             "text-rendering" -> text_rendering
+            "transform-origin" -> transform_origin
+            "transform-box" -> transform_box
             "white-space" -> white_space
             "line-height" -> line_height
             "text-overflow" -> text_overflow

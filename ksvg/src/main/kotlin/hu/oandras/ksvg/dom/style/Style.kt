@@ -161,6 +161,8 @@ internal class Style internal constructor(
     @JvmField val shapeRendering: ShapeRendering?,
     @JvmField val textRendering: TextRendering?,
     @JvmField val colorRendering: ColorRendering?,
+    @JvmField val transformOrigin: TransformOrigin?,
+    @JvmField val transformBox: GeometryBox?,
 
     @JvmField val fontKerning: FontKerning?,
 
@@ -265,6 +267,8 @@ internal class Style internal constructor(
         shapeRendering = null,
         textRendering = null,
         colorRendering = null,
+        transformOrigin = null,
+        transformBox = null,
         fontKerning = null,
         fontVariantLigatures = null,
         fontVariantPosition = null,
@@ -416,6 +420,10 @@ internal class Style internal constructor(
         @JvmField
         var colorRendering: ColorRendering? = null
         @JvmField
+        var transformOrigin: TransformOrigin? = null
+        @JvmField
+        var transformBox: GeometryBox? = null
+        @JvmField
         var fontKerning: FontKerning? = null
         @JvmField
         var fontVariantLigatures: CSSFontFeatureSettings? = null
@@ -539,6 +547,10 @@ internal class Style internal constructor(
             if (kw and SPECIFIED_VECTOR_EFFECT == 0L) this.vectorEffect = VectorEffect.None
             if (kw and SPECIFIED_ISOLATION == 0L) this.isolation = Isolation.auto
             if (kw and SPECIFIED_MIX_BLEND_MODE == 0L) this.mixBlendMode = CSSBlendMode.normal
+            // transform-origin/box are not inherited; null = initial
+            // (origin 0 0 for SVG without CSS box, view-box reference).
+            if (kw and SPECIFIED_TRANSFORM_ORIGIN == 0L) this.transformOrigin = null
+            if (kw and SPECIFIED_TRANSFORM_BOX == 0L) this.transformBox = null
             if (kw and SPECIFIED_ENABLE_BACKGROUND == 0L) this.enableBackground = EnableBackground.Accumulate
             return this
         }
@@ -611,6 +623,8 @@ internal class Style internal constructor(
             this.shapeRendering = original.shapeRendering
             this.textRendering = original.textRendering
             this.colorRendering = original.colorRendering
+            this.transformOrigin = original.transformOrigin
+            this.transformBox = original.transformBox
             this.fontKerning = original.fontKerning
             this.fontVariantLigatures = original.fontVariantLigatures
             this.fontVariantPosition = original.fontVariantPosition
@@ -705,6 +719,8 @@ internal class Style internal constructor(
                 shapeRendering = shapeRendering,
                 textRendering = textRendering,
                 colorRendering = colorRendering,
+                transformOrigin = transformOrigin,
+                transformBox = transformBox,
                 fontKerning = fontKerning,
                 fontVariantLigatures = fontVariantLigatures,
                 fontVariantPosition = fontVariantPosition,
@@ -796,6 +812,8 @@ internal class Style internal constructor(
                     shapeRendering == original.shapeRendering &&
                     textRendering == original.textRendering &&
                     colorRendering == original.colorRendering &&
+                    transformOrigin == original.transformOrigin &&
+                    transformBox == original.transformBox &&
                     fontKerning == original.fontKerning &&
                     fontVariantLigatures == original.fontVariantLigatures &&
                     fontVariantPosition == original.fontVariantPosition &&
@@ -895,7 +913,9 @@ internal class Style internal constructor(
             SPECIFIED_COLOR_INTERPOLATION,
             SPECIFIED_SHAPE_RENDERING,
             SPECIFIED_TEXT_RENDERING,
-            SPECIFIED_COLOR_RENDERING
+            SPECIFIED_COLOR_RENDERING,
+            SPECIFIED_TRANSFORM_ORIGIN,
+            SPECIFIED_TRANSFORM_BOX
         ]
     )
     annotation class SpecifiedFlags2
@@ -981,6 +1001,8 @@ internal class Style internal constructor(
         shapeRendering: ShapeRendering? = this.shapeRendering,
         textRendering: TextRendering? = this.textRendering,
         colorRendering: ColorRendering? = this.colorRendering,
+        transformOrigin: TransformOrigin? = this.transformOrigin,
+        transformBox: GeometryBox? = this.transformBox,
         fontKerning: FontKerning? = this.fontKerning,
         fontVariantLigatures: CSSFontFeatureSettings? = this.fontVariantLigatures,
         fontVariantPosition: CSSFontFeatureSettings? = this.fontVariantPosition,
@@ -1060,6 +1082,8 @@ internal class Style internal constructor(
             shapeRendering = shapeRendering,
             textRendering = textRendering,
             colorRendering = colorRendering,
+            transformOrigin = transformOrigin,
+            transformBox = transformBox,
             fontKerning = fontKerning,
             fontVariantLigatures = fontVariantLigatures,
             fontVariantPosition = fontVariantPosition,
@@ -1195,6 +1219,10 @@ internal class Style internal constructor(
             append(textRendering)
             append(", colorRendering=")
             append(colorRendering)
+            append(", transformOrigin=")
+            append(transformOrigin)
+            append(", transformBox=")
+            append(transformBox)
             append(", fontKerning=")
             append(fontKerning)
             append(", fontVariantLigatures=")
@@ -1315,6 +1343,8 @@ internal class Style internal constructor(
         const val SPECIFIED_SHAPE_RENDERING: Long = 1L shl 3
         const val SPECIFIED_TEXT_RENDERING: Long = 1L shl 4
         const val SPECIFIED_COLOR_RENDERING: Long = 1L shl 5
+        const val SPECIFIED_TRANSFORM_ORIGIN: Long = 1L shl 6
+        const val SPECIFIED_TRANSFORM_BOX: Long = 1L shl 7
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1842,6 +1872,20 @@ internal class Style internal constructor(
                     if (colorRendering != null) builder.addSpecifiedFlag2(SPECIFIED_COLOR_RENDERING)
                 }
 
+                SVGAttr.transform_origin -> {
+                    // Presentation attribute (SVG2): both paths parse it.
+                    val transformOrigin = parseTransformOrigin(value)
+                    builder.transformOrigin = transformOrigin
+                    if (transformOrigin != null) builder.addSpecifiedFlag2(SPECIFIED_TRANSFORM_ORIGIN)
+                }
+
+                SVGAttr.transform_box -> {
+                    // Presentation attribute (SVG2): both paths parse it.
+                    val transformBox = parseGeometryBoxName(value.trim())
+                    builder.transformBox = transformBox
+                    if (transformBox != null) builder.addSpecifiedFlag2(SPECIFIED_TRANSFORM_BOX)
+                }
+
                 // G6 deferred: recognized but not stored. Warn (once per
                 // process) only when the value asks for unimplemented
                 // behavior; values covered by existing paths stay silent.
@@ -2044,6 +2088,8 @@ internal class Style internal constructor(
             SVGAttr.text_anchor -> SPECIFIED_TEXT_ANCHOR
             SVGAttr.text_decoration -> SPECIFIED_TEXT_DECORATION
             SVGAttr.text_transform -> SPECIFIED_TEXT_TRANSFORM
+            SVGAttr.transform_origin -> SPECIFIED_TRANSFORM_ORIGIN
+            SVGAttr.transform_box -> SPECIFIED_TRANSFORM_BOX
             SVGAttr.vector_effect -> SPECIFIED_VECTOR_EFFECT
             SVGAttr.viewport_fill -> SPECIFIED_VIEWPORT_FILL
             SVGAttr.viewport_fill_opacity -> SPECIFIED_VIEWPORT_FILL_OPACITY
