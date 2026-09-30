@@ -47,7 +47,10 @@ internal class AnimateMotion(
     accumulateSum: Boolean,
     keyTimes: FloatList?,
     calcMode: CalcMode,
-    keySplines: String?
+    keySplines: String?,
+    restart: Restart,
+    minMs: Long,
+    maxMs: Long
 ) : Animation(
     baseParams = baseParams,
     attributeName = SVGAttr.transform,
@@ -61,7 +64,10 @@ internal class AnimateMotion(
     accumulateSum = accumulateSum,
     keyTimes = keyTimes,
     calcMode = calcMode,
-    keySplines = keySplines
+    keySplines = keySplines,
+    restart = restart,
+    minMs = minMs,
+    maxMs = maxMs
 ), Container, DomParent by ChildrenStore() {
 
     override fun getNodeName(): String = "animateMotion"
@@ -109,7 +115,10 @@ internal class AnimateMotion(
                 accumulateSum = accumulateSum,
                 keyTimes = keyTimes,
                 calcMode = calcMode,
-                keySplines = keySplines
+                keySplines = keySplines,
+                restart = restart,
+                minMs = minMs,
+                maxMs = maxMs
             )
         }
     }

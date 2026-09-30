@@ -282,9 +282,9 @@ supported (`!important` itself is honored in the cascade).
 |-------------------------------------------------------------------------------------------------------|---------|----------------------------------------------------------------------------------|
 | [`attributeName`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/attributeName) | Full    | Target attribute name                                                            |
 | [`attributeType`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/attributeType) | None | Deprecated SVG 1.1 (XML vs CSS namespace selector)                               |
-| [`min`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/min) | None | Minimum active duration constraint not enforced |
-| [`max`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/max) | None | Maximum active duration constraint not enforced |
-| [`restart`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/restart) | None | `always` behavior assumed; `whenNotActive`/`never` not distinguished |
+| [`min`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/min) | Partial | Active-duration lower clamp; a short active period is extended holding the end value (no re-repeat); inconsistent `min` > `max` ignores both |
+| [`max`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/max) | Partial | Active-duration upper clamp; a long active period is cut short (then `fill` applies); `indefinite` = no constraint |
+| [`restart`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/restart) | Partial | Parsed (`always`, `whenNotActive`, `never`); behaviorally inert — the timeline has a single begin, so no second instance can ever trigger a restart |
 | [`dur`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/dur)                     | Full    | Duration (`Xs`, `Xms`, `indefinite`)                                             |
 | [`begin`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/begin)                 | Full    | Start time                                                                       |
 | [`end`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/end)                     | Full    | Absolute time limit                                                              |

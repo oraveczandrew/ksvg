@@ -37,9 +37,9 @@ internal fun AnimateClipPathNode.clipAt(animationTimeMs: Long, base: CSSClipPath
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return null
 
-    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return null
+    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed, minMs, maxMs) && !fillFreeze) return null
 
-    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed, minMs, maxMs)
     val values = effectiveValues
     val count = values.size
     if (count == 0) return null

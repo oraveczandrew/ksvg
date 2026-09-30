@@ -34,7 +34,10 @@ internal class AnimateRotate(
     accumulateSum: Boolean,
     keyTimes: FloatList?,
     calcMode: CalcMode,
-    keySplines: String?
+    keySplines: String?,
+    restart: Restart,
+    minMs: Long,
+    maxMs: Long
 ) : AnimateTransform(
     transformType = TransformType.rotate,
     baseParams = baseParams,
@@ -52,5 +55,8 @@ internal class AnimateRotate(
     accumulateSum = accumulateSum,
     keyTimes = keyTimes,
     calcMode = calcMode,
-    keySplines = keySplines
+    keySplines = keySplines,
+    restart = restart,
+    minMs = minMs,
+    maxMs = maxMs
 )

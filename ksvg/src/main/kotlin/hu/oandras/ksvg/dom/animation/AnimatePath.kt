@@ -46,7 +46,10 @@ internal class AnimatePath(
     accumulateSum: Boolean,
     keyTimes: FloatList?,
     calcMode: CalcMode,
-    keySplines: String?
+    keySplines: String?,
+    restart: Restart,
+    minMs: Long,
+    maxMs: Long
 ) : Animation(
     baseParams = baseParams,
     attributeName = attributeName,
@@ -60,7 +63,10 @@ internal class AnimatePath(
     accumulateSum = accumulateSum,
     keyTimes = keyTimes,
     calcMode = calcMode,
-    keySplines = keySplines
+    keySplines = keySplines,
+    restart = restart,
+    minMs = minMs,
+    maxMs = maxMs
 ) {
     override fun getNodeName(): String {
         return "animate"
@@ -130,7 +136,10 @@ internal class AnimatePath(
                 accumulateSum = accumulateSum,
                 keyTimes = keyTimes,
                 calcMode = calcMode,
-                keySplines = keySplines
+                keySplines = keySplines,
+                restart = restart,
+                minMs = minMs,
+                maxMs = maxMs
             )
         }
     }

@@ -19,12 +19,15 @@ package hu.oandras.ksvg
 import androidx.collection.mutableFloatListOf
 import androidx.collection.mutableIntListOf
 import hu.oandras.ksvg.render.animation.calculateProgress
+import hu.oandras.ksvg.render.animation.completedIterations
 import hu.oandras.ksvg.render.animation.computePacedKeyTimesColor
 import hu.oandras.ksvg.render.animation.computePacedKeyTimesFloat
+import hu.oandras.ksvg.render.animation.constrainedActiveDurationMs
 import hu.oandras.ksvg.render.animation.interpolate
 import hu.oandras.ksvg.render.animation.isFinished
 import hu.oandras.ksvg.render.animation.normalizeDashArrays
 import hu.oandras.ksvg.render.animation.parseClockValueMillis
+import hu.oandras.ksvg.render.animation.parseClockValueMillisOrNull
 import hu.oandras.ksvg.render.animation.parseDashArrayKeyframes
 import hu.oandras.ksvg.render.animation.parseSingleDashArray
 import hu.oandras.ksvg.render.animation.selectAnimationSegmentDiscrete
@@ -122,6 +125,84 @@ class AnimationUtilsExtendedTest {
     @Test
     fun testParseClockValueMillisInvalid() {
         assertEquals(0L, parseClockValueMillis("abc"))
+    }
+
+    // --- parseClockValueMillisOrNull ---
+
+    @Test
+    fun testParseClockValueMillisOrNullUnits() {
+        assertEquals(2000L, parseClockValueMillisOrNull("2s"))
+        assertEquals(500L, parseClockValueMillisOrNull("500ms"))
+        assertEquals(1500L, parseClockValueMillisOrNull("1500"))
+    }
+
+    @Test
+    fun testParseClockValueMillisOrNullInvalid() {
+        assertNull(parseClockValueMillisOrNull("abc"))
+        assertNull(parseClockValueMillisOrNull("abcs"))
+        assertNull(parseClockValueMillisOrNull(""))
+        assertNull(parseClockValueMillisOrNull("   "))
+    }
+
+    // --- constrainedActiveDurationMs ---
+
+    @Test
+    fun testConstrainedActiveDurationNoConstraint() {
+        assertEquals(1000L, constrainedActiveDurationMs(1000L, 1f, 0L))
+        assertEquals(1000L, constrainedActiveDurationMs(1000L, 1f, 0L, 0L, Long.MAX_VALUE))
+    }
+
+    @Test
+    fun testConstrainedActiveDurationMaxCut() {
+        // 3 iterations cut to 1.5s.
+        assertEquals(1500L, constrainedActiveDurationMs(1000L, 3f, 0L, 0L, 1500L))
+    }
+
+    @Test
+    fun testConstrainedActiveDurationMinExtend() {
+        // Single iteration extended to 2.5s.
+        assertEquals(2500L, constrainedActiveDurationMs(1000L, 1f, 0L, 2500L, Long.MAX_VALUE))
+    }
+
+    @Test
+    fun testConstrainedActiveDurationInconsistentIgnored() {
+        // min > max: both ignored.
+        assertEquals(1000L, constrainedActiveDurationMs(1000L, 1f, 0L, 5000L, 1500L))
+    }
+
+    // --- min/max through progress / finished / iterations ---
+
+    @Test
+    fun testCalculateProgressMaxCutHoldsEnd() {
+        assertEquals(1f, calculateProgress(1000L, 3f, 0L, 2000L, 0L, 1500L))
+    }
+
+    @Test
+    fun testCalculateProgressMinExtendHoldsEnd() {
+        // Raw end (1s) <= elapsed (2s) < constrained end (5s): hold, not modulo.
+        assertEquals(1f, calculateProgress(1000L, 1f, 0L, 2000L, 5000L, Long.MAX_VALUE))
+    }
+
+    @Test
+    fun testIsFinishedMaxCut() {
+        assertTrue(isFinished(1000L, 3f, 0L, Long.MAX_VALUE, 0L, 2000L, 0L, 1500L))
+    }
+
+    @Test
+    fun testIsFinishedMinExtendNotFinished() {
+        assertFalse(isFinished(1000L, 1f, 0L, Long.MAX_VALUE, 0L, 2000L, 5000L, Long.MAX_VALUE))
+    }
+
+    @Test
+    fun testCompletedIterationsMinExtendHoldsRawCount() {
+        // dur=2s x1, min=5s: at 4s the hold counts the raw end (0 full extras).
+        assertEquals(0, completedIterations(4000L, 2000L, 5000L, 2000L))
+    }
+
+    @Test
+    fun testCompletedIterationsMaxCutFrozen() {
+        // dur=2s, cut to 5s: iterations [0,2),[2,4) full, [4,5) partial -> 2.
+        assertEquals(2, completedIterations(6000L, 2000L, 5000L, 6000L))
     }
 
     // --- calculateProgress ---

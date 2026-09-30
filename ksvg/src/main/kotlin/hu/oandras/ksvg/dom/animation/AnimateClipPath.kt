@@ -54,7 +54,10 @@ internal class AnimateClipPath(
     calcMode: CalcMode,
     keySplines: String?,
     @JvmField
-    val parsingFailed: Boolean = false
+    val parsingFailed: Boolean = false,
+    restart: Restart,
+    minMs: Long,
+    maxMs: Long
 ) : Animation(
     baseParams = baseParams,
     attributeName = attributeName,
@@ -68,7 +71,10 @@ internal class AnimateClipPath(
     accumulateSum = accumulateSum,
     keyTimes = keyTimes,
     calcMode = calcMode,
-    keySplines = keySplines
+    keySplines = keySplines,
+    restart = restart,
+    minMs = minMs,
+    maxMs = maxMs
 ) {
     override fun getNodeName(): String {
         return "animate"
@@ -141,7 +147,10 @@ internal class AnimateClipPath(
                 keyTimes = keyTimes,
                 calcMode = calcMode,
                 keySplines = keySplines,
-                parsingFailed = parsingFailed
+                parsingFailed = parsingFailed,
+                restart = restart,
+                minMs = minMs,
+                maxMs = maxMs
             )
         }
     }

@@ -29,6 +29,7 @@ import hu.oandras.ksvg.dom.animation.AnimatePath
 import hu.oandras.ksvg.dom.animation.AnimateTransform
 import hu.oandras.ksvg.dom.animation.Animation
 import hu.oandras.ksvg.dom.animation.CalcMode
+import hu.oandras.ksvg.dom.animation.Restart
 import hu.oandras.ksvg.dom.animation.TransformType
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.PathDefinition
@@ -60,6 +61,15 @@ internal sealed class AnimationNode(
 
     @JvmField
     val endMs: Long = sourceElement.endMs
+
+    @JvmField
+    val restart: Restart = sourceElement.restart
+
+    @JvmField
+    val minMs: Long = sourceElement.minMs
+
+    @JvmField
+    val maxMs: Long = sourceElement.maxMs
 
     @JvmField
     val fillFreeze: Boolean = sourceElement.fillFreeze
@@ -94,6 +104,12 @@ internal sealed class AnimationNode(
             append(repeatDurMs)
             append(", endMs=")
             append(endMs)
+            append(", restart=")
+            append(restart)
+            append(", minMs=")
+            append(minMs)
+            append(", maxMs=")
+            append(maxMs)
             append(", fillFreeze=")
             append(fillFreeze)
             append(", additiveSum=")

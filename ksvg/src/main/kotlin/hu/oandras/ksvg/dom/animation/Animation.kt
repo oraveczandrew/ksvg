@@ -22,6 +22,7 @@ import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.render.animation.parseClockValueMillis
+import hu.oandras.ksvg.render.animation.parseClockValueMillisOrNull
 import hu.oandras.ksvg.render.animation.parseSemicolonFloatList
 import java.util.Locale
 import org.xml.sax.Attributes
@@ -40,6 +41,25 @@ internal sealed class Animation(
     val repeatDurMs: Long,
     @JvmField
     val endMs: Long,
+    /**
+     * SMIL `restart` (default [Restart.always]). Behaviorally inert on the
+     * single-begin timeline (no second instance can occur); stored for
+     * model completeness.
+     */
+    @JvmField
+    val restart: Restart,
+    /**
+     * SMIL `min`: lower clamp of the active duration in ms (0 = none).
+     * Extends a short active period, holding the end value (no re-repeat).
+     */
+    @JvmField
+    val minMs: Long,
+    /**
+     * SMIL `max`: upper clamp of the active duration in ms
+     * ([Long.MAX_VALUE] = indefinite = none).
+     */
+    @JvmField
+    val maxMs: Long,
     @JvmField
     val fillFreeze: Boolean,
     @JvmField
@@ -79,6 +99,9 @@ internal sealed class Animation(
         protected var repeatCount: Float = 1f
         protected var repeatDurMs: Long = 0L
         protected var endMs: Long = Long.MAX_VALUE
+        protected var restart: Restart = Restart.always
+        protected var minMs: Long = 0L
+        protected var maxMs: Long = Long.MAX_VALUE
         protected var fillFreeze: Boolean = false
         protected var additiveSum: Boolean = false
         protected var accumulateSum: Boolean = false
@@ -133,6 +156,19 @@ internal sealed class Animation(
                     parseClockValueMillis(value)
                 }
                 SVGAttr.end -> endMs = parseClockValueMillis(value)
+                SVGAttr.restart -> restart = parseRestart(value)
+                // Invalid min/max are ignored (defaults = no constraint).
+                // max="indefinite" is the explicit no-constraint form.
+                SVGAttr.min -> minMs = if (value.trim().equals("indefinite", ignoreCase = true)) {
+                    Long.MAX_VALUE
+                } else {
+                    parseClockValueMillisOrNull(value)?.takeIf { it >= 0L } ?: 0L
+                }
+                SVGAttr.max -> maxMs = if (value.trim().equals("indefinite", ignoreCase = true)) {
+                    Long.MAX_VALUE
+                } else {
+                    parseClockValueMillisOrNull(value)?.takeIf { it >= 0L } ?: Long.MAX_VALUE
+                }
                 SVGAttr.fill -> fillFreeze = (value == "freeze")
                 SVGAttr.additive -> additiveSum = (value == "sum")
                 SVGAttr.accumulate -> accumulateSum = (value == "sum")

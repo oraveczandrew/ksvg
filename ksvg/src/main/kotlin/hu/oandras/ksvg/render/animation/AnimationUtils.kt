@@ -325,6 +325,28 @@ internal fun parseClockValueMillis(value: String): Long {
     }
 }
 
+/**
+ * Nullable clock-value parse: null when the value is not a valid clock
+ * (unlike [parseClockValueMillis], which folds invalid to 0). Needed for
+ * `min`/`max`, where 0 is a meaningful constraint, not an error signal.
+ */
+internal fun parseClockValueMillisOrNull(value: String): Long? {
+    val trimmed = value.trim()
+    if (trimmed.isEmpty()) return null
+    return try {
+        // Same units as parseClockValueMillis (plain = millis); NaN means
+        // "no number found" (NumberParser never throws), not zero.
+        val ms: Float = when {
+            trimmed.endsWith("ms") -> NumberParser.parseNumber(trimmed, 0, trimmed.length - 2)
+            trimmed.endsWith("s") -> NumberParser.parseNumber(trimmed, 0, trimmed.length - 1) * 1000f
+            else -> trimmed.toFloat()
+        }
+        if (ms.isNaN()) null else ms.toLong()
+    } catch (_: NumberFormatException) {
+        null
+    }
+}
+
 internal fun parseSemicolonColorList(value: String): IntList {
     return TextScanner(value).nextSemicolonColorList()
 }
@@ -489,19 +511,47 @@ internal fun activeDurationMs(durMs: Long, repeatCount: Float, repeatDurMs: Long
 }
 
 /**
+ * SMIL min/max-constrained active duration: [activeDurationMs] clamped to
+ * [minMs]..[maxMs] (`minMs` = 0 and `maxMs` = indefinite mean no constraint).
+ * `min` extends a short active period (the end value is held, never
+ * re-repeated); `max` cuts a long one short. An inconsistent min > max
+ * ignores both, per SMIL.
+ */
+internal fun constrainedActiveDurationMs(
+    durMs: Long,
+    repeatCount: Float,
+    repeatDurMs: Long,
+    minMs: Long = 0L,
+    maxMs: Long = Long.MAX_VALUE,
+): Long {
+    val raw = activeDurationMs(durMs, repeatCount, repeatDurMs)
+    if (minMs > maxMs) return raw
+    return raw.coerceIn(minMs, maxMs)
+}
+
+/**
  * Fully completed iterations behind the current (or frozen) position, for
  * accumulate="sum". During the run it is floor(elapsed/dur); frozen past the
  * active end the in-progress value already holds the final partial iteration,
  * so only the strictly-earlier full ones count (ceil - 1, never negative).
  * This also caps the old unbounded elapsed/dur growth past the active end.
  */
-internal fun completedIterations(elapsed: Long, durMs: Long, activeDurMs: Long): Int {
+internal fun completedIterations(
+    elapsed: Long,
+    durMs: Long,
+    activeDurMs: Long,
+    rawActiveDurMs: Long = activeDurMs,
+): Int {
     if (durMs <= 0L || activeDurMs <= 0L) return 0
-    return if (elapsed >= activeDurMs) {
-        (ceil(activeDurMs.toDouble() / durMs).toInt() - 1).coerceAtLeast(0)
-    } else {
-        (elapsed / durMs).toInt()
+    if (elapsed >= activeDurMs) {
+        return (ceil(activeDurMs.toDouble() / durMs).toInt() - 1).coerceAtLeast(0)
     }
+    // min-extension hold (rawActive <= elapsed < constrained active): the
+    // simple duration does not re-repeat, so count against the raw end.
+    if (elapsed >= rawActiveDurMs) {
+        return (ceil(rawActiveDurMs.toDouble() / durMs).toInt() - 1).coerceAtLeast(0)
+    }
+    return (elapsed / durMs).toInt()
 }
 
 internal fun calculateProgress(
@@ -509,16 +559,18 @@ internal fun calculateProgress(
     repeatCount: Float,
     repeatDurMs: Long,
     elapsed: Long,
+    minMs: Long = 0L,
+    maxMs: Long = Long.MAX_VALUE,
 ): Float {
     if (durMs <= 0) return 1f
 
-    val activeDurMs = activeDurationMs(durMs, repeatCount, repeatDurMs)
+    val activeDurMs = constrainedActiveDurationMs(durMs, repeatCount, repeatDurMs, minMs, maxMs)
 
-    return if (elapsed >= activeDurMs) {
-        1f
-    } else {
-        (elapsed % durMs).toFloat() / durMs.toFloat()
-    }
+    if (elapsed >= activeDurMs) return 1f
+    // min-extension hold (raw end <= elapsed < constrained end): the simple
+    // duration does not re-repeat, the end value is held.
+    if (elapsed >= activeDurationMs(durMs, repeatCount, repeatDurMs)) return 1f
+    return (elapsed % durMs).toFloat() / durMs.toFloat()
 }
 
 internal fun isFinished(
@@ -528,8 +580,10 @@ internal fun isFinished(
     endMs: Long,
     animationTimeMs: Long,
     elapsed: Long,
+    minMs: Long = 0L,
+    maxMs: Long = Long.MAX_VALUE,
 ): Boolean {
     if (animationTimeMs >= endMs) return true
 
-    return elapsed >= activeDurationMs(durMs, repeatCount, repeatDurMs)
+    return elapsed >= constrainedActiveDurationMs(durMs, repeatCount, repeatDurMs, minMs, maxMs)
 }

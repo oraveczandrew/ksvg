@@ -46,7 +46,10 @@ internal sealed class AnimateTransform(
     accumulateSum: Boolean,
     keyTimes: FloatList?,
     calcMode: CalcMode,
-    keySplines: String?
+    keySplines: String?,
+    restart: Restart,
+    minMs: Long,
+    maxMs: Long
 ) : Animation(
     baseParams = baseParams,
     attributeName = SVGAttr.transform,
@@ -60,7 +63,10 @@ internal sealed class AnimateTransform(
     accumulateSum = accumulateSum,
     keyTimes = keyTimes,
     calcMode = calcMode,
-    keySplines = keySplines
+    keySplines = keySplines,
+    restart = restart,
+    minMs = minMs,
+    maxMs = maxMs
 ) {
     override fun getNodeName(): String {
         return "animateTransform"
@@ -117,7 +123,10 @@ internal sealed class AnimateTransform(
                     accumulateSum = accumulateSum,
                     keyTimes = keyTimes,
                     calcMode = calcMode,
-                    keySplines = keySplines
+                    keySplines = keySplines,
+                    restart = restart,
+                    minMs = minMs,
+                    maxMs = maxMs
                 )
 
                 TransformType.scale -> AnimateScale(
@@ -136,7 +145,10 @@ internal sealed class AnimateTransform(
                     accumulateSum = accumulateSum,
                     keyTimes = keyTimes,
                     calcMode = calcMode,
-                    keySplines = keySplines
+                    keySplines = keySplines,
+                    restart = restart,
+                    minMs = minMs,
+                    maxMs = maxMs
                 )
 
                 TransformType.rotate -> AnimateRotate(
@@ -155,7 +167,10 @@ internal sealed class AnimateTransform(
                     accumulateSum = accumulateSum,
                     keyTimes = keyTimes,
                     calcMode = calcMode,
-                    keySplines = keySplines
+                    keySplines = keySplines,
+                    restart = restart,
+                    minMs = minMs,
+                    maxMs = maxMs
                 )
 
                 TransformType.skewX -> AnimateSkewX(
@@ -174,7 +189,10 @@ internal sealed class AnimateTransform(
                     accumulateSum = accumulateSum,
                     keyTimes = keyTimes,
                     calcMode = calcMode,
-                    keySplines = keySplines
+                    keySplines = keySplines,
+                    restart = restart,
+                    minMs = minMs,
+                    maxMs = maxMs
                 )
 
                 TransformType.skewY -> AnimateSkewY(
@@ -193,7 +211,10 @@ internal sealed class AnimateTransform(
                     accumulateSum = accumulateSum,
                     keyTimes = keyTimes,
                     calcMode = calcMode,
-                    keySplines = keySplines
+                    keySplines = keySplines,
+                    restart = restart,
+                    minMs = minMs,
+                    maxMs = maxMs
                 )
             }
         }

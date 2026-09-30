@@ -138,6 +138,9 @@ internal enum class SVGAttr {
     yChannelSelector,
     r,
     radius,
+    restart,
+    min,
+    max,
     repeatDur,
     refX,
     refY,
@@ -322,6 +325,9 @@ internal enum class SVGAttr {
             "yChannelSelector" -> yChannelSelector
             "r" -> r
             "radius" -> radius
+            "restart" -> restart
+            "min" -> min
+            "max" -> max
             "repeatDur" -> repeatDur
             "refX" -> refX
             "refY" -> refY

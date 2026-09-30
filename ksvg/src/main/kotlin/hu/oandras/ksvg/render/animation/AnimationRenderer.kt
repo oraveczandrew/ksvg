@@ -814,9 +814,9 @@ internal inline fun AnimateFloatNode.withValueAt(animationTimeMs: Long, handler:
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return
 
-    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return
+    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed, minMs, maxMs) && !fillFreeze) return
 
-    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed, minMs, maxMs)
     val effectiveKeyTimes = if (calcMode == CalcMode.paced) pacedKeyTimes ?: keyTimes else keyTimes
 
     var result = when (calcMode) {
@@ -825,7 +825,12 @@ internal inline fun AnimateFloatNode.withValueAt(animationTimeMs: Long, handler:
     }
 
     if (accumulateSum) {
-        val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+        val completed = completedIterations(
+            elapsed,
+            durMs,
+            constrainedActiveDurationMs(durMs, repeatCount, repeatDurMs, minMs, maxMs),
+            activeDurationMs(durMs, repeatCount, repeatDurMs),
+        )
         if (completed > 0) {
             val range = effectiveValues[effectiveValues.size - 1] - effectiveValues[0]
             result += range * completed
@@ -839,9 +844,9 @@ internal inline fun AnimateColorNode.withColorAt(animationTimeMs: Long, baseColo
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return
 
-    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return
+    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed, minMs, maxMs) && !fillFreeze) return
 
-    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed, minMs, maxMs)
 
     val color = if (baseRelative) {
         // SMIL by-only / to-only: resolve against the base color. Discrete
@@ -892,9 +897,9 @@ internal fun AnimateTransformNode.applyValueAt(animationTimeMs: Long, out: Float
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return false
 
-    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return false
+    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed, minMs, maxMs) && !fillFreeze) return false
 
-    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed, minMs, maxMs)
     val effectiveKeyTimes = if (calcMode == CalcMode.paced) pacedKeyTimes ?: keyTimes else keyTimes
 
     when (calcMode) {
@@ -903,7 +908,12 @@ internal fun AnimateTransformNode.applyValueAt(animationTimeMs: Long, out: Float
     }
 
     if (accumulateSum) {
-        val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+        val completed = completedIterations(
+            elapsed,
+            durMs,
+            constrainedActiveDurationMs(durMs, repeatCount, repeatDurMs, minMs, maxMs),
+            activeDurationMs(durMs, repeatCount, repeatDurMs),
+        )
         if (completed > 0) {
             val firstIdx = 0
             val lastIdx = effectiveValues.size - stride
@@ -990,9 +1000,9 @@ internal fun AnimateDashArrayNode.withDashArrayAt(
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return false
 
-    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return false
+    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed, minMs, maxMs) && !fillFreeze) return false
 
-    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed, minMs, maxMs)
 
     if (baseRelative) {
         // SMIL to-only / by-only resolve against the base dash at apply time
@@ -1024,7 +1034,12 @@ internal fun AnimateDashArrayNode.withDashArrayAt(
     }
 
     if (accumulateSum) {
-        val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+        val completed = completedIterations(
+            elapsed,
+            durMs,
+            constrainedActiveDurationMs(durMs, repeatCount, repeatDurMs, minMs, maxMs),
+            activeDurationMs(durMs, repeatCount, repeatDurMs),
+        )
         if (completed > 0) {
             val firstIdx = 0
             val lastIdx = effectiveValues.size - stride
@@ -1041,9 +1056,9 @@ internal fun AnimateFloatNode.withPointsAt(animationTimeMs: Long, stride: Int, o
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return false
 
-    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return false
+    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed, minMs, maxMs) && !fillFreeze) return false
 
-    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed, minMs, maxMs)
     val effectiveKeyTimes = if (calcMode == CalcMode.paced) pacedKeyTimes ?: keyTimes else keyTimes
 
     when (calcMode) {
@@ -1052,7 +1067,12 @@ internal fun AnimateFloatNode.withPointsAt(animationTimeMs: Long, stride: Int, o
     }
 
     if (accumulateSum) {
-        val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+        val completed = completedIterations(
+            elapsed,
+            durMs,
+            constrainedActiveDurationMs(durMs, repeatCount, repeatDurMs, minMs, maxMs),
+            activeDurationMs(durMs, repeatCount, repeatDurMs),
+        )
         if (completed > 0) {
             val lastIdx = effectiveValues.size - stride
             for (i in 0 until stride) {
@@ -1068,9 +1088,9 @@ internal fun AnimatePathNode.withPathAt(animationTimeMs: Long, outPath: Path, ba
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return false
 
-    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return false
+    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed, minMs, maxMs) && !fillFreeze) return false
 
-    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed, minMs, maxMs)
     val values = effectiveValues
     val count = values.size
     if (count == 0) return false
@@ -1161,9 +1181,9 @@ internal fun AnimateMotionNode.applyMotionAt(animationTimeMs: Long, out: Matrix)
     val elapsed = animationTimeMs - beginMs
     if (elapsed < 0L) return false
 
-    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed) && !fillFreeze) return false
+    if (isFinished(durMs, repeatCount, repeatDurMs, endMs, animationTimeMs, elapsed, minMs, maxMs) && !fillFreeze) return false
 
-    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed)
+    val progress = calculateProgress(durMs, repeatCount, repeatDurMs, elapsed, minMs, maxMs)
 
     val effectiveProgress = if (keyPoints != null && keyTimes != null) {
         selectAnimationSegment(keyPoints, keyTimes, progress, ::interpolate, parsedKeySplines)
@@ -1205,7 +1225,12 @@ internal fun AnimateMotionNode.applyMotionAt(animationTimeMs: Long, out: Matrix)
         }
 
         if (accumulateSum) {
-            val completed = completedIterations(elapsed, durMs, activeDurationMs(durMs, repeatCount, repeatDurMs))
+            val completed = completedIterations(
+            elapsed,
+            durMs,
+            constrainedActiveDurationMs(durMs, repeatCount, repeatDurMs, minMs, maxMs),
+            activeDurationMs(durMs, repeatCount, repeatDurMs),
+        )
             if (completed > 0) {
                 // For motion, we accumulate the distance between the last and first points of the path
                 if (pathMeasure.getPosTan(0f, startPos, null) && pathMeasure.getPosTan(length, endPos, null)) {
