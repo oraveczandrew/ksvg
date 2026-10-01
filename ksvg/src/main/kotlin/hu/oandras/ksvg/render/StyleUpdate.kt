@@ -175,30 +175,29 @@ internal fun applyStateFromBuilder(
         state.strokeConfig.setTextSize(fontSize.floatValueInContext(currentFontSize))
     }
 
-    state.getFontVariationSetBuilder().addSetting(CSSFontVariationSettings.VARIATION_WEIGHT, builder.fontWeight)
-    builder.fontStyle?.let { fontStyle ->
-        state.getFontVariationSetBuilder().apply {
-            if (fontStyle == FontStyle.italic) {
-                addSetting(CSSFontVariationSettings.VARIATION_ITALIC, CSSFontVariationSettings.VARIATION_ITALIC_VALUE_ON)
-            } else if (fontStyle == FontStyle.oblique) {
-                addSetting(CSSFontVariationSettings.VARIATION_SLANT, CSSFontVariationSettings.VARIATION_OBLIQUE_VALUE_ON)
-            }
-        }
+    val fontVariations = state.getFontVariationSetBuilder()
+    fontVariations.addSetting(CSSFontVariationSettings.VARIATION_WEIGHT, builder.fontWeight)
+    val fontStyle = builder.fontStyle
+    if (fontStyle == FontStyle.italic) {
+        fontVariations.addSetting(CSSFontVariationSettings.VARIATION_ITALIC, CSSFontVariationSettings.VARIATION_ITALIC_VALUE_ON)
+    } else if (fontStyle == FontStyle.oblique) {
+        fontVariations.addSetting(CSSFontVariationSettings.VARIATION_SLANT, CSSFontVariationSettings.VARIATION_OBLIQUE_VALUE_ON)
     }
-    state.getFontVariationSetBuilder().addSetting(CSSFontVariationSettings.VARIATION_WIDTH, builder.fontWidth)
+    fontVariations.addSetting(CSSFontVariationSettings.VARIATION_WIDTH, builder.fontWidth)
 
     // Decorations render manually in TextRenderer; the configs stay cleared.
     state.fillConfig.setTextDecorations(strikeThru = false, underline = false)
     state.strokeConfig.setTextDecorations(strikeThru = false, underline = false)
 
-    state.getFontFeatureSetBuilder().applyKerning(builder.fontKerning)
-    state.getFontFeatureSetBuilder().addSettings(builder.fontFeatureSettings)
-    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantLigatures)
-    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantPosition)
-    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantCaps)
-    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantNumeric)
-    state.getFontFeatureSetBuilder().addSettings(builder.fontVariantEastAsian)
-    state.getFontVariationSetBuilder().addSettings(builder.fontVariationSettings)
+    val fontFeatures = state.getFontFeatureSetBuilder()
+    fontFeatures.applyKerning(builder.fontKerning)
+    fontFeatures.addSettings(builder.fontFeatureSettings)
+    fontFeatures.addSettings(builder.fontVariantLigatures)
+    fontFeatures.addSettings(builder.fontVariantPosition)
+    fontFeatures.addSettings(builder.fontVariantCaps)
+    fontFeatures.addSettings(builder.fontVariantNumeric)
+    fontFeatures.addSettings(builder.fontVariantEastAsian)
+    fontVariations.addSettings(builder.fontVariationSettings)
 
     var spacing = builder.letterSpacing?.floatValueInContext() ?: 0f
     if (spacing > 0 && currentFontSize > 0) {
