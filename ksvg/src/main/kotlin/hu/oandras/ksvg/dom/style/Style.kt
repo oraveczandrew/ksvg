@@ -107,6 +107,7 @@ internal class Style internal constructor(
     @JvmField val fontSizeAdjust: Float,
     @JvmField val whiteSpace: WhiteSpace?,
     @JvmField val pointerEvents: PointerEvents?,
+    @JvmField val unicodeBidi: UnicodeBidi?,
     @JvmField val fontWeight: Float,
     @JvmField val fontStyle: FontStyle?,
     @JvmField val fontWidth: Float,
@@ -234,6 +235,7 @@ internal class Style internal constructor(
         fontSizeAdjust = Float.NaN,
         whiteSpace = null,
         pointerEvents = null,
+        unicodeBidi = null,
         fontWeight = Float.NaN,
         fontStyle = null,
         fontWidth = Float.NaN,
@@ -352,6 +354,8 @@ internal class Style internal constructor(
         var whiteSpace: WhiteSpace? = null
         @JvmField
         var pointerEvents: PointerEvents? = null
+        @JvmField
+        var unicodeBidi: UnicodeBidi? = null
         @JvmField
         var fontWeight: Float = Float.NaN
         @JvmField
@@ -599,6 +603,7 @@ internal class Style internal constructor(
             this.fontSizeAdjust = original.fontSizeAdjust
             this.whiteSpace = original.whiteSpace
             this.pointerEvents = original.pointerEvents
+            this.unicodeBidi = original.unicodeBidi
             this.fontWeight = original.fontWeight
             this.fontStyle = original.fontStyle
             this.fontWidth = original.fontWidth
@@ -698,6 +703,7 @@ internal class Style internal constructor(
                 fontSizeAdjust = fontSizeAdjust,
                 whiteSpace = whiteSpace,
                 pointerEvents = pointerEvents,
+                unicodeBidi = unicodeBidi,
                 fontWeight = fontWeight,
                 fontStyle = fontStyle,
                 fontWidth = fontWidth,
@@ -794,6 +800,7 @@ internal class Style internal constructor(
                     (fontSizeAdjust == original.fontSizeAdjust || (fontSizeAdjust.isNaN() && original.fontSizeAdjust.isNaN())) &&
                     whiteSpace == original.whiteSpace &&
                     pointerEvents == original.pointerEvents &&
+                    unicodeBidi == original.unicodeBidi &&
                     (fontWeight == original.fontWeight || (fontWeight.isNaN() && original.fontWeight.isNaN())) &&
                     fontStyle == original.fontStyle &&
                     (fontWidth == original.fontWidth || (fontWidth.isNaN() && original.fontWidth.isNaN())) &&
@@ -939,7 +946,8 @@ internal class Style internal constructor(
             SPECIFIED_TRANSFORM_BOX,
             SPECIFIED_FONT_SIZE_ADJUST,
             SPECIFIED_WHITE_SPACE,
-            SPECIFIED_POINTER_EVENTS
+            SPECIFIED_POINTER_EVENTS,
+            SPECIFIED_UNICODE_BIDI
         ]
     )
     annotation class SpecifiedFlags2
@@ -988,6 +996,7 @@ internal class Style internal constructor(
         fontSizeAdjust: Float = this.fontSizeAdjust,
         whiteSpace: WhiteSpace? = this.whiteSpace,
         pointerEvents: PointerEvents? = this.pointerEvents,
+        unicodeBidi: UnicodeBidi? = this.unicodeBidi,
         fontWeight: Float = this.fontWeight,
         fontStyle: FontStyle? = this.fontStyle,
         fontWidth: Float = this.fontWidth,
@@ -1073,6 +1082,7 @@ internal class Style internal constructor(
             fontSizeAdjust = fontSizeAdjust,
             whiteSpace = whiteSpace,
             pointerEvents = pointerEvents,
+            unicodeBidi = unicodeBidi,
             fontWeight = fontWeight,
             fontStyle = fontStyle,
             fontWidth = fontWidth,
@@ -1179,6 +1189,8 @@ internal class Style internal constructor(
             append(whiteSpace)
             append(", pointerEvents=")
             append(pointerEvents)
+            append(", unicodeBidi=")
+            append(unicodeBidi)
             append(", fontWeight=")
             append(fontWeight)
             append(", fontStyle=")
@@ -1384,6 +1396,7 @@ internal class Style internal constructor(
         const val SPECIFIED_FONT_SIZE_ADJUST: Long = 1L shl 8
         const val SPECIFIED_WHITE_SPACE: Long = 1L shl 9
         const val SPECIFIED_POINTER_EVENTS: Long = 1L shl 10
+        const val SPECIFIED_UNICODE_BIDI: Long = 1L shl 11
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1759,6 +1772,18 @@ internal class Style internal constructor(
                     if (pointerEvents != null) {
                         builder.pointerEvents = pointerEvents
                         builder.addSpecifiedFlag2(SPECIFIED_POINTER_EVENTS)
+                    }
+                }
+
+                SVGAttr.unicode_bidi -> {
+                    // Presentation attribute: both paths parse it. Only the
+                    // override values change layout (see
+                    // `visualOrderForOverride`); the rest keep the platform
+                    // text stack's default ordering.
+                    val unicodeBidi = parseUnicodeBidi(value)
+                    if (unicodeBidi != null) {
+                        builder.unicodeBidi = unicodeBidi
+                        builder.addSpecifiedFlag2(SPECIFIED_UNICODE_BIDI)
                     }
                 }
 
@@ -2167,6 +2192,7 @@ internal class Style internal constructor(
             SVGAttr.transform_origin -> SPECIFIED_TRANSFORM_ORIGIN
             SVGAttr.transform_box -> SPECIFIED_TRANSFORM_BOX
             SVGAttr.pointer_events -> SPECIFIED_POINTER_EVENTS
+            SVGAttr.unicode_bidi -> SPECIFIED_UNICODE_BIDI
             SVGAttr.vector_effect -> SPECIFIED_VECTOR_EFFECT
             SVGAttr.viewport_fill -> SPECIFIED_VIEWPORT_FILL
             SVGAttr.viewport_fill_opacity -> SPECIFIED_VIEWPORT_FILL_OPACITY

@@ -111,7 +111,9 @@ import hu.oandras.ksvg.dom.text.TSpan
 import hu.oandras.ksvg.dom.text.Text
 import hu.oandras.ksvg.dom.text.TextAnchor
 import hu.oandras.ksvg.dom.text.TextContainer
+import hu.oandras.ksvg.dom.text.TextDirection
 import hu.oandras.ksvg.dom.text.TextPath
+import hu.oandras.ksvg.dom.text.TextPositionedContainer
 import hu.oandras.ksvg.dom.text.TextSequence
 import hu.oandras.ksvg.filtering.LcgRandom
 import hu.oandras.ksvg.filtering.SvgPathNoise
@@ -136,6 +138,7 @@ import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.text.TextBoundsCalculator
 import hu.oandras.ksvg.render.text.calculateTextBounds
 import hu.oandras.ksvg.render.text.calculateTextWidth
+import hu.oandras.ksvg.render.text.visualOrderForOverride
 import hu.oandras.ksvg.render.text.extractRawText
 import hu.oandras.ksvg.render.text.getAnchorPosition
 import hu.oandras.ksvg.render.text.selectTypefaceAndFontStyling
@@ -1410,7 +1413,24 @@ internal class RenderTreeBuilder(
                         isLastChild = i == lastIndex,
                         spacePreserve = state.spacePreserve
                     )
-                    children.add(TextSequenceNode(transformedText))
+                    // Scoped unicode-bidi override (G12 middle ground):
+                    // reorder the chunk into visual order at build time so
+                    // the single drawText call needs no platform reordering.
+                    // Skipped under explicit per-character positioning (x/y/
+                    // dx/dy would need spec-ambiguous position mapping) and
+                    // for chunks the reorder declines (see
+                    // `visualOrderForOverride`).
+                    val override = state.style.unicodeBidi
+                    val visualText =
+                        if (override?.isOverride == true && !hasExplicitPositioning(parent)) {
+                            visualOrderForOverride(
+                                transformedText,
+                                baseRtl = state.style.direction == TextDirection.RTL
+                            )
+                        } else {
+                            null
+                        }
+                    children.add(TextSequenceNode(visualText ?: transformedText))
                 }
 
                 is TSpan -> buildTSpan(child)?.let { children.add(it) }
@@ -2374,6 +2394,22 @@ internal class RenderTreeBuilder(
         if (obj is ElementBase) {
             obj.spacePreserve?.let { state.spacePreserve = it }
         }
+    }
+
+    /**
+     * True when the text container carries explicit PER-CHARACTER geometry
+     * (multi-valued `x`/`y`/`dx`/`dy` lists); bidi-override reordering is
+     * skipped for its direct chunks (reordered positions would need
+     * spec-ambiguous mapping — documented G12 limitation). Single values
+     * only place the line start / shift uniformly, so reordering stays
+     * safe with them.
+     */
+    private fun hasExplicitPositioning(parent: TextContainer): Boolean {
+        val positioned = parent as? TextPositionedContainer ?: return false
+        return (positioned.x?.size ?: 0) > 1 ||
+            (positioned.y?.size ?: 0) > 1 ||
+            (positioned.dx?.size ?: 0) > 1 ||
+            (positioned.dy?.size ?: 0) > 1
     }
 
     private fun display(): Boolean = state.style.display ?: true

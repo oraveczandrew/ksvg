@@ -556,6 +556,10 @@ internal fun updateStyle(
         builder.pointerEvents = sourceStyle.pointerEvents
     }
 
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_UNICODE_BIDI)) {
+        builder.unicodeBidi = sourceStyle.unicodeBidi
+    }
+
     if (sourceStyle.isSpecified2(Style.SPECIFIED_TRANSFORM_ORIGIN)) {
         builder.transformOrigin = sourceStyle.transformOrigin
     }
