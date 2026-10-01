@@ -26,6 +26,8 @@ import hu.oandras.ksvg.dom.style.ContextFill
 import hu.oandras.ksvg.dom.style.ContextStroke
 import hu.oandras.ksvg.dom.style.CurrentColor
 import hu.oandras.ksvg.dom.style.FontStyle
+import hu.oandras.ksvg.dom.style.LineCap
+import hu.oandras.ksvg.dom.style.LineJoin
 import hu.oandras.ksvg.dom.style.ShapeRendering
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.SvgPaint
@@ -42,6 +44,36 @@ import hu.oandras.ksvg.utils.forEachElement
  * Shared by the builder and renderer style paths so variable-font axes and
  * external resolvers never see the raw sentinels.
  */
+/**
+ * Maps a [LineCap] constant to [Paint.Cap] without allocating.
+ * `LineCap` constants equal `Paint.Cap` ordinals; out-of-range values fall back
+ * to `BUTT` (the old `entries[]` indexing crashed on those instead).
+ *
+ * Hot path: called per styled element, so no `entries` array materialization here.
+ */
+internal fun paintCapOf(lineCap: Int): Paint.Cap {
+    return when (lineCap) {
+        LineCap.ROUND -> Paint.Cap.ROUND
+        LineCap.SQUARE -> Paint.Cap.SQUARE
+        else -> Paint.Cap.BUTT
+    }
+}
+
+/**
+ * Maps a [LineJoin] constant to [Paint.Join] without allocating.
+ * `LineJoin` constants equal `Paint.Join` ordinals; out-of-range values fall back
+ * to `MITER` (the old `entries[]` indexing crashed on those instead).
+ *
+ * Hot path: called per styled element, so no `entries` array materialization here.
+ */
+internal fun paintJoinOf(lineJoin: Int): Paint.Join {
+    return when (lineJoin) {
+        LineJoin.ROUND -> Paint.Join.ROUND
+        LineJoin.BEVEL -> Paint.Join.BEVEL
+        else -> Paint.Join.MITER
+    }
+}
+
 /**
  * Applies the shape/text-rendering anti-alias switch to both paint configs.
  * Text elements ([TextContainer]) honor `text-rendering`, everything else
@@ -128,8 +160,8 @@ internal fun applyStateFromBuilder(
     } else {
         state.strokeConfig.setStrokeWidth(strokeWidth.floatValueInContext())
     }
-    state.strokeConfig.setStrokeCap(Paint.Cap.entries[builder.strokeLineCap])
-    state.strokeConfig.setStrokeJoin(Paint.Join.entries[builder.strokeLineJoin])
+    state.strokeConfig.setStrokeCap(paintCapOf(builder.strokeLineCap))
+    state.strokeConfig.setStrokeJoin(paintJoinOf(builder.strokeLineJoin))
     state.strokeConfig.setStrokeMiter(builder.strokeMiterLimit)
     state.updateStrokeDash(
         builder.strokeDashArray,
@@ -248,14 +280,14 @@ internal fun updateStyle(
         val strokeLineCap = sourceStyle.strokeLineCap
         builder.strokeLineCap = strokeLineCap
         // LineCap constants equal Paint.Cap ordinals: no translation needed.
-        state.strokeConfig.setStrokeCap(Paint.Cap.entries[strokeLineCap])
+        state.strokeConfig.setStrokeCap(paintCapOf(strokeLineCap))
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE_LINEJOIN)) {
         val strokeLineJoin = sourceStyle.strokeLineJoin
         builder.strokeLineJoin = strokeLineJoin
         // LineJoin constants equal Paint.Join ordinals: no translation needed.
-        state.strokeConfig.setStrokeJoin(Paint.Join.entries[strokeLineJoin])
+        state.strokeConfig.setStrokeJoin(paintJoinOf(strokeLineJoin))
     }
 
     if (sourceStyle.isSpecified(Style.SPECIFIED_STROKE_MITERLIMIT)) {

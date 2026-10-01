@@ -24,6 +24,7 @@ import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.style.FillRule
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.SvgPaint
 import hu.oandras.ksvg.render.pool.FloatArrayBucket
@@ -160,10 +161,10 @@ internal class RendererState private constructor(
     }
 
     val fillType: Path.FillType
-        get() = Path.FillType.entries[style.fillRule]
+        get() = if (style.fillRule == FillRule.EVEN_ODD) Path.FillType.EVEN_ODD else Path.FillType.WINDING
 
     val clipFillType: Path.FillType
-        get() = Path.FillType.entries[style.clipRule]
+        get() = if (style.clipRule == FillRule.EVEN_ODD) Path.FillType.EVEN_ODD else Path.FillType.WINDING
 
     internal constructor() : this(
         style = Style.getDefaultStyle(),
