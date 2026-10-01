@@ -39,5 +39,6 @@ include(listOf(
     ":ksvg",
     ":filtering",
     ":glide",
+    ":compose",
     ":showcase",
 ))

@@ -40,6 +40,7 @@ The framework is **100% Kotlin**; filters run through a GPU pipeline on API 33+ 
 | `:ksvg`      | `hu.oandras.ksvg:ksvg`                   | Parser, DOM, renderer, public API |
 | `:filtering` | `hu.oandras.ksvg:filtering` (transitive) | Native + Kotlin filter kernels    |
 | `:glide`     | `hu.oandras.ksvg:glide`                  | Glide integration (optional)      |
+| `:compose`   | `hu.oandras.ksvg:compose`                | Jetpack Compose integration (optional) |
 | `:showcase`  | — (demo app, not published)              | Sample application                |
 
 ## Detailed Feature Support

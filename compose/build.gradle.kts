@@ -5,7 +5,7 @@
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *        https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,14 +14,26 @@
  *    limitations under the License.
  */
 
+import ksvg.gradle.configureKsvgPublication
+import ksvg.gradle.configureKsvgRepositories
+import ksvg.gradle.configureKsvgSigning
+import java.lang.module.ModuleFinder.compose
+
 plugins {
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.ksp)
+    id("maven-publish")
+    id("signing")
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.dokka.javadoc)
+}
+
+kotlin {
+    explicitApi()
 }
 
 android {
-    namespace = "hu.oandras.ksvg.showcase"
+    namespace = "hu.oandras.ksvg.compose"
     compileSdk = libs.versions.compileSdk.get().toInt()
     ndkVersion = libs.versions.ndk.get()
     buildToolsVersion = libs.versions.buildTools.get()
@@ -66,41 +78,48 @@ android {
         )
     }
 
-    sourceSets {
-        getByName("main") {
-            assets.directories.apply {
-                add("asset-roots")
-            }
-        }
-    }
-
     buildFeatures.apply {
         compose = true
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
     }
 }
 
 dependencies {
     implementation(project(":ksvg"))
-    implementation(project(":glide"))
-    implementation(project(":compose"))
+
+    implementation(libs.coroutines.android)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
-    implementation(libs.compose.material3)
-    implementation(libs.compose.material.icons.core)
-    implementation(libs.activity.compose)
+    implementation(libs.lifecycle.runtime.compose)
 
-    implementation(libs.appcompat)
-    implementation(libs.activity.ktx)
-    implementation(libs.material)
-    implementation(libs.constraintlayout)
-    implementation(libs.recyclerview)
-    implementation(libs.lifecycle.viewmodel.ktx)
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+}
 
-    implementation(libs.coroutines.android)
+// PUBLISHING (coordinates live in root gradle.properties: ksvg.group / ksvg.version)
 
-    implementation(libs.glide)
+configureKsvgPublication(
+    artifactId = "compose",
+    displayName = "KSVG Compose",
+    description = "Jetpack Compose integration for KSVG.",
+)
+configureKsvgRepositories()
+configureKsvgSigning()
 
-    ksp(libs.glide.ksp)
+dokka {
+    moduleName.set("KSVG Compose")
+}
+
+tasks.register<Jar>("javadocJar") {
+    description = "Packages Dokka Javadoc output for publication."
+    dependsOn("dokkaGeneratePublicationJavadoc")
+    archiveClassifier.set("javadoc")
+    from(tasks.named("dokkaGeneratePublicationJavadoc"))
 }
