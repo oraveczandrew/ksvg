@@ -18,6 +18,7 @@ package hu.oandras.ksvg.render
 
 import android.graphics.Matrix
 import hu.oandras.ksvg.HitRegion
+import hu.oandras.ksvg.dom.style.PointerEvents
 import hu.oandras.ksvg.dom.text.A
 import hu.oandras.ksvg.utils.forEachElement
 
@@ -55,7 +56,7 @@ private fun collectHitRegionsRecursive(
         if (sourceElement is A) {
             val href = sourceElement.href
             val bb = node.boundingBox
-            if (href != null && bb != null) {
+            if (href != null && bb != null && sourceElement.isHitTestable()) {
                 val world = Matrix(parentMatrix)
                 node.transform?.let { world.postConcat(it) }
                 node.viewBoxTransform?.let { world.postConcat(it) }
@@ -73,6 +74,23 @@ private fun collectHitRegionsRecursive(
             collectHitRegionsRecursive(child, regions, childMatrix)
         }
     }
+}
+
+/**
+ * Middle-ground `pointer-events`: only [PointerEvents.none] opts out (the
+ * element contributes no hit region); every other value keeps the
+ * bounding-box region — stroke-level precision is meaningless on touch
+ * screens. Invisible anchors (`visibility` hidden/collapse, inherited via
+ * the computed style in `styleBuilder`) contribute no region either;
+ * `display: none` subtrees have no render nodes at all. Runs on demand
+ * (hit-test walk), never on the render hot path — plain property reads,
+ * no allocation.
+ */
+private fun A.isHitTestable(): Boolean {
+    val computed = styleBuilder
+    if (computed.pointerEvents == PointerEvents.none) return false
+    if (computed.visibility == false) return false
+    return true
 }
 
 /**

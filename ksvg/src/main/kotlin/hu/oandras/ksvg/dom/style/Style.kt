@@ -106,6 +106,7 @@ internal class Style internal constructor(
     @JvmField val fontSize: CSSLength?,
     @JvmField val fontSizeAdjust: Float,
     @JvmField val whiteSpace: WhiteSpace?,
+    @JvmField val pointerEvents: PointerEvents?,
     @JvmField val fontWeight: Float,
     @JvmField val fontStyle: FontStyle?,
     @JvmField val fontWidth: Float,
@@ -232,6 +233,7 @@ internal class Style internal constructor(
         fontSize = null,
         fontSizeAdjust = Float.NaN,
         whiteSpace = null,
+        pointerEvents = null,
         fontWeight = Float.NaN,
         fontStyle = null,
         fontWidth = Float.NaN,
@@ -348,6 +350,8 @@ internal class Style internal constructor(
         var fontSizeAdjust: Float = Float.NaN
         @JvmField
         var whiteSpace: WhiteSpace? = null
+        @JvmField
+        var pointerEvents: PointerEvents? = null
         @JvmField
         var fontWeight: Float = Float.NaN
         @JvmField
@@ -594,6 +598,7 @@ internal class Style internal constructor(
             this.fontSize = original.fontSize
             this.fontSizeAdjust = original.fontSizeAdjust
             this.whiteSpace = original.whiteSpace
+            this.pointerEvents = original.pointerEvents
             this.fontWeight = original.fontWeight
             this.fontStyle = original.fontStyle
             this.fontWidth = original.fontWidth
@@ -692,6 +697,7 @@ internal class Style internal constructor(
                 fontSize = fontSize,
                 fontSizeAdjust = fontSizeAdjust,
                 whiteSpace = whiteSpace,
+                pointerEvents = pointerEvents,
                 fontWeight = fontWeight,
                 fontStyle = fontStyle,
                 fontWidth = fontWidth,
@@ -787,6 +793,7 @@ internal class Style internal constructor(
                     fontSize == original.fontSize &&
                     (fontSizeAdjust == original.fontSizeAdjust || (fontSizeAdjust.isNaN() && original.fontSizeAdjust.isNaN())) &&
                     whiteSpace == original.whiteSpace &&
+                    pointerEvents == original.pointerEvents &&
                     (fontWeight == original.fontWeight || (fontWeight.isNaN() && original.fontWeight.isNaN())) &&
                     fontStyle == original.fontStyle &&
                     (fontWidth == original.fontWidth || (fontWidth.isNaN() && original.fontWidth.isNaN())) &&
@@ -931,7 +938,8 @@ internal class Style internal constructor(
             SPECIFIED_TRANSFORM_ORIGIN,
             SPECIFIED_TRANSFORM_BOX,
             SPECIFIED_FONT_SIZE_ADJUST,
-            SPECIFIED_WHITE_SPACE
+            SPECIFIED_WHITE_SPACE,
+            SPECIFIED_POINTER_EVENTS
         ]
     )
     annotation class SpecifiedFlags2
@@ -979,6 +987,7 @@ internal class Style internal constructor(
         fontSize: CSSLength? = this.fontSize,
         fontSizeAdjust: Float = this.fontSizeAdjust,
         whiteSpace: WhiteSpace? = this.whiteSpace,
+        pointerEvents: PointerEvents? = this.pointerEvents,
         fontWeight: Float = this.fontWeight,
         fontStyle: FontStyle? = this.fontStyle,
         fontWidth: Float = this.fontWidth,
@@ -1063,6 +1072,7 @@ internal class Style internal constructor(
             fontSize = fontSize,
             fontSizeAdjust = fontSizeAdjust,
             whiteSpace = whiteSpace,
+            pointerEvents = pointerEvents,
             fontWeight = fontWeight,
             fontStyle = fontStyle,
             fontWidth = fontWidth,
@@ -1167,6 +1177,8 @@ internal class Style internal constructor(
             append(fontSizeAdjust)
             append(", whiteSpace=")
             append(whiteSpace)
+            append(", pointerEvents=")
+            append(pointerEvents)
             append(", fontWeight=")
             append(fontWeight)
             append(", fontStyle=")
@@ -1371,6 +1383,7 @@ internal class Style internal constructor(
         const val SPECIFIED_TRANSFORM_BOX: Long = 1L shl 7
         const val SPECIFIED_FONT_SIZE_ADJUST: Long = 1L shl 8
         const val SPECIFIED_WHITE_SPACE: Long = 1L shl 9
+        const val SPECIFIED_POINTER_EVENTS: Long = 1L shl 10
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1734,6 +1747,18 @@ internal class Style internal constructor(
                         val visibility = value.equals("visible", ignoreCase = true)
                         builder.visibility = visibility
                         builder.addSpecifiedFlag(SPECIFIED_VISIBILITY)
+                    }
+                }
+
+                SVGAttr.pointer_events -> {
+                    // Presentation attribute (SVG2): both paths parse it.
+                    // Only `none` changes hit-testing (the element contributes
+                    // no hit region); every other value keeps the
+                    // bounding-box region (touch-screen middle ground).
+                    val pointerEvents = parsePointerEvents(value)
+                    if (pointerEvents != null) {
+                        builder.pointerEvents = pointerEvents
+                        builder.addSpecifiedFlag2(SPECIFIED_POINTER_EVENTS)
                     }
                 }
 
@@ -2141,6 +2166,7 @@ internal class Style internal constructor(
             SVGAttr.text_transform -> SPECIFIED_TEXT_TRANSFORM
             SVGAttr.transform_origin -> SPECIFIED_TRANSFORM_ORIGIN
             SVGAttr.transform_box -> SPECIFIED_TRANSFORM_BOX
+            SVGAttr.pointer_events -> SPECIFIED_POINTER_EVENTS
             SVGAttr.vector_effect -> SPECIFIED_VECTOR_EFFECT
             SVGAttr.viewport_fill -> SPECIFIED_VIEWPORT_FILL
             SVGAttr.viewport_fill_opacity -> SPECIFIED_VIEWPORT_FILL_OPACITY
@@ -2151,4 +2177,3 @@ internal class Style internal constructor(
         }
     }
 }
-

@@ -552,6 +552,10 @@ internal fun updateStyle(
         builder.whiteSpace = sourceStyle.whiteSpace
     }
 
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_POINTER_EVENTS)) {
+        builder.pointerEvents = sourceStyle.pointerEvents
+    }
+
     if (sourceStyle.isSpecified2(Style.SPECIFIED_TRANSFORM_ORIGIN)) {
         builder.transformOrigin = sourceStyle.transformOrigin
     }

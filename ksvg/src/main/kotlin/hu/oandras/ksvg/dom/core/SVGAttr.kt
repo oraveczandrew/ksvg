@@ -105,6 +105,7 @@ internal enum class SVGAttr {
     paint_order,
     path,
     pathLength,
+    pointer_events,
     patternContentUnits, patternTransform, patternUnits,
     points,
     preserveAspectRatio,
@@ -299,6 +300,7 @@ internal enum class SVGAttr {
             "paint-order" -> paint_order
             "path" -> path
             "pathLength" -> pathLength
+            "pointer-events" -> pointer_events
             "patternContentUnits" -> patternContentUnits
             "patternTransform" -> patternTransform
             "patternUnits" -> patternUnits
