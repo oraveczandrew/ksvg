@@ -16,10 +16,12 @@
  */
 package hu.oandras.ksvg
 
+import android.annotation.SuppressLint
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
 import androidx.collection.ArraySet
 import java.io.IOException
@@ -49,26 +51,26 @@ public class SimpleAssetResolver(
             "resolveFont('$fontFamily',$fontWeight,'$fontStyle',$fontStretch)"
         }
 
-        val assetManager = assetManager
-
-        // Try font name with suffix ".ttf"
-        try {
-            return Typeface.createFromAsset(assetManager, "$fontFamily.ttf")
-        } catch (_: RuntimeException) {
+        // Try ".ttf", then ".otf", then the first font of a ".ttc" collection.
+        // createFromAsset already builds via Typeface.Builder (default TTC index 0),
+        // so one nullable lookup per suffix covers all three cases.
+        for (suffix in FONT_SUFFIXES) {
+            val path = "$fontFamily.$suffix"
+            val typeface = assetManager.typefaceOrNull(path)
+            if (typeface != null) {
+                loggerContext.logI(TAG) { "resolveFont('$fontFamily') -> $path" }
+                return typeface
+            }
         }
 
-        // That failed, so try ".otf"
-        try {
-            return Typeface.createFromAsset(assetManager, "$fontFamily.otf")
-        } catch (_: RuntimeException) {
-        }
+        loggerContext.logW(TAG) { "resolveFont('$fontFamily') not found in assets" }
 
-        // That failed, so try ".ttc" (True-type collection), if supported on this version of Android
+        return null
+    }
+
+    private fun AssetManager.typefaceOrNull(path: String): Typeface? {
         return try {
-            val builder = Typeface.Builder(assetManager, "$fontFamily.ttc")
-            // Get the first font file in the collection
-            builder.setTtcIndex(0)
-            builder.build()
+            Typeface.createFromAsset(this, path)
         } catch (_: RuntimeException) {
             null
         }
@@ -84,21 +86,27 @@ public class SimpleAssetResolver(
         val resolved = resolveHrefAgainstBase(baseUri, filename)
         loggerContext.logI(TAG) { "resolveImage($filename, baseUri=$baseUri) -> $resolved" }
 
+        if (!isAssetPath(resolved)) {
+            return null
+        }
+
         return try {
             assetManager.open(resolved).use {
                 BitmapFactory.decodeStream(it)
             }
         } catch (_: IOException) {
+            loggerContext.logW(TAG) { "resolveImage($filename) asset not found: $resolved" }
             null
         }
     }
 
     /**
-     * Returns true when passed the MIME types for SVG, JPEG, PNG, or any of the
-     * other bitmap image formats supported by Android's BitmapFactory class.
+     * Returns true when passed the MIME types of the bitmap image formats this
+     * resolver can serve via Android's BitmapFactory class. MIME types match
+     * case-insensitively per RFC 2045.
      */
     override fun isFormatSupported(mimeType: String): Boolean {
-        return supportedFormats.contains(mimeType)
+        return supportedFormats.contains(mimeType.lowercase())
     }
 
     /**
@@ -107,34 +115,47 @@ public class SimpleAssetResolver(
     override fun resolveCSSStyleSheet(url: String, baseUri: String?): ResolvedStylesheet? {
         val resolved = resolveHrefAgainstBase(baseUri, url)
         loggerContext.logI(TAG) { "resolveCSSStyleSheet($url, baseUri=$baseUri) -> $resolved" }
-        return getAssetAsString(resolved)?.let { ResolvedStylesheet(resolved, it) }
+
+        if (!isAssetPath(resolved)) {
+            return null
+        }
+
+        return try {
+            val css = assetManager.open(resolved).bufferedReader().use { it.readText() }
+            ResolvedStylesheet(resolved, css)
+        } catch (_: IOException) {
+            loggerContext.logW(TAG) { "resolveCSSStyleSheet asset not found: $resolved" }
+            null
+        }
     }
 
     /*
-    * Read the contents of the asset whose name is given by "url" and return it as a String.
+    * Only scheme-less relative paths can come from assets: absolute URIs (remote
+    * URLs, data: payloads, file: paths) are declined without touching the
+    * AssetManager, whose open() would only throw on them anyway.
     */
-    private fun getAssetAsString(url: String): String? {
-        return try {
-            assetManager.open(url).bufferedReader().use { it.readText() }
-        } catch (_: IOException) {
-            null
-        }
+    @SuppressLint("UseKtx")
+    private fun isAssetPath(path: String): Boolean {
+        return Uri.parse(path).scheme.isNullOrEmpty()
     }
 
     internal companion object {
         private const val TAG = "SimpleAssetResolver"
 
-        private val supportedFormats: Set<String> = ArraySet<String>(8).apply {
-            // The SVG 1.2 spec requires PNG, JPEG and SVG
-            add("image/svg+xml")
+        private val FONT_SUFFIXES: Array<String> = arrayOf("ttf", "otf", "ttc")
+
+        // Bitmap formats this resolver can serve (BitmapFactory-backed). SVG is
+        // deliberately absent: resolveImage() returns Bitmaps and cannot decode it.
+        // HEIF/HEIC is absent too: platform decoding is codec-dependent, not guaranteed.
+        private val supportedFormats: Set<String> = ArraySet<String>(9).apply {
             add("image/jpeg")
+            add("image/jpg") // widespread non-standard alias
             add("image/png")
             // Other image formats supported by Android BitmapFactory
             add("image/pjpeg")
-            add("image/gif")
+            add("image/gif") // first frame only
             add("image/bmp")
             add("image/x-windows-bmp")
-            // .webp supported in 4.0+ (ICE_CREAM_SANDWICH)
             add("image/webp")
             // .avif supported in 12.0+ (S)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
