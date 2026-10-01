@@ -20,11 +20,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.util.AttributeSet
-import android.util.Log
 import android.view.MotionEvent
 import android.widget.ImageView
+import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import hu.oandras.ksvg.SVG.Companion.getFromResource
 import hu.oandras.ksvg.SVG.Companion.getFromString
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,6 +37,8 @@ import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
+
+private const val TAG = "SVGImageView"
 
 /**
  * SVGImageView is a View widget that allows users to include SVG images in their layouts.
@@ -54,21 +58,68 @@ import java.io.InputStream
 public class KSVGImageView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyle: Int = 0
+    defStyle: Int = 0,
+    config: Config = Config(),
 ) : ImageView(
-    context,
-    attrs,
-    defStyle
+    /* context = */ context,
+    /* attrs = */ attrs,
+    /* defStyleAttr = */ defStyle
 ) {
     private var svg: SVG? = null
     private val renderOptions: RenderOptions = RenderOptions.create()
     private var onSvgClickListener: OnSvgClickListener? = null
 
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    /**
+     * Threading configuration for background SVG loads. Replace before loading
+     * (e.g., with a test dispatcher); in-flight loads stay on the old config.
+     * The view never cancels [Config.scope] itself — only its own [loadJob] —
+     * so host-owned scopes are safe to share.
+     */
+    public data class Config(
+        @JvmField
+        public val scope: CoroutineScope? = null,
+        @JvmField
+        public val mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
+        @JvmField
+        public val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        @JvmField
+        public val loggerContext: LoggerContext = AndroidLoggerContext,
+    )
+
+    public var config: Config = config
+        set(value) {
+            field = value
+            applyConfig()
+        }
 
     private var loadJob: Job? = null
 
+    private var mainDispatcher: CoroutineDispatcher = config.mainDispatcher
+    private var ioDispatcher: CoroutineDispatcher = config.ioDispatcher
+    private var configuredScope: CoroutineScope? = config.scope
+    private var loggerContext: LoggerContext = config.loggerContext
+
+    // Owned fallback for loads with no scope (e.g., XML inflation before attach):
+    // created on demand, torn down on detach. Never a host-owned scope.
+    private var ownedScope: CoroutineScope? = null
+
+    private fun applyConfig() {
+        mainDispatcher = config.mainDispatcher
+        ioDispatcher = config.ioDispatcher
+        configuredScope = config.scope
+        loggerContext = config.loggerContext
+    }
+
+    private fun effectiveScope(): CoroutineScope {
+        configuredScope?.let { return it }
+        findViewTreeLifecycleOwner()?.lifecycleScope?.let { return it }
+        return ownedScope ?: CoroutineScope(SupervisorJob() + mainDispatcher).also {
+            ownedScope = it
+        }
+    }
+
     init {
+        applyConfig()
         if (!isInEditMode) {
             val a = context.theme.obtainStyledAttributes(attrs, R.styleable.SVGImageView, defStyle, 0)
             try {
@@ -107,7 +158,6 @@ public class KSVGImageView @JvmOverloads constructor(
     /**
      * Directly set the SVG that should be rendered by this view.
      * @param svg An `SVG` instance
-
      */
     public fun setSVG(svg: SVG) {
         this.svg = svg
@@ -118,7 +168,6 @@ public class KSVGImageView @JvmOverloads constructor(
      * Directly set the SVG and the CSS.
      * @param svg An `SVG` instance
      * @param css Optional extra CSS to apply when rendering
-
      */
     public fun setSVG(svg: SVG, css: String?, externalFileResolver: ExternalFileResolver?) {
         this.svg = svg
@@ -130,7 +179,6 @@ public class KSVGImageView @JvmOverloads constructor(
     /**
      * Directly set the CSS.
      * @param css Extra CSS to apply when rendering
-
      */
     public fun setCSS(css: String?, externalFileResolver: ExternalFileResolver?) {
         renderOptions.css(css, externalFileResolver)
@@ -173,15 +221,14 @@ public class KSVGImageView @JvmOverloads constructor(
 
     private fun loadResource(resourceId: Int) {
         loadJob?.cancel()
-        loadJob = scope.launch {
-            val loadedSvg = withContext(Dispatchers.IO) {
+        loadJob = effectiveScope().launch {
+            val loadedSvg = withContext(ioDispatcher) {
                 try {
-                    getFromResource(context, resourceId)
+                    getFromResource(context, resourceId, loggerContext = loggerContext)
                 } catch (e: KSVGParseException) {
-                    Log.e(
-                        "SVGImageView",
+                    loggerContext.logE(TAG) {
                         String.format("Error loading resource 0x%x: %s", resourceId, e.message)
-                    )
+                    }
                     null
                 }
             }
@@ -195,7 +242,7 @@ public class KSVGImageView @JvmOverloads constructor(
      * @param uri the URI of an Android resource in your application
      */
     override fun setImageURI(uri: Uri?) {
-        if (!internalSetImageURI(uri)) Log.e("SVGImageView", "File not found: $uri")
+        if (!internalSetImageURI(uri)) loggerContext.logE(TAG) { "File not found: $uri" }
     }
 
     /**
@@ -203,7 +250,7 @@ public class KSVGImageView @JvmOverloads constructor(
      * @param filename the file name of an SVG in the assets folder in your application
      */
     public fun setImageAsset(filename: String) {
-        if (!internalSetImageAsset(filename)) Log.e("SVGImageView", "File not found: $filename")
+        if (!internalSetImageAsset(filename)) loggerContext.logE(TAG) { "File not found: $filename" }
     }
 
     //===============================================================================================
@@ -233,17 +280,21 @@ public class KSVGImageView @JvmOverloads constructor(
     private fun loadFromInputStream(inputStream: InputStream?) {
         if (inputStream == null) return
         loadJob?.cancel()
-        loadJob = scope.launch {
-            val loadedSvg = withContext(Dispatchers.IO) {
+        loadJob = effectiveScope().launch {
+            val loadedSvg = withContext(ioDispatcher) {
                 try {
-                    SVG.getFromInputStream(inputStream)
+                    SVG.getFromInputStream(
+                        inputStream = inputStream,
+                        loggerContext = loggerContext
+                    )
                 } catch (e: KSVGParseException) {
-                    Log.e("SVGImageView", "Parse error loading URI: " + e.message)
+                    loggerContext.logE(TAG) { "Parse error loading URI: " + e.message }
                     null
                 } finally {
                     try {
                         inputStream.close()
-                    } catch (_: IOException) { /* do nothing */
+                    } catch (_: IOException) {
+                        /* do nothing */
                     }
                 }
             }
@@ -253,24 +304,41 @@ public class KSVGImageView @JvmOverloads constructor(
     }
 
     private fun setFromString(url: String) {
-        try {
-            svg = getFromString(url)
+        loadJob?.cancel()
+        loadJob = effectiveScope().launch {
+            val loadedSvg = withContext(ioDispatcher) {
+                try {
+                    getFromString(
+                        svg = url,
+                        loggerContext = loggerContext
+                    )
+                } catch (_: KSVGParseException) {
+                    // Failed to interpret url as a resource, a filename, or an actual SVG...
+                    loggerContext.logE(TAG) { "Could not find SVG at: $url" }
+                    null
+                }
+            }
+            this@KSVGImageView.svg = loadedSvg
             doRender()
-        } catch (_: KSVGParseException) {
-            // Failed to interpret url as a resource, a filename, or an actual SVG...
-            Log.e("SVGImageView", "Could not find SVG at: $url")
         }
     }
 
     private fun doRender() {
         val svg = svg ?: return
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
         setImageDrawable(svg.toDrawable(renderOptions))
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        scope.cancel()
+        loadJob?.cancel()
+        if (configuredScope == null && findViewTreeLifecycleOwner() == null) {
+            // No host scope and no lifecycle to bind to: only the view-owned
+            // fallback below may exist — tear it down (a fresh one is created
+            // on demand). A found lifecycle/host scope is never canceled here:
+            // that would kill coroutines that do not belong to this view.
+            ownedScope?.cancel()
+            ownedScope = null
+        }
         // Release pooled bitmap memory eagerly: the drawable (and its native
         // pixel buffers) would otherwise linger until GC.
         (drawable as? KSVGDrawable)?.trimMemory()

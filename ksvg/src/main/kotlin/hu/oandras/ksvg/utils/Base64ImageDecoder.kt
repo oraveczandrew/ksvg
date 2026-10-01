@@ -19,10 +19,7 @@ package hu.oandras.ksvg.utils
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Log
 import kotlin.io.encoding.Base64
-
-private const val TAG = "Base64ImageDecoder"
 
 /*
 * Check for and decode an image encoded in a data URL.
@@ -54,8 +51,8 @@ internal fun checkForImageDataURL(url: String): Bitmap? {
             startIndex = comma + 1
         ) // throws IllegalArgumentException for bad data
         return BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
-    } catch (e: Exception) {
-        Log.e(TAG, "Could not decode bad Data URL", e)
+    } catch (_: Exception) {
+        // The caller (RenderTreeBuilder) already warns on the resulting null.
         return null
     }
 }

@@ -139,6 +139,7 @@ tasks.withType<JavaCompile>().configureEach {
 dependencies.apply {
     implementation(libs.annotation)
     implementation(libs.lifecycle.common)
+    implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.guava)
     implementation(libs.collection)
 
