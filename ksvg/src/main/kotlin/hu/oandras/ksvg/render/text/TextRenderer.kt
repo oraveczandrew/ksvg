@@ -222,7 +222,7 @@ internal fun glyphScaleFor(
 }
 
 /**
- * Arms [spacingAdjust]/[glyphScale] for one `textLength` subtree from an
+ * Arms [TextProcessor.spacingAdjust]/[TextProcessor.glyphScale] for one `textLength` subtree from an
  * already-measured natural width. Callers save both fields, traverse, and
  * restore. The two modes are exclusive: glyph scaling zeroes spacing.
  */
