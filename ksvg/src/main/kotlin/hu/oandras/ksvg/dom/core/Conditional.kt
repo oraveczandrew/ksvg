@@ -22,6 +22,7 @@ import hu.oandras.ksvg.parser.TextScanner
 import java.util.*
 
 private const val FEATURE_STRING_PREFIX = "http://www.w3.org/TR/SVG11/feature#"
+private const val TINY_FEATURE_STRING_PREFIX = "http://www.w3.org/Graphics/SVG/feature/1.2/#"
 
 // Any element that can appear inside a <switch> element.
 internal interface Conditional {
@@ -44,6 +45,11 @@ internal fun parseRequiredFeatures(value: String): Set<String> {
         val feature = scan.requireNextToken()
         if (feature.startsWith(FEATURE_STRING_PREFIX)) {
             result.add(feature.substring(FEATURE_STRING_PREFIX.length))
+        } else if (feature.startsWith(TINY_FEATURE_STRING_PREFIX)) {
+            // Tiny 1.2 URIs pass through whole: their local names mean
+            // different things than the SVG 1.1 short names (notably
+            // "#Animation"), so they must not be stripped into the 1.1 table.
+            result.add(feature)
         } else {
             // Not a feature string we recognize or support. (In order to avoid accidentally
             // matches with our truncated feature strings, we'll replace it with a string

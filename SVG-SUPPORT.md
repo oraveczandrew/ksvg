@@ -302,7 +302,7 @@ Feature-string inventory for `requiredFeatures` / `requiredExtensions`:
 | String set                                               | Support | Notes                                                                                                                                              |
 |----------------------------------------------------------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------|
 | SVG 1.1 short names (`Structure`, `Text`, `Filter`, ...) | Partial | Evaluated at build time (`SvgFeatures`)<br>composite names (`SVG-static`, …) claimed even when members (`Font`, `ColorProfile`, …) are unsupported |
-| SVG Tiny 1.2 URIs (`.../SVG12/feature#...`)              | None    | Never match; Tiny-gated `switch` branches stay hidden                                                                                              |
+| SVG Tiny 1.2 URIs (`.../feature/1.2/#...`)               | Partial | Supported sets match (`Structure`, `Shape`, `Text`, paint/opacity/graphics attributes, `Gradient`, `SolidColor`, `Image`, `Hyperlinking`, `XlinkAttribute`, `CoreAttribute`, `ConditionalProcessing*`, `TimedAnimation`); media/script/font/navigation/composite sets stay hidden |
 | `TransformedVideo` / `ComposedVideo` (Tiny capabilities) | None    |                                                                                                                                                    |
 
 ### Common Attributes

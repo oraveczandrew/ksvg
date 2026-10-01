@@ -87,6 +87,29 @@ internal fun isSupportedFeature(feature: String): Boolean {
         // "BasicFont",                 // NO
         // "Extensibility",             // NO
 
+        // SVG Tiny 1.2 URIs (Appendix J). Each URI gets its own verdict:
+        // same local names mean different things across profiles (e.g. 1.1
+        // "Animation" is SMIL, Tiny "#Animation" is the <animation> media
+        // element), so these must NOT be derived by stripping the namespace
+        // and reusing the 1.1 table above. Only the normative
+        // "http://www.w3.org/Graphics/SVG/feature/1.2/..." spelling matches;
+        // composites stay false unless every member is supported.
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#Structure",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#ConditionalProcessing",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#ConditionalProcessingAttribute",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#Image",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#Shape",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#Text",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#PaintAttribute",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#OpacityAttribute",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#GraphicsAttribute",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#Gradient",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#SolidColor",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#Hyperlinking",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#XlinkAttribute",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#CoreAttribute",
+        "http://www.w3.org/Graphics/SVG/feature/1.2/#TimedAnimation",
+
         // SVG 1.0 features - all are too general and include things we are not likely to ever support.
         // If we ever do support these, we'll need to change how FEATURE_STRING_PREFIX is used.
         // "org.w3c.svg",
