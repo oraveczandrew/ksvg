@@ -23,6 +23,8 @@ import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
+import hu.oandras.ksvg.parser.parseFloatList
+import hu.oandras.ksvg.parser.parseLength
 import hu.oandras.ksvg.parser.parseLengthList
 import org.xml.sax.Attributes
 
@@ -37,6 +39,12 @@ internal abstract class TextPositionedContainer(
     val dx: List<CSSLength>?,
     @JvmField
     val dy: List<CSSLength>?,
+    @JvmField
+    val rotate: FloatArray?,
+    @JvmField
+    val textLength: CSSLength?,
+    @JvmField
+    val lengthAdjust: LengthAdjust?,
     transform: Matrix? = null,
 ) : TextContainer(
     baseParams = baseParams,
@@ -52,11 +60,17 @@ internal abstract class TextPositionedContainer(
         private var y: List<CSSLength>? = null
         private var dx: List<CSSLength>? = null
         private var dy: List<CSSLength>? = null
+        private var rotate: FloatArray? = null
+        private var textLength: CSSLength? = null
+        private var lengthAdjust: LengthAdjust? = null
 
         protected fun getX(): List<CSSLength>? = x
         protected fun getY(): List<CSSLength>? = y
         protected fun getDx(): List<CSSLength>? = dx
         protected fun getDy(): List<CSSLength>? = dy
+        protected fun getRotate(): FloatArray? = rotate
+        protected fun getTextLength(): CSSLength? = textLength
+        protected fun getLengthAdjust(): LengthAdjust? = lengthAdjust
 
         override fun onAttribute(
             attributes: Attributes,
@@ -69,6 +83,9 @@ internal abstract class TextPositionedContainer(
                 SVGAttr.y -> y = parseLengthList(value)
                 SVGAttr.dx -> dx = parseLengthList(value)
                 SVGAttr.dy -> dy = parseLengthList(value)
+                SVGAttr.rotate -> rotate = parseFloatList(value)
+                SVGAttr.textLength -> textLength = parseLength(value)
+                SVGAttr.lengthAdjust -> lengthAdjust = LengthAdjust.parseOrNull(value)
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
             return true

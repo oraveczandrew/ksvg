@@ -104,7 +104,7 @@ class TextRendererUnitTest {
         val p = ExposedProcessor()
         p.x = 10f
         p.y = 20f
-        p.pushPositioning(floatArrayOf(100f), null, floatArrayOf(5f), null)
+        p.pushPositioning(floatArrayOf(100f), null, floatArrayOf(5f), null, null)
         assertTrue(p.hasAnyPositioning())
         p.runApplyPositioning()
         assertEquals(105f, p.x, 0f)

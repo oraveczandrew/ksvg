@@ -170,6 +170,8 @@ internal enum class SVGAttr {
     text_orientation,
     text_transform,
     text_rendering,
+    textLength,
+    lengthAdjust,
     unicode_bidi,
     transform_origin,
     transform_box,
@@ -375,6 +377,8 @@ internal enum class SVGAttr {
             "text-orientation" -> text_orientation
             "text-transform" -> text_transform
             "text-rendering" -> text_rendering
+            "textLength" -> textLength
+            "lengthAdjust" -> lengthAdjust
             "unicode-bidi" -> unicode_bidi
             "transform-origin" -> transform_origin
             "transform-box" -> transform_box

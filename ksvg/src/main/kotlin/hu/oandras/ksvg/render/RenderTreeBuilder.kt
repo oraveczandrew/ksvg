@@ -115,6 +115,7 @@ import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextDirection
 import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.dom.text.TextPositionedContainer
+import hu.oandras.ksvg.dom.text.LengthAdjust
 import hu.oandras.ksvg.dom.text.TextSequence
 import hu.oandras.ksvg.filtering.LcgRandom
 import hu.oandras.ksvg.filtering.SvgPathNoise
@@ -139,6 +140,8 @@ import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.text.TextBoundsCalculator
 import hu.oandras.ksvg.render.text.calculateTextBounds
 import hu.oandras.ksvg.render.text.calculateTextWidth
+import hu.oandras.ksvg.render.text.countTextChars
+import hu.oandras.ksvg.render.text.spacingAdjustFor
 import hu.oandras.ksvg.render.text.visualOrderForOverride
 import hu.oandras.ksvg.render.text.extractRawText
 import hu.oandras.ksvg.render.text.getAnchorPosition
@@ -1413,12 +1416,21 @@ internal class RenderTreeBuilder(
                 this.x = x
                 this.y = y
             }
+            // Text-level textLength widens the measured bounds like the draw path.
+            val textLength = effectiveTextLength(obj)
+            if (textLength != null) {
+                proc.spacingAdjust = spacingAdjustFor(
+                    textLength,
+                    countTextChars(children),
+                    calculateTextWidth(children, state)
+                )
+            }
             // Measurement only: TextBoundsCalculator never draws, so a throwaway canvas is fine (build time, not hot path).
             calculateTextBounds(canvas = Canvas(), children = children, proc = proc, parentState = state)
             obj.boundingBox = Box(proc.boundingBox)
         }
 
-        val node = TextRenderNode(obj, x, y, dx, dy, children)
+        val node = TextRenderNode(obj, x, y, dx, dy, obj.rotate?.copyOf(), effectiveTextLength(obj), children)
         assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
@@ -1468,8 +1480,17 @@ internal class RenderTreeBuilder(
         return children.optimizeReadOnlyList()
     }
 
-    private fun buildTSpan(obj: TSpan): TSpanRenderNode? {
-        statePush()
+    /**
+     * Build-time `textLength` resolution (user units, like x/y lists).
+     * `spacingAndGlyphs` is not implemented yet: it resolves to null (no
+     * adjustment) so at least the spacing fallback never half-applies.
+     */
+    private fun effectiveTextLength(obj: TextPositionedContainer): Float? {
+        if (obj.lengthAdjust == LengthAdjust.spacingAndGlyphs) return null
+        return obj.textLength?.floatValueXInContext()
+    }
+
+    private fun buildTSpan(obj: TSpan): TSpanRenderNode? {        statePush()
         updateStyleForElement(state, obj)
         if (!display()) {
             statePop()
@@ -1481,6 +1502,7 @@ internal class RenderTreeBuilder(
         val y = obj.y?.mapToFloatArray { it.floatValueYInContext() }
         val dx = obj.dx?.mapToFloatArray { it.floatValueXInContext() }
         val dy = obj.dy?.mapToFloatArray { it.floatValueYInContext() }
+        val rotate = obj.rotate?.copyOf()
 
         val children = buildTextChildren(obj)
 
@@ -1498,7 +1520,7 @@ internal class RenderTreeBuilder(
             }
         }
 
-        val node = TSpanRenderNode(obj, x, y, dx, dy, children)
+        val node = TSpanRenderNode(obj, x, y, dx, dy, rotate, effectiveTextLength(obj), children)
         node.renderState.apply(state)
         resolveNodePaints(node)
 
@@ -1557,6 +1579,7 @@ internal class RenderTreeBuilder(
             val y = obj.y?.map { it.floatValueYInContext() }?.toFloatArray()
             val dx = obj.dx?.map { it.floatValueXInContext() }?.toFloatArray()
             val dy = obj.dy?.map { it.floatValueYInContext() }?.toFloatArray()
+            val rotate = obj.rotate?.copyOf()
 
             val node = TRefRenderNode(
                 sourceElement = obj,
@@ -1564,7 +1587,9 @@ internal class RenderTreeBuilder(
                 x = x,
                 y = y,
                 dx = dx,
-                dy = dy
+                dy = dy,
+                rotate = rotate,
+                textLength = effectiveTextLength(obj)
             )
             node.renderState.apply(state)
             resolveNodePaints(node)

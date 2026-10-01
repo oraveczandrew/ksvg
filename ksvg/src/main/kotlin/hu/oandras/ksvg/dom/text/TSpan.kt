@@ -29,6 +29,9 @@ internal class TSpan(
     y: List<CSSLength>?,
     dx: List<CSSLength>?,
     dy: List<CSSLength>?,
+    rotate: FloatArray?,
+    textLength: CSSLength?,
+    lengthAdjust: LengthAdjust?,
 ) : TextPositionedContainer(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -36,6 +39,9 @@ internal class TSpan(
     y = y,
     dx = dx,
     dy = dy,
+    rotate = rotate,
+    textLength = textLength,
+    lengthAdjust = lengthAdjust,
 ), TextChild {
     override var textRoot: TextRoot? = null
 
@@ -56,6 +62,9 @@ internal class TSpan(
                 y = getY(),
                 dx = getDx(),
                 dy = getDy(),
+                rotate = getRotate(),
+                textLength = getTextLength(),
+                lengthAdjust = getLengthAdjust(),
             )
         }
     }

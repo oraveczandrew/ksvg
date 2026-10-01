@@ -1,0 +1,27 @@
+<!--
+  -    Copyright 2026 András Oravecz <info@oandras.hu>
+  -
+  -    Licensed under the Apache License, Version 2.0 (the "License");
+  -    you may not use this file except in compliance with the License.
+  -    You may obtain a copy of the License at
+  -
+  -        https://www.apache.org/licenses/LICENSE-2.0
+  -
+  -    Unless required by applicable law or agreed to in writing, software
+  -    distributed under the License is distributed on an "AS IS" BASIS,
+  -    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  -    See the License for the specific language governing permissions and
+  -    limitations under the License.
+  -->
+
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="256" height="256" fill="white"/>
+  <!-- per-character rotation supplements the baseline (advances unaffected) -->
+  <text x="20" y="60" font-size="36" fill="red" rotate="0 30 60 90">ABCD</text>
+  <!-- spacing stretch: advances sum to the target -->
+  <text x="20" y="120" font-size="28" fill="blue" textLength="210">Stretch</text>
+  <!-- spacing squeeze -->
+  <text x="20" y="170" font-size="28" fill="green" textLength="60" lengthAdjust="spacing">Squeeze</text>
+  <!-- tspan-level rotation + textLength -->
+  <text x="20" y="220" font-size="28" fill="black">A<tspan rotate="45">B</tspan><tspan textLength="90">CD</tspan></text>
+</svg>

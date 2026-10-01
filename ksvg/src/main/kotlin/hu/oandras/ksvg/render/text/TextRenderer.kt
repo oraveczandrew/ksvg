@@ -18,6 +18,7 @@ package hu.oandras.ksvg.render.text
 
 import android.annotation.SuppressLint
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
@@ -41,20 +42,37 @@ import hu.oandras.ksvg.render.TextNode
 import hu.oandras.ksvg.render.TextPathRenderNode
 import hu.oandras.ksvg.render.TextSequenceNode
 import hu.oandras.ksvg.render.pool.FloatArrayBucket
+import hu.oandras.ksvg.render.pool.PoolOwner
+import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.utils.capitalizeStr
 import hu.oandras.ksvg.utils.forEachElement
+import hu.oandras.ksvg.utils.toRadians
 import java.util.*
+import kotlin.math.cos
+import kotlin.math.sin
 
 internal abstract class TextProcessor {
     @JvmField
     var x: Float = 0f
     @JvmField
     var y: Float = 0f
+    // Supplemental per-character rotation in degrees (SVG `rotate`); summed
+    // across positioning levels like dx/dy, missing values count as 0.
+    // Advances are unaffected (rotation never bends the baseline).
+    @JvmField
+    var rotation: Float = 0f
 
-    private val positioningStack = mutableListOf<TextPositioning>()
+    // Extra advance per character from SVG `textLength` (lengthAdjust=spacing
+    // only): (target - measured) / charCount, set while traversing the
+    // element carrying textLength, restored afterwards. Nested textLengths
+    // override for their subtree (single-level layouts are exact).
+    @JvmField
+    var spacingAdjust: Float = 0f
 
-    fun pushPositioning(x: FloatArray?, y: FloatArray?, dx: FloatArray?, dy: FloatArray?) {
-        positioningStack.add(TextPositioning(x, y, dx, dy))
+    private val positioningStack: MutableList<TextPositioning> = mutableListOf()
+
+    fun pushPositioning(x: FloatArray?, y: FloatArray?, dx: FloatArray?, dy: FloatArray?, rotate: FloatArray?) {
+        positioningStack.add(TextPositioning(x, y, dx, dy, rotate))
     }
 
     fun popPositioning() {
@@ -87,12 +105,16 @@ internal abstract class TextProcessor {
 
         var relX = 0f
         var relY = 0f
+        var rotation = 0f
         positioningStack.forEachElement { p ->
             if (p.dx != null && p.index < p.dx.size) {
                 relX += p.dx[p.index]
             }
             if (p.dy != null && p.index < p.dy.size) {
                 relY += p.dy[p.index]
+            }
+            if (p.rotate != null && p.index < p.rotate.size) {
+                rotation += p.rotate[p.index]
             }
             p.index++
         }
@@ -101,6 +123,7 @@ internal abstract class TextProcessor {
         if (!absY.isNaN()) y = absY
         x += relX
         y += relY
+        this.rotation = rotation
     }
 
     open fun doTextContainer(obj: TextContainer): Boolean {
@@ -112,23 +135,30 @@ internal abstract class TextProcessor {
 }
 
 private class TextPositioning(
+    @JvmField
     val x: FloatArray?,
+    @JvmField
     val y: FloatArray?,
+    @JvmField
     val dx: FloatArray?,
-    val dy: FloatArray?
+    @JvmField
+    val dy: FloatArray?,
+    @JvmField
+    val rotate: FloatArray?
 ) {
+    @JvmField
     var index = 0
 
     fun hasPending(): Boolean {
         return (x != null && index < x.size) ||
                 (y != null && index < y.size) ||
                 (dx != null && index < dx.size) ||
-                (dy != null && index < dy.size)
+                (dy != null && index < dy.size) ||
+                (rotate != null && index < rotate.size)
     }
 }
 
-internal fun RendererState.getAnchorPosition(): TextAnchor? {
-    val style = this.style
+internal fun RendererState.getAnchorPosition(): TextAnchor? {    val style = this.style
     val textAnchor = style.textAnchor
 
     if (style.direction == TextDirection.LTR || textAnchor == TextAnchor.Middle) {
@@ -141,6 +171,34 @@ internal fun RendererState.getAnchorPosition(): TextAnchor? {
     } else {
         TextAnchor.Start
     }
+}
+
+/** Character count of a text subtree (textLength distributes over these). */
+internal fun countTextChars(children: List<TextNode>): Int {
+    var count = 0
+    children.forEachElement { child ->
+        count += when (child) {
+            is TextSequenceNode -> child.text.length
+            is TSpanRenderNode -> countTextChars(child.children)
+            is TRefRenderNode -> child.text.length
+            else -> 0
+        }
+    }
+    return count
+}
+
+/**
+ * Per-character spacing adjustment for `textLength` (spacing mode):
+ * (target - natural) / chars, or 0 when inactive/degenerate. Callers save,
+ * set, traverse, and restore [TextProcessor.spacingAdjust] around it.
+ */
+internal fun spacingAdjustFor(
+    textLength: Float?,
+    charCount: Int,
+    naturalWidth: Float,
+): Float {
+    if (textLength == null || charCount <= 0) return 0f
+    return (textLength - naturalWidth) / charCount
 }
 
 context(renderContext: DisplayContext)
@@ -163,7 +221,7 @@ internal fun calculateTextWidth(children: List<TextNode>, parentState: RendererS
     return width
 }
 
-context(renderContext: DisplayContext)
+context(renderContext: DisplayContext, poolOwner: PoolOwner)
 internal fun calculateTextBounds(
     canvas: Canvas,
     children: List<TextNode>,
@@ -178,23 +236,43 @@ internal fun calculateTextBounds(
             }
 
             is TSpanRenderNode -> {
-                proc.pushPositioning(child.x, child.y, child.dx, child.dy)
+                proc.pushPositioning(child.x, child.y, child.dx, child.dy, child.rotate)
+                val savedAdjust = proc.spacingAdjust
+                val tspanLength = child.textLength
+                if (tspanLength != null) {
+                    proc.spacingAdjust = spacingAdjustFor(
+                        tspanLength,
+                        countTextChars(child.children),
+                        calculateTextWidth(child.children, child.renderState)
+                    )
+                }
                 calculateTextBounds(canvas, child.children, proc, child.renderState)
+                proc.spacingAdjust = savedAdjust
                 proc.popPositioning()
             }
 
             is TRefRenderNode -> {
-                proc.pushPositioning(child.x, child.y, child.dx, child.dy)
+                proc.pushPositioning(child.x, child.y, child.dx, child.dy, child.rotate)
+                val savedAdjust = proc.spacingAdjust
+                val trefLength = child.textLength
+                if (trefLength != null) {
+                    proc.spacingAdjust = spacingAdjustFor(
+                        trefLength,
+                        child.text.length,
+                        measureText(child.text, child.renderState.fillPaint, child.textWidthBuffer)
+                    )
+                }
                 proc.processText(canvas, child.text, child.renderState, child.textWidthBuffer)
+                proc.spacingAdjust = savedAdjust
                 proc.popPositioning()
             }
 
             is TextPathRenderNode -> {
                 // For TextPath we use its path bounds
-                val path = child.path
-                val pathBounds = RectF()
-                path.computeBounds(pathBounds, true)
-                proc.boundingBox.union(pathBounds)
+                poolOwner.rectFPool.withPooledObject { pathBounds ->
+                    child.path.computeBounds(pathBounds, true)
+                    proc.boundingBox.union(pathBounds)
+                }
                 // And update x position by text width
                 proc.x += calculateTextWidth(child.children, child.renderState)
             }
@@ -207,6 +285,15 @@ internal class TextBoundsCalculator : TextProcessor() {
     @JvmField
     val boundingBox: RectF = RectF()
 
+    // Scratch glyph bounds (reused for every character instead of allocating
+    // per glyph). DisplayContext exposes no pools (only RenderContext does),
+    // so the calculator owns its scratch like PlainTextDrawer owns fontMetrics.
+    // Instances are operation-local and used single-threaded.
+    @JvmField
+    val glyphRect: Rect = Rect()
+    @JvmField
+    val glyphBounds: RectF = RectF()
+
     override fun doTextContainer(obj: TextContainer): Boolean {
         // This is the old DOM-based way, should not be called with nodes
         return true
@@ -215,26 +302,53 @@ internal class TextBoundsCalculator : TextProcessor() {
     context(renderContext: DisplayContext)
     override fun processText(canvas: Canvas, text: String, widths: FloatArrayBucket) {
         if (state.style.visibility != false) {
-            val rect = Rect()
+            val rect = glyphRect
             val paint = state.fillPaint
             val transformedText = applyTextTransform(text, state.style.textTransform)
             val baselineOffset = calculateBaselineOffset(paint, state.style)
 
-            if (hasPositioning()) {
+            if (hasPositioning() || spacingAdjust != 0f) {
                 val buffer = widths.getWithSize(transformedText.length)
                 paint.getTextWidths(transformedText, buffer)
                 for (i in transformedText.indices) {
                     applyPositioning()
-                    val s = transformedText[i].toString()
-                    paint.getTextBounds(s, 0, 1, rect)
-                    val textBounds = RectF(rect)
+                    paint.getTextBounds(transformedText, i, i + 1, rect)
+                    val textBounds = glyphBounds
+                    textBounds.set(rect)
+                    val glyphRotation = rotation
+                    if (glyphRotation != 0f) {
+                        // Union the rotated glyph box: rotate the integer
+                        // bounds corners about the glyph origin manually
+                        // (no Matrix allocation on this path).
+                        val radians = glyphRotation.toDouble().toRadians()
+                        val cos = cos(radians).toFloat()
+                        val sin = sin(radians).toFloat()
+                        var minX = Float.MAX_VALUE
+                        var minY = Float.MAX_VALUE
+                        var maxX = -Float.MAX_VALUE
+                        var maxY = -Float.MAX_VALUE
+                        var corner = 0
+                        while (corner < 4) {
+                            val px = if (corner == 0 || corner == 3) rect.left.toFloat() else rect.right.toFloat()
+                            val py = if (corner < 2) rect.top.toFloat() else rect.bottom.toFloat()
+                            val rx = px * cos - py * sin
+                            val ry = px * sin + py * cos
+                            if (rx < minX) minX = rx
+                            if (rx > maxX) maxX = rx
+                            if (ry < minY) minY = ry
+                            if (ry > maxY) maxY = ry
+                            corner++
+                        }
+                        textBounds.set(minX, minY, maxX, maxY)
+                    }
                     textBounds.offset(x, y + baselineOffset)
                     boundingBox.union(textBounds)
-                    x += buffer[i]
+                    x += buffer[i] + spacingAdjust
                 }
             } else {
                 paint.getTextBounds(transformedText, 0, transformedText.length, rect)
-                val textBounds = RectF(rect)
+                val textBounds = glyphBounds
+                textBounds.set(rect)
                 textBounds.offset(x, y + baselineOffset)
                 boundingBox.union(textBounds)
                 x += measureText(transformedText, paint, widths)
@@ -285,7 +399,7 @@ internal open class PlainTextDrawer(
     private fun updatePositionAfterText(text: String, widths: FloatArrayBucket) {
         val style = state.style
         val writingMode = style.writingMode ?: WritingMode.horizontal_tb
-        val advance = measureText(text, state.fillPaint, widths)
+        val advance = measureText(text, state.fillPaint, widths) + spacingAdjust * text.length
         if (writingMode.isVertical) {
             y += advance
         } else {
@@ -305,7 +419,9 @@ internal open class PlainTextDrawer(
         val fm = fontMetrics
         paint.getFontMetrics(fm)
 
-        if (hasPositioning()) {
+        // A textLength adjustment also forces the per-character loop: the
+        // single-draw fast path cannot redistribute advances.
+        if (hasPositioning() || spacingAdjust != 0f) {
             // Measure the whole run once into the node's width buffer, then index
             // per character. This keeps the buffer at the run's fixed length (no
             // per-frame resize) and avoids measuring each glyph in isolation.
@@ -313,17 +429,28 @@ internal open class PlainTextDrawer(
             paint.getTextWidths(text, buffer)
             for (i in text.indices) {
                 applyPositioning()
-                val s = text[i].toString()
                 val adjustedX = x - letterspacingAdj
                 val baselineY = y + baselineOffset
+                // Supplemental per-character rotation about the glyph origin.
+                // Manual save/rotate/restore (not the withRotation helper):
+                // a capturing lambda per glyph would allocate on this hot path.
+                val glyphRotation = rotation
+                val rotated = glyphRotation != 0f
+                val checkpoint = if (rotated) canvas.save() else 0
+                if (rotated) {
+                    canvas.rotate(glyphRotation, adjustedX, baselineY)
+                }
                 if (state.hasFill) {
-                    canvas.drawText(s, adjustedX, baselineY, paint)
+                    canvas.drawText(text, i, i + 1, adjustedX, baselineY, paint)
                 }
                 if (state.hasStroke) {
-                    canvas.drawText(s, adjustedX, baselineY, strokePaint)
+                    canvas.drawText(text, i, i + 1, adjustedX, baselineY, strokePaint)
                 }
-                val advance = buffer[i]
+                val advance = buffer[i] + spacingAdjust
                 drawManualDecorations(canvas, adjustedX, baselineY, advance, paint, fm)
+                if (rotated) {
+                    canvas.restoreToCount(checkpoint)
+                }
                 x += advance
             }
         } else {
@@ -393,15 +520,14 @@ internal open class PlainTextDrawer(
             val fm = paint.fontMetrics
             val charAdvance = fm.bottom - fm.top
 
-            for (char in text) {
-                val s = char.toString()
+            for (i in text.indices) {
                 if (state.hasFill) {
-                    canvas.drawText(s, x, currentY, paint)
+                    canvas.drawText(text, i, i + 1, x, currentY, paint)
                 }
                 if (state.hasStroke) {
-                    canvas.drawText(s, x, currentY, strokePaint)
+                    canvas.drawText(text, i, i + 1, x, currentY, strokePaint)
                 }
-                currentY += charAdvance
+                currentY += charAdvance + spacingAdjust
             }
             y = currentY
         }
@@ -460,14 +586,34 @@ internal fun calculateTextPath(
             }
 
             is TSpanRenderNode -> {
-                proc.pushPositioning(child.x, child.y, child.dx, child.dy)
+                proc.pushPositioning(child.x, child.y, child.dx, child.dy, child.rotate)
+                val savedAdjust = proc.spacingAdjust
+                val tspanLength = child.textLength
+                if (tspanLength != null) {
+                    proc.spacingAdjust = spacingAdjustFor(
+                        tspanLength,
+                        countTextChars(child.children),
+                        calculateTextWidth(child.children, child.renderState)
+                    )
+                }
                 calculateTextPath(child.children, proc, child.renderState)
+                proc.spacingAdjust = savedAdjust
                 proc.popPositioning()
             }
 
             is TRefRenderNode -> {
-                proc.pushPositioning(child.x, child.y, child.dx, child.dy)
+                proc.pushPositioning(child.x, child.y, child.dx, child.dy, child.rotate)
+                val savedAdjust = proc.spacingAdjust
+                val trefLength = child.textLength
+                if (trefLength != null) {
+                    proc.spacingAdjust = spacingAdjustFor(
+                        trefLength,
+                        child.text.length,
+                        measureText(child.text, child.renderState.fillPaint, child.textWidthBuffer)
+                    )
+                }
                 proc.processText(child.text, child.renderState, child.textWidthBuffer)
+                proc.spacingAdjust = savedAdjust
                 proc.popPositioning()
             }
 
@@ -501,16 +647,24 @@ internal class PlainTextToPath(
             val transformedText = applyTextTransform(text, state.style.textTransform)
             val baselineOffset = calculateBaselineOffset(paint, state.style)
 
-            if (hasPositioning()) {
+            if (hasPositioning() || spacingAdjust != 0f) {
                 val buffer = widths.getWithSize(transformedText.length)
                 paint.getTextWidths(transformedText, buffer)
+                // Scratch matrix created only if a rotated glyph shows up
+                // (setRotate reuses it without further allocation).
+                var scratch: Matrix? = null
                 for (i in transformedText.indices) {
                     applyPositioning()
-                    val s = transformedText[i].toString()
                     val spanPath = Path()
-                    paint.getTextPath(s, 0, 1, x, y + baselineOffset, spanPath)
+                    paint.getTextPath(transformedText, i, i + 1, x, y + baselineOffset, spanPath)
+                    val glyphRotation = rotation
+                    if (glyphRotation != 0f) {
+                        val matrix = scratch ?: Matrix().also { scratch = it }
+                        matrix.setRotate(glyphRotation, x, y + baselineOffset)
+                        spanPath.transform(matrix)
+                    }
                     textAsPath.addPath(spanPath)
-                    x += buffer[i]
+                    x += buffer[i] + spacingAdjust
                 }
             } else {
                 val spanPath = Path()

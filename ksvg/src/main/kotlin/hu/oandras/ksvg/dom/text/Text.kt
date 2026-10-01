@@ -33,6 +33,9 @@ internal class Text(
     y: List<CSSLength>?,
     dx: List<CSSLength>?,
     dy: List<CSSLength>?,
+    rotate: FloatArray?,
+    textLength: CSSLength?,
+    lengthAdjust: LengthAdjust?,
     transform: Matrix?,
 ) : TextPositionedContainer(
     baseParams = baseParams,
@@ -41,6 +44,9 @@ internal class Text(
     y = y,
     dx = dx,
     dy = dy,
+    rotate = rotate,
+    textLength = textLength,
+    lengthAdjust = lengthAdjust,
     transform = transform,
 ), TextRoot {
 
@@ -75,6 +81,9 @@ internal class Text(
                 y = getY(),
                 dx = getDx(),
                 dy = getDy(),
+                rotate = getRotate(),
+                textLength = getTextLength(),
+                lengthAdjust = getLengthAdjust(),
                 transform = transform,
             )
         }

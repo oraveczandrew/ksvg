@@ -34,6 +34,9 @@ internal class TRef(
     y: List<CSSLength>?,
     dx: List<CSSLength>?,
     dy: List<CSSLength>?,
+    rotate: FloatArray?,
+    textLength: CSSLength?,
+    lengthAdjust: LengthAdjust?,
 ) : TextPositionedContainer(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -41,6 +44,9 @@ internal class TRef(
     y = y,
     dx = dx,
     dy = dy,
+    rotate = rotate,
+    textLength = textLength,
+    lengthAdjust = lengthAdjust,
 ), TextChild {
 
     override var textRoot: TextRoot? = null
@@ -87,6 +93,9 @@ internal class TRef(
                 y = getY(),
                 dx = getDx(),
                 dy = getDy(),
+                rotate = getRotate(),
+                textLength = getTextLength(),
+                lengthAdjust = getLengthAdjust(),
             )
         }
     }

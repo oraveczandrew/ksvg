@@ -97,6 +97,10 @@ import hu.oandras.ksvg.render.text.PlainTextDrawer
 import hu.oandras.ksvg.render.text.PlainTextToPath
 import hu.oandras.ksvg.render.text.TextProcessor
 import hu.oandras.ksvg.render.text.calculateTextPath
+import hu.oandras.ksvg.render.text.calculateTextWidth
+import hu.oandras.ksvg.render.text.countTextChars
+import hu.oandras.ksvg.render.text.measureText
+import hu.oandras.ksvg.render.text.spacingAdjustFor
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.colorWithOpacity
@@ -411,11 +415,37 @@ internal class Renderer internal constructor(
                     processor.state = state
                     processor.x = node.x + node.dx
                     processor.y = node.y + node.dy
-                    // Static text is captured whole: one replay per frame (see
-                    // renderPathNode). Bypasses OEM canvas-hook allocations on the
-                    // per-glyph drawText calls.
-                    node.withNodeDisplayList(canvas) { nodeCanvas ->
-                        renderTextContainer(nodeCanvas, node, processor)
+                    // Text-level `rotate` rides the same positioning stack as
+                    // tspan lists (consumed per character across the run).
+                    // Pushed only when present: the entry would only burn an
+                    // allocation and per-character index steps otherwise.
+                    val textRotate = node.rotate
+                    if (textRotate != null) {
+                        processor.pushPositioning(null, null, null, null, textRotate)
+                    }
+                    val savedTextAdjust = processor.spacingAdjust
+                    val textLength = node.textLength
+                    if (textLength != null) {
+                        with(this@Renderer) {
+                            processor.spacingAdjust = spacingAdjustFor(
+                                textLength,
+                                countTextChars(node.children),
+                                calculateTextWidth(node.children, state)
+                            )
+                        }
+                    }
+                    try {
+                        // Static text is captured whole: one replay per frame (see
+                        // renderPathNode). Bypasses OEM canvas-hook allocations on the
+                        // per-glyph drawText calls.
+                        node.withNodeDisplayList(canvas) { nodeCanvas ->
+                            renderTextContainer(nodeCanvas, node, processor)
+                        }
+                    } finally {
+                        if (textRotate != null) {
+                            processor.popPositioning()
+                        }
+                        processor.spacingAdjust = savedTextAdjust
                     }
                 }
             }
@@ -429,11 +459,24 @@ internal class Renderer internal constructor(
             // so the tspan's own font styling is applied to its text.
             val plainDrawer = processor as? PlainTextDrawer
             val processorState = plainDrawer?.state
+            val savedAdjust = processor.spacingAdjust
             try {
                 if (plainDrawer != null) {
                     plainDrawer.state = state
                 }
-                processor.pushPositioning(node.x, node.y, node.dx, node.dy)
+                processor.pushPositioning(node.x, node.y, node.dx, node.dy, node.rotate)
+                // textLength (spacing mode): measure the natural run width
+                // once, distribute the difference per character.
+                val textLength = node.textLength
+                if (textLength != null) {
+                    with(this@Renderer) {
+                        processor.spacingAdjust = spacingAdjustFor(
+                            textLength,
+                            countTextChars(node.children),
+                            calculateTextWidth(node.children, state)
+                        )
+                    }
+                }
 
                 checkForGradientsAndPatterns(canvas, node, node.sourceElement.textRoot as Element)
 
@@ -442,6 +485,7 @@ internal class Renderer internal constructor(
                 }
             } finally {
                 processor.popPositioning()
+                processor.spacingAdjust = savedAdjust
                 if (plainDrawer != null) plainDrawer.state = processorState ?: state
             }
         }
@@ -476,14 +520,25 @@ internal class Renderer internal constructor(
             // so the tref's own font styling is applied to its text.
             val plainDrawer = processor as? PlainTextDrawer
             val processorState = plainDrawer?.state
+            val savedAdjust = processor.spacingAdjust
             try {
                 if (plainDrawer != null) {
                     plainDrawer.state = state
                 }
-                processor.pushPositioning(node.x, node.y, node.dx, node.dy)
+                processor.pushPositioning(node.x, node.y, node.dx, node.dy, node.rotate)
+                val textLength = node.textLength
+                if (textLength != null) {
+                    processor.spacingAdjust = spacingAdjustFor(
+                        textLength,
+                        // TRef renders a single flat run (no child nodes).
+                        node.text.length,
+                        measureText(node.text, state.fillPaint, node.textWidthBuffer)
+                    )
+                }
                 processor.processText(canvas, node.text, node.textWidthBuffer)
             } finally {
                 processor.popPositioning()
+                processor.spacingAdjust = savedAdjust
                 if (plainDrawer != null) plainDrawer.state = processorState ?: state
             }
         }

@@ -46,6 +46,11 @@ private val EXCLUDED_FROM_VISUAL_VERIFICATION = setOf(
     // at all. Shorthand expansion is pinned by MarkerShorthandTest instead
     // (shorthand vs explicit pixel-identical, markers proven to paint).
     "marker_shorthand_strokeWidth.svg",
+    // rsvg (verified up to 2.63.2) ignores both `rotate` and `textLength` on
+    // text (verified pixel-identical plain rendering with and without them):
+    // the golden shows unrotated, unstretched text. Rotation and spacing are
+    // pinned by TextRotateTest / TextLengthTest instead.
+    "text_rotate_textlength.svg",
     // rsvg (verified up to 2.63.2) ignores CSS basic-shape `clip-path`
     // (every shape renders unclipped): no valid rsvg golden exists. Phase 1
     // (circle/ellipse/inset/polygon) and phase 2 (rect/xywh/path, side
