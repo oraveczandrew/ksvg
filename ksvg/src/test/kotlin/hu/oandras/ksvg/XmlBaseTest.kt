@@ -19,10 +19,10 @@ package hu.oandras.ksvg
 import android.graphics.Canvas
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Image
-import hu.oandras.ksvg.shadows.MockCanvas
-import hu.oandras.ksvg.shadows.MockPaint
-import hu.oandras.ksvg.shadows.MockPath
-import hu.oandras.ksvg.test.createBitmap
+import hu.oandras.ksvg.mocks.MockCanvas
+import hu.oandras.ksvg.mocks.MockPaint
+import hu.oandras.ksvg.mocks.MockPath
+import hu.oandras.ksvg.render.createBitmap
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

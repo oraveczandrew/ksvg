@@ -94,6 +94,12 @@ internal class SVGImpl internal constructor(
      */
     override val externalFileResolver: ExternalFileResolver?,
     /**
+     * The document base URL this SVG was parsed with (see `documentBaseUrl` on the
+     * `getFrom*` entry points), or null. Anchors relative `xml:base` chains and
+     * `&lt;?xml-stylesheet?&gt;` hrefs; unknown when parsing from a bare stream.
+     */
+    internal val documentBaseUrl: String?,
+    /**
      * The [LoggerContext] used for parser and renderer logging for this document.
      * The parser hands over the context it was given, already wrapped so that
      * unsupported-feature warnings dedup once per parse; the document exposes it
@@ -744,6 +750,9 @@ internal class SVGImpl internal constructor(
          * stylesheets) in this parse; null (default) resolves nothing externally.
          * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
          * (default true; disabling only affects this parse).
+         * @param documentBaseUrl base URL the document was loaded from (used to resolve
+         * relative `&lt;?xml-stylesheet?&gt;` hrefs and anchor `xml:base` chains); null
+         * (default) leaves them unresolved.
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error while parsing the document.
          */
@@ -754,6 +763,7 @@ internal class SVGImpl internal constructor(
             loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
             isInternalEntitiesEnabled: Boolean = true,
+            documentBaseUrl: String? = null,
         ): SVGImpl {
             return parseInputStream(
                 inputStream = inputStream,
@@ -761,6 +771,7 @@ internal class SVGImpl internal constructor(
                 loggerContext = loggerContext,
                 externalFileResolver = externalFileResolver,
                 isInternalEntitiesEnabled = isInternalEntitiesEnabled,
+                documentBaseUrl = documentBaseUrl,
             )
         }
 
@@ -774,6 +785,9 @@ internal class SVGImpl internal constructor(
          * stylesheets) in this parse; null (default) resolves nothing externally.
          * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
          * (default true; disabling only affects this parse).
+         * @param documentBaseUrl base URL the document was loaded from (used to resolve
+         * relative `&lt;?xml-stylesheet?&gt;` hrefs and anchor `xml:base` chains); null
+         * (default) leaves them unresolved.
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error while parsing the document.
          */
@@ -784,6 +798,7 @@ internal class SVGImpl internal constructor(
             loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
             isInternalEntitiesEnabled: Boolean = true,
+            documentBaseUrl: String? = null,
         ): SVGImpl {
             return parseInputStream(
                 inputStream = ByteArrayInputStream(svg.toByteArray()),
@@ -791,6 +806,7 @@ internal class SVGImpl internal constructor(
                 loggerContext = loggerContext,
                 externalFileResolver = externalFileResolver,
                 isInternalEntitiesEnabled = isInternalEntitiesEnabled,
+                documentBaseUrl = documentBaseUrl,
             )
         }
 
@@ -805,6 +821,9 @@ internal class SVGImpl internal constructor(
          * stylesheets) in this parse; null (default) resolves nothing externally.
          * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
          * (default true; disabling only affects this parse).
+         * @param documentBaseUrl base URL the document was loaded from (used to resolve
+         * relative `&lt;?xml-stylesheet?&gt;` hrefs and anchor `xml:base` chains); null
+         * (default) leaves them unresolved.
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error while parsing the document.
 
@@ -817,6 +836,7 @@ internal class SVGImpl internal constructor(
             loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
             isInternalEntitiesEnabled: Boolean = true,
+            documentBaseUrl: String? = null,
         ): SVGImpl {
             return parseInputStream(
                 inputStream = resources.openRawResource(resourceId),
@@ -824,6 +844,7 @@ internal class SVGImpl internal constructor(
                 loggerContext = loggerContext,
                 externalFileResolver = externalFileResolver,
                 isInternalEntitiesEnabled = isInternalEntitiesEnabled,
+                documentBaseUrl = documentBaseUrl,
             )
         }
 
@@ -838,6 +859,9 @@ internal class SVGImpl internal constructor(
          * stylesheets) in this parse; null (default) resolves nothing externally.
          * @param isInternalEntitiesEnabled whether to expand internal entities in this parse
          * (default true; disabling only affects this parse).
+         * @param documentBaseUrl base URL the document was loaded from (used to resolve
+         * relative `&lt;?xml-stylesheet?&gt;` hrefs and anchor `xml:base` chains); null
+         * (default) leaves them unresolved.
          * @return an SVG instance on which you can call one of the render methods.
          * @throws KSVGParseException if there is an error while parsing the document.
          * @throws IOException if there is some IO error while reading the file.
@@ -850,6 +874,7 @@ internal class SVGImpl internal constructor(
             loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
             isInternalEntitiesEnabled: Boolean = true,
+            documentBaseUrl: String? = null,
         ): SVGImpl {
             return parseInputStream(
                 inputStream = assetManager.open(filename),
@@ -857,6 +882,7 @@ internal class SVGImpl internal constructor(
                 loggerContext = loggerContext,
                 externalFileResolver = externalFileResolver,
                 isInternalEntitiesEnabled = isInternalEntitiesEnabled,
+                documentBaseUrl = documentBaseUrl,
             )
         }
 
@@ -866,6 +892,7 @@ internal class SVGImpl internal constructor(
             loggerContext: LoggerContext,
             externalFileResolver: ExternalFileResolver? = null,
             isInternalEntitiesEnabled: Boolean = true,
+            documentBaseUrl: String? = null,
         ): SVGImpl {
             // The parser logs with the wrapped scope, and hands the same
             // instance to the SVGImpl it builds (pass-through in the
@@ -877,6 +904,7 @@ internal class SVGImpl internal constructor(
                     externalFileResolver = externalFileResolver,
                     animationsEnabled = parseAnimations,
                     logger = loggerContext.wrapAsUnsupportedFeatureScope(),
+                    documentBaseUrl = documentBaseUrl,
                 ).parseStream(inputStream)
             } finally {
                 try {

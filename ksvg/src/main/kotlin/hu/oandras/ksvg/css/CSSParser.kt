@@ -44,6 +44,38 @@ internal class CSSParser internal constructor(
 
     private var inMediaRule = false
 
+    // Base URL the current sheet was loaded from (tracks nested @import scope);
+    // null for embedded sheets without a document base. Saved/restored around
+    // nested parses on this (single-threaded) instance.
+    private var currentSourceUrl: String? = null
+    private var activeImportContext: CssImportContext = CssImportContext()
+
+    /**
+     * Shared `@import` cycle/depth guard for one top-level stylesheet parse.
+     */
+    internal class CssImportContext {
+        private val visited: MutableSet<String> = HashSet()
+        private var depth: Int = 0
+
+        fun markSeen(url: String) {
+            visited.add(url)
+        }
+
+        fun enter(url: String): Boolean {
+            if (depth >= MAX_CSS_IMPORT_DEPTH || !visited.add(url)) {
+                return false
+            }
+            depth++
+            return true
+        }
+
+        fun exit() {
+            if (depth > 0) {
+                depth--
+            }
+        }
+    }
+
     internal class Attrib(
         @JvmField
         val name: String,
@@ -189,10 +221,31 @@ internal class CSSParser internal constructor(
 
 
     internal fun parse(sheet: String): CSSRuleset {
-        val scan = CSSTextScanner(sheet)
-        scan.skipWhitespace()
+        return parse(sheet, sourceUrl = null)
+    }
 
-        return parseRuleset(scan)
+    internal fun parse(sheet: String, sourceUrl: String?): CSSRuleset {
+        val importContext = CssImportContext()
+        if (sourceUrl != null) {
+            importContext.markSeen(sourceUrl)
+        }
+        return parse(sheet, sourceUrl, importContext)
+    }
+
+    private fun parse(sheet: String, sourceUrl: String?, importContext: CssImportContext): CSSRuleset {
+        val prevSourceUrl = currentSourceUrl
+        val prevContext = activeImportContext
+        currentSourceUrl = sourceUrl
+        activeImportContext = importContext
+        try {
+            val scan = CSSTextScanner(sheet)
+            scan.skipWhitespace()
+
+            return parseRuleset(scan)
+        } finally {
+            currentSourceUrl = prevSourceUrl
+            activeImportContext = prevContext
+        }
     }
 
     @Throws(CSSParseException::class)
@@ -225,14 +278,23 @@ internal class CSSParser internal constructor(
             if (!scan.empty()) checkCssState(scan.consume(';')) { "Invalid @media rule: expected '}' at end of rule set" }
 
             if (externalFileResolver != null && mediaMatches(mediaList, deviceMediaType)) {
-                // The importing stylesheet's own URL is untracked (content-only
-                // API), so @import arrives with no base.
-                val css = externalFileResolver.resolveCSSStyleSheet(file, null)
-                if (css == null) {
+                // Nested imports resolve against the importing stylesheet's
+                // reported URL; guard against import cycles and runaway depth.
+                val nested = externalFileResolver.resolveCSSStyleSheet(file, currentSourceUrl)
+                if (nested == null) {
                     loggerContext.logW(TAG) { "Could not resolve @import '$file'; ignoring" }
                     return
                 }
-                ruleset.addAll(parse(css))
+                val importContext = activeImportContext
+                if (!importContext.enter(nested.url)) {
+                    loggerContext.logW(TAG) { "Dropping @import '${nested.url}': import cycle or max depth reached; ignoring" }
+                    return
+                }
+                try {
+                    ruleset.addAll(parse(nested.css, nested.url, importContext))
+                } finally {
+                    importContext.exit()
+                }
             }
         } else {
             // Unknown/unsupported at-rule
@@ -401,6 +463,8 @@ internal class CSSParser internal constructor(
 
     companion object {
         private const val TAG = "CSSParser"
+
+        internal const val MAX_CSS_IMPORT_DEPTH: Int = 8
 
         const val CSS_MIME_TYPE: String = "text/css"
 

@@ -42,6 +42,21 @@ import android.graphics.Typeface
  */
 public open class ExternalFileResolver {
     /**
+     * A stylesheet fetched through [resolveCSSStyleSheet].
+     *
+     * @property url the effective URL the content was loaded from, as reported by the
+     *   host (after its own normalization or redirects). The library trusts it as the
+     *   base for relative `@import`s nested inside [css].
+     * @property css the stylesheet text.
+     */
+    public data class ResolvedStylesheet(
+        @JvmField
+        public val url: String,
+        @JvmField
+        public val css: String,
+    )
+
+    /**
      * Called by renderer to resolve font references in &lt;text&gt; elements.
      * 
      * 
@@ -112,12 +127,13 @@ public open class ExternalFileResolver {
      * 
      * @param url the URL of the CSS file as it appears in the SVG file.
      * @param baseUri the base URI in scope for the reference, or null when unknown
-     *   (`&lt;?xml-stylesheet?&gt;` processing instructions and `@import` rules carry
-     *   no element scope, so these always arrive with a null base).
-     * @return a KSVG CSSStyleSheet object, or null if the stylesheet could not be found.
-
+     *   (`&lt;?xml-stylesheet?&gt;` resolves against the document base URL when the
+     *   document was parsed with one; `@import` resolves against the importing
+     *   stylesheet's reported URL).
+     * @return the stylesheet and the effective URL it was loaded from, or null if
+     *   the stylesheet could not be found.
      */
-    public open fun resolveCSSStyleSheet(url: String, baseUri: String?): String? {
+    public open fun resolveCSSStyleSheet(url: String, baseUri: String?): ResolvedStylesheet? {
         return null
     }
 

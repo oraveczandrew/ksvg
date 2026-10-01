@@ -21,21 +21,23 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.os.Build
-import android.util.Log
 import androidx.collection.ArraySet
 import java.io.IOException
 
 /**
  * A sample implementation of [ExternalFileResolver] that retrieves files from
  * an application's "assets" folder.
+ *
+ * @param loggerContext logging scope for resolver diagnostics; defaults to silent.
  */
 public class SimpleAssetResolver(
-    private val assetManager: AssetManager
+    private val assetManager: AssetManager,
+    private val loggerContext: LoggerContext = AndroidLoggerContext,
 ) : ExternalFileResolver() {
 
     /**
      * Attempt to find the specified font in the "assets" folder and return a Typeface object.
-     * For the font name "Foo", first the file "Foo.ttf" will be tried and if that fails, "Foo.otf".
+     * For the font name "Foo", first the file "Foo.ttf" will be tried, and if that fails, "Foo.otf".
      */
     override fun resolveFont(
         fontFamily: String,
@@ -43,10 +45,9 @@ public class SimpleAssetResolver(
         fontStyle: String,
         fontStretch: Float
     ): Typeface? {
-        Log.i(
-            TAG,
+        loggerContext.logI(TAG) {
             "resolveFont('$fontFamily',$fontWeight,'$fontStyle',$fontStretch)"
-        )
+        }
 
         val assetManager = assetManager
 
@@ -73,7 +74,6 @@ public class SimpleAssetResolver(
         }
     }
 
-
     /**
      * Attempt to find the specified image file in the `assets` folder and return a decoded Bitmap.
      *
@@ -82,7 +82,7 @@ public class SimpleAssetResolver(
      */
     override fun resolveImage(filename: String, baseUri: String?): Bitmap? {
         val resolved = resolveHrefAgainstBase(baseUri, filename)
-        Log.i(TAG, "resolveImage($filename, baseUri=$baseUri) -> $resolved")
+        loggerContext.logI(TAG) { "resolveImage($filename, baseUri=$baseUri) -> $resolved" }
 
         return try {
             assetManager.open(resolved).use {
@@ -94,22 +94,20 @@ public class SimpleAssetResolver(
     }
 
     /**
-     * Returns true when passed the MIME types for SVG, JPEG, PNG or any of the
+     * Returns true when passed the MIME types for SVG, JPEG, PNG, or any of the
      * other bitmap image formats supported by Android's BitmapFactory class.
      */
     override fun isFormatSupported(mimeType: String): Boolean {
         return supportedFormats.contains(mimeType)
     }
 
-
     /**
      * Attempt to find the specified stylesheet file in the "assets" folder and return its string contents.
-
      */
-    override fun resolveCSSStyleSheet(url: String, baseUri: String?): String? {
+    override fun resolveCSSStyleSheet(url: String, baseUri: String?): ResolvedStylesheet? {
         val resolved = resolveHrefAgainstBase(baseUri, url)
-        Log.i(TAG, "resolveCSSStyleSheet($url, baseUri=$baseUri) -> $resolved")
-        return getAssetAsString(resolved)
+        loggerContext.logI(TAG) { "resolveCSSStyleSheet($url, baseUri=$baseUri) -> $resolved" }
+        return getAssetAsString(resolved)?.let { ResolvedStylesheet(resolved, it) }
     }
 
     /*

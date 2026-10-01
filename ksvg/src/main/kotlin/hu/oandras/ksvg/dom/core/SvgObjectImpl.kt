@@ -108,10 +108,12 @@ internal open class SvgObjectImpl(
         /**
          * Effective `xml:base` for the element under construction: its own
          * `xml:base` (if any) resolved against the parent element's effective
-         * base per XML Base. Null when no base is in scope.
+         * base per XML Base, anchored at the document base URL when the element
+         * has no ancestor with a base. Null when no base is in scope.
          */
         protected fun effectiveXmlBase(): String? {
             val parentBase = (parent as? ElementBase)?.xmlBase
+                ?: document.documentBaseUrl
             return hu.oandras.ksvg.effectiveXmlBase(parentBase, xmlBase)
         }
     }

@@ -132,6 +132,7 @@ internal class SVGParserImpl(
     private val externalFileResolver: ExternalFileResolver? = null,
     private val animationsEnabled: Boolean = false,
     private val logger: LoggerContext,
+    private val documentBaseUrl: String? = null,
 ) : SVGParser {
     // SVG parser
     private var svgDocument: SVGImpl? = null
@@ -491,6 +492,7 @@ internal class SVGParserImpl(
         svgDocument = SVGImpl(
             isInternalEntitiesEnabled = enableInternalEntities,
             externalFileResolver = externalFileResolver,
+            documentBaseUrl = documentBaseUrl,
             loggerContext = logger
         ).apply {
             animationsEnabled = this@SVGParserImpl.animationsEnabled
@@ -710,7 +712,7 @@ internal class SVGParserImpl(
                 val styleElementContents = styleElementContents
                 if (styleElementContents != null) {
                     inStyleElement = false
-                    parseCSSStyleSheet(styleElementContents.toString())
+                    parseCSSStyleSheet(styleElementContents.toString(), sourceUrl = documentBaseUrl)
                     styleElementContents.setLength(0)
                     return
                 }
@@ -842,20 +844,21 @@ internal class SVGParserImpl(
 
             attr = attributes[XML_STYLESHEET_ATTR_HREF]
             if (attr != null) {
-                // Processing instructions carry no element scope, so there is
-                // no in-scope xml:base to pass along.
-                var css = externalFileResolver.resolveCSSStyleSheet(attr, null)
-                if (css == null) {
+                // No element scope for processing instructions: the href resolves
+                // against the document base URL (or stays relative without one).
+                val resolved = externalFileResolver.resolveCSSStyleSheet(attr, documentBaseUrl)
+                if (resolved == null) {
                     logger.logW(TAG) { "Could not resolve stylesheet href='$attr'; ignoring" }
                     return
                 }
+                var css = resolved.css
 
                 val mediaAttr = attributes[XML_STYLESHEET_ATTR_MEDIA]
                 if (mediaAttr != null && XML_STYLESHEET_ATTR_MEDIA_ALL != mediaAttr.trimLowerThanSpace()) {
                     css = "@media $mediaAttr { $css}"
                 }
 
-                parseCSSStyleSheet(css)
+                parseCSSStyleSheet(css, sourceUrl = resolved.url)
             }
         }
     }
@@ -1291,8 +1294,9 @@ internal class SVGParserImpl(
         debug { "<tref>" }
 
         val currentElement = requireCurrentElement()
+        val svgDocument = requireSvgDocument()
         if (currentElement is TextContainer) {
-            val builder = TRef.Builder(requireSvgDocument(), currentElement)
+            val builder = TRef.Builder(svgDocument, currentElement)
             builder.parseAttributes(attributes)
             val obj = builder.build()
 
@@ -1306,10 +1310,10 @@ internal class SVGParserImpl(
             // A <tref> directly under <svg>/<g> is not strictly valid SVG 1.1, but
             // browsers render it as if it were a top-level <text>. Wrap it in a
             // synthetic <text> so it gains a text root and is drawn.
-            val syntheticText = Text.Builder(requireSvgDocument(), currentElement).build()
+            val syntheticText = Text.Builder(svgDocument, currentElement).build()
             currentElement.addChild(syntheticText)
 
-            val builder = TRef.Builder(requireSvgDocument(), syntheticText)
+            val builder = TRef.Builder(svgDocument, syntheticText)
             builder.parseAttributes(attributes)
             val obj = builder.build()
 
@@ -1525,14 +1529,14 @@ internal class SVGParserImpl(
         }
     }
 
-    private fun parseCSSStyleSheet(sheet: String) {
+    private fun parseCSSStyleSheet(sheet: String, sourceUrl: String? = null) {
         val parser = CSSParser(
             deviceMediaType = MediaType.screen,
             source = Source.Document,
             externalFileResolver = externalFileResolver,
             loggerContext = logger
         )
-        requireSvgDocument().addCSSRules(ruleset = parser.parse(sheet))
+        requireSvgDocument().addCSSRules(ruleset = parser.parse(sheet, sourceUrl))
     }
 
     //=========================================================================

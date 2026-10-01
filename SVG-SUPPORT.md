@@ -311,8 +311,8 @@ supported (`!important` itself is honored in the cascade).
 | Mechanism | Support | Notes |
 |-----------|---------|-------|
 | Embedded `<style>` | Partial | `type`/`media` honored (`text/css`, `all`/`screen`); alternate stylesheets ignored |
-| `<?xml-stylesheet?>` | Partial | Primary stylesheet only; `media` honored; `alternate="yes"` ignored |
-| `@import` / `@media` | Partial | Resolved for screen media via the configured resolver |
+| `<?xml-stylesheet?>` | Partial | Primary stylesheet only; `media` honored; `alternate="yes"` ignored<br>resolves against `documentBaseUrl` when parsed with one; nested `@import`s chain on reported sheet URLs (cycle/depth-guarded) |
+| `@import` / `@media` | Partial | Resolved for screen media via the configured resolver<br>`@import` resolves against the importing sheet URL; cycles dropped, max depth 8 |
 | External `<link rel=stylesheet>` / HTML inline-SVG CSS | None |  |
 | `@font-face` / WOFF/WOFF2 loading | None | Fonts resolve via system fonts + app assets (`SimpleAssetResolver` / `TypefaceResolver`); no embedded webfont loading |
 
