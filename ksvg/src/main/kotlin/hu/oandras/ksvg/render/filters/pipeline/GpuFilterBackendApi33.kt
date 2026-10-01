@@ -28,6 +28,8 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.collection.ArrayMap
 import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
+import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.dom.filter.FeBlendMode
 import hu.oandras.ksvg.dom.filter.FeCompositeOperator
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
@@ -41,8 +43,8 @@ import hu.oandras.ksvg.render.FeDiffuseLightingRenderNode
 import hu.oandras.ksvg.render.FeDisplacementMapRenderNode
 import hu.oandras.ksvg.render.FeDropShadowRenderNode
 import hu.oandras.ksvg.render.FeFloodRenderNode
-import hu.oandras.ksvg.render.FeImageRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
+import hu.oandras.ksvg.render.FeImageRenderNode
 import hu.oandras.ksvg.render.FeMergeRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
@@ -54,18 +56,13 @@ import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.calculatePrimitiveRegion
-import hu.oandras.ksvg.render.resolvePrimitiveInputRegion
-import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.render.filters.buildColorMatrix
 import hu.oandras.ksvg.render.filters.buildColorMatrixValues
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.filters.pipeline.effects.createArithmeticCompositeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createColorMatrixShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearBlendShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearColorMatrixShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createComponentTransferShaderEffect
-import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveDuplicateShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveNoneShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveWrapShaderEffect
@@ -74,6 +71,8 @@ import hu.oandras.ksvg.render.filters.pipeline.effects.createDisplacementMapShad
 import hu.oandras.ksvg.render.filters.pipeline.effects.createFloodShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createImageShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearArithmeticCompositeShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearBlendShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearColorMatrixShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyDilateShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyErodeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createOffsetShaderEffect
@@ -81,11 +80,11 @@ import hu.oandras.ksvg.render.filters.pipeline.effects.createSpecularLightingSha
 import hu.oandras.ksvg.render.filters.pipeline.effects.createTileShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createTurbulenceShaderEffect
 import hu.oandras.ksvg.render.pool.withPooledObject
+import hu.oandras.ksvg.render.resolvePrimitiveInputRegion
 import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
 import kotlin.math.abs
-import kotlin.jvm.JvmSynthetic
 
 /**
  * AGSL (RuntimeShader) GPU backend (API 33+, hardware canvas only).
@@ -141,45 +140,6 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         var lastRawShader: RuntimeShader? = null
         var lastRawBound = false
         val boundResults = mutableSetOf<String>()
-
-        fun trackRawShader(
-            shader: RuntimeShader,
-            resultName: String?,
-            input: String?,
-            previousResult: String?,
-            first: Boolean,
-            generative: Boolean,
-        ) {
-            val bound = generative || when (input) {
-                null if first -> false // SourceGraphic: no raw form
-                "SourceGraphic", "SourceAlpha" -> false
-                null, previousResult -> {
-                    val prev = lastRawShader
-                    if (lastRawBound && prev != null) {
-                        shader.setInputShader("uInput", prev)
-                        true
-                    } else {
-                        false
-                    }
-                }
-
-                else -> {
-                    val dep = resultShaders[input]
-                    if (dep != null && input in boundResults) {
-                        shader.setInputShader("uInput", dep)
-                        true
-                    } else {
-                        false
-                    }
-                }
-            } // SourceGraphic: no raw form
-            lastRawShader = shader
-            lastRawBound = bound
-            if (resultName != null) {
-                resultShaders[resultName] = shader
-                if (bound) boundResults += resultName
-            }
-        }
 
         // 1. Pre-calculate total padding for the entire chain
         val packed = calculateTotalPadding(filterNode, scaleX, scaleY, sx, sy)
@@ -261,7 +221,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     padY = totalPadY,
                                     inputUniformName = "uInput",
                                 )
-                                trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                                lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                                 offsetEffect.chainWith(inputEffect)
                             }
                         }
@@ -344,7 +304,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     inputUniformName = "uInput",
                                 )
                             }
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             morphEffect.chainWith(inputEffect)
                         }
 
@@ -378,7 +338,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     inputUniformName = "uInput",
                                 )
                             }
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             colorMatrixEffect.chainWith(inputEffect)
                         }
 
@@ -418,7 +378,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     primitiveRegion = primitiveRegion,
                                     inputUniformName = "uInput",
                                 ) ?: return null
-                                trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                                lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
 
                                 lightingEffect.chainWith(inputEffect)
                             }
@@ -462,7 +422,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     primitiveRegion = primitiveRegion,
                                     inputUniformName = "uInput",
                                 ) ?: return null
-                                trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                                lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
 
                                 lightingEffect.chainWith(inputEffect)
                             }
@@ -481,7 +441,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             val (shader, transferEffect) = createComponentTransferShaderEffect(
                                 primitive, primitiveRegion, "uInput",
                             )
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             transferEffect.chainWith(inputEffect)
                         }
 
@@ -520,7 +480,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     inputUniformName = "uInput",
                                 )
                             } ?: return null
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             convolveEffect.chainWith(inputEffect)
                         }
 
@@ -559,7 +519,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     primitiveRegion = primitiveRegion,
                                     inputUniformName = "uInput",
                                 )
-                                trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                                lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                                 blendEffect.chainWith(inputEffect)
                             } else {
                                 val in2Effect =
@@ -635,7 +595,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                             )
                                         }
 
-                                        trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                                        lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                                         compositeEffect.chainWith(inputEffect)
                                 }
                             } else {
@@ -666,7 +626,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                 mapShader = mapShader,
                                 inputUniformName = "uInput",
                             )
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             displacementEffect.chainWith(inputEffect)
                         }
 
@@ -713,7 +673,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                 inputUniformName = "in_source",
                             )
 
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = true)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, true, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             turbulenceEffect
                         }
 
@@ -727,7 +687,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                             val color = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
                             val (shader, floodEffect) = createFloodShaderEffect(color, primitiveRegion, "uInput")
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = true)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, true, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             floodEffect
                         }
 
@@ -798,7 +758,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                 totalPadY,
                                 "uInput",
                             ) ?: return null
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = true)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, true, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             imageEffect
                         }
 
@@ -811,7 +771,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             )
 
                             val (shader, tileEffect) = createTileShaderEffect(primitiveRegion, "uInput")
-                            trackRawShader(shader, resultName, input, previousResult, first, generative = false)
+                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             tileEffect.chainWith(inputEffect)
                         }
 
@@ -911,6 +871,59 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         val d = if (dst == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else dst
         val s = if (src == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else src
         return RenderEffect.createBlendModeEffect(d, s, blendMode)
+    }
+
+    /**
+     * Binds a raw shader's `uInput` to the previous bound result (or a named
+     * dependency) and records named results for downstream references. Returns
+     * whether the shader's input ended up bound.
+     *
+     * Deliberately a member function with explicit loop state instead of a local
+     * function: a local `fun` capturing the reassigned `lastRawShader` /
+     * `lastRawBound` forces `Ref$ObjectRef` / `Ref$BooleanRef` wrappers per chain
+     * build. Callers assign the returned flag and `shader` to their own locals
+     * (inside inlined loops, so no wrappers there either).
+     */
+    private fun trackRawShaderBound(
+        shader: RuntimeShader,
+        resultName: String?,
+        input: String?,
+        previousResult: String?,
+        first: Boolean,
+        generative: Boolean,
+        lastRawShader: RuntimeShader?,
+        lastRawBound: Boolean,
+        resultShaders: ArrayMap<String, RuntimeShader>,
+        boundResults: MutableSet<String>,
+    ): Boolean {
+        val bound = generative || when (input) {
+            null if first -> false // SourceGraphic: no raw form
+            "SourceGraphic", "SourceAlpha" -> false
+            null, previousResult -> {
+                val prev: RuntimeShader? = lastRawShader
+                if (lastRawBound && prev != null) {
+                    shader.setInputShader("uInput", prev)
+                    true
+                } else {
+                    false
+                }
+            }
+
+            else -> {
+                val dep = resultShaders[input]
+                if (dep != null && input in boundResults) {
+                    shader.setInputShader("uInput", dep)
+                    true
+                } else {
+                    false
+                }
+            }
+        } // SourceGraphic: no raw form
+        if (resultName != null) {
+            resultShaders[resultName] = shader
+            if (bound) boundResults += resultName
+        }
+        return bound
     }
 
     /**
