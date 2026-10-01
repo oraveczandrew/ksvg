@@ -2309,7 +2309,9 @@ internal class RenderTreeBuilder(
                 val h = obj.height?.floatValueYInContext() ?: return 1f
                 val rx = obj.rx?.floatValueXInContext() ?: 0f
                 val ry = obj.ry?.floatValueYInContext() ?: 0f
-                val r = minOf(rx.coerceAtLeast(0f), ry.coerceAtLeast(0f), w / 2f, h / 2f)
+                val r = minOf(rx.coerceAtLeast(0f), ry.coerceAtLeast(0f))
+                    .coerceAtMost(w / 2f)
+                    .coerceAtMost(h / 2f)
                 2f * (w + h - 4f * r) + (2f * PI.toFloat() * r)
             }
 
