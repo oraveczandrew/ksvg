@@ -339,7 +339,7 @@ properties/attributes are covered here; all are **None** unless noted.
 | `syncBehavior`, `syncTolerance`, `syncMaster`, `syncBehaviorDefault`, `syncToleranceDefault` | None | SMIL/Tiny runtime sync model; single-clock timeline only |
 | `playbackOrder`, `initialVisibility`, `transformBehavior` | None | Tiny media/runtime attributes |
 | `focusable`, `focusHighlight`, `nav-up`, `nav-down`, `nav-left`, `nav-right` | None | Tiny navigation; renderer has no focus model (see Out of Scope) |
-| `xml:base` | None | Base-URI resolution not applied |
+| `xml:base` | Partial | Parsed on every element, effective (parent-resolved) base tracked in DOM; passed alongside `href` to `ExternalFileResolver` (`resolveImage`) and `HitRegion.baseUri` for `<a>`; `<?xml-stylesheet?>` / `@import` arrive with null base (no scope) |
 | `xml:id` | Partial | Mapped to `id` |
 | RDFa/semantic (`role`, `rel`, `rev`, `about`, `content`, `datatype`, `property`, `resource`, `typeof`) | None | Metadata only; ignored |
 | XLink legacy (`xlink:show`, `xlink:actuate`, `xlink:type`, `xlink:role`, `xlink:arcrole`, `xlink:title`) | None | Only `xlink:href` is honored (see Common Attributes) |

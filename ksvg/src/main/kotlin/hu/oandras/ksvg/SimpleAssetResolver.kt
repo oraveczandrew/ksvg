@@ -24,8 +24,6 @@ import android.os.Build
 import android.util.Log
 import androidx.collection.ArraySet
 import java.io.IOException
-import java.io.InputStream
-import java.io.Reader
 
 /**
  * A sample implementation of [ExternalFileResolver] that retrieves files from
@@ -78,12 +76,16 @@ public class SimpleAssetResolver(
 
     /**
      * Attempt to find the specified image file in the `assets` folder and return a decoded Bitmap.
+     *
+     * The `href` is resolved against [baseUri] first; absolute results (remote URLs)
+     * cannot come from assets and decline to null.
      */
-    override fun resolveImage(filename: String): Bitmap? {
-        Log.i(TAG, "resolveImage($filename)")
+    override fun resolveImage(filename: String, baseUri: String?): Bitmap? {
+        val resolved = resolveHrefAgainstBase(baseUri, filename)
+        Log.i(TAG, "resolveImage($filename, baseUri=$baseUri) -> $resolved")
 
         return try {
-            assetManager.open(filename).use {
+            assetManager.open(resolved).use {
                 BitmapFactory.decodeStream(it)
             }
         } catch (_: IOException) {
@@ -104,36 +106,20 @@ public class SimpleAssetResolver(
      * Attempt to find the specified stylesheet file in the "assets" folder and return its string contents.
 
      */
-    override fun resolveCSSStyleSheet(url: String): String? {
-        Log.i(TAG, "resolveCSSStyleSheet($url)")
-        return getAssetAsString(url)
+    override fun resolveCSSStyleSheet(url: String, baseUri: String?): String? {
+        val resolved = resolveHrefAgainstBase(baseUri, url)
+        Log.i(TAG, "resolveCSSStyleSheet($url, baseUri=$baseUri) -> $resolved")
+        return getAssetAsString(resolved)
     }
 
     /*
     * Read the contents of the asset whose name is given by "url" and return it as a String.
     */
     private fun getAssetAsString(url: String): String? {
-        var inputStream: InputStream? = null
         return try {
-            inputStream = assetManager.open(url)
-
-            val r: Reader = inputStream.reader()
-            val buffer = CharArray(4096)
-            val sb = StringBuilder()
-            var len = r.read(buffer)
-            while (len > 0) {
-                sb.appendRange(buffer, 0, len)
-                len = r.read(buffer)
-            }
-            sb.toString()
+            assetManager.open(url).bufferedReader().use { it.readText() }
         } catch (_: IOException) {
             null
-        } finally {
-            try {
-                inputStream?.close()
-            } catch (_: IOException) {
-                // Do nothing
-            }
         }
     }
 
@@ -141,7 +127,7 @@ public class SimpleAssetResolver(
         private const val TAG = "SimpleAssetResolver"
 
         private val supportedFormats: Set<String> = ArraySet<String>(8).apply {
-            // PNG, JPEG and SVG are required by the SVG 1.2 spec
+            // The SVG 1.2 spec requires PNG, JPEG and SVG
             add("image/svg+xml")
             add("image/jpeg")
             add("image/png")

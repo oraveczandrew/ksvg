@@ -1331,7 +1331,7 @@ internal class RenderTreeBuilder(
         if (href != null) {
             image = checkForImageDataURL(href)
             if (image == null && externalFileResolver != null) {
-                image = externalFileResolver.resolveImage(href)
+                image = externalFileResolver.resolveImage(href, obj.xmlBase)
             }
 
             if (image != null) {
@@ -2086,7 +2086,7 @@ internal class RenderTreeBuilder(
             is FeImage -> {
                 val href = primitive.href
                 val image = href?.let {
-                    checkForImageDataURL(it) ?: externalFileResolver?.resolveImage(it)
+                    checkForImageDataURL(it) ?: externalFileResolver?.resolveImage(it, primitive.xmlBase)
                 }
                 // `feImage` may reference another element in the document by id
                 // (e.g. `href="#source"`); in that case we build the referenced

@@ -842,7 +842,9 @@ internal class SVGParserImpl(
 
             attr = attributes[XML_STYLESHEET_ATTR_HREF]
             if (attr != null) {
-                var css = externalFileResolver.resolveCSSStyleSheet(attr)
+                // Processing instructions carry no element scope, so there is
+                // no in-scope xml:base to pass along.
+                var css = externalFileResolver.resolveCSSStyleSheet(attr, null)
                 if (css == null) {
                     logger.logW(TAG) { "Could not resolve stylesheet href='$attr'; ignoring" }
                     return

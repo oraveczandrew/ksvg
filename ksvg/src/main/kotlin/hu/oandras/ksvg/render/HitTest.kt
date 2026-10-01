@@ -62,7 +62,7 @@ private fun collectHitRegionsRecursive(
                 node.viewBoxTransform?.let { world.postConcat(it) }
                 val rect = bb.toRectF()
                 world.mapRect(rect)
-                regions.add(HitRegion(href, rect))
+                regions.add(HitRegion(href, sourceElement.xmlBase, rect))
             }
         }
     }

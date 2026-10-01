@@ -28,7 +28,7 @@ class UnsupportedStylesheetLogTest {
     private class NoopResolver : ExternalFileResolver()
 
     private class StubResolver(private val sheets: Map<String, String> = emptyMap()) : ExternalFileResolver() {
-        override fun resolveCSSStyleSheet(url: String): String? = sheets[url]
+        override fun resolveCSSStyleSheet(url: String, baseUri: String?): String? = sheets[url]
     }
 
     private fun parseWithRecording(

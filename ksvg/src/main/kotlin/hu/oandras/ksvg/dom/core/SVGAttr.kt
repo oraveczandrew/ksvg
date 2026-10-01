@@ -26,6 +26,7 @@ internal enum class SVGAttr {
     alignment_baseline,
     accumulate,
     begin,
+    base,
     baseline_shift,
     calcMode,
     dur,
@@ -212,6 +213,8 @@ internal enum class SVGAttr {
             "alignment-baseline" -> alignment_baseline
             "accumulate" -> accumulate
             "begin" -> begin
+            "base",
+            "xml:base" -> base
             "baseline-shift" -> baseline_shift
             "calcMode" -> calcMode
             "space",

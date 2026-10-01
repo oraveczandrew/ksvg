@@ -46,6 +46,8 @@ internal abstract class ElementBase(
     val classNames: List<String>? = baseParams.classNames // contents of the 'class' attribute
     @JvmField
     val attributes: Map<String, String>? = baseParams.attributes
+    @JvmField
+    val xmlBase: String? = baseParams.xmlBase // effective in-scope xml:base (parent-resolved), or null
 
     private var _animations: ArrayList<Animation>? = null
 
@@ -96,9 +98,11 @@ internal abstract class ElementBase(
         val classNames: List<String>?,
         @JvmField
         val attributes: Map<String, String>?,
+        @JvmField
+        val xmlBase: String?,
     ) {
         override fun toString(): String {
-            return "BaseParams(id=$id, document=$document, parent=$parent, spacePreserve=$spacePreserve, baseStyle=$baseStyle, style=$style, classNames=$classNames, attributes=$attributes)"
+            return "BaseParams(id=$id, document=$document, parent=$parent, spacePreserve=$spacePreserve, baseStyle=$baseStyle, style=$style, classNames=$classNames, attributes=$attributes, xmlBase=$xmlBase)"
         }
     }
 
@@ -122,6 +126,7 @@ internal abstract class ElementBase(
                 style = styleBuilder?.build(),
                 spacePreserve = getSpacePreserve(),
                 attributes = attributesMap,
+                xmlBase = effectiveXmlBase(),
             )
         }
 

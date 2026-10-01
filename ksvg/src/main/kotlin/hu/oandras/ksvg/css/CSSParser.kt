@@ -225,7 +225,9 @@ internal class CSSParser internal constructor(
             if (!scan.empty()) checkCssState(scan.consume(';')) { "Invalid @media rule: expected '}' at end of rule set" }
 
             if (externalFileResolver != null && mediaMatches(mediaList, deviceMediaType)) {
-                val css = externalFileResolver.resolveCSSStyleSheet(file)
+                // The importing stylesheet's own URL is untracked (content-only
+                // API), so @import arrives with no base.
+                val css = externalFileResolver.resolveCSSStyleSheet(file, null)
                 if (css == null) {
                     loggerContext.logW(TAG) { "Could not resolve @import '$file'; ignoring" }
                     return

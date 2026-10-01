@@ -29,10 +29,14 @@ import android.graphics.Typeface
  * Extend this class and override the methods if you want to customize how KSVG treats font, image, and external CSS references.
  *
  * Security and scope contract (applies to every override):
- * - KSVG performs no network fetch itself and resolves no base URIs: relative
- *   `href` values (`../foo.png`, `/abs/path`, `http(s)://…`) reach your resolver
- *   verbatim. Enforce your own allow-list there (no `..` escapes, no unexpected
+ * - KSVG performs no network fetch itself and resolves no references: `href`
+ *   values (`../foo.png`, `/abs/path`, `http(s)://…`) reach your resolver
+ *   verbatim, together with the in-scope `xml:base` (or null when there is
+ *   none). Combine them with [resolveHrefAgainstBase] (or your own policy);
+ *   enforce your own allow-list there (no `..` escapes, no unexpected
  *   schemes) if the SVG source is untrusted.
+ * - Same-document fragment references (`#id`) never reach the resolver; they
+ *   are internal lookups.
  * - `data:` image URLs decode only with `;base64` payloads; anything else falls
  *   through to [resolveImage] (which then usually also declines).
  */
@@ -86,9 +90,11 @@ public open class ExternalFileResolver {
      * them cached, for speed or memory reasons, you should do so yourself.
      * 
      * @param filename the filename as provided in the xlink:href attribute of a &lt;image&gt; element.
+     * @param baseUri the in-scope `xml:base` for the referencing element, or null when there is none.
+     *   Resolve with [resolveHrefAgainstBase] unless you deliberately want raw-href behavior.
      * @return an Android Bitmap object, or null if the image could not be found.
      */
-    public open fun resolveImage(filename: String): Bitmap? {
+    public open fun resolveImage(filename: String, baseUri: String?): Bitmap? {
         return null
     }
 
@@ -105,10 +111,13 @@ public open class ExternalFileResolver {
      * them cached, for speed or memory reasons, you should do so yourself.
      * 
      * @param url the URL of the CSS file as it appears in the SVG file.
+     * @param baseUri the base URI in scope for the reference, or null when unknown
+     *   (`&lt;?xml-stylesheet?&gt;` processing instructions and `@import` rules carry
+     *   no element scope, so these always arrive with a null base).
      * @return a KSVG CSSStyleSheet object, or null if the stylesheet could not be found.
 
      */
-    public open fun resolveCSSStyleSheet(url: String): String? {
+    public open fun resolveCSSStyleSheet(url: String, baseUri: String?): String? {
         return null
     }
 

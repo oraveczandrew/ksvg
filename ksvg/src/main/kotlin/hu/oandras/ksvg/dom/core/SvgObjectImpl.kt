@@ -65,6 +65,8 @@ internal open class SvgObjectImpl(
 
         private var spacePreserve: Boolean? = null
 
+        private var xmlBase: String? = null
+
         @CallSuper
         override fun onAttribute(
             attributes: Attributes,
@@ -75,6 +77,7 @@ internal open class SvgObjectImpl(
             when (attr) {
                 SVGAttr.id -> id = value
                 SVGAttr.space -> spacePreserve = spaceReserveValueFrom(value)
+                SVGAttr.base -> xmlBase = value
                 else -> return false
             }
 
@@ -101,5 +104,15 @@ internal open class SvgObjectImpl(
 
         protected fun getId(): String? = id
         protected fun getSpacePreserve(): Boolean? = spacePreserve
+
+        /**
+         * Effective `xml:base` for the element under construction: its own
+         * `xml:base` (if any) resolved against the parent element's effective
+         * base per XML Base. Null when no base is in scope.
+         */
+        protected fun effectiveXmlBase(): String? {
+            val parentBase = (parent as? ElementBase)?.xmlBase
+            return hu.oandras.ksvg.effectiveXmlBase(parentBase, xmlBase)
+        }
     }
 }

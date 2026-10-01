@@ -20,12 +20,16 @@ import android.graphics.RectF
 /**
  * Represents a clickable region in the rendered SVG document.
  *
- * @property href The `href` attribute value of the `<a>` element.
+ * @property href The `href` attribute value of the `<a>` element, verbatim.
+ * @property baseUri The in-scope `xml:base` for the `<a>` element, or null when there is none.
+ *   Combine with [href] via [resolveHrefAgainstBase] to get the effective click target.
  * @property bounds The bounding rectangle of the clickable region in screen (canvas) coordinates.
  */
 public data class HitRegion(
     @JvmField
     public val href: String,
+    @JvmField
+    public val baseUri: String?,
     @JvmField
     public val bounds: RectF,
 )
