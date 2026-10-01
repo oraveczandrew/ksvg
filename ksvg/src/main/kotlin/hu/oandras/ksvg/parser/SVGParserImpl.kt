@@ -122,6 +122,7 @@ import java.io.InputStream
 import java.util.zip.GZIPInputStream
 import javax.xml.parsers.ParserConfigurationException
 import javax.xml.parsers.SAXParserFactory
+import kotlin.jvm.JvmSynthetic
 
 
 /*
@@ -488,7 +489,8 @@ internal class SVGParserImpl(
     //=========================================================================
     // Parser event classes used by both XML parser implementations
     //=========================================================================
-    private fun startDocument() {
+    @JvmSynthetic
+    internal fun startDocument() {
         svgDocument = SVGImpl(
             isInternalEntitiesEnabled = enableInternalEntities,
             externalFileResolver = externalFileResolver,
@@ -507,14 +509,16 @@ internal class SVGParserImpl(
      * parent container. Malformed XML itself still aborts at the parser level.
      * Called from both parser frontends (XPP fast path + SAX entity path).
      */
-    private fun skipBrokenElement(tag: String, e: KSVGParseException) {
+    @JvmSynthetic
+    internal fun skipBrokenElement(tag: String, e: KSVGParseException) {
         logger.logE(TAG) { "Skipping <$tag>: ${e.message}" }
         ignoring = true
         ignoreDepth = 1
     }
 
     @Throws(KSVGParseException::class)
-    private fun startElement(
+    @JvmSynthetic
+    internal fun startElement(
         uri: String?,
         localName: String,
         qName: String?,
@@ -627,7 +631,8 @@ internal class SVGParserImpl(
     }
 
     @Throws(KSVGParseException::class)
-    private fun text(ch: CharArray, start: Int, length: Int) {
+    @JvmSynthetic
+    internal fun text(ch: CharArray, start: Int, length: Int) {
         if (ignoring) {
             return
         }
@@ -672,7 +677,8 @@ internal class SVGParserImpl(
     }
 
     @Throws(KSVGParseException::class)
-    private fun endElement(uri: String?, localName: String, qName: String) {
+    @JvmSynthetic
+    internal fun endElement(uri: String?, localName: String, qName: String) {
         if (ignoring) {
             if (--ignoreDepth == 0) {
                 ignoring = false
@@ -820,14 +826,16 @@ internal class SVGParserImpl(
     }
 
 
-    private fun endDocument() {
+    @JvmSynthetic
+    internal fun endDocument() {
         // Dump document
         if (BuildConfig.DEBUG) {
             dumpNode(requireSvgDocument().rootElement, "")
         }
     }
 
-    private fun handleProcessingInstruction(
+    @JvmSynthetic
+    internal fun handleProcessingInstruction(
         instruction: String,
         attributes: Map<String, String>
     ) {
@@ -864,7 +872,8 @@ internal class SVGParserImpl(
     }
 
 
-    private fun parseProcessingInstructionAttributes(scan: TextScanner): Map<String, String> {
+    @JvmSynthetic
+    internal fun parseProcessingInstructionAttributes(scan: TextScanner): Map<String, String> {
         val attributes = ArrayMap<String, String>()
 
         scan.skipWhitespace()

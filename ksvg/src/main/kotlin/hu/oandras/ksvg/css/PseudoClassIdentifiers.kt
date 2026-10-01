@@ -19,6 +19,8 @@ package hu.oandras.ksvg.css
 
 import android.util.ArrayMap
 import java.util.Locale
+import kotlin.jvm.JvmStatic
+import kotlin.jvm.JvmSynthetic
 
 // Supported pseudo-classes
 @Suppress("EnumEntryName")
@@ -60,7 +62,9 @@ internal enum class PseudoClassIdentifiers {
     UNSUPPORTED;
 
     companion object {
-        private val cache: Map<String, PseudoClassIdentifiers> = ArrayMap<String, PseudoClassIdentifiers>(entries.size - 1).apply {
+        @JvmSynthetic
+        @JvmField
+        internal val cache: Map<String, PseudoClassIdentifiers> = ArrayMap<String, PseudoClassIdentifiers>(entries.size - 1).apply {
             for (attr in PseudoClassIdentifiers.entries) {
                 if (attr != UNSUPPORTED) {
                     val key = attr.name.replace('_', '-')

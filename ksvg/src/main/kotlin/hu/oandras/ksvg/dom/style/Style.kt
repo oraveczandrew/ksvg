@@ -52,6 +52,7 @@ import hu.oandras.ksvg.parser.parseNonNegativeLength
 import hu.oandras.ksvg.parser.parseOpacity
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
+import kotlin.jvm.JvmSynthetic
 
 // Special attribute keywords
 internal const val NONE: String = "none"
@@ -1526,7 +1527,9 @@ internal class Style internal constructor(
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
         // stay empty (all-zero); the default *values* below are what reset()
         // inherits. isSpecified() means author-declared again.
-        private val DEFAULT_STYLE: Style = run {
+        @JvmSynthetic
+        @JvmField
+        internal val DEFAULT_STYLE: Style = run {
             val def = Builder()
             def.reset(Style())
             def.fill = ColorValue.BLACK

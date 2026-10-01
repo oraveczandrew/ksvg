@@ -19,6 +19,7 @@ package hu.oandras.ksvg.dom.text
 
 import hu.oandras.ksvg.dom.style.NONE
 import hu.oandras.ksvg.parser.TextScanner
+import kotlin.jvm.JvmSynthetic
 
 internal class TextDecoration(val mask: Int) {
     fun hasUnderline(): Boolean = (mask and UNDERLINE) != 0
@@ -32,11 +33,21 @@ internal class TextDecoration(val mask: Int) {
         const val LINE_THROUGH = 4
         const val BLINK = 8
 
-        val None = TextDecoration(NONE)
-        val Underline = TextDecoration(UNDERLINE)
-        val Overline = TextDecoration(OVERLINE)
-        val LineThrough = TextDecoration(LINE_THROUGH)
-        val Blink = TextDecoration(BLINK)
+        @JvmSynthetic
+        @JvmField
+        internal val None: TextDecoration = TextDecoration(NONE)
+        @JvmSynthetic
+        @JvmField
+        internal val Underline: TextDecoration = TextDecoration(UNDERLINE)
+        @JvmSynthetic
+        @JvmField
+        internal val Overline: TextDecoration = TextDecoration(OVERLINE)
+        @JvmSynthetic
+        @JvmField
+        internal val LineThrough: TextDecoration = TextDecoration(LINE_THROUGH)
+        @JvmSynthetic
+        @JvmField
+        internal val Blink: TextDecoration = TextDecoration(BLINK)
     }
 
     override fun equals(other: Any?): Boolean {

@@ -22,7 +22,7 @@ package hu.oandras.ksvg.render.filters.pipeline
  * graph-level backend decision.
  */
 @JvmInline
-internal value class FilterPrimitiveSet private constructor(@JvmField internal val bits: Int) {
+internal value class FilterPrimitiveSet internal constructor(@JvmField internal val bits: Int) {
 
     internal fun contains(flag: Int): Boolean = (bits and flag) != 0
 

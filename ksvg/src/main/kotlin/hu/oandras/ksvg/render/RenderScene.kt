@@ -40,6 +40,8 @@ import hu.oandras.ksvg.render.PaintConfiguration.Companion.DEFAULT_TEXT_SIZE
 import hu.oandras.ksvg.render.pool.BitmapPool
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.anyElement
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmSynthetic
 
 /**
  * Owns a built render-node tree together with the state that decides when the
@@ -80,7 +82,9 @@ internal class RenderScene private constructor(
     private var lastViewPortOverride: Box? = null
 
     // Root-level view overrides resolved at build time (shared helper with the builder).
-    private var rootOverrides: RootViewOverrides = RootViewOverrides(null, null)
+    @JvmSynthetic
+    @JvmField
+    internal var rootOverrides: RootViewOverrides = RootViewOverrides(null, null)
 
     fun isUpToDate(modificationCount: Int, fingerprint: Long): Boolean {
         return this.modificationCount == modificationCount &&

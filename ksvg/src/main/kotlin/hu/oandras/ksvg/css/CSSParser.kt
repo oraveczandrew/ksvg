@@ -30,6 +30,7 @@ import hu.oandras.ksvg.logW
 import hu.oandras.ksvg.parser.checkCssState
 import hu.oandras.ksvg.utils.forEachElement
 import java.util.Locale
+import kotlin.jvm.JvmSynthetic
 
 /**
  * A very simple CSS parser that is not entirely compliant with the CSS spec but
@@ -489,7 +490,8 @@ internal class CSSParser internal constructor(
 
         //==============================================================================
         // Returns true if 'deviceMediaType' matches one of the media types in 'mediaList'
-        private fun mediaMatches(
+        @JvmSynthetic
+        internal fun mediaMatches(
             mediaList: List<MediaType>,
             rendererMediaType: MediaType?
         ): Boolean {
@@ -508,7 +510,8 @@ internal class CSSParser internal constructor(
         }
 
 
-        private fun parseMediaList(scan: CSSTextScanner): List<MediaType> {
+        @JvmSynthetic
+        internal fun parseMediaList(scan: CSSTextScanner): List<MediaType> {
             val typeList = ArrayList<MediaType>()
             while (!scan.empty()) {
                 val type = scan.nextWord() ?: break

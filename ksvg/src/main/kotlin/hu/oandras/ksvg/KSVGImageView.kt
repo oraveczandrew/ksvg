@@ -37,6 +37,8 @@ import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmSynthetic
 
 private const val TAG = "SVGImageView"
 
@@ -65,7 +67,9 @@ public class KSVGImageView @JvmOverloads constructor(
     /* attrs = */ attrs,
     /* defStyleAttr = */ defStyle
 ) {
-    private var svg: SVG? = null
+    @JvmSynthetic
+    @JvmField
+    internal var svg: SVG? = null
     private val renderOptions: RenderOptions = RenderOptions.create()
     private var onSvgClickListener: OnSvgClickListener? = null
 
@@ -95,9 +99,13 @@ public class KSVGImageView @JvmOverloads constructor(
     private var loadJob: Job? = null
 
     private var mainDispatcher: CoroutineDispatcher = config.mainDispatcher
-    private var ioDispatcher: CoroutineDispatcher = config.ioDispatcher
+    @JvmSynthetic
+    @JvmField
+    internal var ioDispatcher: CoroutineDispatcher = config.ioDispatcher
     private var configuredScope: CoroutineScope? = config.scope
-    private var loggerContext: LoggerContext = config.loggerContext
+    @JvmSynthetic
+    @JvmField
+    internal var loggerContext: LoggerContext = config.loggerContext
 
     // Owned fallback for loads with no scope (e.g., XML inflation before attach):
     // created on demand, torn down on detach. Never a host-owned scope.
@@ -323,7 +331,8 @@ public class KSVGImageView @JvmOverloads constructor(
         }
     }
 
-    private fun doRender() {
+    @JvmSynthetic
+    internal fun doRender() {
         val svg = svg ?: return
         setImageDrawable(svg.toDrawable(renderOptions))
     }

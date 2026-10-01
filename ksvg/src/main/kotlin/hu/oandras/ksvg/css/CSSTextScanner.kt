@@ -26,16 +26,20 @@ import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.toPattern
 import java.util.Locale
 import java.util.regex.Pattern
+import kotlin.jvm.JvmSynthetic
 
-private typealias AnPlusB = Long
+internal typealias AnPlusB = Long
 
-private fun AnPlusB(a: Int, b: Int): AnPlusB =
+@JvmSynthetic
+internal fun AnPlusB(a: Int, b: Int): AnPlusB =
     (a.toLong() shl 32) or (b.toLong() and 0xFFFFFFFFL)
 
-private val AnPlusB.a: Int
+@get:JvmSynthetic
+internal val AnPlusB.a: Int
     get() = (this shr 32).toInt()
 
-private val AnPlusB.b: Int
+@get:JvmSynthetic
+internal val AnPlusB.b: Int
     get() = toInt()
 
 internal class CSSTextScanner(input: String) : TextScanner(

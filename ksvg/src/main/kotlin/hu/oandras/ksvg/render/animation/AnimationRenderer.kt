@@ -69,6 +69,7 @@ import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.toRadians
 import kotlin.math.atan2
 import kotlin.math.tan
+import kotlin.jvm.JvmSynthetic
 
 context(renderContext: AnimationContext)
 internal fun RenderNode<*>.updateAnimations(animationTimeMs: Long): Boolean {
@@ -890,7 +891,8 @@ internal inline fun AnimateColorNode.withColorAt(animationTimeMs: Long, baseColo
 }
 
 /** Per-channel `base + by * p` for SMIL `by`-only color animation. */
-private fun addColors(baseColor: Int, byColor: Int, progress: Float): Int {
+@JvmSynthetic
+internal fun addColors(baseColor: Int, byColor: Int, progress: Float): Int {
     return argb(
         clamp255(baseColor.alpha + byColor.alpha * progress),
         clamp255(baseColor.red + byColor.red * progress),

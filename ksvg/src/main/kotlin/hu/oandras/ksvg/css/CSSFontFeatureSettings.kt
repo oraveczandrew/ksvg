@@ -24,6 +24,7 @@ import hu.oandras.ksvg.parser.TextScanner
 import java.util.*
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
+import kotlin.jvm.JvmSynthetic
 
 @ConsistentCopyVisibility
 internal data class CSSFontFeatureSettings internal constructor(
@@ -572,7 +573,9 @@ internal data class CSSFontFeatureSettings internal constructor(
                 calt = true
             )
 
-        private val LIGATURES_ALL_OFF: CSSFontFeatureSettings =
+        @JvmSynthetic
+        @JvmField
+        internal val LIGATURES_ALL_OFF: CSSFontFeatureSettings =
             CSSFontFeatureSettings(
                 liga = false,
                 clig = false,

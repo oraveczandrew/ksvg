@@ -108,6 +108,8 @@ import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.withAlpha
 import java.util.Stack
+import kotlin.jvm.JvmField
+import kotlin.jvm.JvmSynthetic
 import kotlin.math.atan2
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -117,7 +119,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-private val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean  = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S // Android 12
+@JvmSynthetic
+@JvmField
+internal val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S // Android 12
 
 /**
  * Bake raster cap (long side, px) for the API < 31 focal-gradient fallback.
@@ -148,7 +152,9 @@ internal class Renderer internal constructor(
     override val delegate: LoggerContext
         get() = document
     // Renderer state
-    private var state: RendererState = RendererState()
+    @JvmSynthetic
+    @JvmField
+    internal var state: RendererState = RendererState()
 
     // Filter-pipeline backends, resolved per render operation (canvas capability).
     private var softwareBackend: SoftwareFilterBackend? = null
@@ -174,7 +180,9 @@ internal class Renderer internal constructor(
     // Reused across text renders to avoid per-element allocation in the render loop.
     private val plainTextDrawer = PlainTextDrawer(state)
 
-    private val stateStack: Stack<SavedRendererState> = Stack() // Keeps track of render state as we render
+    @JvmSynthetic
+    @JvmField
+    internal val stateStack: Stack<SavedRendererState> = Stack() // Keeps track of render state as we render
 
     // Keep track of element stack while rendering.
     private val parentStack: Stack<Container> =
@@ -1109,7 +1117,9 @@ internal class Renderer internal constructor(
         }
     }
 
-    private val getValuesFloatArray = FloatArray(9)
+    @JvmSynthetic
+    @JvmField
+    internal val getValuesFloatArray: FloatArray = FloatArray(9)
     private inline fun withNewRenderLayer(
         canvas: Canvas,
         node: RenderNode<*>,
@@ -1448,7 +1458,8 @@ internal class Renderer internal constructor(
         }
     }
 
-    private fun obtainFilterBackend(
+    @JvmSynthetic
+    internal fun obtainFilterBackend(
         canvas: Canvas,
         element: RenderNode<*>,
         filterNode: FilterRenderNode,
@@ -1561,11 +1572,13 @@ internal class Renderer internal constructor(
         }
     }
 
-    private fun display(): Boolean {
+    @JvmSynthetic
+    internal fun display(): Boolean {
         return state.style.display ?: true
     }
 
-    private fun visible(): Boolean {
+    @JvmSynthetic
+    internal fun visible(): Boolean {
         return state.style.visibility ?: true
     }
 
@@ -2681,7 +2694,8 @@ internal class Renderer internal constructor(
         return true
     }
 
-    private fun nodeToPath(node: RenderNode<*>, outPath: Path): Boolean {
+    @JvmSynthetic
+    internal fun nodeToPath(node: RenderNode<*>, outPath: Path): Boolean {
         return when (node) {
             is PathRenderNode -> {
                 outPath.set(node.path)
@@ -3045,7 +3059,8 @@ internal class Renderer internal constructor(
          * This was one of the ambiguous markers. Try to see if we can find a better direction for
          * it, now that we have more info available on the neighboring marker positions.
          */
-        private fun realignMarkerMid(
+        @JvmSynthetic
+        internal fun realignMarkerMid(
             lastPos: MarkerVector,
             thisPos: MarkerVector,
             nextPos: MarkerVector

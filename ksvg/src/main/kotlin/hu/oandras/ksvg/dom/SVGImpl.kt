@@ -59,6 +59,7 @@ import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
+import kotlin.jvm.JvmSynthetic
 
 internal const val COLOR_WHITE: Int = 0xFFFFFFFF.toInt()
 internal const val COLOR_TRANSPARENT: Int = 0
@@ -689,7 +690,8 @@ internal class SVGImpl internal constructor(
         }
     }
 
-    private fun getElementById(obj: Container, id: String): SvgObject? {
+    @JvmSynthetic
+    internal fun getElementById(obj: Container, id: String): SvgObject? {
         if (id == obj.id) return obj
         obj.getChildren().forEachElement { child ->
             if (child !is ElementBase) {

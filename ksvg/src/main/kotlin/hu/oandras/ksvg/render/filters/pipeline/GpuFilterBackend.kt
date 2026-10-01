@@ -44,6 +44,7 @@ import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
 import kotlin.math.abs
+import kotlin.jvm.JvmSynthetic
 import android.graphics.RenderNode as AndroidRenderNode
 
 /**
@@ -564,8 +565,12 @@ internal open class GpuFilterBackend internal constructor(
          * matches the requested one; re-fit against `GpuPrimitiveParityTest`
          * if the blur changes.
          */
-        private val SKIA_BLUR_RESPONSE_SIGMA: FloatArray = floatArrayOf(1.05f, 1.55f, 1.75f, 2.80f, 3.75f, 3.95f)
-        private val SKIA_BLUR_RESPONSE_RADIUS: FloatArray = floatArrayOf(1.0f, 1.833f, 2.25f, 4.0f, 5.657f, 6.0f)
+        @JvmSynthetic
+        @JvmField
+        internal val SKIA_BLUR_RESPONSE_SIGMA: FloatArray = floatArrayOf(1.05f, 1.55f, 1.75f, 2.80f, 3.75f, 3.95f)
+        @JvmSynthetic
+        @JvmField
+        internal val SKIA_BLUR_RESPONSE_RADIUS: FloatArray = floatArrayOf(1.0f, 1.833f, 2.25f, 4.0f, 5.657f, 6.0f)
 
         /**
          * Skia blur radius whose effective sigma equals [sigma], by piecewise

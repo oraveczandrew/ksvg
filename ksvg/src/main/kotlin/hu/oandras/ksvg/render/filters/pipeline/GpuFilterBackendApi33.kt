@@ -85,6 +85,7 @@ import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
 import kotlin.math.abs
+import kotlin.jvm.JvmSynthetic
 
 /**
  * AGSL (RuntimeShader) GPU backend (API 33+, hardware canvas only).
@@ -1087,7 +1088,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
     }
 
     companion object {
-        private fun FeBlendMode.toBlendMode(): BlendMode? = when (this) {
+        @JvmSynthetic
+        internal fun FeBlendMode.toBlendMode(): BlendMode? = when (this) {
             FeBlendMode.normal -> BlendMode.SRC_OVER
             FeBlendMode.multiply -> BlendMode.MULTIPLY
             FeBlendMode.screen -> BlendMode.SCREEN
@@ -1106,7 +1108,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
             FeBlendMode.luminosity -> BlendMode.LUMINOSITY
         }
 
-        private fun FeCompositeOperator.toBlendMode(): BlendMode? = when (this) {
+        @JvmSynthetic
+        internal fun FeCompositeOperator.toBlendMode(): BlendMode? = when (this) {
             FeCompositeOperator.over -> BlendMode.SRC_OVER
             FeCompositeOperator.`in` -> BlendMode.SRC_IN
             FeCompositeOperator.out -> BlendMode.SRC_OUT

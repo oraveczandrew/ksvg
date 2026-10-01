@@ -26,7 +26,6 @@ internal sealed interface PseudoClass {
     fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean
 
     val specificity: Int
-        get() = 0
 }
 
 internal class PseudoClassAnPlusB(
@@ -36,6 +35,8 @@ internal class PseudoClassAnPlusB(
     private val isOfType: Boolean, // The node name for when isOfType is true
     private val nodeName: String?
 ) : PseudoClass {
+
+    override val specificity: Int = 0
 
     override fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean {
         // For "*-of-type" pseudo-classes with no explicit node name, count only children of the element's own type.
@@ -97,6 +98,9 @@ internal class PseudoClassOnlyChild(
     private val isOfType: Boolean, // The node name for when isOfType is true
     private val nodeName: String?
 ) : PseudoClass {
+
+    override val specificity: Int = 0
+
     override fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean {
         // For "*-of-type" pseudo-classes with no explicit node name, count only children of the element's own type.
         val nodeNameToCheck = if (isOfType && nodeName == null) obj.getNodeName() else nodeName
@@ -131,6 +135,8 @@ internal class PseudoClassOnlyChild(
 
 
 internal data object PseudoClassRoot : PseudoClass {
+    override val specificity: Int = 0
+
     override fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean {
         return obj.parent == null
     }
@@ -141,6 +147,8 @@ internal data object PseudoClassRoot : PseudoClass {
 }
 
 internal data object PseudoClassEmpty : PseudoClass {
+    override val specificity: Int = 0
+
     override fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean {
         // An element is considered empty when it has no child elements or text content.
         // Elements whose children are dropped/ignored during rendering are treated as empty.
@@ -190,6 +198,8 @@ internal class PseudoClassNot(
 
 
 internal data object PseudoClassTarget : PseudoClass {
+    override val specificity: Int = 0
+
     override fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean {
         return ruleMatchContext != null && obj === ruleMatchContext.targetElement
     }
@@ -204,6 +214,8 @@ internal class PseudoClassNotSupported(
     @JvmField
     internal val name: String
 ) : PseudoClass {
+    override val specificity: Int = 0
+
     override fun matches(ruleMatchContext: CSSParser.RuleMatchContext?, obj: ElementBase): Boolean {
         return false
     }
