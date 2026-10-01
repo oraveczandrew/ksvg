@@ -70,6 +70,15 @@ internal inline fun Float.takeIfNonZeroOrElse(r: () -> Float): Float {
     else r.invoke()
 }
 
+/**
+ * Non-boxing `takeIf { it != 0 } ?: default` for packed-int style fields.
+ * Unlike the stdlib `takeIf`, this never boxes: hot paths (per path per draw)
+ * must not allocate wrapper objects for sentinel checks.
+ */
+internal fun Int.takeIfNonZeroOrElse(default: Int): Int {
+    return if (this != 0) this else default
+}
+
 internal inline fun String.toFloatOrError(errorMessage: () -> String): Float {
     return try {
         toFloat()

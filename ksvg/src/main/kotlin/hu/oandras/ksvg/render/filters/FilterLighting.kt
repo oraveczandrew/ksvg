@@ -77,8 +77,12 @@ private fun doLightingFilter(
     // kernelUnitLength (in filter primitive units) scales the normal-tap
     // distances; the default is one offscreen pixel. Mirrors the reference
     // model (rsvg): downscale the input, light at 1px taps, upscale back.
-    val stepX = kernelUnitLengthX?.let { it * primitiveScaleX }?.takeIf { it > 0f } ?: 1f
-    val stepY = kernelUnitLengthY?.let { it * primitiveScaleY }?.takeIf { it > 0f } ?: 1f
+    // Plain branches instead of `?.let{}?.takeIf{}`: the nullable chain boxes
+    // twice per filter evaluation, this stays unboxed.
+    val scaledStepX = if (kernelUnitLengthX != null) kernelUnitLengthX * primitiveScaleX else 0f
+    val stepX = if (scaledStepX > 0f) scaledStepX else 1f
+    val scaledStepY = if (kernelUnitLengthY != null) kernelUnitLengthY * primitiveScaleY else 0f
+    val stepY = if (scaledStepY > 0f) scaledStepY else 1f
     if (stepX == 1f && stepY == 1f) {
         return lightBitmap(
             primitive = primitive,

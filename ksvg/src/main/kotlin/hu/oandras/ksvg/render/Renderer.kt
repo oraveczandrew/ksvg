@@ -105,6 +105,7 @@ import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.colorWithOpacity
 import hu.oandras.ksvg.utils.forEachElement
+import hu.oandras.ksvg.utils.takeIfNonZeroOrElse
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.withAlpha
 import java.util.Stack
@@ -856,7 +857,7 @@ internal class Renderer internal constructor(
 
     private fun drawPathContent(canvas: Canvas, node: PathRenderNode, state: RendererState) {
         // paintOrder is stored already encoded as three 2-bit digits; 0 = normal.
-        val order = state.style.paintOrder.takeIf { it != 0 } ?: PaintOrder.FILL_STROKE_MARKERS
+        val order = state.style.paintOrder.takeIfNonZeroOrElse(PaintOrder.FILL_STROKE_MARKERS)
         for (shift in 4 downTo 0 step 2) {
             when ((order shr shift) and 3) {
                 PaintOrder.FILL -> if (state.hasFill) {
