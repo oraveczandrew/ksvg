@@ -26,6 +26,7 @@ import android.os.Build
 import android.util.ArrayMap
 import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.render.ALPHA_MATRIX_COLOR_FILTER
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeDropShadowRenderNode
@@ -52,10 +53,13 @@ import android.graphics.RenderNode as AndroidRenderNode
  * feGaussianBlur and feOffset (each primitive's `in` refers to the previous
  * result or is the implicit source). ColorMatrix maps 1:1 onto
  * [RenderEffect.createColorFilterEffect] (same [buildColorMatrix] as the CPU
- * path). GaussianBlur uses [RenderEffect.createBlurEffect] with CLAMP edge
+ * path). GaussianBlur uses [RenderEffect.createBlurEffect] (CLAMP edge
  * mode; the source is recorded with a transparent pad of
  * [Chain.padX]/[Chain.padY] device pixels on every side so the clamp reads
- * transparent black — matching the CPU kernel's transparent-black pedestal.
+ * transparent black — matching the CPU kernel's transparent-black pedestal,
+ * i.e. `edgeMode="none"` exactly). `duplicate`/`wrap` decline to software:
+ * a TileMode switch would replicate/tile the transparent pad instead of the
+ * content edge.
  * Offset maps to [RenderEffect.createOffsetEffect] with device-pixel deltas.
  *
  * Deliberately NOT claimed yet: two-input or canvas-drawn primitives
@@ -311,6 +315,17 @@ internal open class GpuFilterBackend internal constructor(
                     val blurElement = primitive.sourceElement
                     if (blurElement.x != null || blurElement.y != null ||
                         blurElement.width != null || blurElement.height != null
+                    ) {
+                        return null
+                    }
+                    // Edge modes: the source is recorded with a transparent pad
+                    // (see the class KDoc), so Skia's CLAMP already implements
+                    // `none` exactly. A bare TileMode switch can NOT implement
+                    // duplicate/wrap: CLAMP/REPEAT would replicate/tile the
+                    // transparent pad instead of the content edge. Decline so
+                    // software renders them exactly.
+                    if (primitive.edgeMode != ConvolveMatrixEdgeMode.none &&
+                        (primitive.stdDeviationX > 0f || primitive.stdDeviationY > 0f)
                     ) {
                         return null
                     }

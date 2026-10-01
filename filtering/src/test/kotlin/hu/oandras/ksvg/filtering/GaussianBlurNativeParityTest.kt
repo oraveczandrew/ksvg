@@ -72,9 +72,14 @@ class GaussianBlurNativeParityTest(
         val scratch = NativeGaussianBlur.createScratch()
         try {
             NativeGaussianBlur.applyForced(
-                scratch, out, case.width, case.height,
-                case.stdDeviationX, case.stdDeviationY,
-                backend
+                scratch = scratch,
+                pixels = out,
+                width = case.width,
+                height = case.height,
+                stdDeviationX = case.stdDeviationX,
+                stdDeviationY = case.stdDeviationY,
+                simdBackend = backend,
+                edgeMode = StackBlur.EDGE_NONE
             )
         } finally {
             NativeGaussianBlur.destroyScratch(scratch)

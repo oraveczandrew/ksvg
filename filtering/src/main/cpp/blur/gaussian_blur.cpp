@@ -19,17 +19,19 @@
  * Replacement Toolkit's `Blur` (Apache-2.0).
  *
  * Operates on ARGB pixels (as supplied by android.graphics.Bitmap.getPixels):
- * each of the A,R,G,B channels is blurred independently. Pixels outside the
- * bitmap are treated as transparent black, matching the SVG spec for
- * filter-region edges (stdDeviation == Gaussian sigma).
+ * each of the A,R,G,B channels is blurred independently. Out-of-bounds taps
+ * follow `edgeMode` (0=duplicate/clamp, 1=wrap, 2=none/transparent black),
+ * matching the SVG `feGaussianBlur edgeMode` attribute.
  *
  * Dispatch:
- *  - Isotropic (stdDeviationX == stdDeviationY), radius in [1, 25]:
- *    the RIR optimized kernels (ARM NEON *U4_K / x86 SSE *VFU4_K+*HFU4_K) are
- *    used on a zero-padded copy of the image so the kernels' edge clamp reads
- *    transparent black.
- *  - Anisotropic (stdDeviationX != stdDeviationY) or radius > 25 (the kernels
- *    are unrolled up to 25): the pure-C++ scalar two-pass fallback is used.
+ *  - Isotropic (stdDeviationX == stdDeviationY), radius in [1, 25]: the RIR
+ *    optimized kernels (ARM NEON *U4_K / x86 SSE *VFU4_K+*HFU4_K) run on a
+ *    padded copy of the image whose pad ring carries the edge extension
+ *    (transparent zeros for `none`, replicated/wrapped content otherwise),
+ *    so every kernel tap reads the edge-correct pixel.
+ *  - Otherwise (anisotropic or radius > 25, beyond the kernels' unrolled
+ *    range): the pure-C++ scalar two-pass fallback is used, which samples
+ *    per `edgeMode` directly.
  */
 
 #include <jni.h>
@@ -122,12 +124,77 @@ int computeWeights(const float sigma, std::vector<float>& weights) {
            static_cast<uint32_t>(ksvg::clamp255(b));
 }
 
+// Edge modes for the blur (matches StackBlur.EDGE_* and
+// ConvolveMatrixEdgeMode ordinals in `:ksvg`).
+constexpr int kEdgeDuplicate = 0;
+constexpr int kEdgeWrap = 1;
+constexpr int kEdgeNone = 2;
+
+// Maps an out-of-range coordinate per `edgeMode`. Returns -1 for
+// `none` (caller treats it as transparent black).
+inline int sampleCoord(const int coord, const int dim, const int edgeMode) {
+    if (coord >= 0 && coord < dim) return coord;
+    if (edgeMode == kEdgeDuplicate) return std::min(std::max(coord, 0), dim - 1);
+    if (edgeMode == kEdgeWrap && dim > 0) {
+        int m = coord % dim;
+        if (m < 0) m += dim;
+        return m;
+    }
+    return -1;
+}
+
+// Extends the content copied into the padded buffer across the pad ring per
+// `edgeMode`: duplicate replicates the edge pixels, wrap copies from the
+// opposite side. `none` needs no work (the buffer is zero-cleared).
+// Left/right are extended first over the content rows, then top/bottom over
+// the full extended width, so corners come out consistently.
+//
+// This alone implements all three modes for the SIMD kernels: every tap of
+// every output pixel we keep lies within the padded image (pad == radius, and
+// the crop discards the pad ring), and the kernels clamp any residual
+// out-of-range read to the padded bounds — i.e. to the extended edge.
+void fillPad(std::vector<uint8_t>& in, const int w, const int h,
+             const int pad, const int pw, const int edgeMode) {
+    if (edgeMode == kEdgeNone || pad == 0 || w <= 0 || h <= 0) return;
+    const size_t rowBytes = static_cast<size_t>(pw) * 4;
+    uint8_t* const base = in.data();
+    auto row = [&](const int py) -> uint8_t* {
+        return base + static_cast<size_t>(py) * rowBytes;
+    };
+    auto mod = [](const int v, const int m) -> int {
+        const int r = v % m;
+        return r < 0 ? r + m : r;
+    };
+    // Left/right over the content rows. Padded column (pad-1-j) mirrors
+    // content column (-1-j), i.e. (w-1-j) mod w; (pad+w+j) mirrors j mod w.
+    for (int y = 0; y < h; ++y) {
+        uint8_t* const dst = row(y + pad);
+        const uint8_t* const content = dst + static_cast<size_t>(pad) * 4;
+        for (int j = 0; j < pad; ++j) {
+            const int li = edgeMode == kEdgeDuplicate ? 0 : mod(w - 1 - j, w);
+            const int ri = edgeMode == kEdgeDuplicate ? w - 1 : mod(j, w);
+            std::memcpy(dst + static_cast<size_t>(pad - 1 - j) * 4,
+                        content + static_cast<size_t>(li) * 4, 4);
+            std::memcpy(dst + static_cast<size_t>(pad + w + j) * 4,
+                        content + static_cast<size_t>(ri) * 4, 4);
+        }
+    }
+    // Top/bottom over the full extended width. Padded row (pad-1-j) mirrors
+    // content row (-1-j), i.e. (h-1-j) mod h; (pad+h+j) mirrors j mod h.
+    for (int j = 0; j < pad; ++j) {
+        const int ti = edgeMode == kEdgeDuplicate ? pad : pad + mod(h - 1 - j, h);
+        const int bi = edgeMode == kEdgeDuplicate ? pad + h - 1 : pad + mod(j, h);
+        std::memcpy(row(pad - 1 - j), row(ti), rowBytes);
+        std::memcpy(row(pad + h + j), row(bi), rowBytes);
+    }
+}
+
 // Pure-C++ two-pass separable blur (reference + fallback). Handles arbitrary
-// (possibly anisotropic) radii per axis.
+// (possibly anisotropic) radii per axis and all three edge modes.
 void blurScalar(jint* pix, const int w, const int h,
                 const std::vector<float>& wx, const int rx,
                 const std::vector<float>& wy, const int ry,
-                GaussianScratch& s) {
+                GaussianScratch& s, const int edgeMode) {
     const int n = w * h;
     const size_t need = static_cast<size_t>(n) * 4;
     if (s.bufA.size() < need) s.bufA.resize(need);
@@ -148,8 +215,8 @@ void blurScalar(jint* pix, const int w, const int h,
             for (int x = 0; x < w; ++x) {
                 float sa = 0.0f, sr = 0.0f, sg = 0.0f, sb = 0.0f;
                 for (int k = -radius; k <= radius; ++k) {
-                    const int coord = (horizontal ? x : y) + k;
-                    if (coord >= 0 && coord < dim) {
+                    const int coord = sampleCoord((horizontal ? x : y) + k, dim, edgeMode);
+                    if (coord >= 0) {
                         const int idx = (horizontal ? y * w + coord : coord * w + x) * 4;
                         const float wgt = wt[k + radius];
                         sa += s.bufA[idx + 0] * wgt;
@@ -180,9 +247,12 @@ void blurScalar(jint* pix, const int w, const int h,
 
 // Isotropic fast path using the RIR separable kernels. `pix` is the raw
 // premultiplied-ARGB byte buffer. Returns true if a kernel backend ran.
+// All three edge modes are supported: the pad ring carries the edge extension
+// (see fillPad), so the kernels' reads — always inside the padded image for
+// the cropped region — see exactly the extended content.
 bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
                           const std::vector<float>& weights,
-                          GaussianScratch& s, const int forcedBackend = -1) {
+                          GaussianScratch& s, const int edgeMode, const int forcedBackend = -1) {
 #if defined(__aarch64__) || defined(__arm__) || defined(__i386__) || defined(__x86_64__)
     const int pad = r;
     const int pw = w + 2 * pad;
@@ -191,8 +261,9 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
     const size_t pn = static_cast<size_t>(pw) * static_cast<size_t>(ph) * 4;
 
     // Reuse caller-owned padded buffers so the fast path allocates nothing.
-    // Pixels outside [pad, pad+h) x [pad, pad+w) are transparent black, so the
-    // kernels' edge clamp reads SVG-correct edges (memset clears the whole pad).
+    // For `none` the pad stays transparent black (memset clears it all), so the
+    // kernels' edge clamp reads SVG-correct edges; otherwise fillPad extends
+    // the content edges across the pad ring.
     if (s.paddedIn.size() < pn) s.paddedIn.resize(pn);
     if (s.paddedOut.size() < pn) s.paddedOut.resize(pn);
     std::memset(s.paddedIn.data(), 0, pn);
@@ -203,6 +274,7 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
         uint8_t* dst = in.data() + static_cast<size_t>((y + pad) * pw + pad) * 4;
         std::memcpy(dst, src, static_cast<size_t>(w) * 4);
     }
+    fillPad(in, w, h, pad, pw, edgeMode);
 
 #if defined(__aarch64__) || defined(__arm__)
     std::vector<uint16_t> mIp(2 * r + 1);
@@ -225,9 +297,11 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
     if (s.fbuf.size() < fn) s.fbuf.resize(fn);
     float* fbuf0 = s.fbuf.data();             // valid pointer for pin = fbuf0
     float* fbuf_mid = fbuf0 + (size_t)r * 4;  // float4 per padded column
-    // The horizontal pass reads fbuf0[0..r), which no pass ever writes: the
-    // correct value there is the transparent-black edge pedestal (0.0f).
-    // resize() zero-fills today, but spell it out so a future
+    // The horizontal pass reads fbuf0[0..r), which no pass ever writes — but
+    // only for pad-ring outputs that the final crop discards, so the value is
+    // irrelevant to the result. Zero it defensively (transparent black) so a
+    // future crop change cannot leak garbage into left-edge columns.
+    // resize() zero-fills today; spell it out so a future
     // reserve()+uninitialized growth cannot corrupt left-edge columns.
     std::fill(fbuf0, fbuf0 + (size_t)r * 4, 0.0f);
 
@@ -324,37 +398,39 @@ bool blurIsotropicKernel(uint8_t* pix, const int w, const int h, const int r,
 // Validation/test-only: run an explicitly selected backend (see SimdBackend).
 namespace {
 
-void runForced(GaussianScratch* s, jint* pix, const int w, const int h, const float stdDeviationX, const float stdDeviationY, const int backend) {
+void runForced(GaussianScratch* s, jint* pix, const int w, const int h, const float stdDeviationX, const float stdDeviationY, const int backend, const int edgeMode) {
     std::vector<float> wx, wy;
     const int rx = computeWeights(stdDeviationX, wx);
     const int ry = computeWeights(stdDeviationY, wy);
 
     if (backend == SIMD_BACKEND_SCALAR) {
-        blurScalar(pix, w, h, wx, rx, wy, ry, *s);
+        blurScalar(pix, w, h, wx, rx, wy, ry, *s, edgeMode);
         return;
     }
 
     const bool isotropic = rx == ry;
+    // The RIR kernels serve every edge mode (the pad ring carries the edge
+    // extension); only isotropic small radii qualify.
     if (!isotropic || rx < 1 || rx > kMaxKernelRadius) {
         // Kernels only support isotropic small radius; if forced, fall back to scalar
         // rather than crashing if the test provides incompatible params, but log it?
         // Actually, we'll just run scalar.
-        blurScalar(pix, w, h, wx, rx, wy, ry, *s);
+        blurScalar(pix, w, h, wx, rx, wy, ry, *s, edgeMode);
         return;
     }
 
 #if defined(__aarch64__)
     assert(backend == SIMD_BACKEND_NEON64);
-    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s);
+    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s, edgeMode);
 #elif defined(__arm__) || defined(__ARM_NEON__) || defined(__ARM_NEON)
     assert(backend == SIMD_BACKEND_NEON32);
-    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s);
+    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s, edgeMode);
 #elif defined(__i386__) || defined(__x86_64__)
     // Gaussian Blur has hybrid SSE/AVX2 logic inside blurIsotropicKernel;
     // forward the forced backend so each advertised path is actually exercised.
-    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s, backend);
+    blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s, edgeMode, backend);
 #else
-    blurScalar(pix, w, h, wx, rx, wy, ry, *s);
+    blurScalar(pix, w, h, wx, rx, wy, ry, *s, edgeMode);
 #endif
 }
 
@@ -395,12 +471,12 @@ Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_nativeBackend(
 extern "C" JNIEXPORT void JNICALL
 Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_applyForced(
         JNIEnv* env, [[maybe_unused]] jclass clazz, const jlong scratchHandle, const jintArray pixels,
-        const jint width, const jint height, const jfloat stdDeviationX, const jfloat stdDeviationY, const jint simdBackend) {
+        const jint width, const jint height, const jfloat stdDeviationX, const jfloat stdDeviationY, const jint simdBackend, const jint edgeMode) {
     const auto s = reinterpret_cast<GaussianScratch*>(scratchHandle);
     jint* pix = env->GetIntArrayElements(pixels, nullptr);
     if (pix == nullptr) return;
 
-    runForced(s, pix, width, height, stdDeviationX, stdDeviationY, simdBackend);
+    runForced(s, pix, width, height, stdDeviationX, stdDeviationY, simdBackend, edgeMode);
 
     env->ReleaseIntArrayElements(pixels, pix, 0);
 }
@@ -420,7 +496,7 @@ JNIEXPORT void JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_destroy
 extern "C"
 JNIEXPORT void JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_nativeBlur(
         JNIEnv* env, jclass, const jlong scratchHandle, const jintArray pixels, const jint width,
-        const jint height, const jfloat stdDeviationX, const jfloat stdDeviationY) {
+        const jint height, const jfloat stdDeviationX, const jfloat stdDeviationY, const jint edgeMode) {
     const auto s = reinterpret_cast<GaussianScratch*>(scratchHandle);
     jint* pix = env->GetIntArrayElements(pixels, nullptr);
     if (pix == nullptr) return;
@@ -436,16 +512,17 @@ JNIEXPORT void JNICALL Java_hu_oandras_ksvg_filtering_NativeGaussianBlur_nativeB
         return;
     }
 
-    // Isotropic + small-enough radius -> optimized RIR kernels.
+    // Isotropic + small-enough radius -> optimized RIR kernels (all edge
+    // modes; the pad ring carries the edge extension).
     const bool isotropic = rx == ry;
     if (isotropic && rx >= 1 && rx <= kMaxKernelRadius) {
-        if (blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s)) {
+        if (blurIsotropicKernel(reinterpret_cast<uint8_t*>(pix), w, h, rx, wx, *s, edgeMode)) {
             env->ReleaseIntArrayElements(pixels, pix, 0);
             return;
         }
         // No backend for this ABI: fall through to scalar.
     }
 
-    blurScalar(pix, w, h, wx, rx, wy, ry, *s);
+    blurScalar(pix, w, h, wx, rx, wy, ry, *s, edgeMode);
     env->ReleaseIntArrayElements(pixels, pix, 0);
 }

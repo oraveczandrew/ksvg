@@ -42,6 +42,10 @@ public sealed interface StackBlurScratch {
      * [requiresPremultipliedInput]. Both backends emit premultiplied
      * channels; the render boundary (`doFeGaussianBlurFilter`) unpremultiplies
      * before straight storage.
+     *
+     * @param edgeMode 0=duplicate, 1=wrap, 2=none (matches
+     * `ConvolveMatrixEdgeMode` ordinals in `:ksvg`). The native path only
+     * implements `none`; other modes fall back to the Kotlin stack blur.
      */
     public fun blur(
         pixels: IntArray,
@@ -49,6 +53,7 @@ public sealed interface StackBlurScratch {
         height: Int,
         stdDeviationX: Float,
         stdDeviationY: Float,
+        edgeMode: Int,
     )
 
     /**
@@ -77,8 +82,9 @@ private class NativeScratch : StackBlurScratch {
         height: Int,
         stdDeviationX: Float,
         stdDeviationY: Float,
+        edgeMode: Int,
     ) {
-        NativeGaussianBlur.nativeBlur(ensure(), pixels, width, height, stdDeviationX, stdDeviationY)
+        NativeGaussianBlur.nativeBlur(ensure(), pixels, width, height, stdDeviationX, stdDeviationY, edgeMode)
     }
 
     override fun close() {
@@ -101,11 +107,12 @@ private class FallbackScratch : StackBlurScratch {
         height: Int,
         stdDeviationX: Float,
         stdDeviationY: Float,
+        edgeMode: Int,
     ) {
         val rx = max((stdDeviationX * 2.5f + 0.5f).toInt(), 0)
         val ry = max((stdDeviationY * 2.5f + 0.5f).toInt(), 0)
-        if (rx > 0) StackBlur.stackBlur(pixels, width, height, rx, true, scratchX, true)
-        if (ry > 0) StackBlur.stackBlur(pixels, width, height, ry, false, scratchY, rx == 0)
+        if (rx > 0) StackBlur.stackBlur(pixels, width, height, rx, true, scratchX, true, edgeMode)
+        if (ry > 0) StackBlur.stackBlur(pixels, width, height, ry, false, scratchY, rx == 0, edgeMode)
     }
 }
 
@@ -144,6 +151,7 @@ internal object NativeGaussianBlur {
         height: Int,
         stdDeviationX: Float,
         stdDeviationY: Float,
+        edgeMode: Int,
     )
 
     /**
@@ -159,6 +167,7 @@ internal object NativeGaussianBlur {
         stdDeviationX: Float,
         stdDeviationY: Float,
         @SimdBackend simdBackend: Int,
+        edgeMode: Int,
     )
 
     /** Reports the backend the production dispatcher actually selects on this ABI. */
@@ -185,7 +194,8 @@ internal object NativeGaussianBlur {
         stdDeviationX: Float,
         stdDeviationY: Float,
         scratch: StackBlurScratch,
+        edgeMode: Int,
     ) {
-        scratch.blur(pixels, width, height, stdDeviationX, stdDeviationY)
+        scratch.blur(pixels, width, height, stdDeviationX, stdDeviationY, edgeMode)
     }
 }

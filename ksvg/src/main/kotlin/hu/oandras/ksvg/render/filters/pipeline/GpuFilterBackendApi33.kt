@@ -279,6 +279,17 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             }
                             val sigmaX = primitive.stdDeviationX * scaleX
                             val sigmaY = primitive.stdDeviationY * scaleY
+                            // Same pad architecture as the base backend (see
+                            // drawFiltered): the recorded source carries a
+                            // transparent pad, so CLAMP already implements
+                            // `none` exactly, while a TileMode switch would
+                            // replicate/tile the pad. Decline duplicate/wrap
+                            // to software.
+                            if (primitive.edgeMode != ConvolveMatrixEdgeMode.none &&
+                                (sigmaX > 0f || sigmaY > 0f)
+                            ) {
+                                return null
+                            }
                             if (sigmaX <= 0f && sigmaY <= 0f) {
                                 inputEffect
                             } else {

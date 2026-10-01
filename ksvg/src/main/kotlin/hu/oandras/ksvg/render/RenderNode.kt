@@ -874,7 +874,8 @@ internal class StopRenderNode(
 internal class FeGaussianBlurRenderNode(
     sourceElement: FeGaussianBlur,
     @JvmField var stdDeviationX: Float,
-    @JvmField var stdDeviationY: Float
+    @JvmField var stdDeviationY: Float,
+    @JvmField var edgeMode: ConvolveMatrixEdgeMode
 ) : FilterPrimitiveRenderNode<FeGaussianBlur>(sourceElement) {
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_GAUSSIAN_BLUR
     /**

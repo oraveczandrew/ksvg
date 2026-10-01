@@ -541,7 +541,8 @@ private fun benchmarkGaussianBlur(case: BenchmarkCase, sink: KernelBenchmarkSink
                 width = w,
                 height = h,
                 stdDeviationX = 5f,
-                stdDeviationY = 5f
+                stdDeviationY = 5f,
+                edgeMode = StackBlur.EDGE_NONE
             )
         }
 
@@ -553,7 +554,8 @@ private fun benchmarkGaussianBlur(case: BenchmarkCase, sink: KernelBenchmarkSink
                 height = h,
                 stdDeviationX = 5f,
                 stdDeviationY = 5f,
-                simdBackend = b
+                simdBackend = b,
+                edgeMode = StackBlur.EDGE_NONE
             )
         }
     } finally {

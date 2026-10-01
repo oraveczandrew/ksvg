@@ -245,7 +245,7 @@ internal fun doFeGaussianBlurFilter(
         premultiplyInPlace(pixels)
     }
 
-    primitiveNode.blurScratch.blur(pixels, width, height, stdDeviationX, stdDeviationY)
+    primitiveNode.blurScratch.blur(pixels, width, height, stdDeviationX, stdDeviationY, primitiveNode.edgeMode.ordinal)
 
     // Unpremultiplying normalizes uniform regions exactly on both
     // backends (halo chroma stays full while alpha fades — matches the

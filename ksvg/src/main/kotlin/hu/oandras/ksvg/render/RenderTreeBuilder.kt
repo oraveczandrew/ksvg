@@ -67,6 +67,7 @@ import hu.oandras.ksvg.dom.core.Switch
 import hu.oandras.ksvg.dom.core.Symbol
 import hu.oandras.ksvg.dom.core.Use
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
+import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.dom.filter.FeBlend
 import hu.oandras.ksvg.dom.filter.FeColorMatrix
 import hu.oandras.ksvg.dom.filter.FeComponentTransfer
@@ -1983,7 +1984,8 @@ internal class RenderTreeBuilder(
             is FeGaussianBlur -> FeGaussianBlurRenderNode(
                 sourceElement = primitive,
                 stdDeviationX = primitive.stdDeviationX,
-                stdDeviationY = primitive.stdDeviationY
+                stdDeviationY = primitive.stdDeviationY,
+                edgeMode = primitive.edgeMode
             )
 
             is FeColorMatrix -> FeColorMatrixRenderNode(
@@ -2126,9 +2128,11 @@ internal class RenderTreeBuilder(
                         `in` = null,
                         stdDeviationX = primitive.stdDeviationX,
                         stdDeviationY = primitive.stdDeviationY,
+                        edgeMode = ConvolveMatrixEdgeMode.none,
                     ),
                     stdDeviationX = primitive.stdDeviationX,
                     stdDeviationY = primitive.stdDeviationY,
+                    edgeMode = ConvolveMatrixEdgeMode.none,
                 )
                 val offsetNode = FeOffsetRenderNode(
                     sourceElement = FeOffset(

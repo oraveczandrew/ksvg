@@ -48,6 +48,11 @@ internal class StackBlurAxisScratch {
  */
 public object StackBlur {
 
+    /** Edge handling for [blur]: 0=duplicate (clamp), 1=wrap, 2=none (transparent). */
+    public const val EDGE_DUPLICATE: Int = 0
+    public const val EDGE_WRAP: Int = 1
+    public const val EDGE_NONE: Int = 2
+
     /**
      * High quality, fast alternative to Gaussian Blur.
      * Reusable buffers must be provided by the caller through a scratch object.
@@ -57,23 +62,26 @@ public object StackBlur {
      * premultiplies, the second blurs premultiplied channels directly —
      * premultiplying per pass would square alpha). The caller unpremultiplies
      * before straight storage (`setPixels`); see `doFeGaussianBlurFilter`.
+     *
+     * @param edgeMode one of [EDGE_DUPLICATE], [EDGE_WRAP], [EDGE_NONE].
      */
     public fun blur(
         pixels: IntArray,
         width: Int,
         height: Int,
         stdDeviationX: Float,
-        stdDeviationY: Float
+        stdDeviationY: Float,
+        edgeMode: Int
     ) {
         val rx = max((stdDeviationX * 2.5f + 0.5f).toInt(), 0)
         val ry = max((stdDeviationY * 2.5f + 0.5f).toInt(), 0)
         val scratchX = StackBlurAxisScratch()
         val scratchY = StackBlurAxisScratch()
-        if (rx > 0) stackBlur(pixels, width, height, rx, true, scratchX, true)
+        if (rx > 0) stackBlur(pixels, width, height, rx, true, scratchX, true, edgeMode)
         // The horizontal pass already premultiplied (when it ran); the
         // vertical pass must blur premultiplied channels as-is. When only
         // the vertical pass runs it owns the single premultiply.
-        if (ry > 0) stackBlur(pixels, width, height, ry, false, scratchY, rx == 0)
+        if (ry > 0) stackBlur(pixels, width, height, ry, false, scratchY, rx == 0, edgeMode)
     }
 
     internal fun stackBlur(
@@ -84,6 +92,7 @@ public object StackBlur {
         horizontal: Boolean,
         scratch: StackBlurAxisScratch,
         premultiplyInput: Boolean,
+        edgeMode: Int,
     ) {
         scratch.ensure(radius)
         val dv = scratch.dv
@@ -113,7 +122,7 @@ public object StackBlur {
             var bInSum = 0
 
             for (j in -radius..radius) {
-                val p = sample(pix, w, i, innerMax, horizontal, j)
+                val p = sample(pix, w, i, innerMax, horizontal, j, edgeMode)
                 val a = p shr 24 and 0xff
                 val sir = stack[j + radius]
                 // Single premultiply across passes: premultiply here
@@ -166,7 +175,7 @@ public object StackBlur {
                 gOutSum -= sir[2]
                 bOutSum -= sir[3]
 
-                val p = sample(pix, w, i, innerMax, horizontal, j + r1)
+                val p = sample(pix, w, i, innerMax, horizontal, j + r1, edgeMode)
                 val a = p shr 24 and 0xff
                 sir[0] = a
                 sir[1] = if (premultiplyInput) ((p shr 16 and 0xff) * a + 127) / 255 else p shr 16 and 0xff
@@ -202,8 +211,16 @@ public object StackBlur {
     private fun argb(alpha: Int, red: Int, green: Int, blue: Int): Int =
         (alpha shl 24) or (red shl 16) or (green shl 8) or blue
 
-    private fun sample(pix: IntArray, w: Int, outer: Int, innerMax: Int, horizontal: Boolean, j: Int): Int {
-        if (j < 0 || j > innerMax) return 0
-        return pix[if (horizontal) outer * w + j else j * w + outer]
+    private fun sample(pix: IntArray, w: Int, outer: Int, innerMax: Int, horizontal: Boolean, j: Int, edgeMode: Int): Int {
+        if (j in 0..innerMax) return pix[if (horizontal) outer * w + j else j * w + outer]
+        return when (edgeMode) {
+            EDGE_DUPLICATE -> pix[if (horizontal) outer * w + j.coerceIn(0, innerMax) else j.coerceIn(0, innerMax) * w + outer]
+            EDGE_WRAP -> {
+                val size = innerMax + 1
+                val wrapped = ((j % size) + size) % size
+                pix[if (horizontal) outer * w + wrapped else wrapped * w + outer]
+            }
+            else -> 0
+        }
     }
 }

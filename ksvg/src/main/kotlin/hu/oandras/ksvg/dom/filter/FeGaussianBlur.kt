@@ -22,6 +22,8 @@ import hu.oandras.ksvg.dom.core.Conditional
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseFloatList
+import hu.oandras.ksvg.KSVGParseException
+import java.util.Locale
 import org.xml.sax.Attributes
 
 internal class FeGaussianBlur(
@@ -37,6 +39,8 @@ internal class FeGaussianBlur(
     val stdDeviationX: Float,
     @JvmField
     val stdDeviationY: Float,
+    @JvmField
+    val edgeMode: ConvolveMatrixEdgeMode,
 ) : FilterPrimitive(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -63,6 +67,8 @@ internal class FeGaussianBlur(
 
         private var stdDeviationY: Float = 0f
 
+        private var edgeMode: ConvolveMatrixEdgeMode = ConvolveMatrixEdgeMode.none
+
         override fun onAttribute(
             attributes: Attributes,
             index: Int,
@@ -74,6 +80,11 @@ internal class FeGaussianBlur(
                     val values = parseFloatList(value)
                     stdDeviationX = values.getOrNull(0) ?: 0f
                     stdDeviationY = values.getOrNull(1) ?: stdDeviationX
+                }
+                SVGAttr.edgeMode -> edgeMode = if (value.isEmpty()) ConvolveMatrixEdgeMode.none else try {
+                    ConvolveMatrixEdgeMode.valueOf(value.lowercase(Locale.US))
+                } catch (_: IllegalArgumentException) {
+                    throw KSVGParseException("Invalid blur edge mode: $value")
                 }
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
@@ -94,6 +105,7 @@ internal class FeGaussianBlur(
                 `in` = getIn(),
                 stdDeviationX = stdDeviationX,
                 stdDeviationY = stdDeviationY,
+                edgeMode = edgeMode,
             )
         }
     }

@@ -73,7 +73,7 @@ class GaussianBlurNativeParityTest(
             NativeGaussianBlur.applyForced(
                 scratch, out, case.width, case.height,
                 case.stdDeviationX, case.stdDeviationY,
-                backend
+                backend, StackBlur.EDGE_NONE
             )
         } finally {
             NativeGaussianBlur.destroyScratch(scratch)

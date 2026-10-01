@@ -136,7 +136,7 @@ class NativeGaussianBlurDeviceTest {
             }
             val ref = referenceGaussian(px, c.w, c.h, c.sx, c.sy)
             val native = px.copyOf()
-            NativeGaussianBlur.blur(native, c.w, c.h, c.sx, c.sy, StackBlurScratch())
+            NativeGaussianBlur.blur(native, c.w, c.h, c.sx, c.sy, StackBlurScratch(), StackBlur.EDGE_NONE)
             var maxD = 0
             for (i in px.indices) {
                 for (ch in 0..3) {
