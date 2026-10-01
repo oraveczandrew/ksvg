@@ -537,6 +537,7 @@ internal class TextRenderNode(
     @JvmField var dy: Float,
     @JvmField var rotate: FloatArray?,
     @JvmField var textLength: Float?,
+    @JvmField var scaleGlyphs: Boolean,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<Text>(sourceElement, children) {
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -552,6 +553,7 @@ internal class TSpanRenderNode(
     @JvmField var dy: FloatArray?,
     @JvmField var rotate: FloatArray?,
     @JvmField var textLength: Float?,
+    @JvmField var scaleGlyphs: Boolean,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<TSpan>(sourceElement, children) {
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -563,6 +565,7 @@ internal class TextPathRenderNode(
     sourceElement: TextPath,
     @JvmField val path: Path,
     @JvmField var startOffset: Float,
+    @JvmField var flipSide: Boolean,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<TextPath>(sourceElement, children) {
     override fun render(renderer: Renderer, canvas: Canvas) {
@@ -579,6 +582,7 @@ internal class TRefRenderNode(
     @JvmField var dy: FloatArray?,
     @JvmField var rotate: FloatArray?,
     @JvmField var textLength: Float?,
+    @JvmField var scaleGlyphs: Boolean,
 ) : RenderNode<TRef>(sourceElement), TextNode {
     // Per-node width buffer (see TextSequenceNode.textWidthBuffer).
     @JvmField val textWidthBuffer = FloatArrayBucket()

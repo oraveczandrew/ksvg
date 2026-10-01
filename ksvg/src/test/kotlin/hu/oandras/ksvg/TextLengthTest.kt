@@ -88,10 +88,32 @@ class TextLengthTest {
     }
 
     @Test
-    fun spacingAndGlyphsIsIgnored() {
-        val natural = render("")
-        val glyphs = render("""textLength="150" lengthAdjust="spacingAndGlyphs"""")
-        assertTrue("spacingAndGlyphs renders naturally", paintedExtent(glyphs) == paintedExtent(natural))
+    fun spacingAndGlyphsScalesToTarget() {
+        val natural = paintedExtent(render(""))
+        val scaled = paintedExtent(
+            render("textLength=\"150\" lengthAdjust=\"spacingAndGlyphs\"")
+        )
+        // Advances scale to the target exactly (painted max excludes the
+        // scaled trailing gap, like the spacing mode).
+        assertTrue("scaled should reach ~150, got $scaled", scaled.last in 140..160)
+        assertTrue("scale keeps left edge", scaled.first == natural.first)
+    }
+
+    @Test
+    fun spacingAndGlyphsDiffersFromSpacing() {
+        val spaced = render("""textLength="150"""")
+        val scaled = render("textLength=\"150\" lengthAdjust=\"spacingAndGlyphs\"")
+        val w = spaced.width
+        val h = spaced.height
+        val a = IntArray(w * h)
+        val b = IntArray(w * h)
+        spaced.getPixels(a, 0, w, 0, 0, w, h)
+        scaled.getPixels(b, 0, w, 0, 0, w, h)
+        var differing = 0
+        for (i in a.indices) {
+            if (a[i] != b[i]) differing++
+        }
+        assertTrue("scaled glyphs should differ from spaced glyphs", differing > 100)
     }
 
     @Test

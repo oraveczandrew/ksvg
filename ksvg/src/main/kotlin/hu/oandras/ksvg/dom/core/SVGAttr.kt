@@ -201,6 +201,9 @@ internal enum class SVGAttr {
     x1, y1,
     x2, y2,
     z,
+    side,
+    spacing,
+    method,
     viewport_fill, viewport_fill_opacity,
     visibility,
     UNSUPPORTED;
@@ -416,6 +419,9 @@ internal enum class SVGAttr {
             "viewport-fill-opacity" -> viewport_fill_opacity
             "visibility" -> visibility
             "stdDeviation" -> stdDeviation
+            "side" -> side
+            "spacing" -> spacing
+            "method" -> method
             else -> UNSUPPORTED
         }
     }

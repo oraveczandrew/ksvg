@@ -100,7 +100,7 @@ import hu.oandras.ksvg.render.text.calculateTextPath
 import hu.oandras.ksvg.render.text.calculateTextWidth
 import hu.oandras.ksvg.render.text.countTextChars
 import hu.oandras.ksvg.render.text.measureText
-import hu.oandras.ksvg.render.text.spacingAdjustFor
+import hu.oandras.ksvg.render.text.applyTextLength
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.colorWithOpacity
@@ -424,13 +424,15 @@ internal class Renderer internal constructor(
                         processor.pushPositioning(null, null, null, null, textRotate)
                     }
                     val savedTextAdjust = processor.spacingAdjust
+                    val savedTextScale = processor.glyphScale
                     val textLength = node.textLength
                     if (textLength != null) {
                         with(this@Renderer) {
-                            processor.spacingAdjust = spacingAdjustFor(
-                                textLength,
-                                countTextChars(node.children),
-                                calculateTextWidth(node.children, state)
+                            processor.applyTextLength(
+                                textLength = textLength,
+                                scaleGlyphs = node.scaleGlyphs,
+                                naturalWidth = calculateTextWidth(node.children, state),
+                                charCount = countTextChars(node.children)
                             )
                         }
                     }
@@ -446,6 +448,7 @@ internal class Renderer internal constructor(
                             processor.popPositioning()
                         }
                         processor.spacingAdjust = savedTextAdjust
+                        processor.glyphScale = savedTextScale
                     }
                 }
             }
@@ -460,6 +463,7 @@ internal class Renderer internal constructor(
             val plainDrawer = processor as? PlainTextDrawer
             val processorState = plainDrawer?.state
             val savedAdjust = processor.spacingAdjust
+            val savedScale = processor.glyphScale
             try {
                 if (plainDrawer != null) {
                     plainDrawer.state = state
@@ -470,10 +474,11 @@ internal class Renderer internal constructor(
                 val textLength = node.textLength
                 if (textLength != null) {
                     with(this@Renderer) {
-                        processor.spacingAdjust = spacingAdjustFor(
-                            textLength,
-                            countTextChars(node.children),
-                            calculateTextWidth(node.children, state)
+                        processor.applyTextLength(
+                            textLength = textLength,
+                            scaleGlyphs = node.scaleGlyphs,
+                            naturalWidth = calculateTextWidth(node.children, state),
+                            charCount = countTextChars(node.children)
                         )
                     }
                 }
@@ -486,6 +491,7 @@ internal class Renderer internal constructor(
             } finally {
                 processor.popPositioning()
                 processor.spacingAdjust = savedAdjust
+                processor.glyphScale = savedScale
                 if (plainDrawer != null) plainDrawer.state = processorState ?: state
             }
         }
@@ -501,7 +507,8 @@ internal class Renderer internal constructor(
                     node = node,
                     processor = PathTextDrawer(
                         path = node.path,
-                        state = state
+                        state = state,
+                        flipSide = node.flipSide
                     ).apply {
                         x = node.startOffset
                         y = 0f
@@ -521,6 +528,7 @@ internal class Renderer internal constructor(
             val plainDrawer = processor as? PlainTextDrawer
             val processorState = plainDrawer?.state
             val savedAdjust = processor.spacingAdjust
+            val savedScale = processor.glyphScale
             try {
                 if (plainDrawer != null) {
                     plainDrawer.state = state
@@ -528,17 +536,19 @@ internal class Renderer internal constructor(
                 processor.pushPositioning(node.x, node.y, node.dx, node.dy, node.rotate)
                 val textLength = node.textLength
                 if (textLength != null) {
-                    processor.spacingAdjust = spacingAdjustFor(
-                        textLength,
+                    processor.applyTextLength(
+                        textLength = textLength,
+                        scaleGlyphs = node.scaleGlyphs,
+                        naturalWidth = measureText(node.text, state.fillPaint, node.textWidthBuffer),
                         // TRef renders a single flat run (no child nodes).
-                        node.text.length,
-                        measureText(node.text, state.fillPaint, node.textWidthBuffer)
+                        charCount = node.text.length
                     )
                 }
                 processor.processText(canvas, node.text, node.textWidthBuffer)
             } finally {
                 processor.popPositioning()
                 processor.spacingAdjust = savedAdjust
+                processor.glyphScale = savedScale
                 if (plainDrawer != null) plainDrawer.state = processorState ?: state
             }
         }

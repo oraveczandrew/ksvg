@@ -33,6 +33,12 @@ internal class TextPath(
     val href: String?,
     @JvmField
     val startOffset: CSSLength?,
+    @JvmField
+    val side: TextPathSide?,
+    @JvmField
+    val spacing: TextPathSpacing?,
+    @JvmField
+    val method: TextPathMethod?,
 ) : TextContainer(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -50,6 +56,9 @@ internal class TextPath(
 
         private var href: String? = null
         private var startOffset: CSSLength? = null
+        private var side: TextPathSide? = null
+        private var spacing: TextPathSpacing? = null
+        private var method: TextPathMethod? = null
 
         override fun onAttribute(
             attributes: Attributes,
@@ -66,6 +75,9 @@ internal class TextPath(
                 }
 
                 SVGAttr.startOffset -> startOffset = parseLength(value)
+                SVGAttr.side -> side = TextPathSide.parseOrNull(value)
+                SVGAttr.spacing -> spacing = TextPathSpacing.parseOrNull(value)
+                SVGAttr.method -> method = TextPathMethod.parseOrNull(value)
                 else -> return super.onAttribute(attributes, index, attr, value)
             }
             return true
@@ -77,6 +89,9 @@ internal class TextPath(
                 conditionalBundle = getSvgConditionalBundle(),
                 href = href,
                 startOffset = startOffset,
+                side = side,
+                spacing = spacing,
+                method = method,
             )
         }
     }

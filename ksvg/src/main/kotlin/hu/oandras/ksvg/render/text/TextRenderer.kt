@@ -69,6 +69,12 @@ internal abstract class TextProcessor {
     @JvmField
     var spacingAdjust: Float = 0f
 
+    // Uniform horizontal glyph scale from `textLength` with
+    // lengthAdjust="spacingAndGlyphs": target / measured (1 = off). Advances
+    // scale with the glyphs, so the run sums to the target exactly.
+    @JvmField
+    var glyphScale: Float = 1f
+
     private val positioningStack: MutableList<TextPositioning> = mutableListOf()
 
     fun pushPositioning(x: FloatArray?, y: FloatArray?, dx: FloatArray?, dy: FloatArray?, rotate: FloatArray?) {
@@ -201,6 +207,39 @@ internal fun spacingAdjustFor(
     return (textLength - naturalWidth) / charCount
 }
 
+/**
+ * Uniform glyph scale for `textLength` with lengthAdjust="spacingAndGlyphs":
+ * target / measured (1 = off, including degenerate input). Renderers scale
+ * glyphs and advances together, so the run sums to the target exactly.
+ */
+internal fun glyphScaleFor(
+    textLength: Float?,
+    scaleGlyphs: Boolean,
+    naturalWidth: Float,
+): Float {
+    if (textLength == null || !scaleGlyphs || naturalWidth <= 0f) return 1f
+    return textLength / naturalWidth
+}
+
+/**
+ * Arms [spacingAdjust]/[glyphScale] for one `textLength` subtree from an
+ * already-measured natural width. Callers save both fields, traverse, and
+ * restore. The two modes are exclusive: glyph scaling zeroes spacing.
+ */
+internal fun TextProcessor.applyTextLength(
+    textLength: Float?,
+    scaleGlyphs: Boolean,
+    naturalWidth: Float,
+    charCount: Int,
+) {
+    if (textLength == null) return
+    if (scaleGlyphs) {
+        glyphScale = glyphScaleFor(textLength, true, naturalWidth)
+    } else {
+        spacingAdjust = spacingAdjustFor(textLength, charCount, naturalWidth)
+    }
+}
+
 context(renderContext: DisplayContext)
 internal fun calculateTextWidth(children: List<TextNode>, parentState: RendererState): Float {
     var width = 0f
@@ -238,32 +277,38 @@ internal fun calculateTextBounds(
             is TSpanRenderNode -> {
                 proc.pushPositioning(child.x, child.y, child.dx, child.dy, child.rotate)
                 val savedAdjust = proc.spacingAdjust
+                val savedScale = proc.glyphScale
                 val tspanLength = child.textLength
                 if (tspanLength != null) {
-                    proc.spacingAdjust = spacingAdjustFor(
-                        tspanLength,
-                        countTextChars(child.children),
-                        calculateTextWidth(child.children, child.renderState)
+                    proc.applyTextLength(
+                        textLength = tspanLength,
+                        scaleGlyphs = child.scaleGlyphs,
+                        naturalWidth = calculateTextWidth(child.children, child.renderState),
+                        charCount = countTextChars(child.children)
                     )
                 }
                 calculateTextBounds(canvas, child.children, proc, child.renderState)
                 proc.spacingAdjust = savedAdjust
+                proc.glyphScale = savedScale
                 proc.popPositioning()
             }
 
             is TRefRenderNode -> {
                 proc.pushPositioning(child.x, child.y, child.dx, child.dy, child.rotate)
                 val savedAdjust = proc.spacingAdjust
+                val savedScale = proc.glyphScale
                 val trefLength = child.textLength
                 if (trefLength != null) {
-                    proc.spacingAdjust = spacingAdjustFor(
-                        trefLength,
-                        child.text.length,
-                        measureText(child.text, child.renderState.fillPaint, child.textWidthBuffer)
+                    proc.applyTextLength(
+                        textLength = trefLength,
+                        scaleGlyphs = child.scaleGlyphs,
+                        naturalWidth = measureText(child.text, child.renderState.fillPaint, child.textWidthBuffer),
+                        charCount = child.text.length
                     )
                 }
                 proc.processText(canvas, child.text, child.renderState, child.textWidthBuffer)
                 proc.spacingAdjust = savedAdjust
+                proc.glyphScale = savedScale
                 proc.popPositioning()
             }
 
@@ -289,10 +334,8 @@ internal class TextBoundsCalculator : TextProcessor() {
     // per glyph). DisplayContext exposes no pools (only RenderContext does),
     // so the calculator owns its scratch like PlainTextDrawer owns fontMetrics.
     // Instances are operation-local and used single-threaded.
-    @JvmField
-    val glyphRect: Rect = Rect()
-    @JvmField
-    val glyphBounds: RectF = RectF()
+    private val glyphRect: Rect = Rect()
+    private val glyphBounds: RectF = RectF()
 
     override fun doTextContainer(obj: TextContainer): Boolean {
         // This is the old DOM-based way, should not be called with nodes
@@ -307,7 +350,8 @@ internal class TextBoundsCalculator : TextProcessor() {
             val transformedText = applyTextTransform(text, state.style.textTransform)
             val baselineOffset = calculateBaselineOffset(paint, state.style)
 
-            if (hasPositioning() || spacingAdjust != 0f) {
+            val spacingAdjust = spacingAdjust
+            if (spacingAdjust != 0f || glyphScale != 1f || hasPositioning()) {
                 val buffer = widths.getWithSize(transformedText.length)
                 paint.getTextWidths(transformedText, buffer)
                 for (i in transformedText.indices) {
@@ -316,10 +360,11 @@ internal class TextBoundsCalculator : TextProcessor() {
                     val textBounds = glyphBounds
                     textBounds.set(rect)
                     val glyphRotation = rotation
-                    if (glyphRotation != 0f) {
-                        // Union the rotated glyph box: rotate the integer
-                        // bounds corners about the glyph origin manually
-                        // (no Matrix allocation on this path).
+                    val glyphScaleX = glyphScale
+                    if (glyphRotation != 0f || glyphScaleX != 1f) {
+                        // Union the transformed glyph box: scale horizontally
+                        // about the glyph origin, then rotate the corners
+                        // manually (no Matrix allocation on this path).
                         val radians = glyphRotation.toDouble().toRadians()
                         val cos = cos(radians).toFloat()
                         val sin = sin(radians).toFloat()
@@ -329,7 +374,7 @@ internal class TextBoundsCalculator : TextProcessor() {
                         var maxY = -Float.MAX_VALUE
                         var corner = 0
                         while (corner < 4) {
-                            val px = if (corner == 0 || corner == 3) rect.left.toFloat() else rect.right.toFloat()
+                            val px = (if (corner == 0 || corner == 3) rect.left.toFloat() else rect.right.toFloat()) * glyphScaleX
                             val py = if (corner < 2) rect.top.toFloat() else rect.bottom.toFloat()
                             val rx = px * cos - py * sin
                             val ry = px * sin + py * cos
@@ -343,7 +388,7 @@ internal class TextBoundsCalculator : TextProcessor() {
                     }
                     textBounds.offset(x, y + baselineOffset)
                     boundingBox.union(textBounds)
-                    x += buffer[i] + spacingAdjust
+                    x += buffer[i] * glyphScaleX + spacingAdjust
                 }
             } else {
                 paint.getTextBounds(transformedText, 0, transformedText.length, rect)
@@ -399,7 +444,7 @@ internal open class PlainTextDrawer(
     private fun updatePositionAfterText(text: String, widths: FloatArrayBucket) {
         val style = state.style
         val writingMode = style.writingMode ?: WritingMode.horizontal_tb
-        val advance = measureText(text, state.fillPaint, widths) + spacingAdjust * text.length
+        val advance = measureText(text, state.fillPaint, widths) * glyphScale + spacingAdjust * text.length
         if (writingMode.isVertical) {
             y += advance
         } else {
@@ -419,9 +464,10 @@ internal open class PlainTextDrawer(
         val fm = fontMetrics
         paint.getFontMetrics(fm)
 
-        // A textLength adjustment also forces the per-character loop: the
-        // single-draw fast path cannot redistribute advances.
-        if (hasPositioning() || spacingAdjust != 0f) {
+        // A textLength adjustment (either mode) also forces the per-character
+        // loop: the single-draw fast path can neither redistribute advances
+        // nor scale glyphs.
+        if (spacingAdjust != 0f || glyphScale != 1f || hasPositioning()) {
             // Measure the whole run once into the node's width buffer, then index
             // per character. This keeps the buffer at the run's fixed length (no
             // per-frame resize) and avoids measuring each glyph in isolation.
@@ -435,10 +481,15 @@ internal open class PlainTextDrawer(
                 // Manual save/rotate/restore (not the withRotation helper):
                 // a capturing lambda per glyph would allocate on this hot path.
                 val glyphRotation = rotation
+                val glyphScaleX = glyphScale
                 val rotated = glyphRotation != 0f
-                val checkpoint = if (rotated) canvas.save() else 0
+                val scaled = glyphScaleX != 1f
+                val checkpoint = if (rotated || scaled) canvas.save() else 0
                 if (rotated) {
                     canvas.rotate(glyphRotation, adjustedX, baselineY)
+                }
+                if (scaled) {
+                    canvas.scale(glyphScaleX, 1f, adjustedX, baselineY)
                 }
                 if (state.hasFill) {
                     canvas.drawText(text, i, i + 1, adjustedX, baselineY, paint)
@@ -446,9 +497,9 @@ internal open class PlainTextDrawer(
                 if (state.hasStroke) {
                     canvas.drawText(text, i, i + 1, adjustedX, baselineY, strokePaint)
                 }
-                val advance = buffer[i] + spacingAdjust
+                val advance = buffer[i] * glyphScaleX + spacingAdjust
                 drawManualDecorations(canvas, adjustedX, baselineY, advance, paint, fm)
-                if (rotated) {
+                if (rotated || scaled) {
                     canvas.restoreToCount(checkpoint)
                 }
                 x += advance
@@ -527,7 +578,9 @@ internal open class PlainTextDrawer(
                 if (state.hasStroke) {
                     canvas.drawText(text, i, i + 1, x, currentY, strokePaint)
                 }
-                currentY += charAdvance + spacingAdjust
+                // Upright vertical has no per-glyph rotation support (positioned
+                // chunks only); advances still honor both adjustments.
+                currentY += charAdvance * glyphScale + spacingAdjust
             }
             y = currentY
         }
@@ -536,7 +589,8 @@ internal open class PlainTextDrawer(
 
 internal class PathTextDrawer(
     private val path: Path,
-    state: RendererState
+    state: RendererState,
+    private val flipSide: Boolean,
 ) : PlainTextDrawer(state) {
 
     context(renderContext: DisplayContext)
@@ -547,12 +601,22 @@ internal class PathTextDrawer(
             // We need to readjust initial text X position to counter that.
             val letterspacingAdj = state.style.letterSpacing!!.floatValueInContext() / 2
             val baselineOffset = calculateBaselineOffset(state.fillPaint, state.style)
+            // side="right" translates the run to the other side of the path
+            // (glyphs stay upright, reading order unchanged): mirror the
+            // [vOffset+ascent, vOffset+descent] interval about the path.
+            val vOffset = y + baselineOffset
+            val pathOffset = if (flipSide) {
+                val fm = state.fillPaint.fontMetrics
+                -(vOffset + fm.ascent + fm.descent)
+            } else {
+                vOffset
+            }
             if (state.hasFill) {
                 canvas.drawTextOnPath(
                     /* text = */ transformedText,
                     /* path = */ path,
                     /* hOffset = */ x - letterspacingAdj,
-                    /* vOffset = */ y + baselineOffset,
+                    /* vOffset = */ pathOffset,
                     /* paint = */ state.fillPaint
                 )
             }
@@ -562,7 +626,7 @@ internal class PathTextDrawer(
                     /* text = */ transformedText,
                     /* path = */ path,
                     /* hOffset = */ x - letterspacingAdj,
-                    /* vOffset = */ y + baselineOffset,
+                    /* vOffset = */ pathOffset,
                     /* paint = */ state.strokePaint
                 )
             }
@@ -588,32 +652,38 @@ internal fun calculateTextPath(
             is TSpanRenderNode -> {
                 proc.pushPositioning(child.x, child.y, child.dx, child.dy, child.rotate)
                 val savedAdjust = proc.spacingAdjust
+                val savedScale = proc.glyphScale
                 val tspanLength = child.textLength
                 if (tspanLength != null) {
-                    proc.spacingAdjust = spacingAdjustFor(
-                        tspanLength,
-                        countTextChars(child.children),
-                        calculateTextWidth(child.children, child.renderState)
+                    proc.applyTextLength(
+                        textLength = tspanLength,
+                        scaleGlyphs = child.scaleGlyphs,
+                        naturalWidth = calculateTextWidth(child.children, child.renderState),
+                        charCount = countTextChars(child.children)
                     )
                 }
                 calculateTextPath(child.children, proc, child.renderState)
                 proc.spacingAdjust = savedAdjust
+                proc.glyphScale = savedScale
                 proc.popPositioning()
             }
 
             is TRefRenderNode -> {
                 proc.pushPositioning(child.x, child.y, child.dx, child.dy, child.rotate)
                 val savedAdjust = proc.spacingAdjust
+                val savedScale = proc.glyphScale
                 val trefLength = child.textLength
                 if (trefLength != null) {
-                    proc.spacingAdjust = spacingAdjustFor(
-                        trefLength,
-                        child.text.length,
-                        measureText(child.text, child.renderState.fillPaint, child.textWidthBuffer)
+                    proc.applyTextLength(
+                        textLength = trefLength,
+                        scaleGlyphs = child.scaleGlyphs,
+                        naturalWidth = measureText(child.text, child.renderState.fillPaint, child.textWidthBuffer),
+                        charCount = child.text.length
                     )
                 }
                 proc.processText(child.text, child.renderState, child.textWidthBuffer)
                 proc.spacingAdjust = savedAdjust
+                proc.glyphScale = savedScale
                 proc.popPositioning()
             }
 
@@ -631,6 +701,14 @@ internal class PlainTextToPath(
     @JvmField
     val textAsPath: Path,
 ) : TextProcessor() {
+    // Scratch glyph path, rewound (not reset: keeps its backing store)
+    // before every use. Operation-local instance, single-threaded use.
+    private val spanScratch: Path = Path()
+
+    // Scratch transform, created on first rotated/scaled glyph and reused
+    // via setRotate (no further allocation). Same lifetime discipline.
+    private var transformScratch: Matrix? = null
+
     override fun doTextContainer(obj: TextContainer): Boolean {
         return true
     }
@@ -647,29 +725,34 @@ internal class PlainTextToPath(
             val transformedText = applyTextTransform(text, state.style.textTransform)
             val baselineOffset = calculateBaselineOffset(paint, state.style)
 
-            if (hasPositioning() || spacingAdjust != 0f) {
+            val spacingAdjust = spacingAdjust
+            val spanScratch = spanScratch
+            if (hasPositioning() || spacingAdjust != 0f || glyphScale != 1f) {
                 val buffer = widths.getWithSize(transformedText.length)
                 paint.getTextWidths(transformedText, buffer)
-                // Scratch matrix created only if a rotated glyph shows up
+                // Scratch matrix created only if a rotated/scaled glyph shows up
                 // (setRotate reuses it without further allocation).
-                var scratch: Matrix? = null
                 for (i in transformedText.indices) {
                     applyPositioning()
-                    val spanPath = Path()
-                    paint.getTextPath(transformedText, i, i + 1, x, y + baselineOffset, spanPath)
+                    spanScratch.rewind()
+                    paint.getTextPath(transformedText, i, i + 1, x, y + baselineOffset, spanScratch)
                     val glyphRotation = rotation
-                    if (glyphRotation != 0f) {
-                        val matrix = scratch ?: Matrix().also { scratch = it }
+                    val glyphScaleX = glyphScale
+                    if (glyphRotation != 0f || glyphScaleX != 1f) {
+                        val matrix = transformScratch ?: Matrix().also { transformScratch = it }
                         matrix.setRotate(glyphRotation, x, y + baselineOffset)
-                        spanPath.transform(matrix)
+                        if (glyphScaleX != 1f) {
+                            matrix.preScale(glyphScaleX, 1f, x, y + baselineOffset)
+                        }
+                        spanScratch.transform(matrix)
                     }
-                    textAsPath.addPath(spanPath)
-                    x += buffer[i] + spacingAdjust
+                    textAsPath.addPath(spanScratch)
+                    x += buffer[i] * glyphScaleX + spacingAdjust
                 }
             } else {
-                val spanPath = Path()
-                paint.getTextPath(transformedText, 0, transformedText.length, x, y + baselineOffset, spanPath)
-                textAsPath.addPath(spanPath)
+                spanScratch.rewind()
+                paint.getTextPath(transformedText, 0, transformedText.length, x, y + baselineOffset, spanScratch)
+                textAsPath.addPath(spanScratch)
                 x += measureText(transformedText, paint, widths)
             }
         }

@@ -115,6 +115,7 @@ import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextDirection
 import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.dom.text.TextPositionedContainer
+import hu.oandras.ksvg.dom.text.TextPathSide
 import hu.oandras.ksvg.dom.text.LengthAdjust
 import hu.oandras.ksvg.dom.text.TextSequence
 import hu.oandras.ksvg.filtering.LcgRandom
@@ -141,7 +142,7 @@ import hu.oandras.ksvg.render.text.TextBoundsCalculator
 import hu.oandras.ksvg.render.text.calculateTextBounds
 import hu.oandras.ksvg.render.text.calculateTextWidth
 import hu.oandras.ksvg.render.text.countTextChars
-import hu.oandras.ksvg.render.text.spacingAdjustFor
+import hu.oandras.ksvg.render.text.applyTextLength
 import hu.oandras.ksvg.render.text.visualOrderForOverride
 import hu.oandras.ksvg.render.text.extractRawText
 import hu.oandras.ksvg.render.text.getAnchorPosition
@@ -1419,10 +1420,11 @@ internal class RenderTreeBuilder(
             // Text-level textLength widens the measured bounds like the draw path.
             val textLength = effectiveTextLength(obj)
             if (textLength != null) {
-                proc.spacingAdjust = spacingAdjustFor(
-                    textLength,
-                    countTextChars(children),
-                    calculateTextWidth(children, state)
+                proc.applyTextLength(
+                    textLength = textLength,
+                    scaleGlyphs = scaleGlyphs(obj),
+                    naturalWidth = calculateTextWidth(children, state),
+                    charCount = countTextChars(children)
                 )
             }
             // Measurement only: TextBoundsCalculator never draws, so a throwaway canvas is fine (build time, not hot path).
@@ -1430,7 +1432,7 @@ internal class RenderTreeBuilder(
             obj.boundingBox = Box(proc.boundingBox)
         }
 
-        val node = TextRenderNode(obj, x, y, dx, dy, obj.rotate?.copyOf(), effectiveTextLength(obj), children)
+        val node = TextRenderNode(obj, x, y, dx, dy, obj.rotate?.copyOf(), effectiveTextLength(obj), scaleGlyphs(obj), children)
         assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
@@ -1482,12 +1484,15 @@ internal class RenderTreeBuilder(
 
     /**
      * Build-time `textLength` resolution (user units, like x/y lists).
-     * `spacingAndGlyphs` is not implemented yet: it resolves to null (no
-     * adjustment) so at least the spacing fallback never half-applies.
+     * Both lengthAdjust modes resolve the target here; the mode travels in
+     * [scaleGlyphs] (spacingAndGlyphs scales glyphs, spacing only advances).
      */
     private fun effectiveTextLength(obj: TextPositionedContainer): Float? {
-        if (obj.lengthAdjust == LengthAdjust.spacingAndGlyphs) return null
         return obj.textLength?.floatValueXInContext()
+    }
+
+    private fun scaleGlyphs(obj: TextPositionedContainer): Boolean {
+        return obj.lengthAdjust == LengthAdjust.spacingAndGlyphs && obj.textLength != null
     }
 
     private fun buildTSpan(obj: TSpan): TSpanRenderNode? {        statePush()
@@ -1520,7 +1525,7 @@ internal class RenderTreeBuilder(
             }
         }
 
-        val node = TSpanRenderNode(obj, x, y, dx, dy, rotate, effectiveTextLength(obj), children)
+        val node = TSpanRenderNode(obj, x, y, dx, dy, rotate, effectiveTextLength(obj), scaleGlyphs(obj), children)
         node.renderState.apply(state)
         resolveNodePaints(node)
 
@@ -1555,7 +1560,7 @@ internal class RenderTreeBuilder(
         val startOffset = obj.startOffset?.floatValueInContext(measure.length) ?: 0f
 
         val children = buildTextChildren(obj)
-        val node = TextPathRenderNode(obj, path, startOffset, children)
+        val node = TextPathRenderNode(obj, path, startOffset, obj.side == TextPathSide.right, children)
         node.renderState.apply(state)
         resolveNodePaints(node)
         statePop()
@@ -1589,7 +1594,8 @@ internal class RenderTreeBuilder(
                 dx = dx,
                 dy = dy,
                 rotate = rotate,
-                textLength = effectiveTextLength(obj)
+                textLength = effectiveTextLength(obj),
+                scaleGlyphs = scaleGlyphs(obj)
             )
             node.renderState.apply(state)
             resolveNodePaints(node)
