@@ -366,32 +366,34 @@ internal class RenderTreeBuilder(
                         node.filterNode = buildFilter(filter)
                     }
                 }
-                state.style.clipPath?.let {
-                    when (it) {
+                val clipPathRef = state.style.clipPath
+                if (clipPathRef != null) {
+                    when (clipPathRef) {
                         is CSSClipPath.UrlClip -> {
-                            val clipPath = document.resolveIRI(it.iri) as? ClipPath
+                            val clipPath = document.resolveIRI(clipPathRef.iri) as? ClipPath
                             if (clipPath != null) {
                                 node.clipPathNode = buildClipPath(clipPath)
                             } else {
-                                logW("KSVG") { "Clip-path reference '${it.iri}' is missing or invalid; hiding element" }
+                                logW("KSVG") { "Clip-path reference '${clipPathRef.iri}' is missing or invalid; hiding element" }
                                 hideInvalidReference = true
                             }
                         }
 
                         is CSSClipPath.ShapeClip -> {
-                            node.clipShape = resolveShapeClip(it.shape, resolveGeometryBox(it.refBox, node))
+                            node.clipShape = resolveShapeClip(clipPathRef.shape, resolveGeometryBox(clipPathRef.refBox, node))
                         }
 
                         is CSSClipPath.NoClip -> {}
                     }
                 }
-                state.style.mask?.let {
-                    val mask = document.resolveIRI(it) as? Mask
+                val maskRef = state.style.mask
+                if (maskRef != null) {
+                    val mask = document.resolveIRI(maskRef) as? Mask
                     val maskNode = mask?.let { maskIri -> buildMask(maskIri) }
                     if (maskNode != null) {
                         node.maskNode = maskNode
                     } else {
-                        logW("KSVG") { "Mask reference '$it' is missing or invalid; hiding element" }
+                        logW("KSVG") { "Mask reference '$maskRef' is missing or invalid; hiding element" }
                         hideInvalidReference = true
                     }
                 }
