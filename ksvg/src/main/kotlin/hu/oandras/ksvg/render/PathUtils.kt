@@ -21,6 +21,7 @@ import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.Element
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.dom.shapes.CircleShape
+import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.shapes.EllipseShape
 import hu.oandras.ksvg.dom.shapes.LineShape
 import hu.oandras.ksvg.dom.shapes.PathShape
@@ -35,19 +36,23 @@ import kotlin.math.abs
 import kotlin.math.min
 
 context(renderContext: DisplayContext)
-internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathRenderNode?): Boolean {
+internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathRenderNode?, style: Style): Boolean {
+    // SVG2 geometry properties override the element attributes (style is the
+    // computed style: own declarations, inherited css-wide values, or null).
+    val geomWidth = style.geomWidth ?: obj.width
+    val geomHeight = style.geomHeight ?: obj.height
     // Missing width/height makes the <rect> invalid -> not rendered (spec).
-    val objWidth = obj.width ?: return false
-    val objHeight = obj.height ?: return false
-    var x: Float = obj.x.floatValueXInContext()
-    var y: Float = obj.y.floatValueYInContext()
+    val objWidth = geomWidth ?: return false
+    val objHeight = geomHeight ?: return false
+    var x: Float = (style.geomX ?: obj.x).floatValueXInContext()
+    var y: Float = (style.geomY ?: obj.y).floatValueYInContext()
     var w: Float = objWidth.floatValueXInContext()
     var h: Float = objHeight.floatValueYInContext()
-    
+
     // Keep these as primitive locals: a `Float?` intermediate would box every
     // value (java.lang.Float) on each render pass.
-    val rxLength = obj.rx
-    val ryLength = obj.ry
+    val rxLength = style.geomRx ?: obj.rx
+    val ryLength = style.geomRy ?: obj.ry
     var rxVal = rxLength?.floatValueXInContext() ?: 0f
     var ryVal = ryLength?.floatValueYInContext() ?: 0f
 
@@ -79,11 +84,11 @@ internal fun updatePathAndBoundingBox(obj: RectShape, outPath: Path, node: PathR
 }
 
 context(renderContext: DisplayContext)
-internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: PathRenderNode?): Boolean {
-    var cx = obj.cx?.floatValueXInContext() ?: 0f
-    var cy = obj.cy?.floatValueYInContext() ?: 0f
+internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: PathRenderNode?, style: Style): Boolean {
+    var cx = (style.geomCx ?: obj.cx)?.floatValueXInContext() ?: 0f
+    var cy = (style.geomCy ?: obj.cy)?.floatValueYInContext() ?: 0f
     // Missing r makes the <circle> invalid -> not rendered (spec).
-    val rLength = obj.r ?: return false
+    val rLength = style.geomR ?: obj.r ?: return false
     var r = rLength.floatValueInContext()
 
     if (renderContext is AnimationContext && node != null) {
@@ -105,12 +110,12 @@ internal fun updatePathAndBoundingBox(obj: CircleShape, outPath: Path, node: Pat
 }
 
 context(renderContext: DisplayContext)
-internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: PathRenderNode?): Boolean {
-    var cx = obj.cx?.floatValueXInContext() ?: 0f
-    var cy = obj.cy?.floatValueYInContext() ?: 0f
+internal fun updatePathAndBoundingBox(obj: EllipseShape, outPath: Path, node: PathRenderNode?, style: Style): Boolean {
+    var cx = (style.geomCx ?: obj.cx)?.floatValueXInContext() ?: 0f
+    var cy = (style.geomCy ?: obj.cy)?.floatValueYInContext() ?: 0f
     // Missing rx/ry make the <ellipse> invalid -> not rendered (spec).
-    val rxLength = obj.rx ?: return false
-    val ryLength = obj.ry ?: return false
+    val rxLength = style.geomRx ?: obj.rx ?: return false
+    val ryLength = style.geomRy ?: obj.ry ?: return false
     var rx = rxLength.floatValueXInContext()
     var ry = ryLength.floatValueYInContext()
 

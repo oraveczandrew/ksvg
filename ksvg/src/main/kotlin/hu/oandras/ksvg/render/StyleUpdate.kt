@@ -560,6 +560,44 @@ internal fun updateStyle(
         builder.unicodeBidi = sourceStyle.unicodeBidi
     }
 
+    // SVG2 geometry properties (shape builders fall back to the element
+    // attribute when these are unspecified).
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_X)) {
+        builder.geomX = sourceStyle.geomX
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_Y)) {
+        builder.geomY = sourceStyle.geomY
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_WIDTH)) {
+        builder.geomWidth = sourceStyle.geomWidth
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_HEIGHT)) {
+        builder.geomHeight = sourceStyle.geomHeight
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_CX)) {
+        builder.geomCx = sourceStyle.geomCx
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_CY)) {
+        builder.geomCy = sourceStyle.geomCy
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_R)) {
+        builder.geomR = sourceStyle.geomR
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_RX)) {
+        builder.geomRx = sourceStyle.geomRx
+    }
+
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_GEOM_RY)) {
+        builder.geomRy = sourceStyle.geomRy
+    }
+
     if (sourceStyle.isSpecified2(Style.SPECIFIED_TRANSFORM_ORIGIN)) {
         builder.transformOrigin = sourceStyle.transformOrigin
     }

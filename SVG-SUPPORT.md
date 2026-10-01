@@ -249,11 +249,14 @@ All filter primitives support the common attributes `x`, `y`, `width`, `height` 
 ### SVG2 Geometry Properties
 
 Geometry is supported via element attributes (see element rows). The CSS-property
-form (`style="cx: 50"` / stylesheets) is **not** supported:
+form (`style="cx: 50"` / stylesheets) overrides attributes with normal cascade
+precedence (attribute < stylesheet < inline) on `rect`/`circle`/`ellipse`
+(non-viewport shapes). Viewport-establishing geometry (`svg`/`image`/`use`
+`x`/`y`/`width`/`height`) stays attribute-only:
 
 | Property                                                 | Support | Notes                                                                            |
 |----------------------------------------------------------|---------|----------------------------------------------------------------------------------|
-| `x`, `y`, `width`, `height`, `cx`, `cy`, `r`, `rx`, `ry` | None    | As CSS properties; element attributes with the same names are fully supported    |
+| `x`, `y`, `width`, `height`, `cx`, `cy`, `r`, `rx`, `ry` | Partial | As CSS properties on `rect`/`circle`/`ellipse`; negative `width`/`height`/`r`/`rx`/`ry` declarations are dropped |
 | `d`                                                      | None    | CSS property form (`d: path("…")`); the element attribute `d` is fully supported |
 
 ### Rendering

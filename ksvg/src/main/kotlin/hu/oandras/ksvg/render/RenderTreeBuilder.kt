@@ -1320,10 +1320,18 @@ internal class RenderTreeBuilder(
         obj: Shape,
         outPath: Path,
     ): Boolean {
+        return updatePathAndBoundingBoxForGraphicsElement(obj, outPath, state.style)
+    }
+
+    private fun updatePathAndBoundingBoxForGraphicsElement(
+        obj: Shape,
+        outPath: Path,
+        style: Style,
+    ): Boolean {
         return when (obj) {
-            is RectShape -> updatePathAndBoundingBox(obj, outPath, null)
-            is CircleShape -> updatePathAndBoundingBox(obj, outPath, null)
-            is EllipseShape -> updatePathAndBoundingBox(obj, outPath, null)
+            is RectShape -> updatePathAndBoundingBox(obj, outPath, null, style)
+            is CircleShape -> updatePathAndBoundingBox(obj, outPath, null, style)
+            is EllipseShape -> updatePathAndBoundingBox(obj, outPath, null, style)
             is LineShape -> updatePathAndBoundingBox(obj, outPath, null)
             is PolyLineShape -> updatePathAndBoundingBox(obj, outPath, null)
             is PathShape -> updatePathAndBoundingBox(obj, outPath, null)
@@ -1568,6 +1576,13 @@ internal class RenderTreeBuilder(
     }
 
     private fun getPathFromElement(obj: Shape): Path? {
+        // The referenced shape's OWN computed style decides geometry CSS:
+        // state.style here belongs to the referencing element (e.g. textPath)
+        // and must not leak its geometry declarations into the shape.
+        val shapeBuilder = Style().toBuilder()
+        shapeBuilder.reset(state.style)
+        updateStyleForElement(state, shapeBuilder, obj)
+        val shapeStyle = shapeBuilder.build()
         val path = Path()
         return when (obj) {
             is PathShape -> {
@@ -1579,17 +1594,17 @@ internal class RenderTreeBuilder(
             }
 
             is RectShape -> {
-                updatePathAndBoundingBoxForGraphicsElement(obj, path)
+                updatePathAndBoundingBoxForGraphicsElement(obj, path, shapeStyle)
                 path
             }
 
             is CircleShape -> {
-                updatePathAndBoundingBoxForGraphicsElement(obj, path)
+                updatePathAndBoundingBoxForGraphicsElement(obj, path, shapeStyle)
                 path
             }
 
             is EllipseShape -> {
-                updatePathAndBoundingBoxForGraphicsElement(obj, path)
+                updatePathAndBoundingBoxForGraphicsElement(obj, path, shapeStyle)
                 path
             }
 

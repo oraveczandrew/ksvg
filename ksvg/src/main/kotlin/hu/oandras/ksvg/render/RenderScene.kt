@@ -34,6 +34,7 @@ import hu.oandras.ksvg.dom.shapes.PathShape
 import hu.oandras.ksvg.dom.shapes.PolyLineShape
 import hu.oandras.ksvg.dom.shapes.RectShape
 import hu.oandras.ksvg.dom.shapes.Shape
+import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.render.PaintConfiguration.Companion.DEFAULT_TEXT_SIZE
 import hu.oandras.ksvg.render.pool.BitmapPool
@@ -280,13 +281,13 @@ internal class RenderScene private constructor(
      */
     private fun updatePercentShape(node: PathRenderNode, ctx: SceneUpdateContext) {
         val shape = node.sourceElement
-        if (!shapeUsesPercentUnits(shape)) return
+        if (!shapeUsesPercentUnits(shape, node.renderState.style)) return
 
         with(ctx) {
             val regenerated = when (shape) {
-                is RectShape -> updatePathAndBoundingBox(shape, node.path, node)
-                is CircleShape -> updatePathAndBoundingBox(shape, node.path, node)
-                is EllipseShape -> updatePathAndBoundingBox(shape, node.path, node)
+                is RectShape -> updatePathAndBoundingBox(shape, node.path, node, node.renderState.style)
+                is CircleShape -> updatePathAndBoundingBox(shape, node.path, node, node.renderState.style)
+                is EllipseShape -> updatePathAndBoundingBox(shape, node.path, node, node.renderState.style)
                 is LineShape -> updatePathAndBoundingBox(shape, node.path, node)
                 else -> false
             }
@@ -299,7 +300,18 @@ internal class RenderScene private constructor(
 
     private fun CSSLength?.isPercent(): Boolean = this != null && unit == CssUnit.percent
 
-    private fun shapeUsesPercentUnits(shape: Shape): Boolean {
+    private fun shapeUsesPercentUnits(shape: Shape, style: Style): Boolean {
+        // Style-declared geometry (presentation CSS) counts too: a `style="cx:
+        // 50%"` must regenerate on viewport changes even when the attribute
+        // is absolute (the style wins at build time).
+        if (style.geomX.isPercent() || style.geomY.isPercent() ||
+            style.geomWidth.isPercent() || style.geomHeight.isPercent() ||
+            style.geomCx.isPercent() || style.geomCy.isPercent() ||
+            style.geomR.isPercent() || style.geomRx.isPercent() ||
+            style.geomRy.isPercent()
+        ) {
+            return true
+        }
         return when (shape) {
             is RectShape -> shape.x.isPercent() || shape.y.isPercent() ||
                     shape.width.isPercent() || shape.height.isPercent() ||

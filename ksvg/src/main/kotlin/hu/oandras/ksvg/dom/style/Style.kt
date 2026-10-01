@@ -48,6 +48,7 @@ import hu.oandras.ksvg.dom.text.parseTextTransform
 import hu.oandras.ksvg.parser.ColorParser
 import hu.oandras.ksvg.parser.parseFloat
 import hu.oandras.ksvg.parser.parseLength
+import hu.oandras.ksvg.parser.parseNonNegativeLength
 import hu.oandras.ksvg.parser.parseOpacity
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
@@ -199,6 +200,20 @@ internal class Style internal constructor(
     @JvmField
     @PaintOrder
     val paintOrder: Int,
+
+    // SVG2 geometry properties (presentation attributes/kebab-case CSS).
+    // Null = not declared in this style; shape builders fall back to the
+    // element attribute. Viewport-establishing geometry (svg/image/use) is
+    // deliberately NOT consumed from here (see RenderScene.applyViewport).
+    @JvmField val geomX: CSSLength?,
+    @JvmField val geomY: CSSLength?,
+    @JvmField val geomWidth: CSSLength?,
+    @JvmField val geomHeight: CSSLength?,
+    @JvmField val geomCx: CSSLength?,
+    @JvmField val geomCy: CSSLength?,
+    @JvmField val geomR: CSSLength?,
+    @JvmField val geomRx: CSSLength?,
+    @JvmField val geomRy: CSSLength?,
 ) {
 
     /**
@@ -293,6 +308,15 @@ internal class Style internal constructor(
         letterSpacing = null,
         wordSpacing = null,
         paintOrder = PaintOrder.FILL_STROKE_MARKERS,
+        geomX = null,
+        geomY = null,
+        geomWidth = null,
+        geomHeight = null,
+        geomCx = null,
+        geomCy = null,
+        geomR = null,
+        geomRx = null,
+        geomRy = null,
     )
 
     fun toBuilder(): Builder = Builder().apply { reset(this@Style) }
@@ -509,6 +533,24 @@ internal class Style internal constructor(
         @JvmField
         @PaintOrder
         var paintOrder: Int = 0
+        @JvmField
+        var geomX: CSSLength? = null
+        @JvmField
+        var geomY: CSSLength? = null
+        @JvmField
+        var geomWidth: CSSLength? = null
+        @JvmField
+        var geomHeight: CSSLength? = null
+        @JvmField
+        var geomCx: CSSLength? = null
+        @JvmField
+        var geomCy: CSSLength? = null
+        @JvmField
+        var geomR: CSSLength? = null
+        @JvmField
+        var geomRx: CSSLength? = null
+        @JvmField
+        var geomRy: CSSLength? = null
 
         fun addSpecifiedFlag(@SpecifiedFlags flag: Long) {
             specifiedFlags = specifiedFlags or flag
@@ -563,6 +605,17 @@ internal class Style internal constructor(
             if (kw and SPECIFIED_VECTOR_EFFECT == 0L) this.vectorEffect = VectorEffect.None
             if (kw and SPECIFIED_ISOLATION == 0L) this.isolation = Isolation.auto
             if (kw and SPECIFIED_MIX_BLEND_MODE == 0L) this.mixBlendMode = CSSBlendMode.normal
+            // SVG2 geometry properties are not inherited: a declaration only
+            // affects the element carrying it (consumed by shape builders).
+            if (kw and SPECIFIED_GEOM_X == 0L) this.geomX = null
+            if (kw and SPECIFIED_GEOM_Y == 0L) this.geomY = null
+            if (kw and SPECIFIED_GEOM_WIDTH == 0L) this.geomWidth = null
+            if (kw and SPECIFIED_GEOM_HEIGHT == 0L) this.geomHeight = null
+            if (kw and SPECIFIED_GEOM_CX == 0L) this.geomCx = null
+            if (kw and SPECIFIED_GEOM_CY == 0L) this.geomCy = null
+            if (kw and SPECIFIED_GEOM_R == 0L) this.geomR = null
+            if (kw and SPECIFIED_GEOM_RX == 0L) this.geomRx = null
+            if (kw and SPECIFIED_GEOM_RY == 0L) this.geomRy = null
             // transform-origin/box are not inherited; null = initial
             // (origin 0 0 for SVG without CSS box, view-box reference).
             if (kw and SPECIFIED_TRANSFORM_ORIGIN == 0L) this.transformOrigin = null
@@ -661,6 +714,15 @@ internal class Style internal constructor(
             this.letterSpacing = original.letterSpacing
             this.wordSpacing = original.wordSpacing
             this.paintOrder = original.paintOrder
+            this.geomX = original.geomX
+            this.geomY = original.geomY
+            this.geomWidth = original.geomWidth
+            this.geomHeight = original.geomHeight
+            this.geomCx = original.geomCx
+            this.geomCy = original.geomCy
+            this.geomR = original.geomR
+            this.geomRx = original.geomRx
+            this.geomRy = original.geomRy
         }
 
         private var lastBuilt: Style? = null
@@ -701,6 +763,15 @@ internal class Style internal constructor(
                 fontFamily = fontFamily,
                 fontSize = fontSize,
                 fontSizeAdjust = fontSizeAdjust,
+                geomX = geomX,
+                geomY = geomY,
+                geomWidth = geomWidth,
+                geomHeight = geomHeight,
+                geomCx = geomCx,
+                geomCy = geomCy,
+                geomR = geomR,
+                geomRx = geomRx,
+                geomRy = geomRy,
                 whiteSpace = whiteSpace,
                 pointerEvents = pointerEvents,
                 unicodeBidi = unicodeBidi,
@@ -856,7 +927,16 @@ internal class Style internal constructor(
                     colorInterpolationFilters == original.colorInterpolationFilters &&
                     colorInterpolation == original.colorInterpolation &&
                     letterSpacing == original.letterSpacing &&
-                    wordSpacing == original.wordSpacing
+                    wordSpacing == original.wordSpacing &&
+                    geomX == original.geomX &&
+                    geomY == original.geomY &&
+                    geomWidth == original.geomWidth &&
+                    geomHeight == original.geomHeight &&
+                    geomCx == original.geomCx &&
+                    geomCy == original.geomCy &&
+                    geomR == original.geomR &&
+                    geomRx == original.geomRx &&
+                    geomRy == original.geomRy
         }
     }
 
@@ -947,7 +1027,16 @@ internal class Style internal constructor(
             SPECIFIED_FONT_SIZE_ADJUST,
             SPECIFIED_WHITE_SPACE,
             SPECIFIED_POINTER_EVENTS,
-            SPECIFIED_UNICODE_BIDI
+            SPECIFIED_UNICODE_BIDI,
+            SPECIFIED_GEOM_X,
+            SPECIFIED_GEOM_Y,
+            SPECIFIED_GEOM_WIDTH,
+            SPECIFIED_GEOM_HEIGHT,
+            SPECIFIED_GEOM_CX,
+            SPECIFIED_GEOM_CY,
+            SPECIFIED_GEOM_R,
+            SPECIFIED_GEOM_RX,
+            SPECIFIED_GEOM_RY
         ]
     )
     annotation class SpecifiedFlags2
@@ -1056,6 +1145,16 @@ internal class Style internal constructor(
         colorInterpolation: Int = this.colorInterpolation,
         letterSpacing: CSSLength? = this.letterSpacing,
         wordSpacing: CSSLength? = this.wordSpacing,
+        paintOrder: Int = this.paintOrder,
+        geomX: CSSLength? = this.geomX,
+        geomY: CSSLength? = this.geomY,
+        geomWidth: CSSLength? = this.geomWidth,
+        geomHeight: CSSLength? = this.geomHeight,
+        geomCx: CSSLength? = this.geomCx,
+        geomCy: CSSLength? = this.geomCy,
+        geomR: CSSLength? = this.geomR,
+        geomRx: CSSLength? = this.geomRx,
+        geomRy: CSSLength? = this.geomRy,
     ): Style {
         return Style(
             specifiedFlags = specifiedFlags,
@@ -1140,6 +1239,15 @@ internal class Style internal constructor(
             letterSpacing = letterSpacing,
             wordSpacing = wordSpacing,
             paintOrder = paintOrder,
+            geomX = geomX,
+            geomY = geomY,
+            geomWidth = geomWidth,
+            geomHeight = geomHeight,
+            geomCx = geomCx,
+            geomCy = geomCy,
+            geomR = geomR,
+            geomRx = geomRx,
+            geomRy = geomRy,
         )
     }
 
@@ -1397,6 +1505,22 @@ internal class Style internal constructor(
         const val SPECIFIED_WHITE_SPACE: Long = 1L shl 9
         const val SPECIFIED_POINTER_EVENTS: Long = 1L shl 10
         const val SPECIFIED_UNICODE_BIDI: Long = 1L shl 11
+        // SVG2 geometry properties. NOTE: like every other SpecifiedFlags2
+        // value these share bit positions with primary SPECIFIED_* flags, and
+        // cssWideKeywordFlags/importantFlags/suppressedFlags are shared masks
+        // (see the class KDoc): a CSS-wide keyword on e.g. geomX also masks
+        // the primary flag on the same bit. Same pre-existing trade-off as
+        // e.g. POINTER_EVENTS vs STROKE_DASHOFFSET; geometry css-wide keywords
+        // are rarer still, so the established pattern is kept.
+        const val SPECIFIED_GEOM_X: Long = 1L shl 12
+        const val SPECIFIED_GEOM_Y: Long = 1L shl 13
+        const val SPECIFIED_GEOM_WIDTH: Long = 1L shl 14
+        const val SPECIFIED_GEOM_HEIGHT: Long = 1L shl 15
+        const val SPECIFIED_GEOM_CX: Long = 1L shl 16
+        const val SPECIFIED_GEOM_CY: Long = 1L shl 17
+        const val SPECIFIED_GEOM_R: Long = 1L shl 18
+        const val SPECIFIED_GEOM_RX: Long = 1L shl 19
+        const val SPECIFIED_GEOM_RY: Long = 1L shl 20
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1750,6 +1874,82 @@ internal class Style internal constructor(
                     val markerEnd = parseFunctionalIRI(value)
                     builder.markerEnd = markerEnd
                     if (markerEnd != null) builder.addSpecifiedFlag(SPECIFIED_MARKER_END)
+                }
+
+                // SVG2 geometry properties. Presentation attributes carrying
+                // these names are consumed by the shape builders and never
+                // reach this path as attributes; only style/stylesheet
+                // declarations land here and override the attributes at
+                // build time (see updatePathAndBoundingBox). Negative
+                // width/height/r/rx/ry are invalid per spec: the declaration
+                // is dropped without marking specified.
+                SVGAttr.x -> try {
+                    builder.geomX = parseLength(value)
+                    builder.addSpecifiedFlag2(SPECIFIED_GEOM_X)
+                } catch (_: KSVGParseException) {
+                }
+
+                SVGAttr.y -> try {
+                    builder.geomY = parseLength(value)
+                    builder.addSpecifiedFlag2(SPECIFIED_GEOM_Y)
+                } catch (_: KSVGParseException) {
+                }
+
+                SVGAttr.width -> try {
+                    val geomWidth = parseLength(value)
+                    if (!geomWidth.isNegative) {
+                        builder.geomWidth = geomWidth
+                        builder.addSpecifiedFlag2(SPECIFIED_GEOM_WIDTH)
+                    }
+                } catch (_: KSVGParseException) {
+                }
+
+                SVGAttr.height -> try {
+                    val geomHeight = parseLength(value)
+                    if (!geomHeight.isNegative) {
+                        builder.geomHeight = geomHeight
+                        builder.addSpecifiedFlag2(SPECIFIED_GEOM_HEIGHT)
+                    }
+                } catch (_: KSVGParseException) {
+                }
+
+                SVGAttr.cx -> try {
+                    builder.geomCx = parseLength(value)
+                    builder.addSpecifiedFlag2(SPECIFIED_GEOM_CX)
+                } catch (_: KSVGParseException) {
+                }
+
+                SVGAttr.cy -> try {
+                    builder.geomCy = parseLength(value)
+                    builder.addSpecifiedFlag2(SPECIFIED_GEOM_CY)
+                } catch (_: KSVGParseException) {
+                }
+
+                SVGAttr.r -> try {
+                    val geomR = parseLength(value)
+                    if (!geomR.isNegative) {
+                        builder.geomR = geomR
+                        builder.addSpecifiedFlag2(SPECIFIED_GEOM_R)
+                    }
+                } catch (_: KSVGParseException) {
+                }
+
+                SVGAttr.rx -> try {
+                    val geomRx = parseLength(value)
+                    if (!geomRx.isNegative) {
+                        builder.geomRx = geomRx
+                        builder.addSpecifiedFlag2(SPECIFIED_GEOM_RX)
+                    }
+                } catch (_: KSVGParseException) {
+                }
+
+                SVGAttr.ry -> try {
+                    val geomRy = parseLength(value)
+                    if (!geomRy.isNegative) {
+                        builder.geomRy = geomRy
+                        builder.addSpecifiedFlag2(SPECIFIED_GEOM_RY)
+                    }
+                } catch (_: KSVGParseException) {
                 }
 
                 SVGAttr.display -> {
@@ -2139,6 +2339,8 @@ internal class Style internal constructor(
             SVGAttr.color_interpolation -> SPECIFIED_COLOR_INTERPOLATION
             SVGAttr.color_rendering -> SPECIFIED_COLOR_RENDERING
             SVGAttr.color_interpolation_filters -> SPECIFIED_COLOR_INTERPOLATION_FILTERS
+            SVGAttr.cx -> SPECIFIED_GEOM_CX
+            SVGAttr.cy -> SPECIFIED_GEOM_CY
             SVGAttr.direction -> SPECIFIED_DIRECTION
             SVGAttr.display -> SPECIFIED_DISPLAY
             SVGAttr.dominant_baseline -> SPECIFIED_DOMINANT_BASELINE
@@ -2164,6 +2366,7 @@ internal class Style internal constructor(
             SVGAttr.font_variation_settings -> SPECIFIED_FONT_VARIATION_SETTINGS
             SVGAttr.font_weight -> SPECIFIED_FONT_WEIGHT
             SVGAttr.font_width -> SPECIFIED_FONT_WIDTH
+            SVGAttr.height -> SPECIFIED_GEOM_HEIGHT
             SVGAttr.image_rendering -> SPECIFIED_IMAGE_RENDERING
             SVGAttr.isolation -> SPECIFIED_ISOLATION
             SVGAttr.letter_spacing -> SPECIFIED_LETTER_SPACING
@@ -2197,13 +2400,19 @@ internal class Style internal constructor(
             SVGAttr.transform_origin -> SPECIFIED_TRANSFORM_ORIGIN
             SVGAttr.transform_box -> SPECIFIED_TRANSFORM_BOX
             SVGAttr.pointer_events -> SPECIFIED_POINTER_EVENTS
+            SVGAttr.r -> SPECIFIED_GEOM_R
+            SVGAttr.rx -> SPECIFIED_GEOM_RX
+            SVGAttr.ry -> SPECIFIED_GEOM_RY
             SVGAttr.unicode_bidi -> SPECIFIED_UNICODE_BIDI
             SVGAttr.vector_effect -> SPECIFIED_VECTOR_EFFECT
             SVGAttr.viewport_fill -> SPECIFIED_VIEWPORT_FILL
             SVGAttr.viewport_fill_opacity -> SPECIFIED_VIEWPORT_FILL_OPACITY
             SVGAttr.visibility -> SPECIFIED_VISIBILITY
             SVGAttr.white_space -> SPECIFIED_WHITE_SPACE
+            SVGAttr.width -> SPECIFIED_GEOM_WIDTH
             SVGAttr.word_spacing -> SPECIFIED_WORD_SPACING
+            SVGAttr.x -> SPECIFIED_GEOM_X
+            SVGAttr.y -> SPECIFIED_GEOM_Y
             else -> null
         }
     }

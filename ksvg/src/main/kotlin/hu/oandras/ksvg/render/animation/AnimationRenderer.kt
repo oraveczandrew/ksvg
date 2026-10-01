@@ -167,9 +167,9 @@ internal fun RenderNode<*>.updateAnimations(animationTimeMs: Long): Boolean {
 
     if (this is PathRenderNode) {
         when (val shape = sourceElement) {
-            is RectShape -> if (updatePathAndBoundingBox(shape, path, this)) contentChanged = true
-            is CircleShape -> if (updatePathAndBoundingBox(shape, path, this)) contentChanged = true
-            is EllipseShape -> if (updatePathAndBoundingBox(shape, path, this)) contentChanged = true
+            is RectShape -> if (updatePathAndBoundingBox(shape, path, this, renderState.style)) contentChanged = true
+            is CircleShape -> if (updatePathAndBoundingBox(shape, path, this, renderState.style)) contentChanged = true
+            is EllipseShape -> if (updatePathAndBoundingBox(shape, path, this, renderState.style)) contentChanged = true
             is LineShape -> if (updatePathAndBoundingBox(shape, path, this)) contentChanged = true
             is PolyLineShape -> if (updatePathAndBoundingBox(shape, path, this, animationTimeMs)) contentChanged = true
             is PathShape -> if (updatePathAndBoundingBox(shape, path, this, animationTimeMs)) contentChanged = true
