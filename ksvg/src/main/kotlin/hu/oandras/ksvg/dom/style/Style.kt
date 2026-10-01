@@ -105,6 +105,7 @@ internal class Style internal constructor(
     @JvmField val fontFamily: List<String>?,
     @JvmField val fontSize: CSSLength?,
     @JvmField val fontSizeAdjust: Float,
+    @JvmField val whiteSpace: WhiteSpace?,
     @JvmField val fontWeight: Float,
     @JvmField val fontStyle: FontStyle?,
     @JvmField val fontWidth: Float,
@@ -230,6 +231,7 @@ internal class Style internal constructor(
         fontFamily = null,
         fontSize = null,
         fontSizeAdjust = Float.NaN,
+        whiteSpace = null,
         fontWeight = Float.NaN,
         fontStyle = null,
         fontWidth = Float.NaN,
@@ -344,6 +346,8 @@ internal class Style internal constructor(
         var fontSize: CSSLength? = null
         @JvmField
         var fontSizeAdjust: Float = Float.NaN
+        @JvmField
+        var whiteSpace: WhiteSpace? = null
         @JvmField
         var fontWeight: Float = Float.NaN
         @JvmField
@@ -589,6 +593,7 @@ internal class Style internal constructor(
             this.fontFamily = original.fontFamily
             this.fontSize = original.fontSize
             this.fontSizeAdjust = original.fontSizeAdjust
+            this.whiteSpace = original.whiteSpace
             this.fontWeight = original.fontWeight
             this.fontStyle = original.fontStyle
             this.fontWidth = original.fontWidth
@@ -686,6 +691,7 @@ internal class Style internal constructor(
                 fontFamily = fontFamily,
                 fontSize = fontSize,
                 fontSizeAdjust = fontSizeAdjust,
+                whiteSpace = whiteSpace,
                 fontWeight = fontWeight,
                 fontStyle = fontStyle,
                 fontWidth = fontWidth,
@@ -780,6 +786,7 @@ internal class Style internal constructor(
                     fontFamily == original.fontFamily &&
                     fontSize == original.fontSize &&
                     (fontSizeAdjust == original.fontSizeAdjust || (fontSizeAdjust.isNaN() && original.fontSizeAdjust.isNaN())) &&
+                    whiteSpace == original.whiteSpace &&
                     (fontWeight == original.fontWeight || (fontWeight.isNaN() && original.fontWeight.isNaN())) &&
                     fontStyle == original.fontStyle &&
                     (fontWidth == original.fontWidth || (fontWidth.isNaN() && original.fontWidth.isNaN())) &&
@@ -923,7 +930,8 @@ internal class Style internal constructor(
             SPECIFIED_COLOR_RENDERING,
             SPECIFIED_TRANSFORM_ORIGIN,
             SPECIFIED_TRANSFORM_BOX,
-            SPECIFIED_FONT_SIZE_ADJUST
+            SPECIFIED_FONT_SIZE_ADJUST,
+            SPECIFIED_WHITE_SPACE
         ]
     )
     annotation class SpecifiedFlags2
@@ -970,6 +978,7 @@ internal class Style internal constructor(
         fontFamily: List<String>? = this.fontFamily,
         fontSize: CSSLength? = this.fontSize,
         fontSizeAdjust: Float = this.fontSizeAdjust,
+        whiteSpace: WhiteSpace? = this.whiteSpace,
         fontWeight: Float = this.fontWeight,
         fontStyle: FontStyle? = this.fontStyle,
         fontWidth: Float = this.fontWidth,
@@ -1053,6 +1062,7 @@ internal class Style internal constructor(
             fontFamily = fontFamily,
             fontSize = fontSize,
             fontSizeAdjust = fontSizeAdjust,
+            whiteSpace = whiteSpace,
             fontWeight = fontWeight,
             fontStyle = fontStyle,
             fontWidth = fontWidth,
@@ -1155,6 +1165,8 @@ internal class Style internal constructor(
             append(fontSize)
             append(", fontSizeAdjust=")
             append(fontSizeAdjust)
+            append(", whiteSpace=")
+            append(whiteSpace)
             append(", fontWeight=")
             append(fontWeight)
             append(", fontStyle=")
@@ -1358,6 +1370,7 @@ internal class Style internal constructor(
         const val SPECIFIED_TRANSFORM_ORIGIN: Long = 1L shl 6
         const val SPECIFIED_TRANSFORM_BOX: Long = 1L shl 7
         const val SPECIFIED_FONT_SIZE_ADJUST: Long = 1L shl 8
+        const val SPECIFIED_WHITE_SPACE: Long = 1L shl 9
 
         // Flags for the settings that are applied to reset the root style
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
@@ -1919,12 +1932,20 @@ internal class Style internal constructor(
                 // process) only when the value asks for unimplemented
                 // behavior; values covered by existing paths stay silent.
                 SVGAttr.white_space -> {
-                    val v = value.trim()
-                    if (v.equals("pre-wrap", ignoreCase = true) ||
-                        v.equals("pre-line", ignoreCase = true) ||
-                        v.equals("break-spaces", ignoreCase = true)
-                    ) {
-                        loggerContext.logUnsupportedFeature(UnsupportedFeature.WHITE_SPACE_WRAP)
+                    // Presentation attribute (SVG2): both paths parse it.
+                    // Wrapping values preserve like pre but never wrap (no
+                    // wrapping area exists); still warn about the missing
+                    // wrapping once per parse.
+                    val whiteSpace = parseWhiteSpace(value)
+                    if (whiteSpace != null) {
+                        builder.whiteSpace = whiteSpace
+                        builder.addSpecifiedFlag2(SPECIFIED_WHITE_SPACE)
+                        if (whiteSpace == WhiteSpace.preWrap ||
+                            whiteSpace == WhiteSpace.preLine ||
+                            whiteSpace == WhiteSpace.breakSpaces
+                        ) {
+                            loggerContext.logUnsupportedFeature(UnsupportedFeature.WHITE_SPACE_WRAP)
+                        }
                     }
                 }
                 SVGAttr.line_height -> {
@@ -2124,6 +2145,7 @@ internal class Style internal constructor(
             SVGAttr.viewport_fill -> SPECIFIED_VIEWPORT_FILL
             SVGAttr.viewport_fill_opacity -> SPECIFIED_VIEWPORT_FILL_OPACITY
             SVGAttr.visibility -> SPECIFIED_VISIBILITY
+            SVGAttr.white_space -> SPECIFIED_WHITE_SPACE
             SVGAttr.word_spacing -> SPECIFIED_WORD_SPACING
             else -> null
         }

@@ -52,8 +52,11 @@ class C3WhitespaceTest {
     }
 
     @Test
-    fun preserveSpaceKeepsNewline() {
+    fun preserveSpaceFoldsNewlineToSpace() {
+        // Chrome parity (measured, tmp/BROWSER_TEXT_PARITY.md): no engine
+        // breaks SVG <text> on newlines; Chrome collapses them to spaces
+        // even under white-space: pre.
         val result = textXMLSpaceTransform("a\nb", isFirstChild = true, isLastChild = true, spacePreserve = true)
-        assertEquals("a\nb", result)
+        assertEquals("a b", result)
     }
 }

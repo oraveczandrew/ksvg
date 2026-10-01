@@ -39,8 +39,11 @@ internal fun textXMLSpaceTransform(
     spacePreserve: Boolean,
 ): String {
     if (spacePreserve) {
-        // xml:space = "preserve": keep all characters (incl. tabs/newlines) verbatim.
-        return text
+        // Preserve mode (xml:space="preserve" or white-space: pre/...):
+        // keep spaces/tabs verbatim, but fold line breaks to spaces.
+        // Chrome parity (measured): no engine breaks SVG <text> on newlines,
+        // Chrome collapses them even under white-space: pre.
+        return text.replace("\r\n", " ").replace('\n', ' ').replace('\r', ' ')
     }
 
     // xml:space = "default": per SVG/CSS text whitespace handling, newlines and tabs

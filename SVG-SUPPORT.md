@@ -218,7 +218,7 @@ All filter primitives support the common attributes `x`, `y`, `width`, `height` 
 | [`writing-mode`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/writing-mode)                             | Partial | Vertical text layout is applied<br>`textPath` method/spacing/side and full bidi are not                                                                        |
 | [`glyph-orientation-vertical`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/glyph-orientation-vertical) | None    | Parsed but not applied<br>vertical text layout itself is supported                                                                                             |
 | [`unicode-bidi`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/unicode-bidi)                       | None    |                                                                                                                                                                |
-| [`white-space`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/white-space)                         | None    | Only `xml:space` (`space` attribute) is honored (covers `normal`/`pre` behavior)<br>Deferred: `pre-wrap`/`pre-line` wrapping needs a line-breaking engine with a wrapping-area source, which SVG `<text>` has none of |
+| [`white-space`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/white-space)                         | Partial | `normal`, `nowrap`, `pre`, `pre-line`, `pre-wrap`, `break-spaces` parsed (presentation attribute, `style`, stylesheet; inherited; CSS beats `xml:space`)<br>`pre`/`pre-wrap`/`break-spaces` preserve spaces/tabs like `xml:space="preserve"`; newlines fold to spaces everywhere (measured Chrome parity — no engine breaks SVG `<text>` on `\n`)<br>Deferred: actual line wrapping needs a wrapping-area source, which SVG `<text>` has none of |
 | [`line-height`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/line-height)                         | None    | Deferred: only observable in multi-line layout; single-line text is unaffected (browsers included)<br>Would land together with `\n` line stacking in `pre` mode |
 | [`text-overflow`](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/text-overflow)                     | None    | Not applicable: per SVG2 it only takes effect with a validly specified wrapping area, which does not exist for SVG `<text>` (no `width` source); inventing a clip width would be fiction |
 
@@ -349,4 +349,3 @@ The following SVG elements are explicitly **not** supported:
 | Transform types            | 5                  |
 
 ---
-

@@ -548,6 +548,10 @@ internal fun updateStyle(
         builder.fontSizeAdjust = sourceStyle.fontSizeAdjust
     }
 
+    if (sourceStyle.isSpecified2(Style.SPECIFIED_WHITE_SPACE)) {
+        builder.whiteSpace = sourceStyle.whiteSpace
+    }
+
     if (sourceStyle.isSpecified2(Style.SPECIFIED_TRANSFORM_ORIGIN)) {
         builder.transformOrigin = sourceStyle.transformOrigin
     }

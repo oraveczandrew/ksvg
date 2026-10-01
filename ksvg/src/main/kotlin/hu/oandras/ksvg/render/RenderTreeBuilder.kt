@@ -2303,6 +2303,12 @@ internal class RenderTreeBuilder(
         matchingRules.forEachElement { apply(it, true) }
         apply(obj.style, true)
 
+        // CSS white-space (computed above, own or inherited) beats
+        // xml:space: map to the preserve flag consumed by text extraction.
+        // Unspecified everywhere keeps the xml:space chain value set by
+        // checkXMLSpaceAttribute.
+        builder.whiteSpace?.let { state.spacePreserve = it.preservesSpaces }
+
         // Note: we don't apply animations during tree building,
         // they will be applied later using updateAnimations()
     }
