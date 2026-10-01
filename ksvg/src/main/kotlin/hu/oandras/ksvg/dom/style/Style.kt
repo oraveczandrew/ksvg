@@ -1496,8 +1496,13 @@ internal class Style internal constructor(
                 || value.equals("unset", ignoreCase = true)
                 || value.equals("initial", ignoreCase = true)
                 || value.equals("revert", ignoreCase = true)) {
-                specifiedFlagForAttr(SVGAttr.fromString(localName))?.let {
-                    builder.markCssWideKeyword(it)
+                val cssAttr = SVGAttr.fromString(localName)
+                if (cssAttr == SVGAttr.marker) {
+                    builder.markCssWideKeyword(SPECIFIED_MARKER_START or SPECIFIED_MARKER_MID or SPECIFIED_MARKER_END)
+                } else {
+                    specifiedFlagForAttr(cssAttr)?.let {
+                        builder.markCssWideKeyword(it)
+                    }
                 }
                 return
             }
