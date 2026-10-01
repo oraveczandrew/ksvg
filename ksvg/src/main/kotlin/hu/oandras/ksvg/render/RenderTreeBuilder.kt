@@ -1021,6 +1021,24 @@ internal class RenderTreeBuilder(
         val children = buildChildren(obj)
         val node = GroupRenderNode(obj, children)
         node.viewportSpec = ViewportSpec(null, null, useWidth, useHeight)
+        // SVG2 symbol refX/refY: the reference point (post-viewBox coords)
+        // lands on the use x/y, i.e. content shifts by -ref in viewport units.
+        // Unspecified means no adjustment (unlike an explicit zero). Applied as
+        // node.transform so it composes after viewBoxTransform at render time
+        // (renderGroupNode concats transform first, viewBoxTransform second).
+        val symbolRefX = obj.refX
+        val symbolRefY = obj.refY
+        if (symbolRefX != null || symbolRefY != null) {
+            val vb = obj.viewBox
+            val maxX = vb?.width ?: viewPort.width
+            val maxY = vb?.height ?: viewPort.height
+            val dx = -(symbolRefX?.floatValueInContext(maxX) ?: 0f)
+            val dy = -(symbolRefY?.floatValueInContext(maxY) ?: 0f)
+            if (dx != 0f || dy != 0f) {
+                node.transform = Matrix().apply { preTranslate(dx, dy) }
+                node.animationBaseTransform = node.transform?.copy()
+            }
+        }
         // node.viewPort / node.viewBoxTransform are owned by RenderScene.applyViewport.
         node.renderState.apply(state)
         updateParentBoundingBox(obj)

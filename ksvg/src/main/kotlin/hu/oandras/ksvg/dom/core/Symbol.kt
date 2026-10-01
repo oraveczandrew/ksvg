@@ -19,14 +19,22 @@ package hu.oandras.ksvg.dom.core
 
 import android.graphics.Matrix
 import hu.oandras.ksvg.PreserveAspectRatio
+import hu.oandras.ksvg.css.CSSLength
+import hu.oandras.ksvg.css.CssUnit
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.parser.parseLength
+import org.xml.sax.Attributes
 
 internal class Symbol(
     baseParams: BaseParams,
     conditionalBundle: Conditional,
     preserveAspectRatio: PreserveAspectRatio?,
     viewBox: Box?,
-    transform: Matrix?
+    transform: Matrix?,
+    @JvmField
+    val refX: CSSLength?,
+    @JvmField
+    val refY: CSSLength?,
 ) : ViewBoxContainer(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -42,14 +50,50 @@ internal class Symbol(
         document: SVGImpl,
         parent: Container?,
     ) : ViewBoxContainer.Builder<Symbol>(document, parent) {
+        private var refX: CSSLength? = null
+        private var refY: CSSLength? = null
+
+        override fun onAttribute(
+            attributes: Attributes,
+            index: Int,
+            attr: SVGAttr,
+            value: String
+        ): Boolean {
+            when (attr) {
+                SVGAttr.refX -> refX = parseSymbolRef(value, horizontal = true)
+                SVGAttr.refY -> refY = parseSymbolRef(value, horizontal = false)
+                else -> return super.onAttribute(attributes, index, attr, value)
+            }
+            return true
+        }
+
         override fun build(): Symbol {
             return Symbol(
                 baseParams = getBaseParams(),
                 conditionalBundle = getSvgConditionalBundle(),
                 preserveAspectRatio = getPreserveAspectRatio(),
                 viewBox = getViewBox(),
-                transform = getTransform()
+                transform = getTransform(),
+                refX = refX,
+                refY = refY,
             )
         }
+    }
+}
+
+/**
+ * Parses `symbol` refX/refY: length | percentage | left/center/right
+ * (horizontal) | top/center/bottom (vertical). Keywords map to 0%/50%/100%.
+ * Unlike `marker`, an unspecified ref means no adjustment — callers must
+ * distinguish null (absent) from an explicit zero.
+ */
+internal fun parseSymbolRef(value: String, horizontal: Boolean): CSSLength {
+    return when {
+        value.equals("center", ignoreCase = true) -> CSSLength(50f, CssUnit.percent)
+        horizontal && value.equals("left", ignoreCase = true) -> CSSLength(0f, CssUnit.percent)
+        horizontal && value.equals("right", ignoreCase = true) -> CSSLength(100f, CssUnit.percent)
+        !horizontal && value.equals("top", ignoreCase = true) -> CSSLength(0f, CssUnit.percent)
+        !horizontal && value.equals("bottom", ignoreCase = true) -> CSSLength(100f, CssUnit.percent)
+        else -> parseLength(value)
     }
 }
