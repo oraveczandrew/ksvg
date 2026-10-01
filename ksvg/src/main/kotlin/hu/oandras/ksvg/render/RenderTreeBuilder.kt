@@ -107,6 +107,7 @@ import hu.oandras.ksvg.dom.style.GeometryBox
 import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.SvgPaint
+import hu.oandras.ksvg.dom.text.LengthAdjust
 import hu.oandras.ksvg.dom.text.TRef
 import hu.oandras.ksvg.dom.text.TSpan
 import hu.oandras.ksvg.dom.text.Text
@@ -114,9 +115,8 @@ import hu.oandras.ksvg.dom.text.TextAnchor
 import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextDirection
 import hu.oandras.ksvg.dom.text.TextPath
-import hu.oandras.ksvg.dom.text.TextPositionedContainer
 import hu.oandras.ksvg.dom.text.TextPathSide
-import hu.oandras.ksvg.dom.text.LengthAdjust
+import hu.oandras.ksvg.dom.text.TextPositionedContainer
 import hu.oandras.ksvg.dom.text.TextSequence
 import hu.oandras.ksvg.filtering.LcgRandom
 import hu.oandras.ksvg.filtering.SvgPathNoise
@@ -139,14 +139,14 @@ import hu.oandras.ksvg.render.filters.createCompositePaint
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.text.TextBoundsCalculator
+import hu.oandras.ksvg.render.text.applyTextLength
 import hu.oandras.ksvg.render.text.calculateTextBounds
 import hu.oandras.ksvg.render.text.calculateTextWidth
 import hu.oandras.ksvg.render.text.countTextChars
-import hu.oandras.ksvg.render.text.applyTextLength
-import hu.oandras.ksvg.render.text.visualOrderForOverride
 import hu.oandras.ksvg.render.text.extractRawText
 import hu.oandras.ksvg.render.text.getAnchorPosition
 import hu.oandras.ksvg.render.text.selectTypefaceAndFontStyling
+import hu.oandras.ksvg.render.text.visualOrderForOverride
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.anyElement
 import hu.oandras.ksvg.utils.argb
@@ -1215,6 +1215,26 @@ internal class RenderTreeBuilder(
         }
     }
 
+    /**
+     * Cycle-guarded cache lookup for referenceable defs (mask/marker/pattern/
+     * filter/clip-path): cache hit returns immediately, a miss builds once and
+     * only non-null results are stored. Use a labeled
+     * `return@cachedOrBuild` (or fall through to the last expression) inside
+     * [build], never a bare `return`.
+     */
+    private inline fun <K : Any, V : Any> cachedOrBuild(
+        cache: ArrayMap<K, V>,
+        key: K,
+        id: String?,
+        label: String,
+        build: () -> V?,
+    ): V? {
+        return withCycleGuard(id, label) {
+            cache[key]?.let { return@withCycleGuard it }
+            build()?.also { cache[key] = it }
+        }
+    }
+
     private fun buildUse(obj: Use): GroupRenderNode<Use>? {
         updateStyleForElement(state, obj)
         if (!display()) return null
@@ -1713,9 +1733,7 @@ internal class RenderTreeBuilder(
     }
 
     private fun buildClipPath(clipPath: ClipPath): ClipPathRenderNode? {
-        return withCycleGuard(clipPath.id, "clip-path") {
-            clipPathNodeCache[clipPath]?.let { return@withCycleGuard it }
-
+        return cachedOrBuild(clipPathNodeCache, clipPath, clipPath.id, "clip-path") {
             val oldState = state
             val oldStateStack = stateStack.toList()
             stateStack.clear()
@@ -1742,15 +1760,12 @@ internal class RenderTreeBuilder(
             stateStack.clear()
             stateStack.addAll(oldStateStack)
 
-            clipPathNodeCache[clipPath] = node
             node
         }
     }
 
     private fun buildMask(mask: Mask): MaskRenderNode? {
-        return withCycleGuard(mask.id, "mask") {
-            maskNodeCache[mask]?.let { return@withCycleGuard it }
-
+        return cachedOrBuild(maskNodeCache, mask, mask.id, "mask") {
             val oldState = state
             val oldStateStack = stateStack.toList()
             stateStack.clear()
@@ -1760,13 +1775,10 @@ internal class RenderTreeBuilder(
             if (state.style.opacity != 1f) {
                 state.style = state.style.copy(opacity = 1f)
             }
-            // state.style.filter = null
 
             val children = buildChildren(mask)
             val node = MaskRenderNode(mask, children)
             node.renderState.apply(state)
-
-            maskNodeCache[mask] = node
 
             state = oldState
             stateStack.clear()
@@ -1812,9 +1824,7 @@ internal class RenderTreeBuilder(
     }
 
     private fun buildMarker(marker: Marker): MarkerRenderNode? {
-        return withCycleGuard(marker.id, "marker") {
-            markerNodeCache[marker]?.let { return@withCycleGuard it }
-
+        return cachedOrBuild(markerNodeCache, marker, marker.id, "marker") {
             val oldState = state
             val oldStateStack = stateStack.toList()
             stateStack.clear()
@@ -1825,8 +1835,6 @@ internal class RenderTreeBuilder(
             val node = MarkerRenderNode(marker, children)
             node.renderState.apply(state)
 
-            markerNodeCache[marker] = node
-
             state = oldState
             stateStack.clear()
             stateStack.addAll(oldStateStack)
@@ -1836,9 +1844,7 @@ internal class RenderTreeBuilder(
     }
 
     private fun buildPattern(pattern: Pattern): PatternRenderNode? {
-        return withCycleGuard(pattern.id, "pattern") {
-            patternNodeCache[pattern]?.let { return@withCycleGuard it }
-
+        return cachedOrBuild(patternNodeCache, pattern, pattern.id, "pattern") {
             pattern.href?.let {
                 fillInChainedPatternFields(pattern, it)
             }
@@ -1895,8 +1901,6 @@ internal class RenderTreeBuilder(
             // correct. Note this also touches nodes shared with non-pattern uses
             // (markers, <use> targets) — those only lose caching, never correctness.
             children.forEachElement { it.disableSubtreeDisplayListCache() }
-
-            patternNodeCache[pattern] = node
 
             state = oldState
             stateStack.clear()
@@ -1993,9 +1997,7 @@ internal class RenderTreeBuilder(
     }
 
     private fun buildFilter(filter: Filter): FilterRenderNode? {
-        return withCycleGuard(filter.id, "filter") {
-            filterNodeCache[filter]?.let { return@withCycleGuard it }
-
+        return cachedOrBuild(filterNodeCache, filter, filter.id, "filter") {
             val oldState = state
             val oldStateStack = stateStack.toList()
             stateStack.clear()
@@ -2035,7 +2037,6 @@ internal class RenderTreeBuilder(
                         ?.takeIf { it != ColorInterpolation.UNSPECIFIED }
                             ?: filterMode
             }
-            filterNodeCache[filter] = node
 
             state = oldState
             stateStack.clear()
