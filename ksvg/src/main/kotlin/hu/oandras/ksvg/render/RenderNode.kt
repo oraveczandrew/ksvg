@@ -1068,11 +1068,12 @@ internal class FeDiffuseLightingRenderNode(
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_DIFFUSE_LIGHTING
     @JvmField val pixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
+    @JvmField val linearPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val normal: NormalVector = NormalVector()
     @JvmField val lightVec: LightVector = LightVector()
 
     override fun retainedByteCount(): Long =
-        pixels.retainedBytes() + outPixels.retainedBytes()
+        pixels.retainedBytes() + outPixels.retainedBytes() + linearPixels.retainedBytes()
 }
 
 internal class FeSpecularLightingRenderNode(
@@ -1081,11 +1082,12 @@ internal class FeSpecularLightingRenderNode(
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_SPECULAR_LIGHTING
     @JvmField val pixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
+    @JvmField val linearPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val normal: NormalVector = NormalVector()
     @JvmField val lightVec: LightVector = LightVector()
 
     override fun retainedByteCount(): Long =
-        pixels.retainedBytes() + outPixels.retainedBytes()
+        pixels.retainedBytes() + outPixels.retainedBytes() + linearPixels.retainedBytes()
 }
 
 internal class FeImageRenderNode(

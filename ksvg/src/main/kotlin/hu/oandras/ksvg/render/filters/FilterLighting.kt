@@ -47,6 +47,7 @@ private fun doLightingFilter(
     surfaceScale: Float,
     pixels: IntArrayBucket,
     outPixels: IntArrayBucket,
+    linearPixels: IntArrayBucket,
     inputBitmap: Bitmap,
     primitiveScaleX: Float,
     primitiveScaleY: Float,
@@ -158,7 +159,7 @@ private fun doLightingFilter(
         try {
             val res = upscaleBitmap(smallOut, inputBitmap.width, inputBitmap.height)
             if (useLinear && !premultipliedOutput) {
-                linearToSrgbInPlace(res)
+                linearToSrgbInPlace(res, linearPixels)
             }
             return res
         } finally {
@@ -175,11 +176,11 @@ private fun doLightingFilter(
  * Uses the same LUT as the kernel gamma path for bit-consistency.
  */
 context(renderContext: RenderContext)
-private fun linearToSrgbInPlace(bitmap: Bitmap) {
+private fun linearToSrgbInPlace(bitmap: Bitmap, scratch: IntArrayBucket) {
     val size = bitmap.width * bitmap.height
     if (size <= 0) return
     val table = ColorLuts.LINEAR_TO_SRGB.table
-    val pixels = IntArray(size)
+    val pixels = scratch.getWithSize(size)
     bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
     for (i in pixels.indices) {
         val p = pixels[i]
@@ -335,6 +336,7 @@ internal fun doFeDiffuseLightingFilter(
         surfaceScale = primitive.surfaceScale,
         pixels = primitiveNode.pixels,
         outPixels = primitiveNode.outPixels,
+        linearPixels = primitiveNode.linearPixels,
         inputBitmap = inputBitmap,
         primitiveScaleX = primitiveScaleX,
         primitiveScaleY = primitiveScaleY,
@@ -380,6 +382,7 @@ internal fun doFeSpecularLightingFilter(
         surfaceScale = primitive.surfaceScale,
         pixels = primitiveNode.pixels,
         outPixels = primitiveNode.outPixels,
+        linearPixels = primitiveNode.linearPixels,
         inputBitmap = inputBitmap,
         primitiveScaleX = primitiveScaleX,
         primitiveScaleY = primitiveScaleY,
