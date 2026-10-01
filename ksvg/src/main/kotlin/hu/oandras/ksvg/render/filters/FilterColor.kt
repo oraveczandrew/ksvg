@@ -121,10 +121,15 @@ internal fun colorMatrixFilterLinear(
     val outPixels = primitiveNode.outPixels.getWithSize(size)
     outPixels.fill(0) // Clean output outside the clip region
     SoftwareKernels.colorMatrix(
-        srcPixels, outPixels, width,
-        clipLeft, clipTop, clipRight, clipBottom,
-        buildColorMatrixValues(primitiveNode.type, primitiveNode.values),
-        primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
+        srcPixels = srcPixels,
+        outPixels = outPixels,
+        width = width,
+        clipLeft = clipLeft,
+        clipTop = clipTop,
+        clipRight = clipRight,
+        clipBottom = clipBottom,
+        matrix = buildColorMatrixValues(primitiveNode.type, primitiveNode.values),
+        useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
     )
 
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
@@ -157,17 +162,16 @@ internal fun buildColorMatrixValues(type: FeColorMatrixType, values: FloatArray?
  * android.graphics.ColorMatrix.setSaturation computes, spelled out so the
  * kernel path shares it. */
 internal fun saturateMatrixValues(saturation: Float): FloatArray {
-    val s = saturation
     return floatArrayOf(
-        0.213f + 0.787f * s, 0.715f - 0.715f * s, 0.072f - 0.072f * s, 0f, 0f,
-        0.213f - 0.213f * s, 0.715f + 0.285f * s, 0.072f - 0.072f * s, 0f, 0f,
-        0.213f - 0.213f * s, 0.715f - 0.715f * s, 0.072f + 0.928f * s, 0f, 0f,
+        0.213f + 0.787f * saturation, 0.715f - 0.715f * saturation, 0.072f - 0.072f * saturation, 0f, 0f,
+        0.213f - 0.213f * saturation, 0.715f + 0.285f * saturation, 0.072f - 0.072f * saturation, 0f, 0f,
+        0.213f - 0.213f * saturation, 0.715f - 0.715f * saturation, 0.072f + 0.928f * saturation, 0f, 0f,
         0f, 0f, 0f, 1f, 0f
     )
 }
 
 internal fun buildColorMatrix(type: FeColorMatrixType, values: FloatArray?): ColorMatrix {
-    val mapped = buildColorMatrixValues(type, values).copyOf()
+    val mapped = buildColorMatrixValues(type, values)
     mapped[4] *= 255f
     mapped[9] *= 255f
     mapped[14] *= 255f
