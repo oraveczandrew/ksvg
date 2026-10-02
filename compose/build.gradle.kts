@@ -24,8 +24,8 @@ plugins {
     alias(libs.plugins.compose.compiler)
     id("maven-publish")
     id("signing")
-    alias(libs.plugins.dokka)
-    alias(libs.plugins.dokka.javadoc)
+    id("org.jetbrains.dokka")
+    id("org.jetbrains.dokka-javadoc")
 }
 
 kotlin {

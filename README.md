@@ -76,6 +76,8 @@ dependencies {
     implementation("hu.oandras.ksvg:ksvg:1.0.0-beta01")
     // Optional Glide integration:
     implementation("hu.oandras.ksvg:glide:1.0.0-beta01")
+    // Optional Jetpack Compose integration:
+    implementation("hu.oandras.ksvg:compose:1.0.0-beta01")
 }
 ```
 
@@ -113,6 +115,18 @@ Glide.with(context)
     .load(uri)
     .into(imageView)
 ```
+
+Showing an SVG in Jetpack Compose (add the `compose` artifact):
+
+```kotlin
+KsvgImage(
+    assetPath = "sample.svg",
+    contentDescription = null,
+    modifier = Modifier.size(96.dp),
+)
+```
+
+For animated SVGs (SMIL), use `KsvgAnimatedImage` (parses with `parseAnimations = true`), or `KsvgCanvas` for direct canvas rendering without an intermediate `Drawable`.
 
 For more advanced usage, including `RenderOptions` (custom CSS, viewPorts, target
 element rendering, `softwareFiltering(true)` for deterministic CPU rendering),
