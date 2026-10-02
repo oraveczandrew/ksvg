@@ -6,7 +6,7 @@ Priority: **ABI → register liveness → PIC → FP op order → rounding → l
 
 ## Typical mistakes — check these first when hunting an assembly bug
 
-1. **`powf` / libc calls**: which regs does the call clobber on this ISA (per-ISA tables in `native-docs/` + `## 2`, `## 5`)? Live caller-saved regs spilled, return consumed, flags not relied on. i386: keep GOT base live across the call.
+1. **`powf` / libc calls**: which regs does the call clobber on this ISA (per-ISA tables in `docs/native/` + `## 2`, `## 5`)? Live caller-saved regs spilled, return consumed, flags not relied on. i386: keep GOT base live across the call.
 2. **Caller args**: re-derive layout from call site + dispatcher + prologue/frame size (`## 1`). Wrong slot = garbage/SIGSEGV. i386 linear kernels take **6** args only.
 3. **Register clobbers**: look up every value survival in the matching per-ISA `.md` table. Watch `MUL`/`DIV`/`IDIV`→`EDX`, `CPUID`→`EBX`, string ops, `CALL`/`RET`→`RSP`/flags, AArch64 `BL`→`X30`, `PACIASP`, ARMv7 `d8–d15`.
 4. **Rounding**: compare with the Kotlin reference. Missing `+0.5f` (`## 6`) or altered FP op order (`## 7`) = ~half the pixels off by 1 LSB. `0.5f` ≠ `0.5`; `* (1/255.0f)` ≠ `/255.0f`.

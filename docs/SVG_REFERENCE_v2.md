@@ -1,5 +1,9 @@
 # SVG Reference — Audit-First Implementation Reference
 
+> **SVG audit / new-element work only** — do NOT load for general render work.
+> For current support status see `docs/SVG-SUPPORT.md` (the audited record);
+> this file is the audit framework (what to check, which spec defines it).
+
 **Purpose:** AI-facing reference for implementing and reviewing SVG behavior in a renderer/parser such as KSVG.
 
 **Scope:** SVG 2 + SVG 1.1 compatibility + the CSS/graphics specifications that SVG delegates behavior to.
@@ -12,19 +16,7 @@
 
 # 1. Why this document exists
 
-SVG is not a single self-contained specification.
-
-SVG 2 defines the SVG language, but important behavior is supplied by other standards, especially CSS. SVG itself explicitly describes compatibility/dependencies with other standards. The current published SVG 2 document is still the 4 October 2018 Candidate Recommendation; SVG 1.1 Second Edition is the 16 August 2011 Recommendation. Therefore, a renderer targeting real-world SVG cannot use “SVG 2” as the only source of truth.
-
-This reference intentionally separates:
-
-1. **SVG language features**
-2. **delegated CSS/graphics behavior**
-3. **SVG 1.1 compatibility behavior**
-4. **implementation policy**
-5. **tests**
-
-The goal is to prevent a coding AI from silently filling gaps from memory.
+SVG is not self-contained: SVG 2 (still the 4 Oct 2018 CR, not a final standard; editor draft at https://svgwg.org/svg2-draft/) leans on CSS and other specs, plus SVG 1.1 Second Edition (16 Aug 2011 Recommendation, incl. errata) for compatibility. A renderer cannot use "SVG 2" as its only source of truth. This reference therefore separates SVG language features, delegated CSS/graphics behavior, SVG 1.1 compatibility, implementation policy, and tests — so a coding AI never silently fills gaps from memory.
 
 ---
 
@@ -36,29 +28,14 @@ Use this order when resolving a question.
 
 ### SVG 2
 
-https://www.w3.org/TR/SVG2/
-
-Status: Candidate Recommendation, 4 October 2018.
-
-Editor draft:
-
-https://svgwg.org/svg2-draft/
-
-Repository:
-
-https://github.com/w3c/svgwg/
-
-SVG 2 defines the SVG language and processing model. Do not describe the 2018 CR as the final SVG 2 standard.
+https://www.w3.org/TR/SVG2/ (CR, 4 Oct 2018 — do not call it the final standard),
+editor draft https://svgwg.org/svg2-draft/, repo https://github.com/w3c/svgwg/.
 
 ### SVG 1.1 Second Edition
 
-https://www.w3.org/TR/SVG11/
-
-Status: W3C Recommendation, 16 August 2011.
-
-Use this as an important compatibility source for established SVG 1.1 documents and for behavior retained from SVG 1.1.
-
-SVG 1.1 also has errata. Check those when behavior appears contradictory or ambiguous.
+https://www.w3.org/TR/SVG11/ (Recommendation, 16 Aug 2011 + errata) — compatibility
+source for established documents and retained behavior. Check errata when behavior
+looks contradictory.
 
 ---
 
@@ -236,7 +213,6 @@ Primitive inventory:
 - `feConvolveMatrix`
 - `feDiffuseLighting`
 - `feDisplacementMap`
-- `feDropShadow`
 - `feFlood`
 - `feGaussianBlur`
 - `feImage`
@@ -1409,65 +1385,7 @@ Every newly discovered missing feature gets:
 
 ---
 
-# 25. Suggested repository structure
-
-```text
-docs/
-  svg/
-    SVG_REFERENCE.md
-    SVG_SOURCES.md
-    SVG_FEATURE_MATRIX.md
-    SVG_COMPATIBILITY.md
-
-tests/
-  svg/
-    css/
-    geometry/
-    paint/
-    gradients/
-    patterns/
-    markers/
-    clipping/
-    masking/
-    filters/
-    compositing/
-    text/
-    references/
-    viewports/
-```
-
-The reference should remain stable even while implementation code changes.
-
----
-
-# 26. Source links
-
-## SVG
-
-- SVG 2: https://www.w3.org/TR/SVG2/
-- SVG 2 single page: https://www.w3.org/TR/SVG/single-page.html
-- SVG 2 editor draft: https://svgwg.org/svg2-draft/
-- SVG WG repository: https://github.com/w3c/svgwg/
-- SVG 1.1 Second Edition: https://www.w3.org/TR/SVG11/
-- SVG specification index: https://www.w3.org/TR/SVG/all/
-
-## CSS / graphics
-
-- CSS Cascade: https://www.w3.org/TR/css-cascade-6/
-- CSS Values & Units: https://www.w3.org/TR/css-values-4/
-- CSS Color: https://www.w3.org/TR/css-color-4/
-- CSS Transforms 1: https://www.w3.org/TR/css-transforms-1/
-- CSS Transforms 2: https://www.w3.org/TR/css-transforms-2/
-- CSS Masking: https://www.w3.org/TR/css-masking-1/
-- Filter Effects: https://www.w3.org/TR/filter-effects-1/
-- Compositing and Blending: https://www.w3.org/TR/compositing-1/
-- CSS Fonts: https://www.w3.org/TR/css-fonts-4/
-- CSS Text: https://www.w3.org/TR/css-text-4/
-- CSS Writing Modes: https://www.w3.org/TR/css-writing-modes-4/
-
----
-
-# 27. What “complete” means here
+# 25. What “complete” means here
 
 This document does **not** claim:
 
@@ -1501,11 +1419,6 @@ Without Layer A, an AI can omit a feature because it forgot it existed.
 
 Without Layer B, an implementation can claim support while only parsing the syntax.
 
----
-
-# 28. Current conclusion
-
-Use this document as the **architecture of the reference**, not as the final word on SVG.
-
-The next serious step is to generate `SVG_FEATURE_MATRIX.md` from the specifications themselves and use that matrix to audit this document. That is the point where “I think I covered everything” changes into “we can point to the inventory and see what is still missing.”
+The Layer-B record lives in `docs/SVG-SUPPORT.md` (audited support status);
+this document is the Layer-A framework behind it.
 

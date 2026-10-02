@@ -1,10 +1,16 @@
 # KSVG Rendering & Filtering — Architecture and Validation Notes
 
+> **Render/filter/native-kernel work only** — do NOT load for unrelated changes.
+> Skim this header, then read only the relevant section: §1 pipeline ownership,
+> §2 backends/parity tolerances, §3 lighting decisions, §4 native/JNI rules,
+> §5 hot-path rules (review before hot-path edits), §6 validation/benchmarks.
+
 Living internal document. It describes how KSVG turns an SVG DOM into rendered
 pixels (the Render Tree and the filter pipeline), records design decisions and
 their *reasons*, and lists the acceptance criteria/validation commands used to
 check the behavior. It grows incrementally together with the implementation
-work; re-read it before touching the render/filter code.
+work; before touching render/filter code, skim the map above and read the
+relevant section (not the whole file).
 
 Status: working document, kept in sync with `ksvg/src/main/kotlin`.
 Scope: rendering core + filter primitives (software and hardware paths).
@@ -138,13 +144,12 @@ The most subtle lighting issue discovered so far (`lighting_point_spot`):
   breaks golden comparison when the specular result is the **terminal** output of
   the filter (no `feComposite`/`feMerge` to absorb the difference).
 
-Consequences (verified, 2026-08-30):
+Consequences (verified):
 - Specular intensity (alpha) already matches rsvg — the brightness/cone formula is
   correct and must NOT be "fixed" in the kernel.
-- `filter_specular.svg` passes because a `feComposite operator="arithmetic"`
-  consumes the specular before the canvas; only a *direct* specular-to-canvas
-  output exposes the discrepancy.
-- The fix (implemented 2026-08-31): when a `feSpecularLighting` is the **last**
+- Only a *direct* specular-to-canvas output exposes the discrepancy; when a
+  `feComposite`/`feMerge` consumes the specular first, the forms agree.
+- The fix: when a `feSpecularLighting` is the **last**
   primitive of the filter (its result becomes the terminal canvas draw), the
   kernel emits the premultiplied form `(lightColor, intensity)`; otherwise it stays
   straight so consumer kernels (composite/merge) keep working. This is a
@@ -158,12 +163,6 @@ Consequences (verified, 2026-08-30):
   channels are the full-strength `lightColor` and alpha carries the specular
   intensity; otherwise the original straight `(I·color, max(R,G,B))` is kept.
   Diffuse output is untouched (opaque, alpha=255).
-
-  Result (AiVisualDiffTest, 256×256, software backend): `lighting_point_spot`
-  similarity improved **0.425 → 0.722** with the premultiplied-terminal fix alone;
-  `filter_specular.svg` (specular consumed by `feComposite arithmetic` →
-  non-terminal) unchanged at **0.981**. The diffuse-circe divergence (see §3.3)
-  then took it to **0.9783** (target ≥0.95).
 
 ### 3.2 Spot-light cone factor
 
@@ -186,31 +185,22 @@ Per librsvg `lighting.rs` `color_and_vector`:
 
 ### 3.3 Diffuse-vs-specular divergence note
 
-The `lighting_point_spot` left circle (`feDiffuseLighting` + `fePointLight`) showed
-a systematic brightening in rsvg vs KSVG. **Root cause (resolved 2026-08-31)**:
-the SVGs use the spec default `color-interpolation-filters: linearRGB`, so the
-lighting straight RGBA is computed in linear light and the RGB terminals are
-converted back to sRGB via the sRGB EOTF before compositing. KSVG computed the
-entire lighting result directly in sRGB, darkening the diffuse output. The fix
-(`useLinear` threaded through `KotlinKernels.lighting` and the `:filtering`
-`lighting.cpp` native/AGSL path) linearizes the light color once
+The `lighting_point_spot` diffuse circle showed a systematic brightening in rsvg
+vs KSVG. **Root cause**: the SVGs use the spec default
+`color-interpolation-filters: linearRGB`, so the lighting straight RGBA is
+computed in linear light and the RGB terminals are converted back to sRGB via
+the sRGB EOTF before compositing. KSVG computed the entire lighting result
+directly in sRGB, darkening the diffuse output. The fix (`useLinear` threaded
+through `KotlinKernels.lighting` and the `:filtering` `lighting.cpp`
+native/AGSL path) linearizes the light color once
 (`linearLightR/G/B = sRgbToLinear(lightColor)`), computes the straight RGB in
 linear space, then applies `linearToSRgb` to the straight output when
 `color-interpolation-filters` is `LINEAR_RGB`. Bit-exact `sRgbToLinear` /
 `linearToSRgb` helpers were added to both the Kotlin and native kernels.
 
 - Diffuse: `useLinear` gamma-corrects the straight RGB (opaque, alpha=255).
-  `lighting_point_spot` similarity rose **0.722 → 0.9783** (target ≥0.95 met).
 - Specular terminal (`premultipliedOutput`, last primitive): keeps the full light
   color in RGB and the raw linear intensity in alpha — **untouched** by the fix.
-  For the (linearRGB) `lighting_point_spot` specular circle this matches the
-  golden exactly (alpha=intensity, saturated white RGB); verified against
-  `rsvg-convert`, which produces the same alpha=R/GB=255 relationship (i.e., the
-  `alpha = max(R,G,B)` identity holds only in sRGB space, not the linearRGB
-  straight terminal that librsvg emits).
-- Validation: `filter_specular.svg` (sRGB) unchanged (0.9812); `filter_primitives.svg`
-  (linearRGB) improved 0.818 → 0.8264. The pre-existing `lighting.svg` (0.2233) red
-  is unchanged.
 
 > Note: `color-interpolation-filters="sRGB"` is not yet honored by the lighting
 > kernel — the light color is always linearized and gamma-corrected as if linearRGB
@@ -456,26 +446,12 @@ emulated x86 environments.
   -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true
 ```
 
-Methodology note: for everything except Morphology, `ms` is the raw-runner
-**average** (2026-09-02); the Morphology rows come from the stable `nativeBenchmark { }`
-harness (median of 5 batches with warmup + thermal gating + batch-CV
-classifier, measured 2026-09-05 on the same OnePlus 12 / SM8550). Scalar-vs-SIMD
-speedups are only directly comparable within the same run (CPU-frequency/thermal
-drift makes cross-session absolute times differ — e.g., Morphology scalar 512² was
-286.3 ms avg in the 2026-09-02 run vs ~200 ms harness median here). The Morphology
-`neon64` row median (15.979 ms @512², 224.114 ms @2048²) is the post-2026-09-05
-optimization revision of the handwritten AArch64 kernel (`morphology_neon64.S`):
-the tail loop was replaced by a straight-line 1-or-3-pixel tail (`tbz w12, #1`) and
-the per-iteration `cbz` was hoisted out of the vector loop; the previous inline NEON
-path measured **0.44x** vs scalar.
-
-- 2026-09-07 — Ported the full row/pixel/octave loop logic to x86_64 and i386
-  assembly for the feTurbulence filter (AVX2 and SSE2 backends). This matches the
-  full-loop-in-ASM architecture of the AArch64 version, reducing C++ overhead and
-  enabling future interleaving optimizations. Unified symbol naming for Convolve
-  and Lighting across all x86 variants to simplify dispatch and library linking.
-  Enabled Mach-O compatibility for host benchmarking on macOS by porting section
-  directives and commenting out ELF-specific SIZE attributes.
+Methodology rules: compare medians (→ p90 → min) within one controlled session
+only — CPU-frequency/thermal drift makes cross-session absolute times
+incomparable. Record validity/thermal classification with every number. The
+Morphology `neon64` row is the post-optimization handwritten AArch64 kernel
+(straight-line tail, hoisted loop branch; the older inline NEON path measured
+**0.44x** vs scalar, i.e., slower — SIMD is not automatically faster).
 
 ---
 
@@ -492,38 +468,20 @@ removed once the general driver landed.
 
 It provides, per benchmark block (measured region = **only the JNI call**):
 
-- foreground `BenchmarkActivity` + focus wait (the window is held by the same process
-  that loads `libksvgfilters`),
-- benchmark-thread priority key: bump `setThreadPriority(myTid(), -20)`, restored at end,
-- `warmup` → repeated `measurementBatches` × `iterationsPerBatch`, per-iteration
-  `System.nanoTime()` sampling, with **warmup-based batch calibration**: when
-  `targetBatchMillis > 0` (driver: 100 ms), the warmup iterations are timed (≥
-  `MIN_CALIBRATION_SAMPLES` = 32 samples) and the **P25 of the sorted times** (robust against
-  GC/JIT storms inflating most samples) calibrates `effectiveIterationsPerBatch =
-  clamp(targetBatchMillis / p25ms, iterationsPerBatch, max(IterationsPerBatch,
-  maxIterationsPerBatch=200))`. Sub-ms kernels thus gather enough samples per batch for the
-  batch-average-CV rule to average out per-iteration timer/GC noise (~1/√n) instead of being
-  flagged `UNSTABLE`; `targetBatchMillis=0` keeps the legacy exact-count behavior. Per-iteration
-  UI progress pushes are rate-limited (~10/s) so the measured loop stays ~allocation-free —
-  a `BenchmarkUiState` push per iteration parked the GC mid-batch and was the noise source,
-- one `CacheNormalizer.normalize()` (deterministic 1 MB×2 copy/touch) before each batch,
-  outside the measurement,
-- thermal gating (`ThermalStateMonitor`): API 29+ `PowerManager.currentThermalStatus`;
-  API<29 deterministic compute-probe fallback (baseline once per run, >10% degradation =
-  throttled). A batch measured while throttled is **invalidated** → configurable cooldown
-  (`cooldownMillis`, default 5 s) → fresh batch; `invalidatedBatches` / `cooldownTimeMs`
-  are tracked,
+- foreground `BenchmarkActivity` + focus wait, benchmark-thread priority bump
+  (restored at end),
+- `warmup` → repeated `measurementBatches` × `iterationsPerBatch` with
+  `System.nanoTime()` sampling and warmup-based batch calibration (P25-based;
+  `targetBatchMillis=0` keeps legacy exact-count behavior). Per-iteration UI
+  pushes are rate-limited (~10/s) — unthrottled pushes park the GC mid-batch,
+- one `CacheNormalizer.normalize()` before each batch, outside the measurement,
+- thermal gating (API 29+ `PowerManager`, compute-probe fallback below):
+  throttled batches are invalidated → cooldown → fresh batch,
 - per-sample statistics (`BenchmarkStats`: min/median/mean/max/p90/p95/p99/stddev;
   compare by median → p90 → min),
 - classification: `VALID / THERMAL_THROTTLED / THERMAL_RECOVERY /
-  UNSTABLE / INSUFFICIENT_SAMPLES`, `isValid` flag (batch-average CV > 5% → `UNSTABLE`),
-- environment report: device/model/abi/coreCount, SoC (`CpuInfo`:
-  QTI SM8550 on the test device), sustained-mode result, `thermalStatusBefore/After`,
-  `invalidatedBatches`/`cooldownTimeMs`, best-effort sysfs CPU frequency
-  `cpuFreqBeforeKhz`/`cpuFreqAfterKhz`, `cpuAffinityControlAvailable` (always `false`,
-  no root), plus the calibration keys `requestedIterationsPerBatch`/
-  `effectiveIterationsPerBatch`/`calibratedPerIterationMs`/`targetBatchMillis`/
-  `maxIterationsPerBatch`.
+  UNSTABLE / INSUFFICIENT_SAMPLES` (batch-average CV > 5% → `UNSTABLE`),
+- environment report (device/SoC/sustained-mode/thermal/freq/affinity/calibration keys).
 
 CSV (pull-compatible with `runDeviceBenchmark`'s `benchmarks_device*.csv` glob):
 
@@ -536,46 +494,31 @@ env,<key>=<value> ...        # environment block
 batch,iteration,ms           # per-sample rows
 ```
 
-Commands (device serial = e.g., `adbca122`):
+Commands (device serial = e.g., `<serial>`):
 
 ```bash
 ./gradlew :filtering:assembleDebugAndroidTest -PfilterAbis=arm64-v8a -Dorg.gradle.warning.mode=none
-adb -s adbca122 install -r -t filtering/build/outputs/apk/androidTest/debug/filtering-debug-androidTest.apk
-adb -s adbca122 logcat -c
-adb -s adbca122 shell am instrument -w \
+adb -s <serial> install -r -t filtering/build/outputs/apk/androidTest/debug/filtering-debug-androidTest.apk
+adb -s <serial> logcat -c
+adb -s <serial> shell am instrument -w \
   -e class hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
   -e benchmark.kernel Turbulence -e benchmark.quick true \
   hu.oandras.filtering.test/androidx.test.runner.AndroidJUnitRunner
-adb -s adbca122 logcat -d -s System.out
+adb -s <serial> logcat -d -s System.out
 ```
 
 `KernelPerformanceDeviceBenchmark` covers every native backend (scalar, neon64, …) ×
 both sizes (512² / 2048²; quick = 512² only) per kernel and honours the
 `benchmark.kernel` / `benchmark.quick` args. Buffer reuse means the measured region is
 exactly the JNI call. The raw-vs-harness comparison lives in
-`HarnessValidationRawTest`. Console output example:
-
-```text
-=== Benchmark: Turbulence (neon64) 512x512 ===
-thermalSource=powerManager        thermalStatusBefore=0  thermalStatusAfter=0 ...
-stats(count=50) min=4.4414 p90=4.4981 median=4.4679 mean=4.4699 p95=4.5042 max=4.5168
-classification=VALID valid=true invalidatedBatches=0 cooldownTimeMs=0
-```
+`HarnessValidationRawTest`.
 
 **Device findings (OnePlus 11 / CPH2449, SDK 36, SM8550, non-root)** — relevant to
-trusting long bench runs on this device:
-
-- Sustained performance mode is **unsupported** (`sustainedPerformanceMode=false`);
-  reported, never asserted.
-- `PowerManager.currentThermalStatus` stays `NONE` even while performance drifts
-  ~15-20% (observed across sessions); the **sysfs `scaling_cur_freq` read is the
-  load-bearing signal** — e.g., 1.555 → 1.459 GHz across one run with status 0 the whole
-  time. Every CSV carries `cpuFreqBeforeKhz`/`cpuFreqAfterKhz`.
-- The batch-average-CV classifier flags exactly that drift: an early-fast / later-slow
-  scalar run scored `UNSTABLE` `valid=false` while the neon64 cell in the same run scored
-  `VALID`.
-- Not active on this device (reported as false/unavailable): sustained mode, CPU-affinity
-  pinning.
+trusting long bench runs on this device: sustained performance mode is
+unsupported (reported, never asserted); `PowerManager.currentThermalStatus`
+stays `NONE` even under ~15-20% drift, so the **sysfs `scaling_cur_freq` read
+is the load-bearing thermal signal** (carried in every CSV as
+`cpuFreqBeforeKhz`/`cpuFreqAfterKhz`). CPU-affinity pinning is unavailable.
 
 ---
 

@@ -15,13 +15,13 @@ KSVG is a high-performance SVG rendering library for Android, written in Kotlin.
 4. **Renderer (`hu.oandras.ksvg.render.SVGAndroidRenderer`)**: traverses the tree and executes `canvas` operations.
 5. **Animations**: centralized in `AnimationRenderer.kt` and `AnimationUtils.kt` (SMIL timing model).
 
-Before touching render/filter code, re-read `docs/RENDERING_FILTERING.md` — it is the source of truth for pipeline, region, and composition rules.
+Before touching render/filter code, read the relevant `docs/RENDERING_FILTERING.md` section (see its header map) — it is the source of truth for pipeline, region, and composition rules.
 
 ## Documentation Map
 - **`docs/SVG-SUPPORT.md`**: **Source of Truth** for supported SVG features (Full/Partial/None) — keep it updated with every feature change.
-- **`docs/SVG_REFERENCE_v2.md`**: AI-facing, audit-first reference for implementing/reviewing SVG behavior (SVG 2 + SVG 1.1 + delegated CSS/graphics specs). It is a map and audit framework, not a substitute for the specifications.
-- **`docs/RENDERING_FILTERING.md`**: Living architecture and validation notes for the rendering/filtering pipeline. Re-read it before touching render/filter code.
-- **`docs/BENCHMARKS.md`**: Kernel benchmark tables (native SIMD vs. scalar C++ vs. Kotlin reference). Rows follow the ISA superset order (see "Benchmark table conventions").
+- **`docs/SVG_REFERENCE_v2.md`**: AI-facing, audit-first reference for implementing/reviewing SVG behavior (SVG 2 + SVG 1.1 + delegated CSS/graphics specs). It is a map and audit framework, not a substitute for the specifications. Read ONLY for SVG audits / new-element work; `SVG-SUPPORT.md` holds the audited status.
+- **`docs/RENDERING_FILTERING.md`**: Living architecture and validation notes for the rendering/filtering pipeline. Skim its header map, then read the relevant section for your change (never the whole file).
+- **`docs/BENCHMARKS.md`**: Kernel benchmark tables (native SIMD vs. scalar C++ vs. Kotlin reference). Rows follow the ISA superset order (see "Benchmark table conventions"). Read ONLY for native-kernel/perf work, never for functional changes.
 - **`docs/HEADLESS_GRAZIE.md`**: Reproducible headless Grazie grammar-check procedure (IDEA `inspect.sh`, Grazie-only profile, triage rules, known cloud/NLP limitations).
 - **`docs/native/`**: Low-level native docs — `ASSEMBLY_CONVENTIONS.md` (ABI/argument/register/PIC contract plus parity gate), `ASSEMBLY_FORMATTING_REQUIREMENTS.md` (mandatory formatting, indentation, mnemonic padding, and semantic commenting requirements for handwritten assembly), `SIMD_KERNEL_TRICKS.md` (transferable SIMD optimization checklist distilled from the top-performing filter kernels), and per-ISA implicit-register-clobber tables (`X86_IMPLICIT_REGISTER_CLOBBERS.md`, `AARCH64_IMPLICIT_REGISTER_CLOBBERS.md`, `ARM32_IMPLICIT_REGISTER_CLOBBERS.md`): reference lists of which instructions read/write registers or architectural state implicitly (e.g., `MUL`/`DIV` clobbering `EDX`, `CPUID` clobbering `EBX`, string/SP/flags state, pointer-auth/exclusive-monitor state) so handwritten assembly never relies on value survival that the ISA does not guarantee.
 - **`README.md`**: Public project overview, key enhancements, and usage.
@@ -30,7 +30,7 @@ Before touching render/filter code, re-read `docs/RENDERING_FILTERING.md` — it
 ## Critical Development Conventions
 
 ### 1. Performance & Zero-Allocation Rule
-The rendering loop (`render()` methods) and animation updates (`updateAnimations()`) are performance-critical: no allocations, no capturing lambdas, no shared mutable state in hot paths. Full rules live in `docs/RENDERING_FILTERING.md` §5 — read it before touching render/filter code.
+The rendering loop (`render()` methods) and animation updates (`updateAnimations()`) are performance-critical: no allocations, no capturing lambdas, no shared mutable state in hot paths. Full rules live in `docs/RENDERING_FILTERING.md` §5 — read §5 before touching render/filter code.
 
 ### 2. Asking for sources you cannot reliably reproduce
 Do **not** fabricate or guess complex low-level sources (e.g., handwritten ARM/NEON assembly, AArch64 assembly, GPU shaders, or generated coefficient/lookup tables). If such a file is required, and you cannot reproduce it exactly, **ask the user to provide the file** — it is always acceptable to request it rather than invent a subtly wrong version.
@@ -105,7 +105,7 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 
 ## Rendering & Native filters
 
-Rendering hot-path rules, the software/GPU filter backend selection (`RenderOptions.softwareFiltering`), JNI/NDK entry rules, and validated native-filtering lessons live in `docs/RENDERING_FILTERING.md` (§2.2, §4–§6) — read it before touching render/filter code.
+Rendering hot-path rules, the software/GPU filter backend selection (`RenderOptions.softwareFiltering`), JNI/NDK entry rules, and validated native-filtering lessons live in `docs/RENDERING_FILTERING.md` (§2.2, §4–§6) — read the relevant section for your change.
 
 ## Reports
 

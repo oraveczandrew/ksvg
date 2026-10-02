@@ -1,5 +1,8 @@
 # KSVG Filter Kernel Benchmarks
 
+> **Native-kernel/perf work only** — do NOT load for functional changes.
+> Tables: SIMD speedups over the scalar baseline. Regeneration: `docs/RENDERING_FILTERING.md` §6.1.
+
 Speedups relative to `scalar` (`1.00x`). Status: 🚀 >9x, 🟢 faster, 🔴 regression; Kotlin faster = ⬆️. `⚠️ UNSTABLE BENCH` = CoV >5%.
 Row order per kernel: `kotlin → scalar → sse2 → ssse3 → avx2` (x86), `kotlin → scalar → neon32 → neon64` (ARM).
 
