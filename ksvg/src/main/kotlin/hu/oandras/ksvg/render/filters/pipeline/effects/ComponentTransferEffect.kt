@@ -28,6 +28,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.render.FeComponentTransferRenderNode
+import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.filters.buildTransferLutTables
 import hu.oandras.ksvg.utils.alpha
 
@@ -94,12 +95,12 @@ internal fun createComponentTransferShaderEffect(
     // byte packed into RGB wherever alpha < 255.
     var rgb = node.gpuLutBitmap
     if (rgb == null || rgb.isRecycled) {
-        rgb = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
+        rgb = createBitmap(256, 1, Bitmap.Config.ARGB_8888)
         node.gpuLutBitmap = rgb
     }
     var alpha = node.gpuLutAlphaBitmap
     if (alpha == null || alpha.isRecycled) {
-        alpha = Bitmap.createBitmap(256, 1, Bitmap.Config.ARGB_8888)
+        alpha = createBitmap(256, 1, Bitmap.Config.ARGB_8888)
         node.gpuLutAlphaBitmap = alpha
     }
     val rgbPixels = IntArray(256)

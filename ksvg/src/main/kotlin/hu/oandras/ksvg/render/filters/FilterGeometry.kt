@@ -29,6 +29,7 @@ import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
 import hu.oandras.ksvg.render.RenderContext
+import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.withClip
 import hu.oandras.ksvg.utils.alpha
@@ -125,7 +126,7 @@ internal val bitmapReadsAreStraight: Boolean by lazy(LazyThreadSafetyMode.PUBLIC
 
 @SuppressLint("UseKtx")
 private fun probeBitmapReadsAreStraight(): Boolean {
-    val probe = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    val probe = createBitmap(1, 1, Bitmap.Config.ARGB_8888)
     val straight = 128 shl 24 or (255 shl 16) or (165 shl 8)
     probe.setPixels(intArrayOf(straight), 0, 1, 0, 0, 1, 1)
     val back = IntArray(1)

@@ -2536,7 +2536,7 @@ internal class Renderer internal constructor(
             if (current != null && current.width == bakeW && current.height == bakeH) {
                 current
             } else {
-                Bitmap.createBitmap(bakeW, bakeH, Bitmap.Config.ARGB_8888).also {
+                createBitmap(bakeW, bakeH, Bitmap.Config.ARGB_8888).also {
                     resolved.bakeBitmap = it
                 }
             }

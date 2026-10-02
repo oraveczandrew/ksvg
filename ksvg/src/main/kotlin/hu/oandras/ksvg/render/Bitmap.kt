@@ -56,7 +56,7 @@ internal fun createBitmap(width: Int, height: Int): Bitmap {
 }
 
 @SuppressLint("UseKtx")
-internal fun createBitmap(width: Int, height: Int,config: Bitmap.Config): Bitmap {
+internal fun createBitmap(width: Int, height: Int, config: Bitmap.Config): Bitmap {
     return Bitmap.createBitmap(width, height, config)!!
 }
 
