@@ -1659,10 +1659,13 @@ internal class RenderTreeBuilder(
         // The referenced shape's OWN computed style decides geometry CSS:
         // state.style here belongs to the referencing element (e.g., textPath)
         // and must not leak its geometry declarations into the shape.
-        val shapeBuilder = Style().toBuilder()
-        shapeBuilder.reset(state.style)
-        updateStyleForElement(state, shapeBuilder, obj)
-        val shapeStyle = shapeBuilder.build()
+        // The transient builder comes from the pool: building the shape style
+        // must not allocate a throwaway Style.Builder per referenced shape.
+        val shapeStyle = styleBuilderPool.withPooledObject { shapeBuilder ->
+            shapeBuilder.reset(state.style)
+            updateStyleForElement(state, shapeBuilder, obj)
+            shapeBuilder.build()
+        }
         val path = Path()
         return when (obj) {
             is PathShape -> {
@@ -2406,10 +2409,17 @@ internal class RenderTreeBuilder(
 
         // Pass 1: resolve which properties' winning declaration is a CSS-wide keyword
         // (inherit/unset/initial/revert) so lower-priority concrete values lose to them.
-        val matchingRules = ArrayList<Style>()
-        effectiveRules.forEachElement { rule ->
-            if (CSSParser.ruleMatch(ruleMatchContext, rule.selector, obj)) {
-                matchingRules.add(rule.style)
+        // Most documents carry no stylesheet rules at all: skip the match list
+        // entirely instead of allocating an empty ArrayList per element.
+        val matchingRules: List<Style> = if (effectiveRules.isEmpty()) {
+            emptyList()
+        } else {
+            ArrayList<Style>().also { matched ->
+                effectiveRules.forEachElement { rule ->
+                    if (CSSParser.ruleMatch(ruleMatchContext, rule.selector, obj)) {
+                        matched.add(rule.style)
+                    }
+                }
             }
         }
         val cssWideOverrides = resolveCssWideKeywordMask(obj.baseStyle, matchingRules, obj.style)
