@@ -109,7 +109,7 @@ Key gotcha: use `listOf(input)` (NOT `listOfNotNull`) when forwarding a single
 
 The renderer prefers the GPU/RenderEffect pipeline when the canvas is
 hardware-accelerated and the API level allows. To force the CPU/software filter
-backend, use `RenderOptions.softwareFiltering(enabled = true)`, e.g.
+backend, use `RenderOptions.softwareFiltering(enabled = true)`, e.g.,
 `SVG.getFromString(svg).renderToCanvas(canvas, RenderOptions.create().softwareFiltering(true))`.
 The setter is annotated with `@SlowSoftwareFiltering` (a
 `kotlin.RequiresOptIn` marker at WARNING level) because software filtering is
@@ -133,7 +133,7 @@ The most subtle lighting issue discovered so far (`lighting_point_spot`):
   through Android's premultiplied source-over.
 - **rsvg/cairo emits premultiplied** specular: the light color is stored at full
   strength and only the intensity lives in alpha, so straight-decode yields
-  `(color, intensity)` — i.e. `(255,255,255, I)` for white light. Pixels are the
+  `(color, intensity)` — i.e., `(255,255,255, I)` for white light. Pixels are the
   same *visually* on an opaque canvas but differ in the raw channel values, which
   breaks golden comparison when the specular result is the **terminal** output of
   the filter (no `feComposite`/`feMerge` to absorb the difference).
@@ -205,7 +205,7 @@ linear space, then applies `linearToSRgb` to the straight output when
   color in RGB and the raw linear intensity in alpha — **untouched** by the fix.
   For the (linearRGB) `lighting_point_spot` specular circle this matches the
   golden exactly (alpha=intensity, saturated white RGB); verified against
-  `rsvg-convert`, which produces the same alpha=R/GB=255 relationship (i.e. the
+  `rsvg-convert`, which produces the same alpha=R/GB=255 relationship (i.e., the
   `alpha = max(R,G,B)` identity holds only in sRGB space, not the linearRGB
   straight terminal that librsvg emits).
 - Validation: `filter_specular.svg` (sRGB) unchanged (0.9812); `filter_primitives.svg`
@@ -252,7 +252,7 @@ offset to imitate it.
 
 ### 4.1 i386 assembly and TEXTREL
 
-Hand-written i386 assembly must be position-independent. Absolute references to
+Handwritten i386 assembly must be position-independent. Absolute references to
 local literal-pool labels in `.text` create `R_386_32` relocations inside the
 executable text segment; the resulting `DF_TEXTREL` library is rejected by
 Android when native libraries are loaded from an uncompressed APK. The failure
@@ -290,7 +290,7 @@ emulator; a successful build alone does not prove that the library will load.
   mangles internal members (`apply` → `apply$...`), so the C++ symbol
   (`Java_<pkg>_<Class>_<method>`) stops matching → `UnsatisfiedLinkError`.
   Make the enclosing `object` `internal` instead.
-- When wiring in a third-party source (e.g. the RIR Toolkit `Blur` kernels),
+- When wiring in a third-party source (e.g., the RIR Toolkit `Blur` kernels),
   confirm the exact symbol/ABI contract before calling into it; mismatched
   calling conventions produce silent, hard-to-debug corruption.
 
@@ -429,7 +429,7 @@ stable `nativeBenchmark { }` harness — see §6.2:
 32-bit-only test APK. This lets you exercise the ARM32 NEON kernels
 (`convolve_armv7a_neon.S`, `blur_armv7a_neon.S`) on arm64 devices (which also support v7a),
 where the benchmark/parity instrumentation reports the `neon32` backend instead of
-`neon64`. Multiple ABIs are comma-separated, e.g. `-PfilterAbis=armeabi-v7a,arm64-v8a`.
+`neon64`. Multiple ABIs are comma-separated, e.g., `-PfilterAbis=armeabi-v7a,arm64-v8a`.
 Without the property all ABIs build as usual (this is wired in
 `filtering/build.gradle.kts` via `defaultConfig.ndk.abiFilters`).
 
@@ -461,10 +461,10 @@ Methodology note: for everything except Morphology, `ms` is the raw-runner
 harness (median of 5 batches with warmup + thermal gating + batch-CV
 classifier, measured 2026-09-05 on the same OnePlus 12 / SM8550). Scalar-vs-SIMD
 speedups are only directly comparable within the same run (CPU-frequency/thermal
-drift makes cross-session absolute times differ — e.g. Morphology scalar 512² was
+drift makes cross-session absolute times differ — e.g., Morphology scalar 512² was
 286.3 ms avg in the 2026-09-02 run vs ~200 ms harness median here). The Morphology
 `neon64` row median (15.979 ms @512², 224.114 ms @2048²) is the post-2026-09-05
-optimization revision of the hand-written AArch64 kernel (`morphology_neon64.S`):
+optimization revision of the handwritten AArch64 kernel (`morphology_neon64.S`):
 the tail loop was replaced by a straight-line 1-or-3-pixel tail (`tbz w12, #1`) and
 the per-iteration `cbz` was hoisted out of the vector loop; the previous inline NEON
 path measured **0.44x** vs scalar.
@@ -481,7 +481,7 @@ path measured **0.44x** vs scalar.
 
 ### 6.2 Stable native benchmark harness (androidTest, Steps 0-8 done)
 
-A stable, long-running **harness** for comparing native/NEON kernel work (e.g. `old
+A stable, long-running **harness** for comparing native/NEON kernel work (e.g., `old
 assembly vs new assembly`) lives in `filtering/src/androidTest/.../benchmark/`
 (`NativeBenchmarkHarness.kt`, DSL `nativeBenchmark { }`). The device
 kernel benchmark (`KernelPerformanceDeviceBenchmark`, §6.1) runs every filter kernel
@@ -536,7 +536,7 @@ env,<key>=<value> ...        # environment block
 batch,iteration,ms           # per-sample rows
 ```
 
-Commands (device serial = e.g. `adbca122`):
+Commands (device serial = e.g., `adbca122`):
 
 ```bash
 ./gradlew :filtering:assembleDebugAndroidTest -PfilterAbis=arm64-v8a -Dorg.gradle.warning.mode=none
@@ -569,7 +569,7 @@ trusting long bench runs on this device:
   reported, never asserted.
 - `PowerManager.currentThermalStatus` stays `NONE` even while performance drifts
   ~15-20% (observed across sessions); the **sysfs `scaling_cur_freq` read is the
-  load-bearing signal** — e.g. 1.555 → 1.459 GHz across one run with status 0 the whole
+  load-bearing signal** — e.g., 1.555 → 1.459 GHz across one run with status 0 the whole
   time. Every CSV carries `cpuFreqBeforeKhz`/`cpuFreqAfterKhz`.
 - The batch-average-CV classifier flags exactly that drift: an early-fast / later-slow
   scalar run scored `UNSTABLE` `valid=false` while the neon64 cell in the same run scored

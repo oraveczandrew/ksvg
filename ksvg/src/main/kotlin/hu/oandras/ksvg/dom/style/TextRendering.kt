@@ -19,7 +19,7 @@ package hu.oandras.ksvg.dom.style
 /**
  * SVG `text-rendering` property (`auto | optimizeSpeed | optimizeLegibility
  * | geometricPrecision`). Inherited. Only `optimizeSpeed` disables
- * anti-aliasing for glyph painting; the rest keep it enabled
+ * antialiasing for glyph painting; the rest keep it enabled
  * (`optimizeLegibility` hinting subtleties are out of scope: Android
  * paints run with hinting off).
  */
@@ -30,7 +30,7 @@ internal enum class TextRendering {
     optimizeLegibility,
     geometricPrecision;
 
-    /** True when glyphs paint without anti-aliasing under this mode. */
+    /** True when glyphs paint without antialiasing under this mode. */
     internal val disablesAntiAlias: Boolean
         get() = this == optimizeSpeed
 }

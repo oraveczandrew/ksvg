@@ -338,7 +338,7 @@ public object KernelBenchmarkMatrix {
      *
      * [kernels] is an exact kernel-family name filter ("Lighting"). [configs] is a set of
      * case-insensitive substrings matched against the cell display name
-     * ([BenchmarkConfig.name], e.g. "Lighting (diffuse, distant, linear)"); a config is kept
+     * ([BenchmarkConfig.name], e.g., "Lighting (diffuse, distant, linear)"); a config is kept
      * when any of its filters is a substring of the name, which makes both partial ("linear")
      * and full-name selectors work. When both filters are given they are ANDed.
      */

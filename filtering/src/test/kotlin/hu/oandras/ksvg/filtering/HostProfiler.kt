@@ -25,7 +25,7 @@ interface HostProfiler {
     fun start(name: String)
 
     /**
-     * Stops recording and returns a map of deltas (e.g. "cycles", "instructions").
+     * Stops recording and returns a map of deltas (e.g., "cycles", "instructions").
      * Returns null if profiling is unavailable or failed.
      */
     fun stop(): Map<String, Long>?

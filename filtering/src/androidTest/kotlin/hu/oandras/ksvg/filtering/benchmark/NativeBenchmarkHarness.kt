@@ -101,7 +101,7 @@ class NativeBenchmarkBuilder {
     var name: String = "benchmark"
 
     /**
-     * Result suite (owning benchmark class, e.g. `"kernelBenchmark"`). Results land in
+     * Result suite (owning benchmark class, e.g., `"kernelBenchmark"`). Results land in
      * `benchmarks/<suite>/`, so classes sharing one instrumentation run can never
      * delete or overwrite each other's files.
      */
@@ -166,7 +166,7 @@ class NativeBenchmarkBuilder {
 
     /**
      * If set, pins the benchmark thread to this concrete Linux CPU for warmup + all
-     * measurement batches (diagnostic runs only, e.g. Lighting scalar-vs-NEON). The
+     * measurement batches (diagnostic runs only, e.g., Lighting scalar-vs-NEON). The
      * chosen core is reported as `benchmarkCpu=<N>` in the environment block.
      * `sched_setaffinity` may be denied without root; the pin then fails quietly and
      * `affinityApplied=false` is reported so the run is not mistaken for pinned.
@@ -818,7 +818,7 @@ internal const val MIN_CALIBRATION_SAMPLES = 32
 
 /**
  * Wall-clock budget for the timed warmup (calibration path). Fast kernels still collect the
- * full [MIN_CALIBRATION_SAMPLES]; multi-second cells (e.g. 2048x2048 scalar/kotlin) stop well
+ * full [MIN_CALIBRATION_SAMPLES]; multi-second cells (e.g., 2048x2048 scalar/kotlin) stop well
  * below it, so one cell cannot burn 32 x wall-time warmup samples.
  */
 private const val MAX_WARMUP_WALL_MS = 10_000L

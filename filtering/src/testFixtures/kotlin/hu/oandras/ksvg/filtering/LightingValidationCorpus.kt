@@ -201,7 +201,7 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(32 * 8)
         ))
 
-        // Spot light, diffuse, linear
+        // Spotlight, diffuse, linear
         add(Case(
             name = "spot diffuse linear 16x16",
             width = 16,
@@ -444,7 +444,7 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(24 * 16)
         ))
 
-        // Spot light, specular, non-premultiplied -> exercises the spot-specular
+        // Spotlight, specular, non-premultiplied -> exercises the spot-specular
         // SIMD rows (ksvgLightingSpotSpecularRow{Ssse3,Avx2}), which the premult
         // case below never reaches (lighting.cpp dispatches specular SIMD only when
         // !premultiplied). Covers exponent-scaled cos and the non-linear pack path.
@@ -480,7 +480,7 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
 
-        // Spot light, specular, non-premultiplied, LINEAR output. Exercises the
+        // Spotlight, specular, non-premultiplied, LINEAR output. Exercises the
         // *Linear specular rows and the linear->sRGB mapping.
         add(Case(
             name = "spot specular linear 16x16",
@@ -514,7 +514,7 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
 
-        // Spot light, specular, premultiplied output (no limiting cone -> NaN).
+        // Spotlight, specular, premultiplied output (no limiting cone -> NaN).
         add(Case(
             name = "spot specular premult 16x16",
             width = 16,
@@ -580,7 +580,7 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(32 * 8)
         ))
 
-        // Spot light, diffuse, sRGB / non-linear output
+        // Spotlight, diffuse, sRGB / non-linear output
         add(Case(
             name = "spot diffuse 16x16",
             width = 16,
@@ -613,7 +613,7 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
 
-        // Spot light, diffuse, non-default beam exponent (exercises the
+        // Spotlight, diffuse, non-default beam exponent (exercises the
         // params[7] focus path on every backend).
         add(Case(
             name = "spot diffuse beamexp2 16x16",
@@ -647,7 +647,7 @@ public object LightingValidationCorpus {
             input = UnLinearizeValidationCorpus.fixedSeedRandom(16 * 16)
         ))
 
-        // Spot light, specular linear, fractional beam exponent.
+        // Spotlight, specular linear, fractional beam exponent.
         add(Case(
             name = "spot specular beamexp05 linear 16x16",
             width = 16,

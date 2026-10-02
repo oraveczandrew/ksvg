@@ -152,7 +152,7 @@ inline int sampleCoord(const int coord, const int dim, const int edgeMode) {
 // This alone implements all three modes for the SIMD kernels: every tap of
 // every output pixel we keep lies within the padded image (pad == radius, and
 // the crop discards the pad ring), and the kernels clamp any residual
-// out-of-range read to the padded bounds — i.e. to the extended edge.
+// out-of-range read to the padded bounds — i.e., to the extended edge.
 void fillPad(std::vector<uint8_t>& in, const int w, const int h,
              const int pad, const int pw, const int edgeMode) {
     if (edgeMode == kEdgeNone || pad == 0 || w <= 0 || h <= 0) return;
@@ -166,7 +166,7 @@ void fillPad(std::vector<uint8_t>& in, const int w, const int h,
         return r < 0 ? r + m : r;
     };
     // Left/right over the content rows. Padded column (pad-1-j) mirrors
-    // content column (-1-j), i.e. (w-1-j) mod w; (pad+w+j) mirrors j mod w.
+    // content column (-1-j), i.e., (w-1-j) mod w; (pad+w+j) mirrors j mod w.
     for (int y = 0; y < h; ++y) {
         uint8_t* const dst = row(y + pad);
         const uint8_t* const content = dst + static_cast<size_t>(pad) * 4;
@@ -180,7 +180,7 @@ void fillPad(std::vector<uint8_t>& in, const int w, const int h,
         }
     }
     // Top/bottom over the full extended width. Padded row (pad-1-j) mirrors
-    // content row (-1-j), i.e. (h-1-j) mod h; (pad+h+j) mirrors j mod h.
+    // content row (-1-j), i.e., (h-1-j) mod h; (pad+h+j) mirrors j mod h.
     for (int j = 0; j < pad; ++j) {
         const int ti = edgeMode == kEdgeDuplicate ? pad : pad + mod(h - 1 - j, h);
         const int bi = edgeMode == kEdgeDuplicate ? pad + h - 1 : pad + mod(j, h);

@@ -18,7 +18,7 @@
  * i386 scalar pow approximation shared by all lighting_*_i386_*.S kernels.
  *
  * Split out of lighting_i386_ssse3_macros.S so kernels with their own
- * file-local ALPHA_EXTRACT/TO_FLOAT definitions (e.g. the i386 AVX2
+ * file-local ALPHA_EXTRACT/TO_FLOAT definitions (e.g., the i386 AVX2
  * kernels) can use POW1_SSE without macro redefinition collisions.
  * Everything is position-independent by construction (stack-relative and
  * register operands only; tables via GOTOFF, never from inside a macro).

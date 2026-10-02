@@ -789,7 +789,7 @@ internal class CSSParser internal constructor(
                 return 0
             }
             if (ancestors[ancestorsPos] !== obj.parent) {
-                // parent doesn't match, so obj must be an indirect reference (e.g. from a <use>)
+                // parent doesn't match, so obj must be an indirect reference (e.g., from a <use>)
                 return -1
             }
             val children = obj.parent!!.getChildren()

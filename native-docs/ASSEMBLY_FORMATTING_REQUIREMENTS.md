@@ -1,6 +1,6 @@
 # Assembly Formatting Requirements & Style Guide
 
-This guide establishes the mandatory formatting, structure, and documentation standards for all hand-written SIMD assembly kernel sources (`*.S`) across the project. All assembly source files must conform to these layout and architectural style conventions to ensure maintainability, uniform readability, and clean visual structure.
+This guide establishes the mandatory formatting, structure, and documentation standards for all handwritten SIMD assembly kernel sources (`*.S`) across the project. All assembly source files must conform to these layout and architectural style conventions to ensure maintainability, uniform readability, and clean visual structure.
 
 ---
 

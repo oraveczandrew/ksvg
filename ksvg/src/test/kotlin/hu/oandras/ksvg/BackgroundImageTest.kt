@@ -33,7 +33,7 @@ import org.robolectric.annotation.GraphicsMode
  * transparent on every path. A true backdrop snapshot would need readable
  * surfaces, which neither the software `Canvas` (no readback, opaque layers)
  * nor hardware canvases provide — the same reason Firefox never implemented
- * them (bug 437554) and Chrome fakes `BackgroundImage`. rsvg does snapshot,
+ * them (bug 437554) and Chrome fakes `BackgroundImage`. rsvg takes snapshots,
  * so no rsvg reference images here by design; these pin the defined transparent
  * behavior instead. Primitives still run (defined output) instead of being
  * skipped; the GPU chain declines (device suite).

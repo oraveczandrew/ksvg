@@ -52,7 +52,7 @@
  *
  * Inputs:
  *   \src, \ch, \scale, \dst as in ALPHA_FSCALE (\scale may be a memory
- *   operand, e.g. a loop-invariant spill reload).
+ *   operand, e.g., a loop-invariant spill reload).
  *
  * Output:
  *   \dst = float((\src >> 24) & 0xFF) * \scale

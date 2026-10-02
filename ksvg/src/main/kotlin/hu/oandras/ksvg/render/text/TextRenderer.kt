@@ -64,7 +64,7 @@ internal abstract class TextProcessor {
 
     // Extra advance per character from SVG `textLength` (lengthAdjust=spacing
     // only): (target - measured) / charCount, set while traversing the
-    // element carrying textLength, restored afterwards. Nested textLengths
+    // element carrying textLength, restored afterward. Nested textLengths
     // override for their subtree (single-level layouts are exact).
     @JvmField
     var spacingAdjust: Float = 0f

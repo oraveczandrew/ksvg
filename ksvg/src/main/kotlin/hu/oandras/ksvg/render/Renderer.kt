@@ -148,7 +148,7 @@ internal class Renderer internal constructor(
     private val gpuBackendFactory: FilterBackendFactory = FilterBackendFactory.forApi(),
 ): AnimationContext, PoolOwner by pools, DelegatingLoggerContext, LoggerContext by document {
 
-    // Render-time log calls (e.g. animation warnings) reach the per-parse scope
+    // Render-time log calls (e.g., animation warnings) reach the per-parse scope
     // through the document instead of logging unconditionally.
     override val delegate: LoggerContext
         get() = document
@@ -272,7 +272,7 @@ internal class Renderer internal constructor(
         stateStack.push(newSavedRendererState(state , canvas.saveCount)) // Manual push here - don't use statePush();
 
         // Keep track of the element stack while rendering.
-        // The 'render parent' for some elements (e.g. <use> references) is different from its DOM parent.
+        // The 'render parent' for some elements (e.g., <use> references) is different from its DOM parent.
         matrixPool.releaseAll(matrixStack)
         parentStack.clear()
     }
@@ -2547,7 +2547,7 @@ internal class Renderer internal constructor(
         // Texel unit step -> gradient space, unless the texels are already
         // there (plain objectBoundingBox bake). The shader's local matrix
         // applies the box mapping first, so the affine is the inverted shader
-        // matrix with that mapping appended on the right, i.e. m⁻¹ · T · S
+        // matrix with that mapping appended on the right, i.e., m⁻¹ · T · S
         // (`pre*` right-appends, so preTranslate then preScale in source order
         // yields exactly that). Reused via the paint, so no allocation; a null
         // affine means "texels are already gradient space".

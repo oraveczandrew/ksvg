@@ -36,7 +36,7 @@ internal const val VISUAL_LIBRARY_GOLDEN_ROOT_PATH = "test-data/visual-library-g
 internal const val VISUAL_TARGET_SIZE = 256
 
 // SVGs excluded from the rsvg cross-check: rsvg does not implement the feature
-// (e.g. <solidColor> paint server), so its golden is empty/invalid and cannot
+// (e.g., <solidColor> paint server), so its golden is empty/invalid and cannot
 // serve as a reference. The library renders these correctly (see
 // test-data/visual-library-golden); they are not compared against rsvg.
 private val EXCLUDED_FROM_VISUAL_VERIFICATION = setOf(
@@ -66,7 +66,7 @@ private val EXCLUDED_FROM_VISUAL_VERIFICATION = setOf(
 
 // Per-SVG similarity thresholds below the default 0.95, with a documented reason.
 // Two kinds of entries live here:
-//  - Engine differences that are valid but never pixel-equal (fonts, anti-aliasing,
+//  - Engine differences that are valid but never pixel-equal (fonts, antialiasing,
 //    and filter noise/PRNG algorithms that differ from rsvg).
 //  - Complex filter interactions / tiling edge cases with known, stable sub-pixel drift.
 private val ACCEPTED_SIMILARITY_EXCEPTIONS: Map<String, Double> = mapOf(

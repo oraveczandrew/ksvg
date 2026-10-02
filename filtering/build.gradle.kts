@@ -188,7 +188,7 @@ tasks.matching { it.name == "connectedDebugAndroidTest" }
  * Device kernel benchmark wrapper.
  *
  * Runs the instrumented `KernelPerformanceDeviceBenchmark` on the connected
- * device, pulls the generated CSV files into `<repo>/tmp/device-bench-<abi>/` (e.g.
+ * device, pulls the generated CSV files into `<repo>/tmp/device-bench-<abi>/` (e.g.,
  * `tmp/device-bench-arm64-v8a/`, `tmp/device-bench-armeabi-v7a/`), and dumps them as
  * a Markdown table to the terminal.
  *
@@ -201,11 +201,11 @@ tasks.matching { it.name == "connectedDebugAndroidTest" }
  * of minutes on a phone).
  *
  * `benchmark.config` is `+`-separated, case-insensitive substrings matched
- * against the cell display name (e.g. "Lighting (diffuse, distant, linear)");
+ * against the cell display name (e.g., "Lighting (diffuse, distant, linear)");
  * `benchmark.kernel` and `benchmark.config` are ANDed when both are given.
  * NOTE: the `+` parts are ORed (any match keeps the cell), and full display
  * names do NOT work here — AGP truncates `-P` values at the first comma, so
- * use comma-free fragments (e.g. `benchmark.config=distant` for all four
+ * use comma-free fragments (e.g., `benchmark.config=distant` for all four
  * distant-lighting cells, never `specular+distant` to mean AND).
  *
  *   ./gradlew :filtering:runDeviceBenchmark \
@@ -245,7 +245,7 @@ val runDeviceBenchmark = tasks.register("runDeviceBenchmark") {
     description = "Runs the device kernel benchmark, pulls the CSV results into tmp/device-bench-<abi>/, and prints them as a flat table."
 
     // Instrumentation arguments are forwarded the AGP-native way, on the
-    // command line, e.g.:
+    // command line, for example:
     //   ./gradlew :filtering:runDeviceBenchmark \
     //       -Pandroid.testInstrumentationRunnerArguments.class=hu.oandras.ksvg.filtering.KernelPerformanceDeviceBenchmark \
     //       -Pandroid.testInstrumentationRunnerArguments.benchmark.quick=true

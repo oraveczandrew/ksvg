@@ -27,8 +27,8 @@ package hu.oandras.ksvg.filtering
  * Unlike [ComponentTransferNative] there is one table shared by three channels
  * and alpha needs no lookup — it is a pure element-wise byte map, so `src` and
  * `dst` may alias (in-place). Stateless and allocation-free: the pixel arrays
- * are caller-owned scratch (reused buffers), no shared/global state. Avail-
- * ability follows the same `libksvgfilters` library as [NativeGaussianBlur].
+ * are caller-owned scratch (reused buffers), no shared/global state.
+ * Availability follows the same `libksvgfilters` library as [NativeGaussianBlur].
  */
 internal object UnLinearizeNative {
 

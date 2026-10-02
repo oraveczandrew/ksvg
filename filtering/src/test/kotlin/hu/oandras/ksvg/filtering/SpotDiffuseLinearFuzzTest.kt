@@ -20,7 +20,7 @@ import org.junit.Test
 import java.util.Random
 
 /**
- * Differential coverage for the hand-written spot-diffuse-linear vector loops
+ * Differential coverage for the handwritten spot-diffuse-linear vector loops
  * (SSSE3 4-wide, AVX2 8-wide): forced backend vs forced scalar vs the Kotlin
  * oracle over seeded randomized configs (geometries incl. non-%4 widths,
  * k incl. negative, colored lights, spot cone/target variants). Fixed seed

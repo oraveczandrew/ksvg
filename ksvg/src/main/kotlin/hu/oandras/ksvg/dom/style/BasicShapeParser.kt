@@ -498,7 +498,7 @@ internal fun parseGeometryBoxName(word: String): GeometryBox? {
 }
 
 /**
- * Parses a semicolon-separated list of `clip-path` values (e.g. the `values`
+ * Parses a semicolon-separated list of `clip-path` values (e.g., the `values`
  * of an `<animate attributeName="clip-path">`). `none` is a valid endpoint
  * ([CSSClipPath.NoClip]); any invalid item drops the whole list (null), so
  * the animation is rejected like any other invalid value.
@@ -531,7 +531,7 @@ internal fun parseSemicolonClipPathList(value: String): List<CSSClipPath>? {
 /**
  * Parses one `clip-path` animation endpoint: `none` maps to
  * [CSSClipPath.NoClip] (a valid endpoint), anything unparsable is null
- * (absent value, e.g. a missing `from` — or an invalid animation).
+ * (absent value, e.g., a missing `from` — or an invalid animation).
  */
 context(loggerContext: LoggerContext)
 internal fun parseClipPathEndpoint(value: String): CSSClipPath? {

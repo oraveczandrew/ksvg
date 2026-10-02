@@ -14,7 +14,7 @@
 
 SVG is not a single self-contained specification.
 
-SVG 2 defines the SVG language, but important behavior is supplied by other standards, especially CSS. SVG itself explicitly describes compatibility/dependencies with other standards. The current published SVG 2 document is still the 4 October 2018 Candidate Recommendation; SVG 1.1 Second Edition is the 16 August 2011 Recommendation. Therefore a renderer targeting real-world SVG cannot use “SVG 2” as the only source of truth.
+SVG 2 defines the SVG language, but important behavior is supplied by other standards, especially CSS. SVG itself explicitly describes compatibility/dependencies with other standards. The current published SVG 2 document is still the 4 October 2018 Candidate Recommendation; SVG 1.1 Second Edition is the 16 August 2011 Recommendation. Therefore, a renderer targeting real-world SVG cannot use “SVG 2” as the only source of truth.
 
 This reference intentionally separates:
 
@@ -758,7 +758,7 @@ For every feature ask:
 
 # 6. ViewBox and preserveAspectRatio
 
-Audit these independently from generic transforms.
+Audit these independently of generic transforms.
 
 `viewBox` introduces a mapping between viewport and user coordinate systems.
 
@@ -1050,7 +1050,7 @@ Distinguish:
 - filtered-out pixels
 - `pointer-events`
 
-Audit hit testing independently from visual rendering.
+Audit hit testing independently of visual rendering.
 
 ---
 
@@ -1473,7 +1473,7 @@ This document does **not** claim:
 
 > “Everything SVG supports is written above.”
 
-Instead it defines the process by which that claim can eventually be audited.
+Instead, it defines the process by which that claim can eventually be audited.
 
 A trustworthy implementation reference needs two layers:
 

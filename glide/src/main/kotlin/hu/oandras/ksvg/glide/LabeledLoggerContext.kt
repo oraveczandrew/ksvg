@@ -21,7 +21,7 @@ import hu.oandras.ksvg.LoggerContext
 
 /**
  * [LoggerContext] decorator that prefixes every message with the decode source
- * label in parentheses, e.g. `(https://example.com/icon.svg) <original message>`.
+ * label in parentheses, e.g., `(https://example.com/icon.svg) <original message>`.
  *
  * The label itself comes from [KSVGOptions.SOURCE_LABEL]; an empty label is a
  * no-op and the message is forwarded unchanged.

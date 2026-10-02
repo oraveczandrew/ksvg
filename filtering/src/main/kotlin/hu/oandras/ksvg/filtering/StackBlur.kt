@@ -44,7 +44,7 @@ internal class StackBlurAxisScratch {
 
 /**
  * Pure-Kotlin stack blur used as the fallback when the native `libksvgfilters.so`
- * is unavailable (e.g. under the JVM/Robolectric unit-test runner).
+ * is unavailable (e.g., under the JVM/Robolectric unit-test runner).
  */
 public object StackBlur {
 
@@ -106,7 +106,7 @@ public object StackBlur {
 
         // Pixels outside the source are transparent black (0), as required by the SVG
         // spec (filter input outside the filter region is transparent). This makes blurred shapes
-        // show a correct transition at the filter-region edge (e.g. feSpecularLighting height field).
+        // show a correct transition at the filter-region edge (e.g., feSpecularLighting height field).
         for (i in 0 until outerLimit) {
             var aSum = 0
             var rSum = 0

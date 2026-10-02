@@ -37,7 +37,7 @@ import kotlin.math.pow
 internal const val GRADIENT_DENSE_SUBDIVISIONS: Int = 16
 
 /**
- * True when stop alphas differ, i.e. platform premult-lerp would diverge
+ * True when stop alphas differ, i.e., platform premult-lerp would diverge
  * from straight (spec). Uniform alpha (including all-opaque) needs no
  * densification: premult-lerp == straight-lerp there.
  */

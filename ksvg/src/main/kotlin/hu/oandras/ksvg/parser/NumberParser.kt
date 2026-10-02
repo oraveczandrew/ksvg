@@ -122,7 +122,7 @@ internal object NumberParser {
         }
 
         if (decimalSeen && endPos == (decimalPos + 1)) {
-            // No digits following decimal point (e.g. "1.")
+            // No digits following decimal point (e.g., "1.")
             //Log.e("Missing fraction part of number");
             endPosRefOut?.endPos = endPos
             return Float.NaN
@@ -205,7 +205,7 @@ internal object NumberParser {
         // Biggest negative float is 2^-149 ~== 1.4e-45
         // Some numbers that will overflow will get through the scan
         // and be returned as 'valid', yet fail when value() is called.
-        // However they will be very rare and not worth slowing down
+        // However, they will be very rare and not worth slowing down
         // the parse for.
         if ((exponent + numDigits) > 39 || (exponent + numDigits) < -44) {
             endPosRefOut?.endPos = endPos

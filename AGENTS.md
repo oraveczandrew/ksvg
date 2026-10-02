@@ -22,7 +22,7 @@ Before touching render/filter code, re-read `RENDERING_FILTERING.md` — it is t
 - **`SVG_REFERENCE_v2.md`**: AI-facing, audit-first reference for implementing/reviewing SVG behavior (SVG 2 + SVG 1.1 + delegated CSS/graphics specs). It is a map and audit framework, not a substitute for the specifications.
 - **`RENDERING_FILTERING.md`**: Living architecture and validation notes for the rendering/filtering pipeline. Re-read it before touching render/filter code.
 - **`BENCHMARKS.md`**: Kernel benchmark tables (native SIMD vs. scalar C++ vs. Kotlin reference). Rows follow the ISA superset order (see "Benchmark table conventions").
-- **`native-docs/`**: Low-level native docs — `ASSEMBLY_CONVENTIONS.md` (ABI/argument/register/PIC contract plus parity gate), `ASSEMBLY_FORMATTING_REQUIREMENTS.md` (mandatory formatting, indentation, mnemonic padding, and semantic commenting requirements for handwritten assembly), `SIMD_KERNEL_TRICKS.md` (transferable SIMD optimization checklist distilled from the top-performing filter kernels), and per-ISA implicit-register-clobber tables (`X86_IMPLICIT_REGISTER_CLOBBERS.md`, `AARCH64_IMPLICIT_REGISTER_CLOBBERS.md`, `ARM32_IMPLICIT_REGISTER_CLOBBERS.md`): reference lists of which instructions read/write registers or architectural state implicitly (e.g. `MUL`/`DIV` clobbering `EDX`, `CPUID` clobbering `EBX`, string/SP/flags state, pointer-auth/exclusive-monitor state) so handwritten assembly never relies on value survival that the ISA does not guarantee.
+- **`native-docs/`**: Low-level native docs — `ASSEMBLY_CONVENTIONS.md` (ABI/argument/register/PIC contract plus parity gate), `ASSEMBLY_FORMATTING_REQUIREMENTS.md` (mandatory formatting, indentation, mnemonic padding, and semantic commenting requirements for handwritten assembly), `SIMD_KERNEL_TRICKS.md` (transferable SIMD optimization checklist distilled from the top-performing filter kernels), and per-ISA implicit-register-clobber tables (`X86_IMPLICIT_REGISTER_CLOBBERS.md`, `AARCH64_IMPLICIT_REGISTER_CLOBBERS.md`, `ARM32_IMPLICIT_REGISTER_CLOBBERS.md`): reference lists of which instructions read/write registers or architectural state implicitly (e.g., `MUL`/`DIV` clobbering `EDX`, `CPUID` clobbering `EBX`, string/SP/flags state, pointer-auth/exclusive-monitor state) so handwritten assembly never relies on value survival that the ISA does not guarantee.
 - **`README.md`**: Public project overview, key enhancements, and usage.
 - **qemu-trace-bridge** (external repo, https://github.com/oraveczandrew/qemu-trace-bridge): instruction-by-instruction tracer for native assembly kernels under QEMU (i386+AVX2 with full 256-bit YMM via a patched GDB stub, ARM32/ARM64 NEON on stock QEMU). Use it to observe the exact before/after machine state when static audit (§5) is inconclusive.
 
@@ -86,7 +86,7 @@ If static audit is inconclusive, trace one instruction live with qemu-trace-brid
 *   **`SvgFeatures.kt`**: Update the supported feature strings returned to `<switch>` elements.
 
 ## Common Gotchas
-*   **Explicit API mode is ON**: all public declarations (classes, objects, functions, properties, consts) need explicit visibility modifiers and explicit return/property types. Missing ones are compile errors, not warnings.
+*   **Explicit API mode is ON**: all public declarations (classes, objects, functions, properties, consts) need explicit visibility modifiers and explicit return/property types. Omissions are compile errors, not warnings.
 *   **`public` is NOT needed in `src/test` / `src/androidTest`**.
 *   **`Paint.setFontVariationSettings`**: Throws `NoSuchMethodError` in Robolectric; avoid testing complex text layouts in unit tests if they rely on variable fonts.
 *   **`stroke-dasharray`**: Requires normalization (doubling the array if length is odd) before it can be used with Android's `DashPathEffect`.
@@ -97,7 +97,7 @@ If static audit is inconclusive, trace one instruction live with qemu-trace-brid
 Reusable image-diff/diagnostic tests for investigating rendering fidelity live here. Keep them in the codebase so future sessions can reuse them.
 - **`AiVisualDiffTest`**: Parameterized per-SVG diff test. It renders each SVG under `test-data/verification/`/`filters/`/`meteocons/`, compares against the matching `*-golden/*.png` (rsvg/browser reference) using `hu.oandras.ksvg.comparisons.GoldenImageUtils.compareWithGolden`, and writes `<name>.out.png`, `<name>.diff.png`, and `summary.txt` (similarity, diffPixels, cornerDiff, meanAbsErr) under `ksvg/test-data/ai-helper/<name>/`.
 - Use the library color helpers from `hu.oandras.ksvg.utils.ColorUtils` (`val Int.alpha/red/green/blue`) for pixel math — do not recompute `(p shr 24) and 0xff` inline.
-- **CLI filtering**: pass `-PverifyFilter=<substring>` (e.g. `-PverifyFilter=filter_specular`) to run a single SVG across all visual-comparison suites (`VerificationVisualComparisonTest`, `FiltersVisualComparisonTest`, `MeteoconsVisualComparisonTest`, `AiVisualDiffTest`). The value is forwarded to the JVM system property `ksvg.verify.filter` and matched case-sensitively against the SVG file name.
+- **CLI filtering**: pass `-PverifyFilter=<substring>` (e.g., `-PverifyFilter=filter_specular`) to run a single SVG across all visual-comparison suites (`VerificationVisualComparisonTest`, `FiltersVisualComparisonTest`, `MeteoconsVisualComparisonTest`, `AiVisualDiffTest`). The value is forwarded to the JVM system property `ksvg.verify.filter` and matched case-sensitively against the SVG file name.
 - Example: `./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AiVisualDiffTest" -PverifyFilter=filter_specular -Dorg.gradle.warning.mode=none`
 
 ## Rendering & Native filters
@@ -114,7 +114,7 @@ If the user asks for a report, make it in the tmp folder as a Markdown file.
 - Record important findings, attempted approaches, failures, decisions, and next steps. Read it before starting or resuming work, and do not repeat failed approaches unless new evidence justifies them.
 - Update the log after each major investigation step or milestone, so the current state can be recovered after interruption.
 - Work-log/audit identifiers ("#45", "D10", "R7") live ONLY in `tmp/` logs and commit messages — never in code, KDoc, logs, or docs (`tmp/` is git-ignored, so such a reference points nowhere). Write the self-contained reason instead.
-- Committable files must never reference `tmp/` paths (incl. screenshots), device serials (`adbca122`), or emulator names (`emulator-5554`): say "API-26 emulator" / "API-36 phone" instead.
+- Committable files must never reference `tmp/` paths (incl. screenshots), device serials (`adbca122`), or emulator names (`emulator-5554`): say, "API-26 emulator" / "API-36 phone" instead.
 
 ## Quick Commands
 - Always use the Gradle daemon (omit `--no-daemon`).
@@ -128,7 +128,7 @@ If the user asks for a report, make it in the tmp folder as a Markdown file.
 - **Temporary files go inside the project**, in a `tmp/` folder at the repo root (git-ignored), not in system temp directories. Clean it up when done.
 
 ### Viewing test `println` / stdout
-Test standard output (e.g. `println` debug statements) is suppressed by default. Pass `-PshowTestOutput --console=plain` to surface it:
+Test standard output (e.g., `println` debug statements) is suppressed by default. Pass `-PshowTestOutput --console=plain` to surface it:
 ```bash
 ./gradlew :ksvg:testDebugUnitTest --tests "hu.oandras.ksvg.aihelpers.AnalyzeComponentTransferTest" -PshowTestOutput --console=plain -Dorg.gradle.warning.mode=none
 ```

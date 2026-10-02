@@ -32,7 +32,7 @@ import hu.oandras.ksvg.render.pool.Pool
 
 /**
  * Minimal [RenderContext] for driving filter kernels directly in unit
- * tests (e.g. `doFeImageFilter`) with hand-built bitmaps. Real pools where
+ * tests (e.g., `doFeImageFilter`) with hand-built bitmaps. Real pools where
  * the kernels need them ([bitmapPool], [canvasPool], [matrixPool],
  * [rectFPool]); inert stubs elsewhere. `renderNode`/`resolveFloodColor`
  * are unsupported (they need a full renderer).

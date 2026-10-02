@@ -85,7 +85,7 @@
  *   \mem_off  = byte offset of the channel factor from the params base
  *   \base     = params base register (holds %eax for R, %edx for G/B)
  *   \dst      = 32-bit GPR receiving the truncated channel (eax/ecx/edx)
- *   \half     = symbol of the 0.5 literal (e.g. .Ldd_half, via GOTOFF)
+ *   \half     = symbol of the 0.5 literal (e.g., .Ldd_half, via GOTOFF)
  *
  * Output:
  *   \dst = (int)(\base[\mem_off] * intensity + 0.5)
@@ -158,7 +158,7 @@
  *   deliberately fixed (kernel contract, identical at both use sites).
  *   NOTE: the max is computed on the UNSHIFTED channel bytes. (A prior
  *   revision maxed the already-shifted values, which degenerates to A=B;
- *   e.g. pure-red pixels packed alpha 0. Matches the x86_64 vpmaxsd path.)
+ *   e.g., pure-red pixels packed alpha 0. Matches the x86_64 vpmaxsd path.)
  *
  * Output:
  *   packed 0xAARRGGBB pixel stored to the dst pointer

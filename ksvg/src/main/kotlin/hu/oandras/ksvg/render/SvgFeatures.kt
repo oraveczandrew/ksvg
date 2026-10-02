@@ -88,7 +88,7 @@ internal fun isSupportedFeature(feature: String): Boolean {
         // "Extensibility",             // NO
 
         // SVG Tiny 1.2 URIs (Appendix J). Each URI gets its own verdict:
-        // same local names mean different things across profiles (e.g. 1.1
+        // same local names mean different things across profiles (e.g., 1.1
         // "Animation" is SMIL, Tiny "#Animation" is the <animation> media
         // element), so these must NOT be derived by stripping the namespace
         // and reusing the 1.1 table above. Only the normative

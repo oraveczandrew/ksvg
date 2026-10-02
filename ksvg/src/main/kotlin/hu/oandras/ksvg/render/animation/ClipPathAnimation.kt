@@ -124,7 +124,7 @@ private fun discreteClipIndex(count: Int, keyTimes: FloatList?, progress: Float)
  */
 internal fun interpolateClipPath(from: CSSClipPath, to: CSSClipPath, progress: Float): CSSClipPath {
     // Exact endpoints even when the pair cannot interpolate (so a frozen end
-    // state reaches `to`, and a zero progress holds `from`).
+    // state reaches `to`, and zero progress holds `from`).
     if (progress <= 0f) return from
     if (progress >= 1f) return to
     if (from is CSSClipPath.ShapeClip && to is CSSClipPath.ShapeClip && from.refBox == to.refBox) {

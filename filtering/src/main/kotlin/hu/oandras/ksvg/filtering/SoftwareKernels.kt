@@ -44,7 +44,7 @@ public object SoftwareKernels {
         get() = NativeBackend.isAvailable
 
     /**
-     * Supported SIMD execution sets on this device (e.g. "Scalar, SSSE3, AVX2"
+     * Supported SIMD execution sets on this device (e.g., "Scalar, SSSE3, AVX2"
      * or "Scalar, NEON64"), reported by a kernel-independent native function.
      * This is device *capability*, not the dispatched backend: production
      * dispatch is per-kernel and may still fall back to scalar, and x86_64

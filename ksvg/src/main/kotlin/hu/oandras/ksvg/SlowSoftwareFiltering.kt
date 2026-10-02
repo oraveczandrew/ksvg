@@ -23,14 +23,14 @@ import kotlin.RequiresOptIn
  * the GPU/RenderEffect pipeline.
  *
  * Software filtering is significantly slower than the hardware-accelerated path
- * and should only be used when deterministic output is required (e.g. tests or
+ * and should only be used when deterministic output is required (e.g., tests or
  * golden comparisons) or when a filter primitive is not supported by the GPU
- * backend. Callers must opt in (e.g. `@OptIn(SlowSoftwareFiltering::class)`) to
+ * backend. Callers must opt in (e.g., `@OptIn(SlowSoftwareFiltering::class)`) to
  * acknowledge the performance cost.
  */
 @RequiresOptIn(
     level = RequiresOptIn.Level.WARNING,
-    message = "Forcing software filtering bypasses the GPU filter pipeline and is significantly slower. Only use it for deterministic output (e.g. tests) or for filter primitives the GPU backend does not support."
+    message = "Forcing software filtering bypasses the GPU filter pipeline and is significantly slower. Only use it for deterministic output (e.g., tests) or for filter primitives the GPU backend does not support."
 )
 @Retention(AnnotationRetention.BINARY)
 @Target(

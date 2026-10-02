@@ -54,9 +54,9 @@ class D10StitchTilesTest {
             assertTrue("noise(y+$p) must equal noise(y)", abs(v - noise.noise2(t, 2.4 + p, p, p, w, w)) < 1e-9)
         }
         // Seam continuity: the cell straddling the wrap line folds only its
-        // far corner (e.g. t=9.9999 folds bx1 but not bx0), so exact
+        // far corner (e.g., t=9.9999 folds bx1 but not bx0), so exact
         // t/t+p equality does NOT hold there by design — but the folded far
-        // corner meets the folded near corner, i.e. the tile edge is
+        // corner meets the folded near corner, i.e., the tile edge is
         // seamless: the difference scales with eps (measured ~1e-7 at 1e-7).
         // A broken fold would diverge O(0.1).
         val eps = 1e-7

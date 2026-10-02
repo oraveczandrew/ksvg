@@ -30,7 +30,7 @@ import hu.oandras.ksvg.utils.forEachValue
  * - [acquire] and [acquireSameAs] always hand back a fully erased (transparent)
  *   bitmap, whether it was freshly allocated or reused from the pool.
  * - The pool owns any bitmap passed to [release]; it must not be touched
- *   afterwards and must not be released more than once.
+ *   afterward and must not be released more than once.
  */
 internal class BitmapPool {
 

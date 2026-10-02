@@ -268,7 +268,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             val morph = primitive.sourceElement
                             val radX = morph.radiusX * scaleX
                             val radY = morph.radiusY * scaleY
-                            // Interior rule (matches the CPU kernel's write window).
+                            // Interior rule (matches the CPU-kernel write window).
                             // Erode writes only [max(clip, r), min(clip,
                             // size - r)) — everything else stays transparent.
                             // Dilate instead covers the full clip rect with
@@ -729,7 +729,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             // the referenced subtree).
                             //
                             // preserveAspectRatio mapping lives on the CPU
-                            // path only (the chain blits unscaled at the
+                            // path only (the chain draws unscaled at the
                             // region origin): decline whenever the software
                             // output would differ — an explicit PAR, or a
                             // subregion that is not exactly the unscaled

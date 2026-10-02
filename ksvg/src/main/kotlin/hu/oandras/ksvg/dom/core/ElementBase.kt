@@ -39,9 +39,9 @@ internal abstract class ElementBase(
 ) {
 
     @JvmField
-    val baseStyle: Style? = baseParams.baseStyle // style defined by explicit style attributes in the element (e.g. fill="black")
+    val baseStyle: Style? = baseParams.baseStyle // style defined by explicit style attributes in the element (e.g., fill="black")
     @JvmField
-    val style: Style? = baseParams.style // style expressed in a 'style' attribute (e.g. style="fill:black")
+    val style: Style? = baseParams.style // style expressed in a 'style' attribute (e.g., style="fill:black")
     @JvmField
     val classNames: List<String>? = baseParams.classNames // contents of the 'class' attribute
     @JvmField

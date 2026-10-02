@@ -40,9 +40,9 @@ The relevant Chromium SVG filter primitive UseCounter bucket IDs are 5747–5763
 
 **Latest measurement date:** 2026-09-16
 
-## Usage per one million page loads
+## Usage per one million-page loads
 
-The latest percentage can be converted to an intuitive approximate count per one million page loads:
+The latest percentage can be converted to an intuitive approximate count per one million-page loads:
 
 | SVG filter primitive | Approx. uses per 1,000,000 page loads |
 |---|---:|
@@ -64,7 +64,7 @@ The latest percentage can be converted to an intuitive approximate count per one
 | `feDiffuseLighting` | 0.02 |
 | `feTile` | 0.00059 |
 
-These figures are simple conversions of the latest percentages and should be read as expected feature occurrences per one million page loads, not as counts of unique pages.
+These figures are simple conversions of the latest percentages and should be read as expected feature occurrences per one million-page loads, not as counts of unique pages.
 
 ### Chromium UseCounter documentation
 

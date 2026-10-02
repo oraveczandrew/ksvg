@@ -242,7 +242,7 @@ class GoldenModelProbe {
         // Model 5: alpha-premultiply-ish: golden = comp but where golden alpha value is channel3 (aa).
         // golden composite = raw premul: already the same as comp. So skip.
         // Model 6: golden r = (rr*aa/255) (premultiplied raw) then NO unpremultiply over white?
-        // i.e. golden returns premultiplied value directly = rr*aa/255 (dark, not over white).
+        // i.e., golden returns premultiplied value directly = rr*aa/255 (dark, not over white).
         var m6 = 0.0
         for (p in pts) {
             val ac = p.aa / 255.0
@@ -251,7 +251,7 @@ class GoldenModelProbe {
         }
         println("Model6 (premultiplied raw, no white) err=${(m6 / pts.size).toString().take(7)}")
 
-        // Model 7: golden = lerp(raw, white, t) i.e. raw faded, then NO alpha (opaque). solve t and c
+        // Model 7: golden = lerp(raw, white, t) i.e., raw faded, then NO alpha (opaque). solve t and c
         var tnum = 0.0; var tden = 0.0
         for (p in pts) {
             // golden-raw = t*(255-raw)

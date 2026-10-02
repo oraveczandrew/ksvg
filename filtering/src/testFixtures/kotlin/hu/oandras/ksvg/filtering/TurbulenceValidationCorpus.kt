@@ -112,7 +112,7 @@ public object TurbulenceValidationCorpus {
         // Anisotropic / sub-rectangle clip region (transparent fill outside).
         add(Case("clip", 96, 80, 12, 8, 84, 72, 0.03, 0.05, 0, 0, 2, false, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1234))
 
-        // Non-integer origin / anchor + non-unit primitive units.
+        // Fractional origin / anchor + non-unit primitive units.
         add(Case("fractional", 50, 50, 0, 0, 50, 50, 0.1, 0.1, 0, 0, 1, true, 1.0, 1.0, 3.5, -1.25, 2.0, 7.5, 0.75, 1.25, 3))
 
         // Stitch tiles: whole lattice periods so edges wrap seamlessly.

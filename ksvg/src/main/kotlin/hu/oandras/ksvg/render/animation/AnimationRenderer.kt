@@ -344,7 +344,7 @@ internal fun applyAnimatedStyle(
     var changed = applyAnimatedStyle(state, builder, node.animationNodes)
     // `clip-path` property animation writes node fields (clipShape, url-clip
     // suppression), not just the style: node fields are not part of the
-    // per-frame base revert, so they are handled (reset + written) here.
+    // per-frame baseline revert, so they are handled (reset + written) here.
     node.animationNodes?.forEachElement { animation ->
         if (animation is AnimateClipPathNode) {
             if (applyClipPathAnimation(builder, node, animation)) changed = true
@@ -903,7 +903,7 @@ internal fun addColors(baseColor: Int, byColor: Int, progress: Float): Int {
 
 /**
  * Base color of a color-animated attribute. Must be read after the per-frame
- * base reset in `updateAnimations`, so `by`-only / `to`-only animations
+ * baseline reset in `updateAnimations`, so `by`-only / `to`-only animations
  * resolve against the underlying value instead of compounding.
  */
 private fun baseColorFor(state: RendererState, builder: Style.Builder, attributeName: SVGAttr): Int {

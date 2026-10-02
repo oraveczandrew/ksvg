@@ -115,7 +115,7 @@ internal sealed interface ClipRadius {
 internal sealed interface ClipPosition {
     data class Len(@JvmField val v: CSSLength) : ClipPosition
 
-    /** Keyword with an explicit offset, e.g. `right 10px` in 3-4 value positions. */
+    /** Keyword with an explicit offset, e.g., `right 10px` in 3-4 value positions. */
     data class Offset(
         @JvmField
         val anchor: ClipPosition,

@@ -89,7 +89,7 @@ public fun rememberSvgAsset(
  * mutation does not re-trigger anything — pass a new instance to re-render.
  *
  * Sizing: SVGs without intrinsic width/height report `-1` intrinsics, so an unconstrained
- * layout collapses. Give the content an explicit size (e.g. `Modifier.size(96.dp)`) or set
+ * layout collapses. Give the content an explicit size (e.g., `Modifier.size(96.dp)`) or set
  * explicit dimensions on the document.
  */
 @Composable
@@ -133,7 +133,7 @@ public fun KsvgImage(
 }
 
 /**
- * Displays a static SVG loaded from the `assets` folder (e.g. `"visual/a_link.svg"`).
+ * Displays a static SVG loaded from the `assets` folder (e.g., `"visual/a_link.svg"`).
  *
  * See [KsvgImage] for sizing and options semantics.
  */

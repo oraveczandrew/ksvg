@@ -18,7 +18,7 @@ package hu.oandras.ksvg.dom.animation
 
 /**
  * SMIL `restart` attribute (`always | whenNotActive | never`, default
- * `always`): whether a new begin instance may restart a running animation.
+ * `always`): whether a newly started instance may restart a running animation.
  *
  * KSVG has a single-begin timeline (no event/syncbase/instance lists), so no
  * second instance can ever occur and the value is behaviorally inert. It is

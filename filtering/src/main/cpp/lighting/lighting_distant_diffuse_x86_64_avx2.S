@@ -111,7 +111,7 @@
 /*
  * Description:
  *   Weighted row/column sum a + 2b + c over three integer vectors
- *   (e.g. the 1:2:1 Sobel row-sum). Emits vpaddd b,b,dst; vpaddd a,dst,dst;
+ *   (e.g., the 1:2:1 Sobel row-sum). Emits vpaddd b,b,dst; vpaddd a,dst,dst;
  *   vpaddd c,dst,dst so dst = a + 2*b + c, matching the pre-existing
  *   distant-diffuse kernels bit-for-bit (integer add is associative, so the
  *   accumulation order into dst is arbitrary; keep this exact form anyway).
@@ -237,7 +237,7 @@
  * Inputs:
  *   \i            = clamped intensity (float)
  *   \lr, \lg, \lb = per-channel color factors (float; may be memory operands)
- *   \half         = symbol of the 0.5 broadcast literal (e.g. .Lhalf)
+ *   \half         = symbol of the 0.5 broadcast literal (e.g., .Lhalf)
  *
  * Output:
  *   \i            = packed 0xFFRRGGBB pixel (int32 lanes)
@@ -320,7 +320,7 @@
  *   \pb           = GPR pointing at DistantLightingParams (0 -> invDx,
  *                   4 -> invDy, 8 -> k, 12/16/20 -> lx/ly/lz, 24/28/32 ->
  *                   lr/lg/lb, 36 -> ss)
- *   \one          = symbol of the 1.0 broadcast literal (e.g. .Lone)
+ *   \one          = symbol of the 1.0 broadcast literal (e.g., .Lone)
  *
  * Output:
  *   \idx, \idy    = 1/invDx, 1/invDy folded with ss

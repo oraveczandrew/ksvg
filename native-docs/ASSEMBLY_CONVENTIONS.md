@@ -1,6 +1,6 @@
 # SIMD Kernel Development Ground Truth
 
-Invariants + reverse-engineered lessons for hand-written SIMD kernels in `filtering/src/main/cpp/**/*.S`.
+Invariants + reverse-engineered lessons for handwritten SIMD kernels in `filtering/src/main/cpp/**/*.S`.
 
 Priority: **ABI → register liveness → PIC → FP op order → rounding → lighting window/center-height → tail → parity → runtime validation**
 
@@ -50,7 +50,7 @@ Liveness rule: a register is dead only if dead across the **entire remaining con
 
 ## 3. PIC — mandatory shared-library invariant
 
-- **x86-64**: RIP-relative constants only (e.g. `addps .Lhalf(%rip), %xmm1`); no absolute addressing.
+- **x86-64**: RIP-relative constants only (e.g., `addps .Lhalf(%rip), %xmm1`); no absolute addressing.
 - **i386**: GOT base in `%ebx` — `calll .L0$pb` / `popl %ebx` / `addl $_GLOBAL_OFFSET_TABLE_+(.Ltmp0-.L0$pb), %ebx`. Locals `@GOTOFF(%ebx)`, globals `@GOT(%ebx)`. `%ebx` must be live while such code is reachable.
 - **AArch64**: PC-relative (`adrp/add`, literal pools); avoid absolute table/LUT addressing that introduces text relocations.
 
@@ -139,7 +139,7 @@ No mutable global/static write buffers; scratch caller-owned; state per-call or 
 
 ## 13. Parity gate — correctness gate
 
-Every kernel change must pass the matching `*NativeParityTest` (deterministic corpus, byte-for-byte vs Kotlin/scalar reference by default, with documented per-kernel tolerances — e.g. Gaussian-blur SIMD tails ±1 LSB, specular lighting `maxDelta = 1`). Compile/assemble/link success and benchmarks are **not** correctness proof. **Parity is the gate.**
+Every kernel change must pass the matching `*NativeParityTest` (deterministic corpus, byte-for-byte vs Kotlin/scalar reference by default, with documented per-kernel tolerances — e.g., Gaussian-blur SIMD tails ±1 LSB, specular lighting `maxDelta = 1`). Compile/assemble/link success and benchmarks are **not** correctness proof. **Parity is the gate.**
 
 ---
 

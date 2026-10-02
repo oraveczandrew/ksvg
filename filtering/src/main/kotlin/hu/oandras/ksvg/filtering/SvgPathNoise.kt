@@ -29,7 +29,7 @@ import kotlin.math.sqrt
  *  - the four channel gradient tables are filled first, in channel order 0..3, each
  *    drawing exactly two LCG values per lattice point (retrying when both are zero),
  *    from the shared LCG stream;
- *  - only afterwards is the single lattice permutation built/shuffled from the same
+  *  - only afterward is the single lattice permutation built/shuffled from the same
  *    stream and shared across all channels.
  */
 public class SvgPathNoise(

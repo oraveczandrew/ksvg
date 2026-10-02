@@ -129,7 +129,7 @@ class DeviceBenchmarkSink(
 
     /**
      * Upper bound on harness iterations for one matrix sweep, for the [BenchmarkViewModel]
-     * global progress bar. Calibration and thermal retries adjust the live total afterwards
+     * global progress bar. Calibration and thermal retries adjust the live total afterward
      * (`commitCellPlan` / `addInvalidatedIterations`), so this is only the static estimate.
      * The warmup term uses [MIN_CALIBRATION_SAMPLES] (not [WARMUP_ITERATIONS]) because this
      * sink always enables warmup-based calibration, whose warmup loop runs until that bound

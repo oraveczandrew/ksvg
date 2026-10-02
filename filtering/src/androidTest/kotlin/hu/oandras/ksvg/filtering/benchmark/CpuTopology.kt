@@ -21,7 +21,7 @@ import java.io.File
 /**
  * Best-effort per-core topology read from sysfs for the diagnostic benchmark.
  *
- * CLUSTER IDENTIFICATION: On ARM big.LITTLE (SM8550: 4x Cortex-X3 + 4x Cortex-A715 +
+ * CLUSTER IDENTIFICATION: On ARM big-little (SM8550: 4x Cortex-X3 + 4x Cortex-A715 +
  * 4x A510) performance cores are the ones with the highest `cpuinfo_max_freq`. The
  * mapping is device-specific and MUST NOT be assumed equal across devices, which is why
  * the chosen core is derived from the measured sysfs data and reported in the log

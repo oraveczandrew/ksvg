@@ -30,7 +30,7 @@
  *   base %r14.
  *
  * Inputs:
- *   \intens_off  = byte offset of powered intensity[i] in (%rsp) (e.g. 4*i)
+ *   \intens_off  = byte offset of powered intensity[i] in (%rsp) (e.g., 4*i)
  *   \out_off     = byte offset for the packed pixel store
  *   \l2s         = 1 to run L2S_SPOT on the three truncated bytes, 0 otherwise
  *

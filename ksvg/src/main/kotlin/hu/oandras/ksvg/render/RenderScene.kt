@@ -49,7 +49,7 @@ import kotlin.jvm.JvmSynthetic
  *
  * Rebuild triggers:
  *  - document [modificationCount] changed (parse/mutation),
- *  - render-options fingerprint changed (css / view / viewBox / preserveAspectRatio / target).
+ *  - render-options fingerprint changed (CSS / view / viewBox / preserveAspectRatio / target).
  *
  * Viewport (drawable bounds) changes are handled IN PLACE by [applyViewport]:
  * only nested viewport containers (<svg>/<symbol>) re-resolve their viewport
@@ -164,7 +164,7 @@ internal class RenderScene private constructor(
         ctx.walkViewPort = viewPort
 
         // Reuse the node's viewBox transform matrix across applyViewport calls so we
-        // don't allocate a new Matrix per viewport container on every bounds change.
+        // don't allocate a new Matrix per viewport container whenever the bounds change.
         // applyViewportTransform only composes pre* ops, so reset before recomputing.
         val matrix = node.viewBoxTransform ?: Matrix()
         matrix.reset()
@@ -330,7 +330,7 @@ internal class RenderScene private constructor(
     }
 
     /**
-     * Builder post-processing (e.g. text-anchor justification) can adjust the
+     * Builder post-processing (e.g., text-anchor justification) can adjust the
      * resolved values away from their raw length resolution, so fields are only
      * touched when a percent unit is actually present.
      */

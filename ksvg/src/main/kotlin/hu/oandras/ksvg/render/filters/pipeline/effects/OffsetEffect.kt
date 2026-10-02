@@ -94,7 +94,7 @@ internal fun createOffsetShaderEffect(
         primitiveRegion.left, primitiveRegion.top, primitiveRegion.right, primitiveRegion.bottom,
     )
     // Input extent for the out-of-bounds transparent rule (mirrors the CPU
-    // source bitmap bounds). Inset by half a texel like the convolve
+    // source bitmap bounds). Inset by half a texel like the convolution
     // uBounds.
     shader.setFloatUniform(
         "uBounds",

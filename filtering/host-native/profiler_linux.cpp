@@ -54,7 +54,7 @@ Java_hu_oandras_ksvg_filtering_LinuxHardwareProfiler_nativeOpen(JNIEnv *env, job
 
     int fd_cycles = perf_event_open(&pe, 0, -1, -1, 0);
     if (fd_cycles == -1) {
-        // Fallback for virtualized PMUs (e.g. VMware vPMC) using raw Intel CPU_CLK_UNHALTED (0x3c)
+        // Fallback for virtualized PMUs (e.g., VMware vPMC) using raw Intel CPU_CLK_UNHALTED (0x3c)
         pe.type = PERF_TYPE_RAW;
         pe.config = 0x3c;
         fd_cycles = perf_event_open(&pe, 0, -1, -1, 0);

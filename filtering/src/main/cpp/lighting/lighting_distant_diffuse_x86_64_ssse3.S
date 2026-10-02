@@ -29,7 +29,7 @@
  *   \pb           = GPR pointing at DistantLightingParams (0 -> invDx,
  *                   4 -> invDy, 8 -> k, 12/16/20 -> lx/ly/lz, 24/28/32 ->
  *                   lr/lg/lb, 36 -> ss)
- *   \one          = symbol of the 1.0 literal (e.g. .Lone)
+ *   \one          = symbol of the 1.0 literal (e.g., .Lone)
  *
  * Output:
  *   \idx, \idy    = 1/invDx, 1/invDy folded with ss
@@ -141,7 +141,7 @@
  *
  * Inputs:
  *   \dx, \dy       = derivative vectors
- *   \one           = symbol of the 1.0 literal (e.g. .Lone)
+ *   \one           = symbol of the 1.0 literal (e.g., .Lone)
  *
  * Output:
  *   \nx, \ny, \nz  = normalized normal components (|n| = 1)
@@ -183,7 +183,7 @@
  *   \nx, \ny, \nz = normal components (float vectors)
  *   \lx, \ly, \lz = light direction components (float vectors, preserved)
  *   \k            = intensity scale (float vector, preserved)
- *   \zero, \one   = symbols of the 0.0 / 1.0 literals (e.g. .Lzero, .Lone)
+ *   \zero, \one   = symbols of the 0.0 / 1.0 literals (e.g., .Lzero, .Lone)
  *
  * Output:
  *   \nx          = clamped intensity
@@ -215,7 +215,7 @@
  * Inputs:
  *   \i            = clamped intensity (float)
  *   \lr, \lg, \lb = per-channel color factors (float vectors, preserved)
- *   \half         = symbol of the 0.5 literal (e.g. .Lhalf)
+ *   \half         = symbol of the 0.5 literal (e.g., .Lhalf)
  *   \alpha        = symbol of the 0xFF000000 mask literal
  *
  * Output:

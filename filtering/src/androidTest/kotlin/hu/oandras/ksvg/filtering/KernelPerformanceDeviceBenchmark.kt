@@ -40,9 +40,9 @@ import org.junit.runner.RunWith
  *    ArithmeticComposite (both modes), ConvolveMatrix, DisplacementMap, Lighting,
  *    Turbulence, GaussianBlur; empty runs the full suite.
  *  - `benchmark.config` = optional config-name filter, `+`-separated case-insensitive
- *    substrings matched against the cell display name, e.g. "diffuse, distant, linear",
+ *    substrings matched against the cell display name, e.g., "diffuse, distant, linear",
  *    "linear" or a full "Lighting (diffuse, distant, linear)"; ANDed with
- *    `benchmark.kernel` when both are given (e.g. kernel=Lighting + config=specular).
+ *    `benchmark.kernel` when both are given (e.g., kernel=Lighting + config=specular).
  *  - `benchmark.quick` = true runs 512x512 only (else 512x512 + 2048x2048).
  */
 @RunWith(AndroidJUnit4::class)

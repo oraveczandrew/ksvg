@@ -23,8 +23,8 @@ import java.net.URI
  * resource references (`<image>` / `<feImage>` file hrefs, `<a>` click URLs)
  * against the in-scope `xml:base` chain.
  *
- * KSVG parses `xml:base` on every element and tracks the effective (parent-
- * resolved) base URI, but it never resolves references itself: the raw `href`
+ * KSVG parses `xml:base` on every element and tracks the effective
+ * (parent-resolved) base URI, but it never resolves references itself: the raw `href`
  * and the in-scope base reach [ExternalFileResolver] side by side, and the
  * host decides how to combine them (these helpers implement the default
  * RFC 3986 behavior).

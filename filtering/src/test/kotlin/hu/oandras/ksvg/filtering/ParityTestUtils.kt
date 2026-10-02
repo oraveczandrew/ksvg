@@ -40,7 +40,7 @@ internal fun argb(a: Int, r: Int, g: Int, b: Int): Int =
  * ARGB input guaranteed to exercise every 8-bit value (0..255) in each colour
  * channel: pixel `i` has A=i, R=i, G=(i+85)&0xFF, B=(i*137)&0xFF. 85 and 137 are
  * coprime with 256, so G and B are permutations of 0..255 exactly like R and A.
- * This means any single-byte LUT gather bug (e.g. a table that only addresses
+ * This means any single-byte LUT gather bug (e.g., a table that only addresses
  * 64 entries silently zeroing channels 64..255) is caught for every index.
  */
 internal fun fullCoverage(width: Int, height: Int): IntArray {

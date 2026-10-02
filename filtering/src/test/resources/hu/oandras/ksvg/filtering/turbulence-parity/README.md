@@ -23,7 +23,7 @@ pipeline.
 The source SVGs live in the shared visual test data: `ksvg/test-data/visual/turbulence_seed_stitch.svg`
 and `ksvg/test-data/visual/turbulence.svg`. The captures were produced by rendering those
 SVGs at canvas 256x256 (the root `width`/`height` overridden on the command line) with
-the instrumented `rsvg-convert`, e.g.:
+the instrumented `rsvg-convert`, for example:
 
 ```bash
 cd tmp/librsvg

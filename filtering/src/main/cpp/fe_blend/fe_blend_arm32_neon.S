@@ -85,7 +85,7 @@
  * Stack frame: push {r4-r11, lr} (36B) + vpush {d8-d15} (64B)
  * + sub sp, sp, #260 (total 360B, so sp stays 8B-aligned per AAPCS;
  * slots use @0..255, @256..259 is padding). Stack args (caller sp+0
- * up, i.e. current sp+360 up): clipLeft @360, clipTop @364,
+ * up, i.e., current sp+360 up): clipLeft @360, clipTop @364,
  * clipRight @368, clipBottom @372, mode @376, useLinear @380 (ldrb:
  * upper bytes void), srgbToLinear @384, linearToSrgb @388.
  * Registers: r4/r5/r6 = src/dst/out cursors, r7 = row stride bytes,
@@ -340,7 +340,7 @@
 .endm
 
 /*
- * Extract one narrowed lane (full s-reg name, e.g. s0) into the pixel
+ * Extract one narrowed lane (full s-reg name, e.g., s0) into the pixel
  * accumulator r3 at SHIFT, with optional LUT encode through [r10].
  * Clobbers r12.
  */

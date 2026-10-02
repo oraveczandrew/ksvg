@@ -120,7 +120,7 @@ private class FallbackScratch : StackBlurScratch {
  * Creates a [StackBlurScratch] backed by the native true-Gaussian path when the
  * shared library is available, or by the pure-Kotlin stack blur otherwise. The
  * native handle is created lazily on first [StackBlurScratch.blur], so this is
- * safe to call even when the native library is absent (e.g. under Robolectric),
+ * safe to call even when the native library is absent (e.g., under Robolectric),
  * where the Kotlin fallback is used and no native call occurs.
  */
 public fun StackBlurScratch(): StackBlurScratch =

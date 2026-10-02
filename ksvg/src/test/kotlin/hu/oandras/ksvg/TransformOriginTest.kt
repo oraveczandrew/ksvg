@@ -83,7 +83,7 @@ class TransformOriginTest {
     fun fillBoxLeftTopKeepsCorner() {
         val out = render("transform-origin=\"left top\" transform-box=\"fill-box\"")
         // Near-pivot interior point (the pivot pixel itself is a boundary
-        // case under anti-aliasing): rotated (1,2) offset lands at
+        // case under antialiasing): rotated (1,2) offset lands at
         // (u,v)=(2.12,0.71), strictly inside the 40x40 area.
         assertRed(out.getPixel(31, 32))
     }

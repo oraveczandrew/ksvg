@@ -58,7 +58,7 @@ import android.graphics.RenderNode as AndroidRenderNode
  * mode; the source is recorded with a transparent pad of
  * [Chain.padX]/[Chain.padY] device pixels on every side so the clamp reads
  * transparent black — matching the CPU kernel's transparent-black pedestal,
- * i.e. `edgeMode="none"` exactly). `duplicate`/`wrap` decline to software:
+ * i.e., `edgeMode="none"` exactly). `duplicate`/`wrap` decline to software:
  * a TileMode switch would replicate/tile the transparent pad instead of the
  * content edge.
  * Offset maps to [RenderEffect.createOffsetEffect] with device-pixel deltas.
@@ -439,7 +439,7 @@ internal open class GpuFilterBackend internal constructor(
             recording.translate(padX - deviceRegion.left, padY - deviceRegion.top)
             recording.concat(matrix)
             // The source content and the CTM applied above are baked into the
-            // display list; snapshot the matrix so a later CTM change (e.g. an
+            // display list; snapshot the matrix so a later CTM change (e.g., an
             // animated transform, or an ancestor moving) forces a re-record
             // instead of reusing the stale, frozen content.
             val sourceMatrix = slot.gpuSourceMatrix ?: Matrix().also { slot.gpuSourceMatrix = it }
@@ -555,7 +555,7 @@ internal open class GpuFilterBackend internal constructor(
     companion object {
         /**
          * `RenderEffect.createBlurEffect` interprets its radius as the 1/e
-         * falloff radius (kernel ~exp(-x²/r²)), i.e. an effective Gaussian
+         * falloff radius (kernel ~exp(-x²/r²)), i.e., an effective Gaussian
          * sigma of r/√2 — not the SVG stdDeviation — and Skia's kernel is an
          * approximation whose width scales slightly sub-linearly on top.
          * Parity-measured (CPU-fit σ vs requested radius r):

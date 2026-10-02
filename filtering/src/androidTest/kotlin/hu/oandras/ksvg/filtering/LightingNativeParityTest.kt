@@ -25,8 +25,8 @@ import org.junit.runners.Parameterized
  * ([LightingNative.applyForced]) and the pure-Kotlin reference
  * ([KotlinKernels.lighting]). For every configuration in the shared
  * [LightingValidationCorpus], every SIMD backend this host advertises is forced
- * and compared byte-for-byte, covering distant/point/spot lights, diffuse and
- * specular, and linear/sRGB premultiplied output.
+ * and compared byte-for-byte, covering distant, point and spotlight
+ * configurations, diffuse and specular, and linear/sRGB premultiplied output.
  */
 @NativeParityTest
 @RunWith(Parameterized::class)

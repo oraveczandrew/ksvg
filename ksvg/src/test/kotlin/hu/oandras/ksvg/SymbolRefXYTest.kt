@@ -74,7 +74,7 @@ class SymbolRefXYTest {
         val baseline = render("", """x="0" y="30" width="40" height="10"""")
         assertTrue("baseline should paint at (110, 45)", isRed(baseline.getPixel(110, 45)))
         assertTrue("baseline should be clear at (110, 20)", !isRed(baseline.getPixel(110, 20)))
-        // refY=25 moves the block to local y [5, 15), i.e. global [15, 25).
+        // refY=25 moves the block to local y [5, 15), i.e., global [15, 25).
         val shifted = render("""refY="25"""", """x="0" y="30" width="40" height="10"""")
         assertTrue("refY should paint at (110, 20)", isRed(shifted.getPixel(110, 20)))
         assertTrue("refY should clear (110, 45)", !isRed(shifted.getPixel(110, 45)))

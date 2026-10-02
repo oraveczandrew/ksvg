@@ -37,7 +37,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
- * Shared immutable paint for feImage raster blits (bilinear scaling).
+ * Shared immutable paint for feImage raster copies (bilinear scaling).
  * Module-level: no per-frame allocation, never mutated after creation.
  */
 private val feImageBitmapPaint: Paint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -194,7 +194,7 @@ internal fun doFeImageFilter(
 ): Bitmap {
     val referencedNode = primitiveNode.referencedNode
     if (referencedNode != null) {
-        // Element reference (e.g. `href="#source"`): render the referenced
+        // Element reference (e.g., `href="#source"`): render the referenced
         // subtree into a region-sized bitmap (F10; restores the Aug-29 behavior
         // dropped by the raster-only rewrite). `acquireSameAs` hands back a
         // fully erased bitmap, so an empty subregion (empty clip) correctly

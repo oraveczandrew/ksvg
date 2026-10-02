@@ -23,7 +23,7 @@ import hu.oandras.ksvg.render.RenderNode
 /**
  * Per-element GPU fast-path state for one [FilterRenderNode].
  *
- * Several elements may share a single filter node (e.g. one `blur` filter
+ * Several elements may share a single filter node (e.g., one `blur` filter
  * referenced twice); each needs its own source recording and effect chain.
  * A single shared slot makes all but the last element draw the last one's
  * recorded content on deferred hardware canvases (endpoint `filters.svg`

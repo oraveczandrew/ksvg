@@ -70,7 +70,7 @@ class C1FilterComposeTest {
         )
 
         // The composite paint must carry the element opacity (0.5 -> alpha 127).
-        // Currently the paint is `null` (", null)"), so this fails.
+        // Currently, the paint is `null` (", null)"), so this fails.
         assertFalse("Filter composite must not be drawn with a null paint (opacity dropped)", op.endsWith("null)"))
         assertTrue("Filter composite paint should carry alpha for opacity=0.5 (a:127)", op.contains("a:127"))
     }
@@ -91,7 +91,7 @@ class C1FilterComposeTest {
         )
 
         // The composite paint must carry the blend mode.
-        // Currently the paint is `null`, so this fails.
+        // Currently, the paint is `null`, so this fails.
         assertFalse("Filter composite must not be drawn with a null paint (blend-mode dropped)", op.endsWith("null)"))
         assertTrue("Filter composite paint should carry the blend mode", op.contains("blend:"))
     }

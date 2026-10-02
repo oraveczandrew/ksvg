@@ -33,9 +33,9 @@ crisp (max pixel step 27 vs 250). The API-26 SwiftShader path softens ALL HW
 `canvas.drawPath` of a plain rect whose path-space bounds snap to an empty int
 rect draws nothing on emulator GPU canvases (bisected: 0.5-unit rect absent at
 any canvas scale, 1.5-unit rect and same-size circles draw; host SW draws
-everything; API-26 SwiftShader additionally culls sub-unit curves).
+everything; API-26 SwiftShader additionally culls subunit curves).
 `fillWithPattern` bakes bbox-unit content into super-unit paths, so patterns
- are immune. Plain-group sub-unit geometry under huge zoom is still affected —
+ are immune. Plain-group subunit geometry under huge zoom is still affected —
  negligible in practice (sub-pixel at normal zoom).
 
 ## 4. Mask-region edge strip on API-26 emulator HW mid-pulse (emulator-only)

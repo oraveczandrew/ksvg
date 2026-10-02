@@ -75,7 +75,7 @@ public class SvgDecoder(
 
             // Intrinsic size fallback (same values the old code wrote into the
             // document, now kept local: the shared document is never mutated).
-            // Missing intrinsics (e.g. viewBox-only) fall back to the target
+            // Missing intrinsics (e.g., viewBox-only) fall back to the target
             // size, or 192px for SIZE_ORIGINAL.
             val missingIntrinsics = svg.documentWidth == -1f || svg.documentHeight == -1f
             val documentWidth: Float

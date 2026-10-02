@@ -69,8 +69,8 @@
  *
  * Inputs:
  *   \intens_off  = byte offset of intensity[i] in the caller's 32(%rsp)-based
- *                  scratch area (e.g. 4*i)
- *   \spot_off    = byte offset of the spot-factor segment (e.g. 32+4*i)
+ *                  scratch area (e.g., 4*i)
+ *   \spot_off    = byte offset of the spot-factor segment (e.g., 32+4*i)
  *   \out_off     = byte offset for the packed pixel store
  *   \dst_reg     = GPR store base
  *   \params_reg  = GPR pointing at SpotLightingParams (8 -> k, 24/28/32 ->

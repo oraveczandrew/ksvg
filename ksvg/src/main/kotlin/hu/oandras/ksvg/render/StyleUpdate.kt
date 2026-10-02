@@ -136,7 +136,7 @@ internal fun resolveRelativeFontWeight(specified: Float, baseWeight: Float): Flo
  * carried-over state plus declared-only overrides is exactly the old behavior
  * for clean (non-lineage) sources.
  *
- * Preconditions: [builder] holds complete values (e.g. reset from
+ * Preconditions: [builder] holds complete values (e.g., reset from
  * `DEFAULT_STYLE`); [builder]'s font weight must already be resolved to an
  * absolute value (never a lighter/bolder sentinel).
  */

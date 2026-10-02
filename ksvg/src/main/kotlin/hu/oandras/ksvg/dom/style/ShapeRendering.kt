@@ -19,7 +19,7 @@ package hu.oandras.ksvg.dom.style
 /**
  * SVG `shape-rendering` property (`auto | optimizeSpeed | crispEdges |
  * geometricPrecision`). Inherited. `optimizeSpeed`/`crispEdges` disable
- * anti-aliasing for shape painting; the rest keep it enabled.
+ * antialiasing for shape painting; the rest keep it enabled.
  */
 @Suppress("EnumEntryName")
 internal enum class ShapeRendering {
@@ -28,7 +28,7 @@ internal enum class ShapeRendering {
     crispEdges,
     geometricPrecision;
 
-    /** True when shapes paint without anti-aliasing under this mode. */
+    /** True when shapes paint without antialiasing under this mode. */
     internal val disablesAntiAlias: Boolean
         get() = this == optimizeSpeed || this == crispEdges
 }

@@ -42,7 +42,7 @@
  *   and packs: (max << 24) | (R << 16) | (G << 8) | B.
  *
  * Inputs:
- *   \lut        = base of the L2S table (e.g. %r14)
+ *   \lut        = base of the L2S table (e.g., %r14)
  *   \xmm        = XMM register holding per-lane packed indices (lanes 0/1)
  *   \lane1q, \lane1d = 64-bit index view / 32-bit value view of the lane-1 reg
  *   \lane0q, \lane0d = same pair for the lane-0 reg (holds the packed result)

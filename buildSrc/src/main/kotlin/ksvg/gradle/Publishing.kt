@@ -80,10 +80,10 @@ public fun MavenPublication.ksvgPom(displayName: String, description: String): U
  *
  * Per the AGP docs the component only exists after evaluation, so the publication is
  * registered lazily and `from(...)` runs in a nested afterEvaluate. Sources jar comes
- * from AGP's `withSourcesJar()`; the Dokka javadoc jar is attached here.
+ * from AGP's `withSourcesJar()`; the Dokka Javadoc jar is attached here.
  *
  * @param stripPomDependencies `group:artifact` coordinates to drop from the generated
- * POM (Maven can't represent variants, so e.g. test-fixture-only deps would otherwise
+ * POM (Maven can't represent variants, so e.g., test-fixture-only deps would otherwise
  * leak into the main POM as runtime deps; Gradle consumers are unaffected thanks to
  * Gradle Module Metadata).
  */

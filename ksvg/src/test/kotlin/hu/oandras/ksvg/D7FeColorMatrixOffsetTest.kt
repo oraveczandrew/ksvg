@@ -61,7 +61,7 @@ class D7FeColorMatrixOffsetTest {
         val a = pixel.alpha
 
         // SVG: offset 0.5 adds 0.5 to R in [0,1] space -> ~128.
-        // Bug (offset * 255 = 127.5): R' clamps to 255 (full white).
+        // Bug (offset * 255 = 127.5): the R channel clamps to 255 (full white).
         assertTrue("Expected R ~= 128 (offset in [0,1]), got R=$r", r in 120..140)
         assertTrue("Expected G=0, got G=$g", g == 0)
         assertTrue("Expected B=0, got B=$b", b == 0)

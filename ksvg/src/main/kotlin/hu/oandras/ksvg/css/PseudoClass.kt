@@ -70,7 +70,7 @@ internal class PseudoClassAnPlusB(
         // Check if an + b == childPos.  The test is true for any n >= 0.
         // So rearranging fo n we get: n = (childPos - b) / a
         if (a == 0) {
-            // a is zero for pseudo classes like: nth-child(b)
+            // a == 0 for pseudo classes like: nth-child(b)
             // So we match if childPos == b
             return childPos == b
         }

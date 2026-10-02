@@ -27,7 +27,7 @@
  *     int width, int height, float scale, int xChannel, int yChannel);
  *
  * AAPCS / armeabi-v7a softfp ABI (same convention the repo's other armv7a
- * kernels use, e.g. morphology_armv7a_neon.S):
+ * kernels use, e.g., morphology_armv7a_neon.S):
  *   r0 = src     r1 = map      r2 = dst     r3 = width
  *   [sp,#0]  = height
  *   [sp,#4]  = scale (float bits)

@@ -165,7 +165,7 @@ private fun unsupportedFeatureMessage(@UnsupportedFeature feature: Int): String 
  * such scope in its chain ([findScope] finds none) logs every call.
  *
  * Callers decide WHEN a value actually needs the unimplemented behavior
- * (e.g. `white-space: normal` never calls this); this only dedupes.
+ * (e.g., `white-space: normal` never calls this); this only dedupes.
  */
 internal fun LoggerContext.logUnsupportedFeature(
     @UnsupportedFeature
@@ -177,7 +177,7 @@ internal fun LoggerContext.logUnsupportedFeature(
 }
 
 /**
- * Logs a warning for a dropped unsupported element (e.g. `<foreignObject>`),
+ * Logs a warning for a dropped unsupported element (e.g., `<foreignObject>`),
  * deduped by tag name by the surrounding [UnsupportedFeatureScope] (one log per
  * tag name per parse). A context with no such scope in its chain logs every call.
  */
@@ -188,7 +188,7 @@ internal fun LoggerContext.logUnsupportedElement(tag: String) {
 }
 
 /**
- * Logs a warning for a dropped unknown presentation attribute (e.g.
+ * Logs a warning for a dropped unknown presentation attribute (e.g.,
  * `foo="bar"`), deduped by attribute name by the surrounding
  * [UnsupportedFeatureScope] (one log per name per parse). A context with no such
  * scope in its chain logs every call.
@@ -207,7 +207,7 @@ internal fun LoggerContext.logUnsupportedAttribute(name: String) {
 }
 
 /**
- * Logs a warning for a recognized but unimplemented CSS pseudo-class (e.g.
+ * Logs a warning for a recognized but unimplemented CSS pseudo-class (e.g.,
  * `:hover`), deduped by pseudo-class name by the surrounding
  * [UnsupportedFeatureScope] (one log per name per parse). A context with no
  * such scope in its chain logs every call.
@@ -222,7 +222,7 @@ internal fun LoggerContext.logUnsupportedPseudoClass(name: String) {
 }
 
 /**
- * Logs a warning for a dropped unknown/unsupported CSS at-rule (e.g.
+ * Logs a warning for a dropped unknown/unsupported CSS at-rule (e.g.,
  * `@foobar`), deduped by keyword by the surrounding [UnsupportedFeatureScope]
  * (one log per keyword per parse). A context with no such scope in its chain
  * logs every call.
@@ -238,14 +238,14 @@ internal fun LoggerContext.logUnsupportedAtRule(keyword: String) {
 
 /**
  * Logs a warning for an animation targeting an attribute the animator cannot
- * drive (e.g. `<animate attributeName="display">`), deduped by attribute name
+ * drive (e.g., `<animate attributeName="display">`), deduped by attribute name
  * by the surrounding [UnsupportedFeatureScope] (one log per name per parse).
  * A context with no such scope in its chain logs every call.
  *
  * Out-of-vocabulary targets are reported at parse time by
  * [logUnsupportedAttribute] instead, so names reaching here are either known
  * but unhandled, or the parse-time warning was bypassed. The name uses the
- * `SVGAttr` enum spelling (e.g. `stroke_dasharray`): it is reported as-is to
+ * `SVGAttr` enum spelling (e.g., `stroke_dasharray`): it is reported as-is to
  * stay allocation-free on the animation hot path.
  */
 internal fun LoggerContext.logUnsupportedAnimatedAttribute(name: String) {

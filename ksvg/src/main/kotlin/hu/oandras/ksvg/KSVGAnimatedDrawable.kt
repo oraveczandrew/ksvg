@@ -64,7 +64,7 @@ public open class KSVGAnimatedDrawable @JvmOverloads public constructor(
 
         val wasRunning = running
         running = true
-        // Always reset the time base so a drawable that is reused (e.g. by Glide's
+        // Always reset the time base so a drawable that is reused (e.g., by Glide's
         // resource cache) restarts its animation cleanly instead of freezing on a
         // stale start timestamp.
         startedAtMs = SystemClock.uptimeMillis()

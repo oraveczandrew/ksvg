@@ -296,7 +296,7 @@ ksvgLightingDistantDiffuseRowNeon32:
 // AAPCS32:
 //   r0 = srcT, r1 = srcM, r2 = srcB, r3 = dst
 //   [sp, #0] = count, [sp, #4] = params, [sp, #8] = linearToSrgb
-//   (i.e. [sp+#104]/[sp+#108]/[sp+#112] after the two pushes below)
+//   (i.e., [sp+#104]/[sp+#108]/[sp+#112] after the two pushes below)
 //
 // Register map (loop-invariant): same q4-q14 params/helpers as Neon32.
 //   r6 = linearToSrgb (LUT base); r7 = 0xFF000000 alpha (pack);

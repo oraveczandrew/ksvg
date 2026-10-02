@@ -32,7 +32,7 @@ import org.robolectric.annotation.GraphicsMode
  * The SW blur must keep chroma in the halo.
  *
  * Blurring uniform red over transparency must fade ALPHA while red stays
- * 255 (straight storage, rsvg reference) — i.e. the blur kernel contract is
+ * 255 (straight storage, rsvg reference) — i.e., the blur kernel contract is
  * straight-in → straight-out like the native true-Gaussian path (proven by
  * `GaussianBlurNativeParityTest` on translucent inputs) and the corpus
  * reference. Regression test for the double-premultiplied halo

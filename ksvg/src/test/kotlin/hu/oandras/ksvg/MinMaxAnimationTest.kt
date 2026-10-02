@@ -93,10 +93,10 @@ class MinMaxAnimationTest {
     @Test
     fun inconsistentMinMaxAreIgnored() {
         // min > max: both ignored, raw 2s active applies (progress 0.75 at 1.5s).
-        valoddMinMaxIgnored()
+        oddMinMaxIgnored()
     }
 
-    private fun valoddMinMaxIgnored() {
+    private fun oddMinMaxIgnored() {
         val odd = opacityRect("""from="1" to="0" dur="2s" min="5s" max="1s"""")
         val mid = renderAt(odd, 1500L)
         assertEquals(6400, countPixels(mid) { it.alpha != 0 })

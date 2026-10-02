@@ -274,7 +274,7 @@ internal fun premultipliedCopy(src: Bitmap): Bitmap {
 /**
  * Keeps alpha, zeroes RGB. For asserting transparent output: RGB under
  * alpha-zero is display-invisible, and straight vs premultiplied pipelines
- * legitimately store different RGB there (e.g. arithmetic-sub terminal
+ * legitimately store different RGB there (e.g., arithmetic-sub terminal
  * output: straight residue vs premultiplied zero) while displaying (and
  * CPU-storing) identically.
  */
@@ -355,8 +355,8 @@ internal fun parityStats(
             total++
             val a = swPx[i]
             // Shift-tolerant matching (opt-in): edge-amplifying kernels
-            // (convolve edge-detect, morphology, blur halos) turn ±1px base-
-            // scene rasterization differences into huge channel diffs. With
+            // (convolve edge-detect, morphology, blur halos) turn ±1px
+            // base-scene rasterization differences into huge channel diffs. With
             // matchRadius=1 the pixel passes when it matches ANY pixel in
             // the other's 3x3 window. This blinds ≤1px geometry shifts
             // (covered precisely, shift-sensitively, in the corpus/chain

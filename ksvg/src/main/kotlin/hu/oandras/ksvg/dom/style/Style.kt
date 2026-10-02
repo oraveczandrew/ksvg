@@ -1509,9 +1509,9 @@ internal class Style internal constructor(
         // SVG2 geometry properties. NOTE: like every other SpecifiedFlags2
         // value these share bit positions with primary SPECIFIED_* flags, and
         // cssWideKeywordFlags/importantFlags/suppressedFlags are shared masks
-        // (see the class KDoc): a CSS-wide keyword on e.g. geomX also masks
+        // (see the class KDoc): a CSS-wide keyword on e.g., geomX also masks
         // the primary flag on the same bit. Same pre-existing trade-off as
-        // e.g. POINTER_EVENTS vs STROKE_DASHOFFSET; geometry css-wide keywords
+        // e.g., POINTER_EVENTS vs STROKE_DASHOFFSET; geometry css-wide keywords
         // are rarer still, so the established pattern is kept.
         const val SPECIFIED_GEOM_X: Long = 1L shl 12
         const val SPECIFIED_GEOM_Y: Long = 1L shl 13
@@ -2329,8 +2329,8 @@ internal class Style internal constructor(
 
         /**
          * The SPECIFIED_* flag of properties that support CSS-wide keywords, used by
-         * the inherit/unset/initial/revert handling in [processStyleProperty]. Multi-
-         * property shorthands and properties without a dedicated flag return null.
+         * the inherit/unset/initial/revert handling in [processStyleProperty]. Multi-property
+         * shorthands and properties without a dedicated flag return null.
          */
         private fun specifiedFlagForAttr(attr: SVGAttr): Long? = when (attr) {
             SVGAttr.alignment_baseline -> SPECIFIED_ALIGNMENT_BASELINE

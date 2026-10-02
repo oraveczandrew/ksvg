@@ -102,7 +102,7 @@ class AnimateMotionTest {
 
         val operations = canvas.asShadow().getOperations()
         // Path is diagonal from (0,0) to (10,10). Angle is 45 degrees.
-        // At 500ms, it should be at (5, 5) with 45 degree rotation.
+        // At 500ms, it should be at (5, 5) with 45-degree rotation.
         assertTrue("Expected rotation and translation at (5,5), but got: $operations", 
             operations.any { it.startsWith("concat(Matrix(") && it.contains(" 5 5))") && !it.contains(" 1 0 0 1 5 5") })
     }

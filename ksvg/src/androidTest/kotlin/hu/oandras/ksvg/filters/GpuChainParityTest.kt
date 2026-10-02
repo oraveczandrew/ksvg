@@ -463,8 +463,8 @@ class GpuChainParityTest {
         // cannot represent, so the chain must decline and both sides render SW
         // bit-exactly. SW correctness (fill without stroke) is pinned by
         // FillStrokePaintTest (host); this pins the routing. The stroked rect
-        // makes FillPaint differ from SourceGraphic, so the decline is load-
-        // bearing (an unstroked rect would pass vacuously).
+        // makes FillPaint differ from SourceGraphic, so the decline is
+        // load-bearing (an unstroked rect would pass vacuously).
         checkFallback(
             name = "chainFillPaintDecline",
             svg = """

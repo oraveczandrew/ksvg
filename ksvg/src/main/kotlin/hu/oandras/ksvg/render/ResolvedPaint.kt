@@ -39,7 +39,7 @@ import hu.oandras.ksvg.render.animation.AnimationNode
 private const val TAG = "Renderer"
 
 /**
- * The outcome of resolving a paint reference (e.g. fill="url(#grad)") at build time.
+ * The outcome of resolving a paint reference (e.g., fill="url(#grad)") at build time.
  *
  * Each node that references a gradient carries its own [Linear]/[Radial] instance with its own
  * render state (shader cache), so that different elements referencing the same gradient don't

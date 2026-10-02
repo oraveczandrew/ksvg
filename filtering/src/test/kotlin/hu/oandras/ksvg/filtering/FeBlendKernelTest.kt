@@ -50,7 +50,7 @@ class FeBlendKernelTest {
 
     @Test
     fun `multiply against translucent backdrop follows the CSS general formula`() {
-        // Source opaque cyan over 50%-alpha red: (1-ab) * cyan, i.e. half cyan.
+        // Source opaque cyan over 50%-alpha red: (1-ab) * cyan, i.e., half cyan.
         // Linear space encodes half as sRGB ~187, gamma space as ~127 — the
         // canvas xfermode path always produced the gamma value.
         val linear = runBlend(0xFF00FFFF.toInt(), 0x80FF0000.toInt(), 1, true)

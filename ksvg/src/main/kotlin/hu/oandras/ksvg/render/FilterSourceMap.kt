@@ -70,7 +70,7 @@ internal class FilterSourceMap(
 
     /**
      * Returns the user-space subregion of a previously stored named result, or `null` when
-     * [id] does not reference a stored result (e.g. it is a standard input or is unknown).
+     * [id] does not reference a stored result (e.g., it is a standard input or is unknown).
      */
     fun getResultRegion(id: String?): RectF? {
         if (id == null) return null

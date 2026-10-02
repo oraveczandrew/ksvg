@@ -221,7 +221,7 @@ internal open class TextScanner(input: String) {
     }
 
     /**
-     * Case-insensitive [consume] for ASCII CSS keywords (e.g. `!IMPORTANT`).
+     * Case-insensitive [consume] for ASCII CSS keywords (e.g., `!IMPORTANT`).
      * Zero-allocation: uses region matching instead of lowercasing.
      */
     fun consumeIgnoreCase(str: String): Boolean {

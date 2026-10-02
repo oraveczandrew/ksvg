@@ -350,7 +350,7 @@ class CssPseudoClassesTest {
         //List<String>  ops = mock.getOperations();
         //println("DEBUG OPS: " + ops.joinToString(", "))
         assertEquals("#ff00ff00", mock.paintProp(4, "color"))
-        //assertEquals("#ff000000", mock.paintProp(7, "color"));   TODO uncomment when we support children of graphics elements (e.g. when we have a proper DOM)
+        //assertEquals("#ff000000", mock.paintProp(7, "color"));   TODO uncomment when we support children of graphics elements (e.g., when we have a proper DOM)
         assertEquals(
             "#ff00ff00",
             mock.paintProp(7, "color")

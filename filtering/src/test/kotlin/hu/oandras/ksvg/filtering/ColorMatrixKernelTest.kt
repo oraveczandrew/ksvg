@@ -88,7 +88,7 @@ class ColorMatrixKernelTest {
         val src = 0xFF9680C8.toInt()
         assertEquals(src, runMatrix(src, m, false))
         // Linear path round-trips through 8-bit LUTs; channels >= ~52
-        // round-trip within +-1 (darker values crush, e.g. 18 -> 22), so the
+        // round-trip within +-1 (darker values crush, e.g., 18 -> 22), so the
         // test color only uses exact round-tripping channels.
         val linear = runMatrix(src, m, true)
         assertEquals(255, channel(linear, 24))

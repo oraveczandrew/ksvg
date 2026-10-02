@@ -31,7 +31,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Geometry animation inside `<clipPath>` (e.g. `<circle><animate
+ * Geometry animation inside `<clipPath>` (e.g., `<circle><animate
  * attributeName="r"/></circle>`): the referencing element's clip follows the
  * animated clip content every frame.
  */

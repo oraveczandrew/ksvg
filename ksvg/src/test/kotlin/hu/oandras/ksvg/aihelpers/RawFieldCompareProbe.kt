@@ -40,8 +40,8 @@ import kotlin.math.sqrt
  * compares three quantities over the fully-opaque noise region (kernel alpha == 255):
  *   1. out.png RGB  vs raw RGB        (is KSVG's alpha-composite == raw when a==255?)
  *   2. golden RGB   vs raw RGB        (does the golden match the raw field?)
- *   3. implied-alpha solve: does `golden = (a/255)*raw + (1-a/255)*255` hold with a
- *      CONSTANT effective a? If so, the golden is just the raw field faded toward white
+  *   3. implied-alpha solve: does `golden = (a/255)*raw + (1-a/255)*255` hold with a
+  *      CONSTANT effective alpha? If so, the golden is just the raw field faded toward white
  *      by a fixed factor (signature of an opacity/premultiply mismatch).
  */
 @RunWith(RobolectricTestRunner::class)

@@ -196,7 +196,7 @@ class P1AuditReproTest {
             """.trimIndent()
         ) as SVGImpl
 
-        // Uppercase URL( must resolve the gradient (midpoint is purple).
+        // Uppercase URL() must resolve the gradient (midpoint is purple).
         // (Before the fix the paint fell back to black.)
         val mid = drawAt(svg, 0L)
         assertTrue("expected purple midpoint, got r=${mid.red} b=${mid.blue}", mid.red > 80 && mid.blue > 80)

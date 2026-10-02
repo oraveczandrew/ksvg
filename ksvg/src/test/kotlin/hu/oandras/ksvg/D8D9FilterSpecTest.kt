@@ -70,7 +70,7 @@ class D8D9FilterSpecTest {
         )
         var sawOpaqueHighlight = false
         var sawTranslucentSlope = false
-        // Check well inside the lit square to avoid edge anti-aliasing artifacts.
+        // Check well inside the lit square to avoid edge antialiasing artifacts.
         // The bump map is a flat rect, so the field is uniform: every pixel
         // carries full-strength white with the rsvg intensity (116).
         for (y in 26 until 74) for (x in 26 until 74) {

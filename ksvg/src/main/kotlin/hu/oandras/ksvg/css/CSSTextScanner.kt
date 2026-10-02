@@ -67,8 +67,8 @@ internal class CSSTextScanner(input: String) : TextScanner(
     //   -- rest-char*
     //
     // Where:
-    //   start-char: a-z A-Z _ or escape or non-ASCII
-    //   rest-char: a-z A-Z 0-9 _ - or escape non-ASCII
+    //   start-char: a-z, A-Z, _ or escape or non-ASCII
+    //   rest-char: a-z, A-Z, 0-9, _ - or escape non-ASCII
     //   escape:  (not yet implemented)
     //     \ char
     //     \ hexdigit{1-6}
@@ -97,7 +97,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
     }
 
     /*
-    * Parse a simpleSelectors group (eg. E, F, G). In many/most cases there will be only one entry.
+    * Parse a simpleSelectors group (e.g., E, F, G). In many/most cases there will be only one entry.
     */
     @Throws(CSSParseException::class)
     internal fun nextSelectorGroup(): MutableList<CSSParser.Selector>? {
@@ -321,7 +321,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
 
     /*
     * Parse a list of identifiers from a pseudo class parameter set.
-    * Eg. for :lang(en)
+     * E.g., for :lang(en)
     */
     private fun nextIdentListParam(): MutableList<String>? {
         if (empty()) return null
@@ -546,7 +546,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
                 pseudo = PseudoClassNotSupported(identifier.lowercase(Locale.US))
                 selector.addedAttributeOrPseudo()
                 // The functional ones take parameters we don't implement either
-                // (e.g. :nth-col(2n), :current(...)): skip the parameter block so
+                // (e.g., :nth-col(2n), :current(...)): skip the parameter block so
                 // the rest of the selector still parses instead of the whole
                 // rule being dropped as malformed.
                 if (consume('(')) {

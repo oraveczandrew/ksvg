@@ -73,7 +73,7 @@ private const val IMAGE_SHADER: String = """
  * @param padX padY the device-space padding of the filter region top-left
  * (bitmap index space starts here, like the turbulence `uOffset`; the
  * image bounds are `pad + bitmap size`. Only used when the CPU output is
- * the same unscaled blit — i.e. no preserveAspectRatio mapping, subregion
+ * the same unscaled blit — i.e., no preserveAspectRatio mapping, subregion
  * at the region origin, matching bitmap size; the caller declines
  * otherwise and software renders instead)
  * @param inputUniformName the shader-input uniform name (`uInput`)

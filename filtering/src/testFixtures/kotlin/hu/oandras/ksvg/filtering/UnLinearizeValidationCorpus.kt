@@ -54,7 +54,7 @@ public object UnLinearizeValidationCorpus {
 
     /**
      * Guarantees every 8-bit value 0..255 appears in each colour channel AND in
-     * alpha (i has A=i, R=i, G=(i+85)&255, B=(i*137)&255). Exhaustive LUT domain.
+     * alpha (`i` has A=`i`, R=`i`, G=(`i`+85)&255, B=(`i`*137)&255). Exhaustive LUT domain.
      */
     public fun exhaustiveLut(size: Int): IntArray {
         val out = IntArray(size)

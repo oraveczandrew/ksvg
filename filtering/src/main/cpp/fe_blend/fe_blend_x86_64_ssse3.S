@@ -23,7 +23,7 @@
  * Divisions use reciprocals: widening multiplies by a 1/255 constant
  * (exhaustive: 0/256 roundtrip diffs); compositing/dodge/burn divide
  * via one Newton-Raphson step over `rcpps` (no FMA on SSSE3;
- * relative err ~2^-21, i.e. ~1e-4 LSB at narrow — same profile as
+ * relative err ~2^-21, i.e., ~1e-4 LSB at narrow — same profile as
  * the shipped arm32 kernel). 0-lanes give +Inf, masked exactly like
  * the div path. Alpha never linearized. Non-separable modes (12..15)
  * never reach this function: the C++ dispatcher routes them to scalar
@@ -99,7 +99,7 @@
  * Scalar equivalent (fe_blend.cpp):
  *   o = ((1-ab)*cs*as + (1-as)*cb*ab + as*ab*t) / ao; ao<=0 -> 0.
  * 1/ao via one Newton-Raphson step (no FMA on SSSE3): relative err
- * ~2^-21, i.e. ~1e-4 LSB at narrow — same profile as the shipped
+ * ~2^-21, i.e., ~1e-4 LSB at narrow — same profile as the shipped
  * arm32 kernel (device-green). 0-lanes give +Inf, masked exactly like
  * the div path. Clobbers xmm0, xmm1, xmm2, xmm7. Slots: TSLOT/T
  * channel triple, SCSLOT/BCSLOT. (xmm2 is scratch-reloaded throughout

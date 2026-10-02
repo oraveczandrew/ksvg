@@ -25,7 +25,7 @@
  *   mnemonics.
  *
  * Inputs:
- *   \lut        = base of the L2S table (e.g. %rax)
+ *   \lut        = base of the L2S table (e.g., %rax)
  *   \ri, \gi, \bi = 64-bit index registers holding the byte indices
  *   \ro, \go, \bo = 32-bit registers receiving the gathered bytes
  *                   (may differ from the index regs)

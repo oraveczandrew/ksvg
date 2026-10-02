@@ -225,7 +225,7 @@ internal class SVGImpl internal constructor(
     /**
      * Parse-end seal: precomputes the id/IRI lookup caches and the intrinsic
      * dimensions, so post-parse rendering never mutates the document for
-     * lookups. Id indexing replicates [getElementById] first-match order
+     * lookups. ID indexing replicates [getElementById] first-match order
      * (document order, first occurrence wins); existing entries (filled by
      * during-parse lookups) are never overwritten.
      *

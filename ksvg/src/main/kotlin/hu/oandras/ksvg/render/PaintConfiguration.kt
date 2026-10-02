@@ -90,7 +90,7 @@ internal class PaintConfiguration {
     var wordSpacing: Float = Float.NaN
 
     /**
-     * Edge anti-aliasing switch (shape-rendering/text-rendering). Defaults to
+     * Edge antialiasing switch (shape-rendering/text-rendering). Defaults to
      * a freshly constructed Android Paint with ANTI_ALIAS_FLAG (true); paired
      * snapshots start from the same configuration, so the first diff is a
      * no-op like every other field.

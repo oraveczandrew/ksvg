@@ -23,8 +23,8 @@ import org.junit.Test
 
 /**
  * Correctness of the linear→sRGB (unlinearize) filter-output transfer reference:
- * the [ColorLuts.UN_LINEARIZE] table, [KotlinKernels.unLinearizeArgb] single-
- * pixel semantics and [KotlinKernels.unLinearize] batch op. These tests were
+ * the [ColorLuts.UN_LINEARIZE] table, [KotlinKernels.unLinearizeArgb] single-pixel
+ * semantics and [KotlinKernels.unLinearize] batch op. These tests were
  * migrated from `:ksvg`'s `ColorUtilsTest` when the transfer moved into the
  * `:filtering` module.
  */
@@ -188,7 +188,7 @@ class UnlinearizeKernelTest {
     @Test
     fun unLinearize_all256Indices_eachChannel() {
         // Guaranteed full-coverage input: every 8-bit index appears in every colour
-        // channel and alpha spans 0..255, so any single-byte lookup error (e.g. a
+        // channel and alpha spans 0..255, so any single-byte lookup error (e.g., a
         // 64-entry table silently zeroing channels >= 64) is caught for all 256.
         val width = 16
         val height = 16

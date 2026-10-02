@@ -20,7 +20,7 @@
  * This header is included by the lighting_*_x86_64_avx2.S sources (after
  * asm_macros.S). Only definitions live here; every macro is
  * register-parameterized, and callers are responsible for loading table
- * bases (e.g. %r15) before use. On Apple the tables land in __TEXT,__const;
+ * bases (e.g., %r15) before use. On Apple the tables land in __TEXT,__const;
  * on ELF in .rodata — the same RODATA handling as the per-file literals.
  */
 
@@ -131,7 +131,7 @@
  */
 // NOTE: the dummy parameter exists so Apple-LLVM treats $N immediates
 // below as literals. In a parameter-less macro body LLVM substitutes
-// bare $N (N followed by a non-digit, e.g. $1, $23, $255, $0xff) with
+// bare $N (N followed by a non-digit, e.g., $1, $23, $255, $0xff) with
 // the Nth macro argument (empty here), silently producing a memory
 // operand - or EVEX-encoded garbage -> SIGILL. Named-parameter macros
 // (like POW8_AVX2/POW4_SSSE3) are immune. Same reason: no $0x hex,

@@ -42,7 +42,7 @@ import org.robolectric.annotation.GraphicsMode
  *
  * Setup: 1x1 white source bitmap, subregion (10,10)-(50,30) in a 100x100
  * region at scale 1. meet scales to 20x20 centered (x 20..40); letterbox
- * wings (e.g. x=12) stay transparent while the mapped core (x=30) is
+ * wings (e.g., x=12) stay transparent while the mapped core (x=30) is
  * opaque.
  *
  * `doFeImageFilter` is driven directly with a minimal [RenderContext]

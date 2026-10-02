@@ -774,7 +774,7 @@ internal class SVGParserImpl(
                 checkState(elem != null) {
                     // This situation has been reported by a user. But I am unable to reproduce this fault.
                     // If you can get this error please add your SVG file as a test case.
-                    // For now we'll return a parse exception for consistency (instead of NPE).
+                    // For now, we'll return a parse exception for consistency (instead of NPE).
                     throw KSVGParseException(
                         String.format(
                             "Unbalanced end element </%s> found",

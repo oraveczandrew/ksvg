@@ -128,7 +128,7 @@ internal fun calculatePrimitiveRegion(
  * primitive's subregion).
  * @param standardFilterRegion the full filter region (default for standard inputs).
  * @param namedRegion resolves a named result id to its recorded subregion, or null if unknown
- * (e.g. an unregistered standard-input name).
+ * (e.g., an unregistered standard-input name).
  * @param lastResultRegion the previous primitive's subregion (used when `in == null` on a
  * non-first, non-merge primitive).
  * @param out receives the resulting user-space union.

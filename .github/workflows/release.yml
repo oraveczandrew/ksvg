@@ -44,7 +44,7 @@ jobs:
 
       - name: Publish to staging repo
         # Same artifacts that would go to Central/GH Packages (AAR, sources,
-        # javadoc, POM, module metadata), redirected into dist/repo.
+        # Javadoc, POM, module metadata), redirected into dist/repo.
         # Signing stays off here (publishToMavenLocal never requires keys).
         run: >
           ./gradlew

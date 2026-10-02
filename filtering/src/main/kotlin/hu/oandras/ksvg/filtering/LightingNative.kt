@@ -20,7 +20,7 @@ package hu.oandras.ksvg.filtering
  * feDiffuseLighting / feSpecularLighting kernel over unpremultiplied
  * ARGB_8888 IntArrays — near-exact port of the Kotlin reference loop in
  * `FilterLighting.kt` (3x3 Sobel surface gradient from the alpha heightmap,
- * distant/point/spot light vectors incl. cone attenuation, specular via
+ * distant/point/spotlight vectors incl. cone attenuation, specular via
  * double pow). Diffuse is byte-for-byte; specular allows ±1 LSB
  * (`maxDelta = 1` in the parity test) due to libm pow rounding.
  *

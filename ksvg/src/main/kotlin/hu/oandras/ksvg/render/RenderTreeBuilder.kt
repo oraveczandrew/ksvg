@@ -321,7 +321,7 @@ internal class RenderTreeBuilder(
         if (obj is NotDirectlyRendered) return null
         if (obj is Conditional && !displayConditional(obj)) return null
 
-        // Break cyclic references (e.g. <use>/<g> A->B->A). A referenced element is
+        // Break cyclic references (e.g., <use>/<g> A->B->A). A referenced element is
         // re-entered while still being built only via such a cycle, so treating its
         // re-entry as empty/missing matches the spec and avoids unbounded recursion.
         val id = (obj as? ElementBase)?.id
@@ -1028,7 +1028,7 @@ internal class RenderTreeBuilder(
         val node = GroupRenderNode(obj, children)
         node.viewportSpec = ViewportSpec(null, null, useWidth, useHeight)
         // SVG2 symbol refX/refY: the reference point (post-viewBox coords)
-        // lands on the use x/y, i.e. content shifts by -ref in viewport units.
+        // lands on the use x/y, i.e., content shifts by -ref in viewport units.
         // Unspecified means no adjustment (unlike an explicit zero). Applied as
         // node.transform so it composes after viewBoxTransform at render time
         // (renderGroupNode concats transform first, viewBoxTransform second).
@@ -1630,7 +1630,7 @@ internal class RenderTreeBuilder(
 
     private fun getPathFromElement(obj: Shape): Path? {
         // The referenced shape's OWN computed style decides geometry CSS:
-        // state.style here belongs to the referencing element (e.g. textPath)
+        // state.style here belongs to the referencing element (e.g., textPath)
         // and must not leak its geometry declarations into the shape.
         val shapeBuilder = Style().toBuilder()
         shapeBuilder.reset(state.style)
@@ -2158,7 +2158,7 @@ internal class RenderTreeBuilder(
                     checkForImageDataURL(it) ?: externalFileResolver?.resolveImage(it, primitive.xmlBase)
                 }
                 // `feImage` may reference another element in the document by id
-                // (e.g. `href="#source"`); in that case we build the referenced
+                // (e.g., `href="#source"`); in that case we build the referenced
                 // node and render it instead of an external/raster image.
                 val referencedNode = if (href != null && href.startsWith("#")) {
                     document.getElementById(href.substring(1))?.let { build(it) }
@@ -2397,8 +2397,8 @@ internal class RenderTreeBuilder(
         apply(obj.style, true)
 
         // CSS white-space (computed above, own or inherited) beats
-        // xml:space: map to the preserve flag consumed by text extraction.
-        // Unspecified everywhere keeps the xml:space chain value set by
+        // `xml:space`: map to the preserve flag consumed by text extraction.
+        // Unspecified everywhere keeps the `xml:space` chain value set by
         // checkXMLSpaceAttribute.
         builder.whiteSpace?.let { state.spacePreserve = it.preservesSpaces }
 
@@ -2471,7 +2471,7 @@ internal class RenderTreeBuilder(
 
     /**
      * True when the text container carries explicit PER-CHARACTER geometry
-     * (multi-valued `x`/`y`/`dx`/`dy` lists); bidi-override reordering is
+     * (multivalued `x`/`y`/`dx`/`dy` lists); bidi-override reordering is
      * skipped for its direct chunks (reordered positions would need
      * spec-ambiguous mapping — documented G12 limitation). Single values
      * only place the line start / shift uniformly, so reordering stays

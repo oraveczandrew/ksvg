@@ -28,11 +28,11 @@ package hu.oandras.ksvg.filtering.benchmark
  */
 internal class BenchmarkTask {
 
-    /** Kernel display name (e.g. `Turbulence`). */
+    /** Kernel display name (e.g., `Turbulence`). */
     @JvmField
     var benchmark: String = ""
 
-    /** Backend display name (e.g. `kotlin`, `scalar`, `neon64`). */
+    /** Backend display name (e.g., `kotlin`, `scalar`, `neon64`). */
     @JvmField
     var backend: String = ""
 

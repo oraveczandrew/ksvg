@@ -384,7 +384,7 @@ internal fun parsePath(value: String): PathDefinition {
 }
 
 /**
- * Parses a semicolon-separated list of path data strings (e.g. the `values` of an
+ * Parses a semicolon-separated list of path data strings (e.g., the `values` of an
  * `<animate attributeName="d">`) into a list of [PathDefinition]s.
  */
 context(loggerContext: LoggerContext)

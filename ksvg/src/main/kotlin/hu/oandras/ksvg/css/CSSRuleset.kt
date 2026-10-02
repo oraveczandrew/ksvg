@@ -56,7 +56,7 @@ internal class CSSRuleset {
 }
 
 /**
- * Merges document rules with per-render overlay rules (e.g. from `RenderOptions`)
+ * Merges document rules with per-render overlay rules (e.g., from `RenderOptions`)
  * into [into], ordered exactly as [CSSRuleset.add] would insert them: ascending
  * specificity, document rules preceding equal-specificity overlay rules.
  * Both inputs must already be specificity-ordered (which `add` maintains).

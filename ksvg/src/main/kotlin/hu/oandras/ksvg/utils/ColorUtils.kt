@@ -60,7 +60,7 @@ internal fun packHsla(hue: Float, sat: Float, light: Float, alpha: Float = Float
 
 // Hue (degrees), saturation [0, 100], lightness [0, 100]
 internal fun hslToRgb(hue: Float, sat: Float, light: Float): Int {
-    var h = if (hue >= 0f) hue % 360f else (hue % 360f) + 360f // positive modulo (ie. -10 => 350)
+    var h = if (hue >= 0f) hue % 360f else (hue % 360f) + 360f // positive modulo (i.e., -10 => 350)
     h /= 60f // [0, 360] -> [0, 6]
     val s = clamp(sat / 100f, 0f, 1f)
     val l = clamp(light / 100f, 0f, 1f)

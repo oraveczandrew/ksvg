@@ -44,7 +44,7 @@ private const val DISPLACEMENT_MAP_SHADER: String = """
                 // interpolate here; migrating both paths is future work. The
                 // CPU clamps out-of-range reads to the bitmap edge while this
                 // shader relies on the input effect's edge behavior instead.)
-                // `uMap` arrives premultiplied (hwui convention; e.g. the
+                // `uMap` arrives premultiplied (hwui convention; e.g., the
                 // turbulence effect emits premultiplied since `b4d5020f`)
                 // while the CPU kernel shifts from straight map bytes, so
                 // unpremultiply first — same `rgb / alpha` convention as the

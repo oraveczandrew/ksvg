@@ -1,7 +1,7 @@
 # SIMD Kernel Development & Debugging Guide
 
 Purpose: transferable rules and known traps for **developing and debugging** the
-hand-written SIMD kernels in `filtering/src/main/cpp/**/*.S`. Benchmark numbers
+handwritten SIMD kernels in `filtering/src/main/cpp/**/*.S`. Benchmark numbers
 live in `BENCHMARKS.md`; this file is about what must *stay true* and what
 already fails.
 
@@ -33,7 +33,7 @@ conditions in §4.
   as pre-computed `dup`'d scalars so the loop body has no division — but never
   at the cost of FP op order or the rounding convention (see §2).
 - **Variable-radius windows**: fully unrolled body, computed jump entry
-  (`adr` + `br` into the middle), symmetric taps folded before the multiply.
+  (`adr` + `br` into the middle), symmetric taps folded before multiplying.
   GaussianBlur's AOSP macros are the reference (`blur_aarch64_neon.S:82-234`).
 - **Interleave 2/4 pixels per iteration** to amortize per-pixel setup, with
   independent accumulator chains to hide FP latency; keep a scalar tail for the
@@ -155,7 +155,7 @@ is at or immediately before the first divergent stage. What this caught:
   reads 16 bytes, so a single-double Hot constant drags in its neighbor
   (G lane got `+1.0` instead of `+0.5`; fractal R/G got wrong offset/scale/
   rounding the same way). Rule: packed FP mem-ops need a true 16-byte pair
-  constant (e.g. `LCPI0_17` `[0.5,0.5]`); otherwise `vmovddup`-broadcast the
+  constant (e.g., `LCPI0_17` `[0.5,0.5]`); otherwise `vmovddup`-broadcast the
   single double first. Scalar (`vaddsd`/`vmulsd`) paths are immune.
 - **Probe hygiene** (instrumentation must not perturb the kernel): guards
   must use provably-dead registers (a `movl 32(%esp), %eax` guard destroyed
