@@ -43,7 +43,7 @@ jobs:
         uses: ./.github/actions/setup-android-sdk
 
       - name: Publish to staging repo
-        # Same artifacts that would go to Central/GH Packages (AAR, sources,
+        # The same artifacts that would go to Central/GH Packages (AAR, sources,
         # Javadoc, POM, module metadata), redirected into dist/repo.
         # Signing stays off here (publishToMavenLocal never requires keys).
         run: >
@@ -51,13 +51,14 @@ jobs:
           :ksvg:publishReleasePublicationToMavenLocal
           :filtering:publishReleasePublicationToMavenLocal
           :glide:publishReleasePublicationToMavenLocal
-          :showcase:assembleDebug
+          :showcase:assembleRelease
           "-Dmaven.repo.local=$GITHUB_WORKSPACE/dist/repo"
 
       - name: Collect demo APK
-        # Debug APK (auto-signed): try-out demo, not the published library.
+        # Release APK (R8-minified, profileable): try-out demo, not the published library.
+        # NOTE: unsigned — needs signing (e.g., apksigner with a release key) before installation.
         run: |
-          cp showcase/build/outputs/apk/debug/showcase-debug.apk \
+          cp showcase/build/outputs/apk/release/showcase-release-unsigned.apk \
             "dist/ksvg-showcase-$KSVG_VERSION.apk"
           ls -la dist dist/repo | head -30
 
@@ -67,7 +68,7 @@ jobs:
           # NOTE: test-fixtures AARs are inter-module test reuse only
           # (testFixtures(project(":filtering"))) — AGP attaches them to the
           # release publication automatically; they must not ship. Central
-          # upload (D-track) needs the same exclusion at publish time.
+          # upload (D-track) needs the same exclusion at publishing time.
           files: |
             dist/*.apk
             dist/repo/**/*.aar
