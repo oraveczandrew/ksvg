@@ -23,8 +23,8 @@ import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
-import android.util.ArrayMap
 import androidx.annotation.RequiresApi
+import androidx.collection.MutableScatterMap
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.render.ALPHA_MATRIX_COLOR_FILTER
@@ -44,7 +44,6 @@ import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
 import kotlin.math.abs
-import kotlin.jvm.JvmSynthetic
 import android.graphics.RenderNode as AndroidRenderNode
 
 /**
@@ -272,7 +271,7 @@ internal open class GpuFilterBackend internal constructor(
         val packed = calculateTotalPadding(filterNode, scaleX, scaleY, sx, sy)
         val totalPadX = (packed shr 32).toInt()
         val totalPadY = (packed and 0xFFFFFFFFL).toInt()
-        val resultEffects = ArrayMap<String, RenderEffect>()
+        val resultEffects = MutableScatterMap<String, RenderEffect>()
 
         filterNode.primitives.forEachElement { primitive ->
             val sourceElement = primitive.sourceElement
@@ -526,7 +525,7 @@ internal open class GpuFilterBackend internal constructor(
         previousResult: String?,
         first: Boolean,
         currentChain: RenderEffect?,
-        resultEffects: Map<String, RenderEffect>
+        resultEffects: MutableScatterMap<String, RenderEffect>
     ): RenderEffect? {
         if (input == null) {
             return if (first) IDENTITY_EFFECT else currentChain

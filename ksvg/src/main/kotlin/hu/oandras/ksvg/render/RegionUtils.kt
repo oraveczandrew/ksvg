@@ -17,7 +17,7 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.RectF
-import androidx.collection.ArrayMap
+import androidx.collection.MutableScatterMap
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.Region
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
@@ -139,7 +139,7 @@ internal fun resolvePrimitiveInputRegion(
     inputIds: List<String?>,
     isMerge: Boolean,
     standardFilterRegion: RectF,
-    namedRegions: ArrayMap<String, RectF>?,
+    namedRegions: MutableScatterMap<String, RectF>?,
     lastResultRegion: RectF,
     out: RectF,
 ): Boolean {
@@ -172,7 +172,7 @@ internal fun resolvePrimitiveInputRegion(
 internal fun resolveSingleInputRegion(
     id: String?,
     standardFilterRegion: RectF,
-    namedRegions: ArrayMap<String, RectF>?,
+    namedRegions: MutableScatterMap<String, RectF>?,
     lastResultRegion: RectF,
     out: RectF,
 ): Boolean {
@@ -193,7 +193,7 @@ private fun resolveOneInputRegion(
     id: String?,
     isMerge: Boolean,
     standardFilterRegion: RectF,
-    namedRegions: ArrayMap<String, RectF>?,
+    namedRegions: MutableScatterMap<String, RectF>?,
     lastResultRegion: RectF,
 ): RectF? {
     val standard = id == "SourceGraphic" || id == "SourceAlpha"

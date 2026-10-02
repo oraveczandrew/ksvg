@@ -26,8 +26,8 @@ import android.graphics.RuntimeShader
 import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
-import androidx.collection.ArrayMap
-import androidx.collection.ArraySet
+import androidx.collection.MutableScatterMap
+import androidx.collection.MutableScatterSet
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
@@ -94,6 +94,23 @@ import kotlin.math.abs
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBackend(renderContext) {
 
+    // Chain-build scratch state. tryBuildChainImpl is reentrancy-free pure
+    // construction on a thread-confined backend (the same confinement as the
+    // inherited recordingActive/activeSlot fields), so these containers are
+    // reused across chain builds instead of reallocated per build — a build
+    // happens per frame for animated filters and on every scroll reposition.
+    // Reset at the start of every build; only the containers are shared, values
+    // retained by the built chain live their normal lives.
+    // `boundResults` is deliberately a MutableScatterSet, not an ArraySet:
+    // ArraySet.clear() drops its backing arrays while ScatterSet.clear() only
+    // resets occupancy, so the scratch storage survives across builds.
+    private val scratchResultShaders = MutableScatterMap<String, RuntimeShader>()
+    private val scratchResultEffects = MutableScatterMap<String, RenderEffect>()
+    private val scratchBoundResults = MutableScatterSet<String>()
+    private val scratchResultRegions = MutableScatterMap<String, RectF>()
+    private val scratchRegionRects = ArrayList<RectF>()
+    private val scratchLastRegion = RectF()
+
     override val supportedMask: Int
         get() = FilterPrimitiveSet.FLAG_COLOR_MATRIX or
                 FilterPrimitiveSet.FLAG_GAUSSIAN_BLUR or
@@ -127,9 +144,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         var chain: RenderEffect? = null
         var previousResult: String? = null
         var first = true
-        val primitiveCount = filterNode.primitives.size
-        val resultShaders = ArrayMap<String, RuntimeShader>(primitiveCount)
-        val resultEffects = ArrayMap<String, RenderEffect>(primitiveCount)
+        val resultShaders = scratchResultShaders.also { it.clear() }
+        val resultEffects = scratchResultEffects.also { it.clear() }
         // Raw-shader input bindings for downstream in2/uMap references:
         // `resultShaders` holds RAW RuntimeShaders, but the
         // chain wires inputs at the EFFECT level
@@ -139,10 +155,10 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         // black) unless bound here. `boundResults` names the results whose
         // raw shader evaluates standalone (generative, or raw-`uInput`
         // bound to another bound result); in2 references outside it
-        // decline the chain instead of sampling transparent.
+        // declines the chain instead of sampling transparent.
         var lastRawShader: RuntimeShader? = null
         var lastRawBound = false
-        val boundResults = ArraySet<String>(primitiveCount)
+        val boundResults = scratchBoundResults.also { it.clear() }
 
         // 1. Pre-calculate total padding for the entire chain
         val packed = calculateTotalPadding(filterNode, scaleX, scaleY, sx, sy)
@@ -152,9 +168,14 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         // Track per-result user-space subregions so a primitive that omits x/y/width/height and
         // references a prior result defaults to that result's subregion (instead of the whole
         // filter region), matching the software backend. `lastResultRegion` starts as the filter
-        // region (the first primitive's SourceGraphic default).
-        val lastResultRegion = RectF(filterRegion)
-        val hwResultRegion = ArrayMap<String, RectF>(primitiveCount)
+        // region (the first primitive's SourceGraphic default). Region value
+        // RectFs come from the scratch-free list (recycled from the previous
+        // build at the top of this function), so a chain build allocates none.
+        val lastResultRegion = scratchLastRegion.also { it.set(filterRegion) }
+        scratchResultRegions.forEach { _, region ->
+            scratchRegionRects.add(region)
+        }
+        val hwResultRegion = scratchResultRegions.also { it.clear() }
 
         filterNode.primitives.forEachElement { primitive ->
             val sourceElement = primitive.sourceElement
@@ -364,9 +385,10 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             // (`doLightingFilter`: `light ?: return inputBitmap`).
                             // Mirror with passthrough; the output raw form
                             // is the input raw form for downstream in2.
+                            val boundDiffuseShader = lastRawShader
                             if (primitive.sourceElement.light == null) {
-                                if (resultName != null && lastRawBound && lastRawShader != null) {
-                                    resultShaders[resultName] = lastRawShader
+                                if (resultName != null && lastRawBound && boundDiffuseShader != null) {
+                                    resultShaders[resultName] = boundDiffuseShader
                                     boundResults += resultName
                                 }
                                 inputEffect
@@ -405,9 +427,10 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             // Terminal specular emits premultiplied output on the CPU
                             // path (full light color + intensity alpha); mirror it.
                             // No light source: input passthrough like diffuse.
+                            val boundSpecularShader = lastRawShader
                             if (primitive.sourceElement.light == null) {
-                                if (resultName != null && lastRawBound && lastRawShader != null) {
-                                    resultShaders[resultName] = lastRawShader
+                                if (resultName != null && lastRawBound && boundSpecularShader != null) {
+                                    resultShaders[resultName] = boundSpecularShader
                                     boundResults += resultName
                                 }
                                 inputEffect
@@ -881,7 +904,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
      * dependency) and records named results for downstream references. Returns
      * whether the shader's input ended up bound.
      *
-     * Deliberately a member function with explicit loop state instead of a local
+     * Deliberately a member function with an explicit loop state instead of a local
      * function: a local `fun` capturing the reassigned `lastRawShader` /
      * `lastRawBound` forces `Ref$ObjectRef` / `Ref$BooleanRef` wrappers per chain
      * build. Callers assign the returned flag and `shader` to their own locals
@@ -896,8 +919,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         generative: Boolean,
         lastRawShader: RuntimeShader?,
         lastRawBound: Boolean,
-        resultShaders: ArrayMap<String, RuntimeShader>,
-        boundResults: MutableSet<String>,
+        resultShaders: MutableScatterMap<String, RuntimeShader>,
+        boundResults: MutableScatterSet<String>,
     ): Boolean {
         val bound = generative || when (input) {
             null if first -> false // SourceGraphic: no raw form
@@ -944,7 +967,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         mergeNodes: List<String?>?,
         input: String?,
         lastResultRegion: RectF,
-        hwResultRegion: ArrayMap<String, RectF>,
+        hwResultRegion: MutableScatterMap<String, RectF>,
         userRegion: RectF,
         inputUnion: RectF,
     ) {
@@ -981,13 +1004,23 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         resultName: String?,
         userRegion: RectF,
         lastResultRegion: RectF,
-        hwResultRegion: ArrayMap<String, RectF>,
+        hwResultRegion: MutableScatterMap<String, RectF>,
     ) {
         if (resultName != null) {
-            val rec = hwResultRegion[resultName] ?: RectF().also { hwResultRegion[resultName] = it }
+            val rec = hwResultRegion[resultName] ?: obtainRegionRect().also { hwResultRegion[resultName] = it }
             rec.set(userRegion)
         }
         lastResultRegion.set(userRegion)
+    }
+
+    /** Region-value scratch RectF, recycled across chain builds (see fields). */
+    private fun obtainRegionRect(): RectF {
+        val pooled = scratchRegionRects
+        return if (pooled.isNotEmpty()) {
+            pooled.removeAt(pooled.size - 1)
+        } else {
+            RectF()
+        }
     }
 
     context(renderContext: RenderContext)
