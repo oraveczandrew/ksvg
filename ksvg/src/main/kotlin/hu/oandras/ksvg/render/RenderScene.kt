@@ -19,6 +19,7 @@ package hu.oandras.ksvg.render
 import android.graphics.Matrix
 import android.graphics.PathMeasure
 import android.graphics.Rect
+import androidx.tracing.trace
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.css.CSSLength
@@ -116,29 +117,31 @@ internal class RenderScene private constructor(
             return
         }
 
-        val ctx = SceneUpdateContext(pools, dPI)
+        trace("KSVG.applyViewport") {
+            val ctx = SceneUpdateContext(pools, dPI)
 
-        // Mirror build(renderOptions): the external viewport is decisive, root
-        // width/height only refine it when expressed in percent.
-        var vp = options.viewPort ?: Box(
-            bounds.left.toFloat(),
-            bounds.top.toFloat(),
-            bounds.width().toFloat(),
-            bounds.height().toFloat()
-        )
-        with(ctx) {
-            rootSvg.width?.let {
-                if (it.unit == CssUnit.percent) vp = vp.copy(width = it.floatValueInContext(vp.width))
+            // Mirror build(renderOptions): the external viewport is decisive, root
+            // width/height only refine it when expressed in percent.
+            var vp = options.viewPort ?: Box(
+                bounds.left.toFloat(),
+                bounds.top.toFloat(),
+                bounds.width().toFloat(),
+                bounds.height().toFloat()
+            )
+            with(ctx) {
+                rootSvg.width?.let {
+                    if (it.unit == CssUnit.percent) vp = vp.copy(width = it.floatValueInContext(vp.width))
+                }
+                rootSvg.height?.let {
+                    if (it.unit == CssUnit.percent) vp = vp.copy(height = it.floatValueInContext(vp.height))
+                }
             }
-            rootSvg.height?.let {
-                if (it.unit == CssUnit.percent) vp = vp.copy(height = it.floatValueInContext(vp.height))
-            }
+
+            updateViewportContainer(root, rootSvg, vp, rootOverrides.viewBoxOverride, rootOverrides.parOverride, ctx)
+            val viewportRect = viewport ?: Rect(bounds).also { viewport = it }
+            viewportRect.set(bounds)
+            lastViewPortOverride = options.viewPort
         }
-
-        updateViewportContainer(root, rootSvg, vp, rootOverrides.viewBoxOverride, rootOverrides.parOverride, ctx)
-        val viewportRect = viewport ?: Rect(bounds).also { viewport = it }
-        viewportRect.set(bounds)
-        lastViewPortOverride = options.viewPort
     }
 
     fun recycle(bitmapPool: BitmapPool) {
@@ -358,29 +361,31 @@ internal class RenderScene private constructor(
             modificationCount: Int,
             optionsFingerprint: Long,
         ): RenderScene {
-            val builder = RenderTreeBuilder(
-                document = document,
-                dPI = dPI,
-                externalFileResolver = externalFileResolver,
-                pools = pools,
-                logger = document,
-            )
-            val node = builder.build(options)
-            val scene = RenderScene(node, dPI, modificationCount, optionsFingerprint)
-            scene.rootOverrides = resolveRootViewOverrides(document, options) ?: RootViewOverrides(null, null)
-            // Resolve viewBox transforms up front so the first render already has
-            // correct geometry (the drawable only calls applyViewport on later
-            // bounds-only changes, otherwise viewport nodes would render with a
-            // null viewBoxTransform on the very first frame).
-            val vp = options.viewPort
-            if (node != null && vp != null) {
-                scene.applyViewport(
-                    Rect(0, 0, vp.width.toInt(), vp.height.toInt()),
-                    options,
-                    pools,
+            return trace("KSVG.buildScene") {
+                val builder = RenderTreeBuilder(
+                    document = document,
+                    dPI = dPI,
+                    externalFileResolver = externalFileResolver,
+                    pools = pools,
+                    logger = document,
                 )
+                val node = builder.build(options)
+                val scene = RenderScene(node, dPI, modificationCount, optionsFingerprint)
+                scene.rootOverrides = resolveRootViewOverrides(document, options) ?: RootViewOverrides(null, null)
+                // Resolve viewBox transforms up front so the first render already has
+                // correct geometry (the drawable only calls applyViewport on later
+                // bounds-only changes, otherwise viewport nodes would render with a
+                // null viewBoxTransform on the very first frame).
+                val vp = options.viewPort
+                if (node != null && vp != null) {
+                    scene.applyViewport(
+                        Rect(0, 0, vp.width.toInt(), vp.height.toInt()),
+                        options,
+                        pools,
+                    )
+                }
+                scene
             }
-            return scene
         }
 
         /**

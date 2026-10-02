@@ -21,6 +21,7 @@ lifecycle = "2.11.0"
 collection = "1.6.0"
 guava = "33.7.1-android"
 coroutines = "1.11.0"
+tracing = "2.0.3"
 activityKtx = "1.13.0"
 composeBom = "2026.08.00"
 coreKtx = "1.19.1"
@@ -51,6 +52,8 @@ activity-compose = { group = "androidx.activity", name = "activity-compose", ver
 collection = { group = "androidx.collection", name = "collection", version.ref = "collection" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+tracing = { group = "androidx.tracing", name = "tracing", version.ref = "tracing" }
+tracing-ktx = { group = "androidx.tracing", name = "tracing-ktx", version.ref = "tracing" }
 activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }

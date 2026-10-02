@@ -25,6 +25,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
+import androidx.tracing.trace
 import hu.oandras.ksvg.DelegatingLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.HitRegion
@@ -337,52 +338,54 @@ internal class SVGImpl internal constructor(
 
      */
     override fun renderToCanvas(canvas: Canvas, renderOptions: RenderOptions?) {
-        val renderOptions = renderOptions ?: RenderOptionsImpl()
+        trace("KSVG.renderToCanvas") {
+            val renderOptions = renderOptions ?: RenderOptionsImpl()
 
-        if (!renderOptions.hasViewPort()) {
-            renderOptions.viewPort(
-                minX = 0f,
-                minY = 0f,
-                width = canvas.width.toFloat(),
-                height = canvas.height.toFloat()
+            if (!renderOptions.hasViewPort()) {
+                renderOptions.viewPort(
+                    minX = 0f,
+                    minY = 0f,
+                    width = canvas.width.toFloat(),
+                    height = canvas.height.toFloat()
+                )
+            }
+
+            val pools = PoolOwner()
+
+            val options = renderOptions as? RenderOptionsImpl ?: RenderOptionsImpl(renderOptions)
+            val scene = RenderScene.build(
+                document = this,
+                dPI = renderDPI,
+                externalFileResolver = externalFileResolver,
+                pools = pools,
+                options = options,
+                modificationCount = modificationCount,
+                optionsFingerprint = RenderScene.computeOptionsFingerprint(options),
             )
-        }
+            val node = scene.rootNode ?: return@trace
+            val vp = options.viewPort
+            if (vp != null) {
+                val bounds = android.graphics.Rect(
+                    vp.minX.toInt(), vp.minY.toInt(),
+                    (vp.minX + vp.width).toInt(), (vp.minY + vp.height).toInt()
+                )
+                scene.applyViewport(bounds, options, pools)
+            }
 
-        val pools = PoolOwner()
-
-        val options = renderOptions as? RenderOptionsImpl ?: RenderOptionsImpl(renderOptions)
-        val scene = RenderScene.build(
-            document = this,
-            dPI = renderDPI,
-            externalFileResolver = externalFileResolver,
-            pools = pools,
-            options = options,
-            modificationCount = modificationCount,
-            optionsFingerprint = RenderScene.computeOptionsFingerprint(options),
-        )
-        val node = scene.rootNode ?: return
-        val vp = options.viewPort
-        if (vp != null) {
-            val bounds = android.graphics.Rect(
-                vp.minX.toInt(), vp.minY.toInt(),
-                (vp.minX + vp.width).toInt(), (vp.minY + vp.height).toInt()
+            val renderer = Renderer(
+                document = this,
+                dPI = renderDPI,
+                pools = pools,
+                gpuBackendFactory = options.gpuBackendFactory,
             )
-            scene.applyViewport(bounds, options, pools)
+
+            renderer.renderDocument(canvas, node, renderOptions)
+
+            // Store render state for lazy hit region computation
+            lastRenderNode = node
+            lastRenderViewPort = renderOptions.viewPort?.toRectF()
+            hitRegionsDirty = true
         }
-
-        val renderer = Renderer(
-            document = this,
-            dPI = renderDPI,
-            pools = pools,
-            gpuBackendFactory = options.gpuBackendFactory,
-        )
-
-        renderer.renderDocument(canvas, node, renderOptions)
-
-        // Store render state for lazy hit region computation
-        lastRenderNode = node
-        lastRenderViewPort = renderOptions.viewPort?.toRectF()
-        hitRegionsDirty = true
     }
 
     /**
@@ -900,19 +903,21 @@ internal class SVGImpl internal constructor(
             // instance to the SVGImpl it builds (pass-through in the
             // secondary constructor), so parse- and render-time warnings
             // share one per-document dedup scope.
-            return try {
-                SVGParserImpl(
-                    enableInternalEntities = isInternalEntitiesEnabled,
-                    externalFileResolver = externalFileResolver,
-                    animationsEnabled = parseAnimations,
-                    logger = loggerContext.wrapAsUnsupportedFeatureScope(),
-                    documentBaseUrl = documentBaseUrl,
-                ).parseStream(inputStream)
-            } finally {
+            return trace("KSVG.parse") {
                 try {
-                    inputStream.close()
-                } catch (_: IOException) {
-                    // Do nothing
+                    SVGParserImpl(
+                        enableInternalEntities = isInternalEntitiesEnabled,
+                        externalFileResolver = externalFileResolver,
+                        animationsEnabled = parseAnimations,
+                        logger = loggerContext.wrapAsUnsupportedFeatureScope(),
+                        documentBaseUrl = documentBaseUrl,
+                    ).parseStream(inputStream)
+                } finally {
+                    try {
+                        inputStream.close()
+                    } catch (_: IOException) {
+                        // Do nothing
+                    }
                 }
             }
         }

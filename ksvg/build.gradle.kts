@@ -142,6 +142,8 @@ dependencies.apply {
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.guava)
     implementation(libs.collection)
+    implementation(libs.tracing)
+    implementation(libs.tracing.ktx)
 
     implementation(project(":filtering"))
 

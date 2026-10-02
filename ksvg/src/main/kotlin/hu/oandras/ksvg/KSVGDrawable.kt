@@ -32,6 +32,7 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import android.util.LayoutDirection
 import androidx.annotation.RequiresApi
+import androidx.tracing.trace
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.render.RenderOptionsImpl
 import hu.oandras.ksvg.render.RenderScene
@@ -133,67 +134,69 @@ public open class KSVGDrawable @JvmOverloads public constructor(
     }
 
     private fun drawIntoBounds(canvas: Canvas, bounds: Rect) {
-        if (!ownsAnimationClock) {
-            // Legacy/test seam: follow direct document-clock manipulation.
-            // Drawables that own their clock (animated) never read the shared
-            // document clock here.
-            (svg as? SVGImpl)?.let { renderer.animationTimeMs = it.animationTimeMs }
-        }
-        val saveCount = saveForAlphaAndFilter(
-            canvas = canvas,
-            left = bounds.left.toFloat(),
-            top = bounds.top.toFloat(),
-            right = bounds.right.toFloat(),
-            bottom = bounds.bottom.toFloat()
-        )
-        val mirrored = autoMirrored && layoutDirection == LayoutDirection.RTL
-        if (mirrored) {
-            canvas.translate(bounds.left.toFloat() + bounds.right.toFloat(), 0f)
-            canvas.scale(-1f, 1f)
-        }
-        val options = getRenderOptions(
-            left = bounds.left.toFloat(),
-            top = bounds.top.toFloat(),
-            width = bounds.width().toFloat(),
-            height = bounds.height().toFloat()
-        ) as RenderOptionsImpl
+        trace("KSVG.draw") {
+            if (!ownsAnimationClock) {
+                // Legacy/test seam: follow direct document-clock manipulation.
+                // Drawables that own their clock (animated) never read the shared
+                // document clock here.
+                (svg as? SVGImpl)?.let { renderer.animationTimeMs = it.animationTimeMs }
+            }
+            val saveCount = saveForAlphaAndFilter(
+                canvas = canvas,
+                left = bounds.left.toFloat(),
+                top = bounds.top.toFloat(),
+                right = bounds.right.toFloat(),
+                bottom = bounds.bottom.toFloat()
+            )
+            val mirrored = autoMirrored && layoutDirection == LayoutDirection.RTL
+            if (mirrored) {
+                canvas.translate(bounds.left.toFloat() + bounds.right.toFloat(), 0f)
+                canvas.scale(-1f, 1f)
+            }
+            val options = getRenderOptions(
+                left = bounds.left.toFloat(),
+                top = bounds.top.toFloat(),
+                width = bounds.width().toFloat(),
+                height = bounds.height().toFloat()
+            ) as RenderOptionsImpl
 
-        val svgImpl = svg as SVGImpl
+            val svgImpl = svg as SVGImpl
 
-        var node = scene?.rootNode
-        val modCount = svgImpl.modificationCount
-        val fingerprint = RenderScene.computeOptionsFingerprint(options)
-        val currentScene = scene
-        val upToDate = currentScene != null &&
+            var node = scene?.rootNode
+            val modCount = svgImpl.modificationCount
+            val fingerprint = RenderScene.computeOptionsFingerprint(options)
+            val currentScene = scene
+            val upToDate = currentScene != null &&
                 currentScene.isUpToDate(modCount, fingerprint)
 
-        if (!upToDate) {
-            scene?.recycle(pools.bitmapPool)
+            if (!upToDate) {
+                scene?.recycle(pools.bitmapPool)
 
-            val newScene = RenderScene.build(
-                document = svgImpl,
-                dPI = svg.renderDPI,
-                externalFileResolver = svg.externalFileResolver,
-                pools = pools,
-                options = options,
-                modificationCount = modCount,
-                optionsFingerprint = fingerprint,
-            )
-            scene = newScene
-            node = newScene.rootNode
-            hitRegionsDirty = true
-        } else {
-            // Bounds-only change: update viewports/transforms in place, no rebuild.
-            currentScene.applyViewport(bounds, options, pools)
-            // Viewport geometry changed: cached hit regions map to the old one.
-            hitRegionsDirty = true
+                val newScene = RenderScene.build(
+                    document = svgImpl,
+                    dPI = svg.renderDPI,
+                    externalFileResolver = svg.externalFileResolver,
+                    pools = pools,
+                    options = options,
+                    modificationCount = modCount,
+                    optionsFingerprint = fingerprint,
+                )
+                scene = newScene
+                node = newScene.rootNode
+                hitRegionsDirty = true
+            } else {
+                // Bounds-only change: update viewports/transforms in place, no rebuild.
+                currentScene.applyViewport(bounds, options, pools)
+                // Viewport geometry changed: cached hit regions map to the old one.
+                hitRegionsDirty = true
+            }
+
+            if (node != null) {
+                renderer.renderDocument(canvas, node, options)
+            }
+
+            canvas.restoreToCount(saveCount)
         }
-
-        if (node != null) {
-            renderer.renderDocument(canvas, node, options)
-        }
-
-        canvas.restoreToCount(saveCount)
     }
 
     /**

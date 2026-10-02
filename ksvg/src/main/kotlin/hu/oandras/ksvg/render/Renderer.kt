@@ -37,6 +37,8 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Shader.TileMode
 import android.os.Build
+import androidx.annotation.ChecksSdkIntAtLeast
+import androidx.tracing.trace
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.DelegatingLoggerContext
 import hu.oandras.ksvg.LoggerContext
@@ -122,6 +124,7 @@ import kotlin.math.roundToInt
 
 @JvmSynthetic
 @JvmField
+@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
 internal val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S // Android 12
 
 /**
@@ -292,40 +295,42 @@ internal class Renderer internal constructor(
     }
 
     internal fun renderDocument(canvas: Canvas, rootNode: RenderNode<*>, renderOptions: RenderOptions) {
+        trace("KSVG.renderDocument") {
+            forceSoftwareFiltering = renderOptions.hasSoftwareFiltering()
 
-        forceSoftwareFiltering = renderOptions.hasSoftwareFiltering()
-
-        val css = renderOptions.css
-        effectiveRules = if (css != null) {
-            ArrayList<CSSRule>(document.cSSRules.size + css.cssRuleSet.rules.size).also { merged ->
-                mergeRulesInCascadeOrder(merged, document.cSSRules, css.cssRuleSet.rules)
+            val css = renderOptions.css
+            effectiveRules = if (css != null) {
+                ArrayList<CSSRule>(document.cSSRules.size + css.cssRuleSet.rules.size).also { merged ->
+                    mergeRulesInCascadeOrder(merged, document.cSSRules, css.cssRuleSet.rules)
+                }
+            } else {
+                document.cSSRules
             }
-        } else {
-            document.cSSRules
-        }
 
-        if (renderOptions.hasTarget()) {
-            ruleMatchContext = RuleMatchContext(
-                targetElement = document.getElementById(renderOptions.targetId)
-            )
-        }
-
-        // Initialize the state
-        resetState(canvas)
-
-        if (document.animationsEnabled) {
-            rootNode.updateAnimations(animationTimeMs)
-        }
-
-        withNewRootContextState(canvas, rootNode.subtreeContainsBlendMode) { canvas, _ ->
-            val viewPort = (rootNode as? GroupRenderNode)?.viewPort ?: renderOptions.viewPort
-            if (viewPort != null && rootNode.renderState.style.overflow == false) {
-                setClipRect(canvas, viewPort)
+            if (renderOptions.hasTarget()) {
+                ruleMatchContext = RuleMatchContext(
+                    targetElement = document.getElementById(renderOptions.targetId)
+                )
             }
-            rootNode.render(this@Renderer, canvas)
+
+            // Initialize the state
+            resetState(canvas)
+
+            if (document.animationsEnabled) {
+                trace("KSVG.animations") {
+                    rootNode.updateAnimations(animationTimeMs)
+                }
+            }
+
+            withNewRootContextState(canvas, rootNode.subtreeContainsBlendMode) { canvas, _ ->
+                val viewPort = (rootNode as? GroupRenderNode)?.viewPort ?: renderOptions.viewPort
+                if (viewPort != null && rootNode.renderState.style.overflow == false) {
+                    setClipRect(canvas, viewPort)
+                }
+                rootNode.render(this@Renderer, canvas)
+            }
         }
     }
-
 
     internal fun renderGroupNode(canvas: Canvas, node: GroupRenderNode<*>) {
         withNewNodeState(canvas, node, saveCanvas = true) { canvas, _ ->
@@ -1171,146 +1176,150 @@ internal class Renderer internal constructor(
         filterNode: FilterRenderNode,
         r: (Canvas, RendererState) -> Unit,
     ) {
-        val filter = filterNode.sourceElement
-        if (node.boundingBox == null) {
-            pathPool.withPooledObject { tempPath ->
-                if (nodeToPath(node, tempPath)) {
-                    node.updateBoundingBox(tempPath)
+        trace("KSVG.filter") {
+            val filter = filterNode.sourceElement
+            if (node.boundingBox == null) {
+                pathPool.withPooledObject { tempPath ->
+                    if (nodeToPath(node, tempPath)) {
+                        node.updateBoundingBox(tempPath)
+                    }
                 }
             }
-        }
-        val boundingBox = node.boundingBox ?: Box.EMPTY
+            val boundingBox = node.boundingBox ?: Box.EMPTY
 
-        rectFPool.withPooledObject { region ->
-            calculateRegion(filter, boundingBox, region)
-            // The filter effects region is clipped to the viewport in the filter's
-            // coordinate space (the user-space viewBox), matching librsvg/browser
-            // behavior. Without this the region can extend past the canvas (e.g.,
-            // the default 1.2x object-bounding-box supersampling), and primitives
-            // like feTurbulence would size their tile/lattice to the off-canvas
-            // region instead of the visible subregion.
-            state.viewBox?.let { viewBox ->
-                if (region.left < viewBox.minX) region.left = viewBox.minX
-                if (region.top < viewBox.minY) region.top = viewBox.minY
-                if (region.right > viewBox.maxX()) region.right = viewBox.maxX()
-                if (region.bottom > viewBox.maxY()) region.bottom = viewBox.maxY()
-            }
-            if (region.width() > 0f && region.height() > 0f) {
-                matrixPool.withPooledObject { matrix ->
-                    matrixPool.withPooledObject { newMatrix ->
-                        rectFPool.withPooledObject { deviceRegion ->
-                            @Suppress("DEPRECATION")
-                            canvas.getMatrix(matrix)
+            rectFPool.withPooledObject { region ->
+                calculateRegion(filter, boundingBox, region)
+                // The filter effects region is clipped to the viewport in the filter's
+                // coordinate space (the user-space viewBox), matching librsvg/browser
+                // behavior. Without this the region can extend past the canvas (e.g.,
+                // the default 1.2x object-bounding-box supersampling), and primitives
+                // like feTurbulence would size their tile/lattice to the off-canvas
+                // region instead of the visible subregion.
+                state.viewBox?.let { viewBox ->
+                    if (region.left < viewBox.minX) region.left = viewBox.minX
+                    if (region.top < viewBox.minY) region.top = viewBox.minY
+                    if (region.right > viewBox.maxX()) region.right = viewBox.maxX()
+                    if (region.bottom > viewBox.maxY()) region.bottom = viewBox.maxY()
+                }
+                if (region.width() > 0f && region.height() > 0f) {
+                    matrixPool.withPooledObject { matrix ->
+                        matrixPool.withPooledObject { newMatrix ->
+                            rectFPool.withPooledObject { deviceRegion ->
+                                @Suppress("DEPRECATION")
+                                canvas.getMatrix(matrix)
 
-                            matrix.mapRect(deviceRegion, region)
-                            val m = getValuesFloatArray
-                            matrix.getValues(m)
-                            val sx = hypot(m[Matrix.MSCALE_X], m[Matrix.MSKEW_Y])
-                            val sy = hypot(m[Matrix.MSCALE_Y], m[Matrix.MSKEW_X])
-                            val width = deviceRegion.width().ceilToInt()
-                            val height = deviceRegion.height().ceilToInt()
+                                matrix.mapRect(deviceRegion, region)
+                                val m = getValuesFloatArray
+                                matrix.getValues(m)
+                                val sx = hypot(m[Matrix.MSCALE_X], m[Matrix.MSKEW_Y])
+                                val sy = hypot(m[Matrix.MSCALE_Y], m[Matrix.MSKEW_X])
+                                val width = deviceRegion.width().ceilToInt()
+                                val height = deviceRegion.height().ceilToInt()
 
-                            val backend = obtainFilterBackend(canvas, node, filterNode, sx, sy, region, deviceRegion, boundingBox)
-                            val recCanvas = backend.beginRecording(
-                                node = node,
-                                filterNode = filterNode,
-                                width = width,
-                                height = height,
-                                sx = sx,
-                                sy = sy,
-                                matrix = matrix,
-                                newMatrix = newMatrix,
-                                filterRegion = region,
-                                deviceRegion = deviceRegion,
-                                boundingBox = boundingBox
-                            )
-                            if (recCanvas != null) {
-                                val stateStackState = if (BuildConfig.DEBUG) {
-                                    stateStack.size
-                                } else {
-                                    0
-                                }
-                                try {
-                                    r(recCanvas, state)
-                                } finally {
-                                    backend.endRecording(filterNode)
-                                    if (BuildConfig.DEBUG) {
-                                        val sourceElement = node.sourceElement
-                                        check(stateStack.size == stateStackState) {
-                                            "Stack size mismatch after rendering filter source for node ${sourceElement.getNodeName()} (id: ${sourceElement.id})"
+                                val backend = obtainFilterBackend(canvas, node, filterNode, sx, sy, region, deviceRegion, boundingBox)
+                                val recCanvas = backend.beginRecording(
+                                    node = node,
+                                    filterNode = filterNode,
+                                    width = width,
+                                    height = height,
+                                    sx = sx,
+                                    sy = sy,
+                                    matrix = matrix,
+                                    newMatrix = newMatrix,
+                                    filterRegion = region,
+                                    deviceRegion = deviceRegion,
+                                    boundingBox = boundingBox
+                                )
+                                if (recCanvas != null) {
+                                    val stateStackState = if (BuildConfig.DEBUG) {
+                                        stateStack.size
+                                    } else {
+                                        0
+                                    }
+                                    try {
+                                        r(recCanvas, state)
+                                    } finally {
+                                        backend.endRecording(filterNode)
+                                        if (BuildConfig.DEBUG) {
+                                            val sourceElement = node.sourceElement
+                                            check(stateStack.size == stateStackState) {
+                                                "Stack size mismatch after rendering filter source for node ${sourceElement.getNodeName()} (id: ${sourceElement.id})"
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            // FillPaint/StrokePaint variants (software backend only; the
-                            // GPU backend declines such graphs in obtainFilterBackend, so
-                            // it never needs them). Two separate inline branches — not a
-                            // wrapped lambda — so nothing is captured and nothing
-                            // allocates on this hot path. The toggled flags are saved
-                            // and restored; shapes/text read them from the passed
-                            // state, container children reset from their own state
-                            // (their FillPaint degrades to SourceGraphic-equivalent).
-                            val swBackend = backend as? SoftwareFilterBackend
-                            if (swBackend != null &&
-                                (filterNode.usesFillPaint || filterNode.usesStrokePaint)
-                            ) {
-                                val sourceReRecorded = recCanvas != null
-                                if (filterNode.usesFillPaint) {
-                                    val fillCanvas = swBackend.beginPaintRecording(
+                                // FillPaint/StrokePaint variants (software backend only; the
+                                // GPU backend declines such graphs in obtainFilterBackend, so
+                                // it never needs them). Two separate inline branches — not a
+                                // wrapped lambda — so nothing is captured and nothing
+                                // allocates on this hot path. The toggled flags are saved
+                                // and restored; shapes/text read them from the passed
+                                // state, container children reset from their own state
+                                // (their FillPaint degrades to SourceGraphic-equivalent).
+                                val swBackend = backend as? SoftwareFilterBackend
+                                if (swBackend != null &&
+                                    (filterNode.usesFillPaint || filterNode.usesStrokePaint)
+                                ) {
+                                    val sourceReRecorded = recCanvas != null
+                                    if (filterNode.usesFillPaint) {
+                                        val fillCanvas = swBackend.beginPaintRecording(
+                                            node = node,
+                                            width = width,
+                                            height = height,
+                                            matrix = matrix,
+                                            newMatrix = newMatrix,
+                                            deviceRegion = deviceRegion,
+                                            fill = true,
+                                            sourceReRecorded = sourceReRecorded,
+                                        )
+                                        if (fillCanvas != null) {
+                                            val oldStroke = state.hasStroke
+                                            state.hasStroke = false
+                                            try {
+                                                r(fillCanvas, state)
+                                            } finally {
+                                                state.hasStroke = oldStroke
+                                            }
+                                        }
+                                    }
+                                    if (filterNode.usesStrokePaint) {
+                                        val strokeCanvas = swBackend.beginPaintRecording(
+                                            node = node,
+                                            width = width,
+                                            height = height,
+                                            matrix = matrix,
+                                            newMatrix = newMatrix,
+                                            deviceRegion = deviceRegion,
+                                            fill = false,
+                                            sourceReRecorded = sourceReRecorded,
+                                        )
+                                        if (strokeCanvas != null) {
+                                            val oldFill = state.hasFill
+                                            state.hasFill = false
+                                            try {
+                                                r(strokeCanvas, state)
+                                            } finally {
+                                                state.hasFill = oldFill
+                                            }
+                                        }
+                                    }
+                                }
+                                trace(if (backend is SoftwareFilterBackend) "KSVG.filter.sw" else "KSVG.filter.hw") {
+                                    backend.drawFiltered(
+                                        canvas = canvas,
                                         node = node,
+                                        filterNode = filterNode,
                                         width = width,
                                         height = height,
-                                        matrix = matrix,
-                                        newMatrix = newMatrix,
+                                        sx = sx,
+                                        sy = sy,
+                                        filterRegion = region,
                                         deviceRegion = deviceRegion,
-                                        fill = true,
-                                        sourceReRecorded = sourceReRecorded,
+                                        boundingBox = boundingBox,
+                                        state = state
                                     )
-                                    if (fillCanvas != null) {
-                                        val oldStroke = state.hasStroke
-                                        state.hasStroke = false
-                                        try {
-                                            r(fillCanvas, state)
-                                        } finally {
-                                            state.hasStroke = oldStroke
-                                        }
-                                    }
-                                }
-                                if (filterNode.usesStrokePaint) {
-                                    val strokeCanvas = swBackend.beginPaintRecording(
-                                        node = node,
-                                        width = width,
-                                        height = height,
-                                        matrix = matrix,
-                                        newMatrix = newMatrix,
-                                        deviceRegion = deviceRegion,
-                                        fill = false,
-                                        sourceReRecorded = sourceReRecorded,
-                                    )
-                                    if (strokeCanvas != null) {
-                                        val oldFill = state.hasFill
-                                        state.hasFill = false
-                                        try {
-                                            r(strokeCanvas, state)
-                                        } finally {
-                                            state.hasFill = oldFill
-                                        }
-                                    }
                                 }
                             }
-                            backend.drawFiltered(
-                                canvas = canvas,
-                                node = node,
-                                filterNode = filterNode,
-                                width = width,
-                                height = height,
-                                sx = sx,
-                                sy = sy,
-                                filterRegion = region,
-                                deviceRegion = deviceRegion,
-                                boundingBox = boundingBox,
-                                state = state
-                            )
                         }
                     }
                 }
