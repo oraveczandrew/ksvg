@@ -20,19 +20,27 @@ import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.indexOfFirstElement
 
 internal abstract class Pool<T> {
-    private val deque = ArrayList<T>()
+    // Created on the first release, not in the constructor: pools that never
+    // recycle anything pay no ArrayList (e.g., rarely touched pools, or the
+    // PoolOwnerImpl instances a Renderer overrides without ever using).
+    private var deque: ArrayList<T>? = null
 
     protected abstract fun createInstance(): T
 
     protected abstract fun resetInstance(item: T)
 
     fun pull(): T {
-        return deque.removeLastOrNull()?.also {
+        return deque?.removeLastOrNull()?.also {
             resetInstance(it)
         } ?: createInstance()
     }
 
     fun release(item: T) {
+        var deque = deque
+        if (deque == null) {
+            deque = ArrayList()
+            this.deque = deque
+        }
         if (deque.indexOfFirstElement { it === item } < 0) {
             deque.add(item)
         }
@@ -46,7 +54,7 @@ internal abstract class Pool<T> {
     }
 
     fun clear() {
-        deque.clear()
+        deque?.clear()
     }
 }
 
