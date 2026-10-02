@@ -24,6 +24,7 @@ import hu.oandras.ksvg.dom.shapes.PathShape
 import hu.oandras.ksvg.dom.shapes.PolyLineShape
 import hu.oandras.ksvg.dom.shapes.PolygonShape
 import hu.oandras.ksvg.dom.shapes.RectShape
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.BeforeClass

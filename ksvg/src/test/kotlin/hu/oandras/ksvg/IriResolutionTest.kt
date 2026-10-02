@@ -16,6 +16,7 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test

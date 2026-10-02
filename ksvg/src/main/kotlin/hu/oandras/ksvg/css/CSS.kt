@@ -17,9 +17,9 @@
 
 package hu.oandras.ksvg.css
 
-import hu.oandras.ksvg.AndroidLoggerContext
-import hu.oandras.ksvg.LoggerContext
-import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
+import hu.oandras.ksvg.logger.AndroidLoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.wrapAsUnsupportedFeatureScope
 
 /**
  * This is a container for pre-parsed CSS that can be used to avoid parsing raw CSS string on each

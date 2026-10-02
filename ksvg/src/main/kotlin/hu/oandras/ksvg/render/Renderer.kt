@@ -39,8 +39,8 @@ import android.graphics.Shader.TileMode
 import android.os.Build
 import androidx.tracing.trace
 import hu.oandras.ksvg.BuildConfig
-import hu.oandras.ksvg.DelegatingLoggerContext
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.DelegatingLoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.compat.isBlendModeSupported
@@ -78,9 +78,9 @@ import hu.oandras.ksvg.dom.style.RenderQuality
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.VectorEffect
 import hu.oandras.ksvg.filtering.SoftwareKernels
-import hu.oandras.ksvg.logD
-import hu.oandras.ksvg.logE
-import hu.oandras.ksvg.logI
+import hu.oandras.ksvg.logger.logD
+import hu.oandras.ksvg.logger.logE
+import hu.oandras.ksvg.logger.logI
 import hu.oandras.ksvg.render.animation.AnimationContext
 import hu.oandras.ksvg.render.animation.AnimationNode
 import hu.oandras.ksvg.render.animation.applyAnimatedStyle

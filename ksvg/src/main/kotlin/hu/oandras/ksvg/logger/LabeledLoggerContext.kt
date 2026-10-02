@@ -14,17 +14,15 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.glide
-
-import hu.oandras.ksvg.DelegatingLoggerContext
-import hu.oandras.ksvg.LoggerContext
+package hu.oandras.ksvg.logger
 
 /**
  * [LoggerContext] decorator that prefixes every message with the decode source
  * label in parentheses, e.g., `(https://example.com/icon.svg) <original message>`.
  *
- * The label itself comes from [KSVGOptions.SOURCE_LABEL]; an empty label is a
- * no-op and the message is forwarded unchanged.
+ * The label itself comes from the caller's options (e.g., the Glide
+ * integration's source label); an empty label is a no-op and the message is
+ * forwarded unchanged.
  */
 private class LabeledLoggerContext(
     override val delegate: LoggerContext,
@@ -49,5 +47,10 @@ private class LabeledLoggerContext(
     }
 }
 
-internal fun LoggerContext.labeledWith(label: String?): LoggerContext =
+/**
+ * Returns this context wrapped so every message is prefixed with the decode
+ * source [label] in parentheses, or this context unchanged when [label] is
+ * null or blank.
+ */
+public fun LoggerContext.labeledWith(label: String?): LoggerContext =
     if (label.isNullOrBlank()) this else LabeledLoggerContext(delegate = this, label = label)

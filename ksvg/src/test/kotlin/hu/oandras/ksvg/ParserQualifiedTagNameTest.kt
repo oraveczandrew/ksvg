@@ -17,6 +17,8 @@ package hu.oandras.ksvg
 
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Group
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import hu.oandras.ksvg.parser.SVGParserImpl
 import org.junit.Assert.assertEquals
 import org.junit.Test

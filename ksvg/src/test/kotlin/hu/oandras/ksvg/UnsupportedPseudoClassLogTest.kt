@@ -16,6 +16,7 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.logger.logUnsupportedPseudoClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

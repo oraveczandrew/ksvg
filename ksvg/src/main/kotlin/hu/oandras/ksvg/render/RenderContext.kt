@@ -17,7 +17,7 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.Canvas
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.render.pool.PoolOwner
 

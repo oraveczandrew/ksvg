@@ -17,9 +17,9 @@
 
 package hu.oandras.ksvg.parser
 
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.dom.core.PathDefinition
-import hu.oandras.ksvg.logE
+import hu.oandras.ksvg.logger.logE
 import kotlin.math.abs
 
 private const val TAG = "PathParser"

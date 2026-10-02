@@ -18,15 +18,15 @@ package hu.oandras.ksvg.css
 
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.ExternalFileResolver
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.style.Style
-import hu.oandras.ksvg.logE
-import hu.oandras.ksvg.logUnsupportedAtRule
-import hu.oandras.ksvg.logUnsupportedPseudoClass
-import hu.oandras.ksvg.logW
+import hu.oandras.ksvg.logger.logE
+import hu.oandras.ksvg.logger.logUnsupportedAtRule
+import hu.oandras.ksvg.logger.logUnsupportedPseudoClass
+import hu.oandras.ksvg.logger.logW
 import hu.oandras.ksvg.parser.checkCssState
 import hu.oandras.ksvg.utils.forEachElement
 import java.util.Locale

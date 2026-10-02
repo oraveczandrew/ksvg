@@ -23,6 +23,7 @@ import hu.oandras.ksvg.dom.core.PathDefinition
 import hu.oandras.ksvg.dom.style.FontStyle
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.style.parseFontFamily
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import hu.oandras.ksvg.parser.parsePath
 import hu.oandras.ksvg.render.createBitmap
 import hu.oandras.ksvg.render.MarkerVector

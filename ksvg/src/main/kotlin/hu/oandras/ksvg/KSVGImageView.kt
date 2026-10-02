@@ -26,6 +26,9 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import hu.oandras.ksvg.SVG.Companion.getFromResource
 import hu.oandras.ksvg.SVG.Companion.getFromString
+import hu.oandras.ksvg.logger.AndroidLoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.logE
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

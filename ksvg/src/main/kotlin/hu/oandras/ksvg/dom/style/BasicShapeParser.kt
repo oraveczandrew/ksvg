@@ -16,10 +16,10 @@
 
 package hu.oandras.ksvg.dom.style
 
-import hu.oandras.ksvg.LoggerContext
-import hu.oandras.ksvg.UnsupportedFeature
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.UnsupportedFeature
 import hu.oandras.ksvg.css.CSSLength
-import hu.oandras.ksvg.logUnsupportedFeature
+import hu.oandras.ksvg.logger.logUnsupportedFeature
 import hu.oandras.ksvg.parser.TextScanner
 import hu.oandras.ksvg.parser.parsePath
 

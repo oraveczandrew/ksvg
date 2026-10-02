@@ -22,6 +22,7 @@ import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.text.TextSequence
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test

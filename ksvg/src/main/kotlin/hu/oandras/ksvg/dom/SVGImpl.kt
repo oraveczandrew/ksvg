@@ -26,13 +26,13 @@ import android.graphics.RectF
 import androidx.collection.ArrayMap
 import androidx.collection.ArraySet
 import androidx.tracing.trace
-import hu.oandras.ksvg.DelegatingLoggerContext
+import hu.oandras.ksvg.logger.DelegatingLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.HitRegion
 import hu.oandras.ksvg.KSVGAnimatedDrawable
 import hu.oandras.ksvg.KSVGDrawable
 import hu.oandras.ksvg.KSVGParseException
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.OnSvgClickListener
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
@@ -45,7 +45,7 @@ import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.Svg
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.core.View
-import hu.oandras.ksvg.logW
+import hu.oandras.ksvg.logger.logW
 import hu.oandras.ksvg.parser.SVGParserImpl
 import hu.oandras.ksvg.render.PathConverter
 import hu.oandras.ksvg.render.RenderNode
@@ -56,7 +56,7 @@ import hu.oandras.ksvg.render.collectHitRegions
 import hu.oandras.ksvg.render.inverseRootMapping
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.forEachElement
-import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
+import hu.oandras.ksvg.logger.wrapAsUnsupportedFeatureScope
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream

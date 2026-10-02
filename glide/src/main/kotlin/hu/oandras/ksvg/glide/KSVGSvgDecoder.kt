@@ -19,9 +19,10 @@ package hu.oandras.ksvg.glide
 import com.bumptech.glide.load.Options
 import com.bumptech.glide.load.ResourceDecoder
 import com.bumptech.glide.load.engine.Resource
-import hu.oandras.ksvg.AndroidLoggerContext
+import hu.oandras.ksvg.logger.AndroidLoggerContext
 import hu.oandras.ksvg.KSVGParseException
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.labeledWith
 import hu.oandras.ksvg.SVG
 import java.io.IOException
 import java.io.InputStream

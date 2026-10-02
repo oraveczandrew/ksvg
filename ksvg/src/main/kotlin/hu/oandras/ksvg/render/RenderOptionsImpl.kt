@@ -16,10 +16,10 @@
  */
 package hu.oandras.ksvg.render
 
-import hu.oandras.ksvg.AndroidLoggerContext
+import hu.oandras.ksvg.logger.AndroidLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
-import hu.oandras.ksvg.LoggerContext
-import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.wrapAsUnsupportedFeatureScope
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.css.CSS

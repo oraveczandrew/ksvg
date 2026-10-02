@@ -14,9 +14,8 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg.glide
+package hu.oandras.ksvg.logger
 
-import hu.oandras.ksvg.LoggerContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

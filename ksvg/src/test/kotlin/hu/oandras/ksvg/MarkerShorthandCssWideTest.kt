@@ -17,6 +17,7 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import org.junit.Assert.assertFalse
 import org.junit.Test
 

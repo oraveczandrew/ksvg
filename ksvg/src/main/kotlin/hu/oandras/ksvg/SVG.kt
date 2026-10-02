@@ -24,6 +24,8 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.logger.AndroidLoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import java.io.IOException
 import java.io.InputStream
 

@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg
+package hu.oandras.ksvg.logger
 
 import android.util.Log
 

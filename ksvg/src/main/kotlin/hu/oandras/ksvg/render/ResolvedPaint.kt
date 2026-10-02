@@ -21,7 +21,7 @@ import android.graphics.Bitmap
 import android.graphics.Shader
 import android.graphics.Shader.TileMode
 import androidx.collection.ArraySet
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Pattern
@@ -32,8 +32,8 @@ import hu.oandras.ksvg.dom.gradient.GradientLinear
 import hu.oandras.ksvg.dom.gradient.GradientRadial
 import hu.oandras.ksvg.dom.style.PaintReference
 import hu.oandras.ksvg.dom.style.SvgPaint
-import hu.oandras.ksvg.logE
-import hu.oandras.ksvg.logW
+import hu.oandras.ksvg.logger.logE
+import hu.oandras.ksvg.logger.logW
 import hu.oandras.ksvg.render.animation.AnimationNode
 
 private const val TAG = "Renderer"

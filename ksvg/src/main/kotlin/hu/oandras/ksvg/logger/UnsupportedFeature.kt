@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package hu.oandras.ksvg
+package hu.oandras.ksvg.logger
 
 import androidx.annotation.IntDef
 import androidx.collection.ArraySet

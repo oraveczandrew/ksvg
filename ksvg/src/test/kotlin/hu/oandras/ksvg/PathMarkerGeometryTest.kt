@@ -17,6 +17,7 @@ package hu.oandras.ksvg
 
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Box
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import hu.oandras.ksvg.render.GroupRenderNode
 import hu.oandras.ksvg.render.PathRenderNode
 import hu.oandras.ksvg.render.RenderNode

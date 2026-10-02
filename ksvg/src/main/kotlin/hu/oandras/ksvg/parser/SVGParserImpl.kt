@@ -24,8 +24,8 @@ import androidx.collection.ArrayMap
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.KSVGParseException
-import hu.oandras.ksvg.LoggerContext
-import hu.oandras.ksvg.UnsupportedFeature
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.UnsupportedFeature
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.MediaType
 import hu.oandras.ksvg.css.Source
@@ -103,11 +103,11 @@ import hu.oandras.ksvg.dom.text.TextContainer
 import hu.oandras.ksvg.dom.text.TextPath
 import hu.oandras.ksvg.dom.text.TextRoot
 import hu.oandras.ksvg.dom.text.TextSequence
-import hu.oandras.ksvg.logD
-import hu.oandras.ksvg.logE
-import hu.oandras.ksvg.logUnsupportedElement
-import hu.oandras.ksvg.logUnsupportedFeature
-import hu.oandras.ksvg.logW
+import hu.oandras.ksvg.logger.logD
+import hu.oandras.ksvg.logger.logE
+import hu.oandras.ksvg.logger.logUnsupportedElement
+import hu.oandras.ksvg.logger.logUnsupportedFeature
+import hu.oandras.ksvg.logger.logW
 import hu.oandras.ksvg.render.animation.isColorAttribute
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.trimLowerThanSpace

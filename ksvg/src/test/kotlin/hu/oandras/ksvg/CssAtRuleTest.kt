@@ -20,6 +20,7 @@ import android.graphics.Canvas
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.MediaType
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.logger.logUnsupportedAtRule
 import hu.oandras.ksvg.mocks.MockCanvas
 import hu.oandras.ksvg.mocks.MockPaint
 import hu.oandras.ksvg.mocks.MockPath

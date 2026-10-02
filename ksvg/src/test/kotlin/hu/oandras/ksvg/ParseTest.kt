@@ -21,6 +21,7 @@ import android.graphics.Canvas
 import android.graphics.Path
 import android.os.Build
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import hu.oandras.ksvg.mocks.MockCanvas
 import hu.oandras.ksvg.mocks.MockPaint
 import hu.oandras.ksvg.mocks.MockPath

@@ -24,6 +24,10 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import androidx.collection.ArraySet
+import hu.oandras.ksvg.logger.AndroidLoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.logI
+import hu.oandras.ksvg.logger.logW
 import java.io.IOException
 
 /**

@@ -29,10 +29,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import hu.oandras.ksvg.AndroidLoggerContext
+import hu.oandras.ksvg.logger.AndroidLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.KSVGAnimatedDrawable
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
 import kotlinx.coroutines.CoroutineDispatcher

@@ -16,11 +16,11 @@
 
 package hu.oandras.ksvg.dom.style
 
-import hu.oandras.ksvg.NoopLoggerContext
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import hu.oandras.ksvg.RecordingLoggerContext
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.assertIs
-import hu.oandras.ksvg.wrapAsUnsupportedFeatureScope
+import hu.oandras.ksvg.logger.wrapAsUnsupportedFeatureScope
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.text.TextAnchor

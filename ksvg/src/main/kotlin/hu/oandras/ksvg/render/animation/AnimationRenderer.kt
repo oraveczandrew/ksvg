@@ -39,7 +39,7 @@ import hu.oandras.ksvg.dom.style.BasicShape
 import hu.oandras.ksvg.dom.style.CSSClipPath
 import hu.oandras.ksvg.dom.style.GeometryBox
 import hu.oandras.ksvg.dom.style.Style
-import hu.oandras.ksvg.logUnsupportedAnimatedAttribute
+import hu.oandras.ksvg.logger.logUnsupportedAnimatedAttribute
 import hu.oandras.ksvg.render.ClipPathRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode

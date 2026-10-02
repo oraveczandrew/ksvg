@@ -20,6 +20,7 @@ import android.graphics.Bitmap
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.ElementBase
+import hu.oandras.ksvg.logger.NoopLoggerContext
 import hu.oandras.ksvg.render.GroupRenderNode
 import hu.oandras.ksvg.render.MarkerRenderNode
 import hu.oandras.ksvg.render.FeImageRenderNode

@@ -29,10 +29,10 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.DefaultAlpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import hu.oandras.ksvg.AndroidLoggerContext
+import hu.oandras.ksvg.logger.AndroidLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.KSVGDrawable
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.SVG
 import kotlinx.coroutines.CoroutineDispatcher

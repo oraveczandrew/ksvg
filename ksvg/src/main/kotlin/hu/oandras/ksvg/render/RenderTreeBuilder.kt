@@ -27,9 +27,9 @@ import androidx.collection.FloatList
 import androidx.collection.MutableFloatList
 import androidx.collection.MutableIntList
 import androidx.collection.ScatterSet
-import hu.oandras.ksvg.DelegatingLoggerContext
+import hu.oandras.ksvg.logger.DelegatingLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.css.CSSLength
@@ -121,7 +121,7 @@ import hu.oandras.ksvg.dom.text.TextPositionedContainer
 import hu.oandras.ksvg.dom.text.TextSequence
 import hu.oandras.ksvg.filtering.LcgRandom
 import hu.oandras.ksvg.filtering.SvgPathNoise
-import hu.oandras.ksvg.logW
+import hu.oandras.ksvg.logger.logW
 import hu.oandras.ksvg.render.animation.AnimateClipPathNode
 import hu.oandras.ksvg.render.animation.AnimateColorNode
 import hu.oandras.ksvg.render.animation.AnimateDashArrayNode

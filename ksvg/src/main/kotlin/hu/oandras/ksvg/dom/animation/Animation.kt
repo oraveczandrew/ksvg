@@ -21,7 +21,7 @@ import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.SVGAttr
-import hu.oandras.ksvg.logUnsupportedAttribute
+import hu.oandras.ksvg.logger.logUnsupportedAttribute
 import hu.oandras.ksvg.render.animation.parseClockValueMillis
 import hu.oandras.ksvg.render.animation.parseClockValueMillisOrDefault
 import hu.oandras.ksvg.render.animation.parseSemicolonFloatList

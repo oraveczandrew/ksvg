@@ -18,9 +18,9 @@
 package hu.oandras.ksvg.dom.core
 
 import androidx.annotation.CallSuper
-import hu.oandras.ksvg.DelegatingLoggerContext
+import hu.oandras.ksvg.logger.DelegatingLoggerContext
 import hu.oandras.ksvg.KSVGParseException
-import hu.oandras.ksvg.LoggerContext
+import hu.oandras.ksvg.logger.LoggerContext
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.style.Style
 import java.util.Locale

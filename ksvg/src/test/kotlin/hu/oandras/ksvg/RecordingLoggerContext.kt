@@ -14,6 +14,7 @@
  *    limitations under the License.
  */
 package hu.oandras.ksvg
+import hu.oandras.ksvg.logger.LoggerContext
 
 /**
  * [LoggerContext] test fake that records every logged message (all levels

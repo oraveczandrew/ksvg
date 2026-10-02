@@ -20,8 +20,8 @@ package hu.oandras.ksvg.dom.style
 
 import androidx.annotation.LongDef
 import hu.oandras.ksvg.KSVGParseException
-import hu.oandras.ksvg.LoggerContext
-import hu.oandras.ksvg.UnsupportedFeature
+import hu.oandras.ksvg.logger.LoggerContext
+import hu.oandras.ksvg.logger.UnsupportedFeature
 import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.css.CSSLength
@@ -43,8 +43,8 @@ import hu.oandras.ksvg.dom.text.parseTextAnchor
 import hu.oandras.ksvg.dom.text.parseTextDecoration
 import hu.oandras.ksvg.dom.text.parseTextDirection
 import hu.oandras.ksvg.dom.text.parseTextTransform
-import hu.oandras.ksvg.logUnsupportedAttribute
-import hu.oandras.ksvg.logUnsupportedFeature
+import hu.oandras.ksvg.logger.logUnsupportedAttribute
+import hu.oandras.ksvg.logger.logUnsupportedFeature
 import hu.oandras.ksvg.parser.ColorParser
 import hu.oandras.ksvg.parser.parseFloat
 import hu.oandras.ksvg.parser.parseLength

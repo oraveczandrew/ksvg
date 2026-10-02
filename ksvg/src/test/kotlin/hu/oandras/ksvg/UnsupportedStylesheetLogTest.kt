@@ -16,6 +16,8 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.dom.SVGImpl
+import hu.oandras.ksvg.logger.UnsupportedFeature
+import hu.oandras.ksvg.logger.logUnsupportedFeature
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
