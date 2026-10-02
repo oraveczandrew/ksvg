@@ -136,63 +136,72 @@ internal fun interpolateClipPath(from: CSSClipPath, to: CSSClipPath, progress: F
 }
 
 private fun interpolateBasicShape(from: BasicShape, to: BasicShape, p: Float): BasicShape? {
-    return when {
-        from is BasicShape.Circle && to is BasicShape.Circle -> BasicShape.Circle(
+    return when (from) {
+        is BasicShape.Circle if to is BasicShape.Circle -> BasicShape.Circle(
             r = lerpRadius(from.r, to.r, p) ?: return null,
             cx = lerpPosition(from.cx, to.cx, p) ?: return null,
             cy = lerpPosition(from.cy, to.cy, p) ?: return null,
         )
 
-        from is BasicShape.Ellipse && to is BasicShape.Ellipse -> BasicShape.Ellipse(
+        is BasicShape.Ellipse if to is BasicShape.Ellipse -> BasicShape.Ellipse(
             rx = lerpRadius(from.rx, to.rx, p) ?: return null,
             ry = lerpRadius(from.ry, to.ry, p) ?: return null,
             cx = lerpPosition(from.cx, to.cx, p) ?: return null,
             cy = lerpPosition(from.cy, to.cy, p) ?: return null,
         )
 
-        from is BasicShape.Inset && to is BasicShape.Inset -> {
-            val round = lerpRound(from.roundX, from.roundY, to.roundX, to.roundY, p) ?: return null
-            BasicShape.Inset(
-                top = lerpLength(from.top, to.top, p) ?: return null,
-                right = lerpLength(from.right, to.right, p) ?: return null,
-                bottom = lerpLength(from.bottom, to.bottom, p) ?: return null,
-                left = lerpLength(from.left, to.left, p) ?: return null,
-                roundX = round.first,
-                roundY = round.second,
-            )
+        is BasicShape.Inset if to is BasicShape.Inset -> {
+            lerpRound(from.roundX, from.roundY, to.roundX, to.roundY, p) { x, y ->
+                BasicShape.Inset(
+                    top = lerpLength(from.top, to.top, p) ?: return null,
+                    right = lerpLength(from.right, to.right, p) ?: return null,
+                    bottom = lerpLength(from.bottom, to.bottom, p) ?: return null,
+                    left = lerpLength(from.left, to.left, p) ?: return null,
+                    roundX = x,
+                    roundY = y,
+                )
+            }
         }
 
-        from is BasicShape.Rect && to is BasicShape.Rect -> {
-            val round = lerpRound(from.roundX, from.roundY, to.roundX, to.roundY, p) ?: return null
-            BasicShape.Rect(
-                top = lerpLength(from.top, to.top, p) ?: return null,
-                right = lerpLength(from.right, to.right, p) ?: return null,
-                bottom = lerpLength(from.bottom, to.bottom, p) ?: return null,
-                left = lerpLength(from.left, to.left, p) ?: return null,
-                roundX = round.first,
-                roundY = round.second,
-            )
+        is BasicShape.Rect if to is BasicShape.Rect -> {
+            lerpRound(from.roundX, from.roundY, to.roundX, to.roundY, p) { x, y ->
+                BasicShape.Rect(
+                    top = lerpLength(from.top, to.top, p) ?: return null,
+                    right = lerpLength(from.right, to.right, p) ?: return null,
+                    bottom = lerpLength(from.bottom, to.bottom, p) ?: return null,
+                    left = lerpLength(from.left, to.left, p) ?: return null,
+                    roundX = x,
+                    roundY = y,
+                )
+            }
         }
 
-        from is BasicShape.Xywh && to is BasicShape.Xywh -> {
-            val round = lerpRound(from.roundX, from.roundY, to.roundX, to.roundY, p) ?: return null
-            BasicShape.Xywh(
-                x = lerpLength(from.x, to.x, p) ?: return null,
-                y = lerpLength(from.y, to.y, p) ?: return null,
-                w = lerpLength(from.w, to.w, p) ?: return null,
-                h = lerpLength(from.h, to.h, p) ?: return null,
-                roundX = round.first,
-                roundY = round.second,
-            )
+        is BasicShape.Xywh if to is BasicShape.Xywh -> {
+            lerpRound(from.roundX, from.roundY, to.roundX, to.roundY, p) { x, y ->
+                BasicShape.Xywh(
+                    x = lerpLength(from.x, to.x, p) ?: return null,
+                    y = lerpLength(from.y, to.y, p) ?: return null,
+                    w = lerpLength(from.w, to.w, p) ?: return null,
+                    h = lerpLength(from.h, to.h, p) ?: return null,
+                    roundX = x,
+                    roundY = y,
+                )
+            }
         }
 
-        from is BasicShape.Polygon && to is BasicShape.Polygon ->
-            if (from.fillRule == to.fillRule && from.points.size == to.points.size) {
-                val points = ArrayList<CSSLength>(from.points.size)
-                for (i in from.points.indices) {
-                    points.add(lerpLength(from.points[i], to.points[i], p) ?: return null)
+        is BasicShape.Polygon if to is BasicShape.Polygon ->
+            if (from.fillRule == to.fillRule) {
+                val fromPoints = from.points
+                val toPoints = to.points
+                if (fromPoints.size == toPoints.size) {
+                    val points = ArrayList<CSSLength>(fromPoints.size)
+                    for (i in fromPoints.indices) {
+                        points.add(lerpLength(fromPoints[i], toPoints[i], p) ?: return null)
+                    }
+                    BasicShape.Polygon(points, from.fillRule)
+                } else {
+                    null
                 }
-                BasicShape.Polygon(points, from.fillRule)
             } else {
                 null
             }
@@ -227,14 +236,15 @@ private fun lerpPosition(a: ClipPosition, b: ClipPosition, p: Float): ClipPositi
     return if (a == b) a else null
 }
 
-private fun lerpRound(
+private inline fun <T> lerpRound(
     aX: CSSLength?,
     aY: CSSLength?,
     bX: CSSLength?,
     bY: CSSLength?,
-    p: Float
-): Pair<CSSLength?, CSSLength?>? {
-    if (aX == null && aY == null && bX == null && bY == null) return Pair(null, null)
+    p: Float,
+    onResult: (x: CSSLength?, y: CSSLength?) -> T,
+): T? {
+    if (aX == null && aY == null && bX == null && bY == null) return onResult(null, null)
     if (aX == null || bX == null) return null
     val x = lerpLength(aX, bX, p) ?: return null
     // A lone `round <r>` parses to roundX == roundY; a missing Y still means X.
@@ -245,5 +255,5 @@ private fun lerpRound(
     } else {
         return null
     }
-    return Pair(x, y)
+    return onResult(x, y)
 }
