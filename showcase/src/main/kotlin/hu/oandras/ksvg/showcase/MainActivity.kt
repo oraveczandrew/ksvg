@@ -60,6 +60,17 @@ class MainActivity : AppCompatActivity() {
         adapter.stateRestorationPolicy =
             RecyclerView.Adapter.StateRestorationPolicy.PREVENT
         binding.recyclerView.adapter = adapter
+        // While the list flings, silence the animation tickers of attached
+        // cells: their per-frame invalidations compete with the first draws
+        // of newly bound cells for the frame budget (Perfetto: Full Self-Jank
+        // during fling). Only SETTLING pauses — slow drags keep animating so
+        // the freeze is never stared at. setVisible keeps pooled render state,
+        // so resume draws stay cheap. Glide still owns start/stop via attach state.
+        binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                setAttachedAnimationsVisible(newState != RecyclerView.SCROLL_STATE_SETTLING)
+            }
+        })
 
         binding.bottomNavigation.setOnItemSelectedListener { item ->
             when (item.itemId) {
@@ -109,8 +120,11 @@ class MainActivity : AppCompatActivity() {
             else -> null
         }
         if (requestedCategory != null) {
-            val menuId = if (requestedCategory == Category.METEOCONS) R.id.menu_meteocons
-                else R.id.menu_verification
+            val menuId = if (requestedCategory == Category.METEOCONS) {
+                R.id.menu_meteocons
+            } else {
+                R.id.menu_verification
+            }
             bindingSelectedCategory(requestedCategory, menuId)
         }
         pendingScrollTo = intent.getStringExtra(EXTRA_SCROLL_TO)
@@ -132,6 +146,13 @@ class MainActivity : AppCompatActivity() {
     private fun bindingSelectedCategory(category: Category, menuId: Int) {
         viewModel.currentCategory.value = category
         bottomNavigation.selectedItemId = menuId
+    }
+
+    private fun setAttachedAnimationsVisible(visible: Boolean) {
+        for (i in 0 until recyclerView.childCount) {
+            val holder = recyclerView.getChildViewHolder(recyclerView.getChildAt(i))
+            (holder as? SvgAdapter.ViewHolder)?.setAnimationsVisible(visible)
+        }
     }
 
     private fun consumePendingScroll() {

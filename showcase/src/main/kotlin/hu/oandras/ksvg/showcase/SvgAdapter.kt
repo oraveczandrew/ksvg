@@ -23,6 +23,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.RequestManager
+import hu.oandras.ksvg.KSVGAnimatedDrawable
 import hu.oandras.ksvg.glide.KSVGOptions
 
 internal class SvgAdapter(
@@ -49,6 +50,18 @@ internal class SvgAdapter(
         fun onRecycled() {
             // Stop ticking animated drawables on recycled cells.
             requestManager.clear(imageView)
+        }
+
+        /**
+         * Pauses/resumes the animation ticker without tearing down render
+         * state. Unlike `stop()`, `setVisible` keeps the pooled scene, so the
+         * resume draw stays cheap — used to silence the per-frame
+         * invalidations of attached cells while the list scrolls (Perfetto:
+         * fling-time first-draw builds blew the frame budget next to the
+         * animation storm). No-op for static drawables or stopped animations.
+         */
+        fun setAnimationsVisible(visible: Boolean) {
+            (imageView.drawable as? KSVGAnimatedDrawable)?.setVisible(visible, false)
         }
     }
 

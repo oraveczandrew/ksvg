@@ -33,8 +33,10 @@ public class KSVGDrawableResource(private val drawable: KSVGDrawable) : Drawable
         }
         // Fresh drawable (nothing rendered yet): estimate one intrinsic-sized
         // frame so zero-size entries never sit weightless in the memory cache.
-        val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: FALLBACK_DIMENSION_PX
-        val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: FALLBACK_DIMENSION_PX
+        val drawableWidth = drawable.intrinsicWidth
+        val width = if (drawableWidth > 0) drawableWidth else FALLBACK_DIMENSION_PX
+        val drawableHeight = drawable.intrinsicHeight
+        val height = if (drawableHeight > 0) drawableHeight else FALLBACK_DIMENSION_PX
         return (width.toLong() * height.toLong() * BYTES_PER_PIXEL)
             .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
