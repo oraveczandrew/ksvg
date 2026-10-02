@@ -146,14 +146,13 @@ internal fun resolvePrimitiveInputRegion(
     out.setEmpty()
     var has = false
     for (i in inputIds.indices) {
-        val id = inputIds[i]
-        val standard = id == "SourceGraphic" || id == "SourceAlpha"
-        val r = when {
-            isMerge && id == null -> standardFilterRegion
-            !isMerge && id == null -> lastResultRegion
-            else -> (if (id != null) namedRegions?.get(id) else null)
-                ?: if (standard) standardFilterRegion else null
-        } ?: continue
+        val r = resolveOneInputRegion(
+            id = inputIds[i],
+            isMerge = isMerge,
+            standardFilterRegion = standardFilterRegion,
+            namedRegions = namedRegions,
+            lastResultRegion = lastResultRegion,
+        ) ?: continue
         if (has) {
             out.union(r)
         } else {
@@ -162,4 +161,46 @@ internal fun resolvePrimitiveInputRegion(
         has = true
     }
     return has
+}
+
+/**
+ * Single-input variant of [resolvePrimitiveInputRegion]: the overwhelmingly
+ * common non-merge case carries exactly one input id, which does not need a
+ * list wrapper (every `listOf(input)` was a throwaway allocation per filter
+ * primitive per chain build).
+ */
+internal fun resolveSingleInputRegion(
+    id: String?,
+    standardFilterRegion: RectF,
+    namedRegions: ArrayMap<String, RectF>?,
+    lastResultRegion: RectF,
+    out: RectF,
+): Boolean {
+    // Mirrors the list version exactly, including emptying out on failure.
+    out.setEmpty()
+    val r = resolveOneInputRegion(
+        id = id,
+        isMerge = false,
+        standardFilterRegion = standardFilterRegion,
+        namedRegions = namedRegions,
+        lastResultRegion = lastResultRegion,
+    ) ?: return false
+    out.set(r)
+    return true
+}
+
+private fun resolveOneInputRegion(
+    id: String?,
+    isMerge: Boolean,
+    standardFilterRegion: RectF,
+    namedRegions: ArrayMap<String, RectF>?,
+    lastResultRegion: RectF,
+): RectF? {
+    val standard = id == "SourceGraphic" || id == "SourceAlpha"
+    return when {
+        isMerge && id == null -> standardFilterRegion
+        !isMerge && id == null -> lastResultRegion
+        else -> (if (id != null) namedRegions?.get(id) else null)
+            ?: if (standard) standardFilterRegion else null
+    }
 }

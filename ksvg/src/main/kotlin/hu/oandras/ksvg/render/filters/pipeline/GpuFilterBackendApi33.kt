@@ -82,6 +82,7 @@ import hu.oandras.ksvg.render.filters.pipeline.effects.createTileShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createTurbulenceShaderEffect
 import hu.oandras.ksvg.render.pool.withPooledObject
 import hu.oandras.ksvg.render.resolvePrimitiveInputRegion
+import hu.oandras.ksvg.render.resolveSingleInputRegion
 import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
@@ -177,8 +178,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         unitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
                         originalObjBBox = boundingBox,
                         resultName = resultName,
-                        inputs = mergeNodes ?: listOf(input),
-                        isMerge = mergeNodes != null,
+                        mergeNodes = mergeNodes,
+                        input = input,
                         lastResultRegion = lastResultRegion,
                         hwResultRegion = hwResultRegion,
                         userRegion = primitiveRegion,
@@ -940,21 +941,31 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         unitsAreUser: Boolean,
         originalObjBBox: Box,
         resultName: String?,
-        inputs: List<String?>,
-        isMerge: Boolean,
+        mergeNodes: List<String?>?,
+        input: String?,
         lastResultRegion: RectF,
         hwResultRegion: ArrayMap<String, RectF>,
         userRegion: RectF,
         inputUnion: RectF,
     ) {
-        val hasInput = resolvePrimitiveInputRegion(
-            inputIds = inputs,
-            isMerge = isMerge,
-            standardFilterRegion = filterRegion,
-            namedRegions = hwResultRegion,
-            lastResultRegion = lastResultRegion,
-            out = inputUnion,
-        )
+        val hasInput = if (mergeNodes != null) {
+            resolvePrimitiveInputRegion(
+                inputIds = mergeNodes,
+                isMerge = true,
+                standardFilterRegion = filterRegion,
+                namedRegions = hwResultRegion,
+                lastResultRegion = lastResultRegion,
+                out = inputUnion,
+            )
+        } else {
+            resolveSingleInputRegion(
+                id = input,
+                standardFilterRegion = filterRegion,
+                namedRegions = hwResultRegion,
+                lastResultRegion = lastResultRegion,
+                out = inputUnion,
+            )
+        }
         calculatePrimitiveRegion(
             primitive = primitiveSource,
             filterRegion = filterRegion,
