@@ -499,16 +499,13 @@ internal class Renderer internal constructor(
                 processor.pushPositioning(node.x, node.y, node.dx, node.dy, node.rotate)
                 // textLength (spacing mode): measure the natural run width
                 // once, distribute the difference per character.
-                val textLength = node.textLength
-                if (textLength != null) {
-                    with(this@Renderer) {
-                        processor.applyTextLength(
-                            textLength = textLength,
-                            scaleGlyphs = node.scaleGlyphs,
-                            naturalWidth = calculateTextWidth(node.children, state),
-                            charCount = countTextChars(node.children)
-                        )
-                    }
+                with(this@Renderer) {
+                    processor.applyTextLength(
+                        textLength = node.textLength,
+                        scaleGlyphs = node.scaleGlyphs,
+                        naturalWidth = calculateTextWidth(node.children, state),
+                        charCount = countTextChars(node.children)
+                    )
                 }
 
                 checkForGradientsAndPatterns(canvas, node, node.sourceElement.textRoot as Element)
@@ -562,16 +559,13 @@ internal class Renderer internal constructor(
                     plainDrawer.state = state
                 }
                 processor.pushPositioning(node.x, node.y, node.dx, node.dy, node.rotate)
-                val textLength = node.textLength
-                if (textLength != null) {
-                    processor.applyTextLength(
-                        textLength = textLength,
-                        scaleGlyphs = node.scaleGlyphs,
-                        naturalWidth = measureText(node.text, state.fillPaint, node.textWidthBuffer),
-                        // TRef renders a single flat run (no child nodes).
-                        charCount = node.text.length
-                    )
-                }
+                processor.applyTextLength(
+                    textLength = node.textLength,
+                    scaleGlyphs = node.scaleGlyphs,
+                    naturalWidth = measureText(node.text, state.fillPaint, node.textWidthBuffer),
+                    // TRef renders a single flat run (no child nodes).
+                    charCount = node.text.length
+                )
                 processor.processText(canvas, node.text, node.textWidthBuffer)
             } finally {
                 processor.popPositioning()
