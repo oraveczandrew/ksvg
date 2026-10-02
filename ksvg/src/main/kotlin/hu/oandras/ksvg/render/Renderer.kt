@@ -37,7 +37,6 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Shader.TileMode
 import android.os.Build
-import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.tracing.trace
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.DelegatingLoggerContext
@@ -124,7 +123,6 @@ import kotlin.math.roundToInt
 
 @JvmSynthetic
 @JvmField
-@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
 internal val SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S // Android 12
 
 /**
@@ -779,7 +777,7 @@ internal class Renderer internal constructor(
         // moves the content without moving the culled bounds, so such replays
         // vanish (e.g., only the first of several <use> panels shows). Draw directly
         // unless the canvas matrix is scale-only. Below API 29 the Picture replay
-        // carries its own translate, so it is unaffected.
+        // carries its own translation, so it is unaffected.
         if (canvasTransformBreaksReplay(canvas)) { content(canvas); return }
 
         var rec = displayList
@@ -1499,7 +1497,7 @@ internal class Renderer internal constructor(
         // would not need a separate compositing layer for the result.
         // FillPaint/StrokePaint inputs need per-element fill-only/stroke-only
         // recordings that the GPU chain cannot represent: decline to software.
-        // BackgroundImage/BackgroundAlpha likewise resolve to a transparent
+        // BackgroundImage/BackgroundAlpha likewise resolves to a transparent
         // software bitmap the chain cannot produce: decline to software.
         if (filterNode.usesFillPaint || filterNode.usesStrokePaint ||
             filterNode.usesBackgroundImage || filterNode.usesBackgroundAlpha
@@ -2014,7 +2012,7 @@ internal class Renderer internal constructor(
             // Effective color-interpolation for this gradient: own
             // declarations win over inherited ones via the state above.
             // AUTO/unspecified behave as sRGB (spec initial); LINEAR_RGB
-            // densifies in linearized space below.
+            // densifies in the linearized space below.
             val interpolation = state.style.colorInterpolation
             val linearStops = interpolation == ColorInterpolation.LINEAR_RGB
 
@@ -2270,6 +2268,9 @@ internal class Renderer internal constructor(
 
                 if (resolved.colors == null || resolved.colors!!.size != numStops) {
                     resolved.colors = if (SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS) {
+                        // The S guard satisfies the Longs Q requirement; lint cannot
+                        // infer this through the flag, hence the suppression.
+                        @Suppress("NewApi")
                         GradientColorArray.Longs(LongArray(numStops))
                     } else {
                         GradientColorArray.Ints(IntArray(numStops))
@@ -2318,17 +2319,19 @@ internal class Renderer internal constructor(
                 // the write-only GradientColorArray cannot feed expansion —
                 // densify from the straight mirror into flavor-matched dense
                 // storage (extra pack pass, no allocation). linearRGB always
-                // densifies via the linearized subdivision (see linear path).
+                // densifies via the linearized subdivision (see the linear path).
                 val effColors: GradientColorArray
                 val effPositions: FloatArray
                 val interpolationChanged = resolved.lastInterpolation != interpolation
-                val linearDensified = linearStops
+                val linearDensified: Boolean = linearStops
                 val densified = linearDensified || needsDensify(straightColors, numStops)
                 if (densified) {
                     val m = denseCount(numStops)
                     var dense = resolved.denseColors
                     if (dense == null || dense.size != m) {
                         dense = if (SUPPORTS_RADIAL_GRADIENT_WITH_FOCUS) {
+                            // Same S-guard reasoning as above: satisfies the Q requirement.
+                            @Suppress("NewApi")
                             GradientColorArray.Longs(LongArray(m))
                         } else {
                             GradientColorArray.Ints(IntArray(m))
@@ -2842,7 +2845,7 @@ internal class Renderer internal constructor(
                 // with bbox content units, the tile content scale is baked into pooled
                 // paths per draw instead of living on the canvas, so sub-1-unit
                 // content stays drawable on GPU canvases. The canvas keeps only the
-                // per-tile translate (+ seam overlap). Text-containing patterns keep
+                // per-tile translation (+ seam overlap). Text-containing patterns keep
                 // the legacy canvas-scaled transform.
                 val usePathBake = pattern.viewBox == null &&
                         pattern.patternContentUnitsAreUser == false &&
