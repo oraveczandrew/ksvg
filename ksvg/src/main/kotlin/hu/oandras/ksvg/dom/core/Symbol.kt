@@ -89,11 +89,11 @@ internal class Symbol(
  */
 internal fun parseSymbolRef(value: String, horizontal: Boolean): CSSLength {
     return when {
-        value.equals("center", ignoreCase = true) -> CSSLength(50f, CssUnit.percent)
-        horizontal && value.equals("left", ignoreCase = true) -> CSSLength(0f, CssUnit.percent)
-        horizontal && value.equals("right", ignoreCase = true) -> CSSLength(100f, CssUnit.percent)
-        !horizontal && value.equals("top", ignoreCase = true) -> CSSLength(0f, CssUnit.percent)
-        !horizontal && value.equals("bottom", ignoreCase = true) -> CSSLength(100f, CssUnit.percent)
+        value.equals("center", ignoreCase = true) -> CSSLength.PERCENT_50
+        horizontal && value.equals("left", ignoreCase = true) -> CSSLength.PERCENT_0
+        horizontal && value.equals("right", ignoreCase = true) -> CSSLength.PERCENT_100
+        !horizontal && value.equals("top", ignoreCase = true) -> CSSLength.PERCENT_0
+        !horizontal && value.equals("bottom", ignoreCase = true) -> CSSLength.PERCENT_100
         else -> parseLength(value)
     }
 }

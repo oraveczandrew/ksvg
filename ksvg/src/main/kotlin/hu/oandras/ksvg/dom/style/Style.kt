@@ -1536,7 +1536,7 @@ internal class Style internal constructor(
             def.fillOpacity = 1f
             def.stroke = null // none
             def.strokeOpacity = 1f
-            def.strokeWidth = CSSLength(1f)
+            def.strokeWidth = CSSLength.ONE
             def.strokeLineCap = LineCap.BUTT
             def.strokeLineJoin = LineJoin.MITER
             def.strokeMiterLimit = 4f

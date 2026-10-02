@@ -41,7 +41,7 @@ internal fun parseTransformOrigin(value: String): TransformOrigin? {
     val x = parseOriginComponent(tokens[0], isX = true) ?: return null
     // Single value: y defaults to center (CSS).
     val y = if (tokens.size == 1) {
-        CSSLength(50f, CssUnit.percent)
+        CSSLength.PERCENT_50
     } else {
         parseOriginComponent(tokens[1], isX = false) ?: return null
     }

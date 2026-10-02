@@ -145,7 +145,7 @@ internal open class TextScanner(input: String) {
         val scalar = nextFloat()
         if (scalar.isNaN()) return null
         val unit = nextUnit() ?: CssUnit.px
-        return CSSLength(scalar, unit)
+        return CSSLength.of(scalar, unit)
     }
 
     /*

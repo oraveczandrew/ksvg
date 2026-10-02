@@ -52,7 +52,7 @@ internal fun parseLength(value: String): CSSLength {
     }
     try {
         val scalar: Float = parseFloat(value, 0, end)
-        return CSSLength(scalar, unit)
+        return CSSLength.of(scalar, unit)
     } catch (e: NumberFormatException) {
         throw KSVGParseException("Invalid length value: $value", e)
     }
@@ -81,7 +81,7 @@ internal fun parseLengthList(value: String): List<CSSLength> {
         val scalar = scan.nextFloat()
         checkState(!scalar.isNaN()) { "Invalid length list value: " + scan.ahead() }
         val unit = scan.nextUnit() ?: CssUnit.px
-        coords.add(CSSLength(scalar, unit))
+        coords.add(CSSLength.of(scalar, unit))
         scan.skipCommaWhitespace()
     }
     return coords

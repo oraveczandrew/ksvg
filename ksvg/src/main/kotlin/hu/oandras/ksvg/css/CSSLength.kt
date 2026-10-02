@@ -131,8 +131,35 @@ internal data class CSSLength(
         @JvmField
         val ZERO: CSSLength = CSSLength(0f)
         @JvmField
+        val ONE: CSSLength = CSSLength(1f)
+        @JvmField
+        val PERCENT_0: CSSLength = CSSLength(0f, CssUnit.percent)
+        @JvmField
         val PERCENT_50: CSSLength = CSSLength(50f, CssUnit.percent)
         @JvmField
         val PERCENT_100: CSSLength = CSSLength(100f, CssUnit.percent)
+
+        /**
+         * Returns a shared instance for the handful of values that dominate
+         * parsed documents (zero lengths, common percentages), or a fresh
+         * instance otherwise. Safe because [CSSLength] is immutable and never
+         * compared by identity.
+         */
+        @JvmStatic
+        fun of(value: Float, unit: CssUnit): CSSLength {
+            if (unit == CssUnit.px) {
+                when (value) {
+                    0f -> return ZERO
+                    1f -> return ONE
+                }
+            } else if (unit == CssUnit.percent) {
+                when (value) {
+                    0f -> return PERCENT_0
+                    50f -> return PERCENT_50
+                    100f -> return PERCENT_100
+                }
+            }
+            return CSSLength(value, unit)
+        }
     }
 }
