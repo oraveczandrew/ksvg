@@ -57,7 +57,7 @@ private val EXCLUDED_FROM_ENDPOINT_VERIFICATION = setOf(
 )
 
 // Below API 29 blends fall back to PorterDuff layer compositing and flood
-// (KNOWN_ISSUES.md item 1). The host software path is unaffected, so these
+// (docs/KNOWN_ISSUES.md item 1). The host software path is unaffected, so these
 // stay gated there and are skipped here only on old devices.
 private val EXCLUDED_BELOW_API_29 = setOf(
     "blend_mode.svg",

@@ -2,7 +2,7 @@
 
 Purpose: transferable rules and known traps for **developing and debugging** the
 handwritten SIMD kernels in `filtering/src/main/cpp/**/*.S`. Benchmark numbers
-live in `BENCHMARKS.md`; this file is about what must *stay true* and what
+live in `docs/BENCHMARKS.md`; this file is about what must *stay true* and what
 already fails.
 
 Reading priority: `ASSEMBLY_CONVENTIONS.md` + per-ISA implicit-clobber tables →

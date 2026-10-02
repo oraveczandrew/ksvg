@@ -122,7 +122,7 @@
  * bit SHIFT. xmm7 must be zero (caller zeroes it once per pixel... per
  * tail loop is fine, it is never written elsewhere in the tail).
  * ENC=1: encode R/G/B through the table at (%r15) (A stays raw).
- * Pass bare numbers for SHIFT (see RENDERING_FILTERING.md §4.2).
+ * Pass bare numbers for SHIFT (see docs/RENDERING_FILTERING.md §4.2).
  */
 .macro TAILROW o0, o1, o2, o3, o4, shift, enc
     movss \o0(%r10), %xmm5

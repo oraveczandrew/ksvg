@@ -23,7 +23,7 @@
  * Differences from the x86-64 twin, all forced by the 32-bit target:
  * - i386 SysV ABI: every argument arrives on the stack (offsets counted
  *   from scratch; see the prologue comment).
- * - PIC (RENDERING_FILTERING.md §4.1): %ebp is the PC anchor
+ * - PIC (docs/RENDERING_FILTERING.md §4.1): %ebp is the PC anchor
  *   (`call 1f; popl`), constants via `(.Llabel-1b)(%ebp)` — no R_386_32
  *   relocations, no TEXTREL. Verify with llvm-readelf after building.
  * - The frame keeps %esp 16-aligned (sub $156) so the spill slots are
@@ -96,7 +96,7 @@
  * Inputs B=xmm1 G=xmm2 R=xmm3 A=xmm4 (lane 0). MATRIX is %ebx, xmm7 is
  * the clamp-zero (caller zeroes it). ENC=1: encode R/G/B through the
  * table whose base the caller stashed at 24(%esp) (A stays raw).
- * SHIFT is a bare number (see RENDERING_FILTERING.md §4.2).
+ * SHIFT is a bare number (see docs/RENDERING_FILTERING.md §4.2).
  */
 .macro TAILROW o0, o1, o2, o3, o4, shift, enc
     movss \o0(%ebx), %xmm5

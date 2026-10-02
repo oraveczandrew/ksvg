@@ -47,7 +47,7 @@ object KernelBenchmarkRunner {
 
     /**
      * Backend order for emitted rows. Mirrors the ISA superset convention
-     * (`BENCHMARKS.md` header + `BenchmarkTableWriter.isaOrder` in buildSrc):
+     * (`docs/BENCHMARKS.md` header + `BenchmarkTableWriter.isaOrder` in buildSrc):
      * reference first, then native backends from oldest to newest ISA.
      */
     private val isaOrder = listOf("kotlin", "scalar", "sse2", "ssse3", "avx2", "avx512", "neon32", "neon64")

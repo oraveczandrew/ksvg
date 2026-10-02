@@ -338,7 +338,7 @@ internal class RenderTreeBuilder(
         try {
             // A DOM element may be referenced by several <use> instances; its cached
             // bounding box must be recomputed fresh for each build instead of
-            // accumulating stale values across instances (SVG-SUPPORT.md, <use>).
+            // accumulating stale values across instances (docs/SVG-SUPPORT.md, <use>).
             (obj as? Element)?.boundingBox = null
             statePush()
             checkXMLSpaceAttribute(obj)

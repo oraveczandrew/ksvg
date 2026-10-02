@@ -30,7 +30,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * `SVG_REFERENCE_v2.md` §12 interaction matrix: the compositing pipeline must
+ * `docs/SVG_REFERENCE_v2.md` §12 interaction matrix: the compositing pipeline must
  * apply its stages in order (filter → clip → mask → opacity → blend) instead
  * of flattening them into one generic alpha step. Each test pairs two stages
  * with probes that only pass when *both* are honored (dropping either stage

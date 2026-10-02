@@ -46,7 +46,7 @@ import hu.oandras.ksvg.filtering.LightingValidationCorpus
  * - Spot cone: the GPU shader has no cone logic (spot renders as point);
  *   the corpus geometries sit fully inside their cones, so no cutoff
  *   triggers on either side. Spot's own specularExponent is missing from
- *   the DOM (RENDERING_FILTERING.md §3.2) — the parent exponent feeds
+ *   the DOM (docs/RENDERING_FILTERING.md §3.2) — the parent exponent feeds
  *   both sides equally here.
  *
  * Conventions (shared with round-A): the filtered element carries

@@ -46,7 +46,7 @@ fun readBenchmarkRows(file: File): List<BenchRow> {
 }
 
 /**
- * Builds the single flat BENCHMARKS.md-style table for the pull-and-print path:
+ * Builds the single flat docs/BENCHMARKS.md-style table for the pull-and-print path:
  * kernels alphabetical, sizes ascending, backends in ISA superset order, speedup
  * relative to the (Kernel, Size) group's scalar median, status icons
  * (kotlin faster than scalar -> ⬆️; >9x -> 🚀 bold; >1x -> 🟢; <1x -> 🔴) and a
@@ -145,7 +145,7 @@ object BenchmarkTableWriter {
     }
 
     /**
-     * Full BENCHMARKS.md export for `exportBenchmarkTable`: dispatches on the CSV
+     * Full docs/BENCHMARKS.md export for `exportBenchmarkTable`: dispatches on the CSV
      * format (device format when a MedianMs column exists, host format otherwise).
      */
     fun markdownTable(rows: List<BenchRow>): String {
@@ -221,7 +221,7 @@ object BenchmarkTableWriter {
         return outMd.toString()
     }
 
-    /** Port of the host-format branch: BENCHMARKS.md-style flat table using AvgMs/Speedup columns. */
+    /** Port of the host-format branch: docs/BENCHMARKS.md-style flat table using AvgMs/Speedup columns. */
     private fun hostTable(rows: List<BenchRow>): String {
         val header = rows.first().header
         val kernelIdx = header.indexOf("Kernel")

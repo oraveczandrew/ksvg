@@ -15,35 +15,35 @@ KSVG is a high-performance SVG rendering library for Android, written in Kotlin.
 4. **Renderer (`hu.oandras.ksvg.render.SVGAndroidRenderer`)**: traverses the tree and executes `canvas` operations.
 5. **Animations**: centralized in `AnimationRenderer.kt` and `AnimationUtils.kt` (SMIL timing model).
 
-Before touching render/filter code, re-read `RENDERING_FILTERING.md` — it is the source of truth for pipeline, region, and composition rules.
+Before touching render/filter code, re-read `docs/RENDERING_FILTERING.md` — it is the source of truth for pipeline, region, and composition rules.
 
 ## Documentation Map
-- **`SVG-SUPPORT.md`**: **Source of Truth** for supported SVG features (Full/Partial/None) — keep it updated with every feature change.
-- **`SVG_REFERENCE_v2.md`**: AI-facing, audit-first reference for implementing/reviewing SVG behavior (SVG 2 + SVG 1.1 + delegated CSS/graphics specs). It is a map and audit framework, not a substitute for the specifications.
-- **`RENDERING_FILTERING.md`**: Living architecture and validation notes for the rendering/filtering pipeline. Re-read it before touching render/filter code.
-- **`BENCHMARKS.md`**: Kernel benchmark tables (native SIMD vs. scalar C++ vs. Kotlin reference). Rows follow the ISA superset order (see "Benchmark table conventions").
+- **`docs/SVG-SUPPORT.md`**: **Source of Truth** for supported SVG features (Full/Partial/None) — keep it updated with every feature change.
+- **`docs/SVG_REFERENCE_v2.md`**: AI-facing, audit-first reference for implementing/reviewing SVG behavior (SVG 2 + SVG 1.1 + delegated CSS/graphics specs). It is a map and audit framework, not a substitute for the specifications.
+- **`docs/RENDERING_FILTERING.md`**: Living architecture and validation notes for the rendering/filtering pipeline. Re-read it before touching render/filter code.
+- **`docs/BENCHMARKS.md`**: Kernel benchmark tables (native SIMD vs. scalar C++ vs. Kotlin reference). Rows follow the ISA superset order (see "Benchmark table conventions").
 - **`docs/HEADLESS_GRAZIE.md`**: Reproducible headless Grazie grammar-check procedure (IDEA `inspect.sh`, Grazie-only profile, triage rules, known cloud/NLP limitations).
-- **`native-docs/`**: Low-level native docs — `ASSEMBLY_CONVENTIONS.md` (ABI/argument/register/PIC contract plus parity gate), `ASSEMBLY_FORMATTING_REQUIREMENTS.md` (mandatory formatting, indentation, mnemonic padding, and semantic commenting requirements for handwritten assembly), `SIMD_KERNEL_TRICKS.md` (transferable SIMD optimization checklist distilled from the top-performing filter kernels), and per-ISA implicit-register-clobber tables (`X86_IMPLICIT_REGISTER_CLOBBERS.md`, `AARCH64_IMPLICIT_REGISTER_CLOBBERS.md`, `ARM32_IMPLICIT_REGISTER_CLOBBERS.md`): reference lists of which instructions read/write registers or architectural state implicitly (e.g., `MUL`/`DIV` clobbering `EDX`, `CPUID` clobbering `EBX`, string/SP/flags state, pointer-auth/exclusive-monitor state) so handwritten assembly never relies on value survival that the ISA does not guarantee.
+- **`docs/native/`**: Low-level native docs — `ASSEMBLY_CONVENTIONS.md` (ABI/argument/register/PIC contract plus parity gate), `ASSEMBLY_FORMATTING_REQUIREMENTS.md` (mandatory formatting, indentation, mnemonic padding, and semantic commenting requirements for handwritten assembly), `SIMD_KERNEL_TRICKS.md` (transferable SIMD optimization checklist distilled from the top-performing filter kernels), and per-ISA implicit-register-clobber tables (`X86_IMPLICIT_REGISTER_CLOBBERS.md`, `AARCH64_IMPLICIT_REGISTER_CLOBBERS.md`, `ARM32_IMPLICIT_REGISTER_CLOBBERS.md`): reference lists of which instructions read/write registers or architectural state implicitly (e.g., `MUL`/`DIV` clobbering `EDX`, `CPUID` clobbering `EBX`, string/SP/flags state, pointer-auth/exclusive-monitor state) so handwritten assembly never relies on value survival that the ISA does not guarantee.
 - **`README.md`**: Public project overview, key enhancements, and usage.
 - **qemu-trace-bridge** (external repo, https://github.com/oraveczandrew/qemu-trace-bridge): instruction-by-instruction tracer for native assembly kernels under QEMU (i386+AVX2 with full 256-bit YMM via a patched GDB stub, ARM32/ARM64 NEON on stock QEMU). Use it to observe the exact before/after machine state when static audit (§5) is inconclusive.
 
 ## Critical Development Conventions
 
 ### 1. Performance & Zero-Allocation Rule
-The rendering loop (`render()` methods) and animation updates (`updateAnimations()`) are performance-critical: no allocations, no capturing lambdas, no shared mutable state in hot paths. Full rules live in `RENDERING_FILTERING.md` §5 — read it before touching render/filter code.
+The rendering loop (`render()` methods) and animation updates (`updateAnimations()`) are performance-critical: no allocations, no capturing lambdas, no shared mutable state in hot paths. Full rules live in `docs/RENDERING_FILTERING.md` §5 — read it before touching render/filter code.
 
 ### 2. Asking for sources you cannot reliably reproduce
 Do **not** fabricate or guess complex low-level sources (e.g., handwritten ARM/NEON assembly, AArch64 assembly, GPU shaders, or generated coefficient/lookup tables). If such a file is required, and you cannot reproduce it exactly, **ask the user to provide the file** — it is always acceptable to request it rather than invent a subtly wrong version.
 *   When wiring in a third-party source (e.g., the RIR Toolkit `Blur` kernels), confirm the exact symbol/ABI contract before calling into it; mismatched calling conventions produce silent, hard-to-debug corruption.
 
 ### 3. Assembly bug investigation — start here
-When investigating a suspected native/assembly kernel bug, first read native-docs/ASSEMBLY_CONVENTIONS.md (especially the "Typical mistakes" checklist), then native-docs/SIMD_KERNEL_TRICKS.md (structural patterns, rounding/parity checklist, known traps).
+When investigating a suspected native/assembly kernel bug, first read docs/native/ASSEMBLY_CONVENTIONS.md (especially the "Typical mistakes" checklist), then docs/native/SIMD_KERNEL_TRICKS.md (structural patterns, rounding/parity checklist, known traps).
 
 Before touching code, identify the target ISA and grep the relevant implicit-register-clobber table for every suspicious instruction:
 
-x86/x86-64: native-docs/X86_IMPLICIT_REGISTER_CLOBBERS.md
-AArch64: native-docs/AARCH64_IMPLICIT_REGISTER_CLOBBERS.md
-ARM32: native-docs/ARM32_IMPLICIT_REGISTER_CLOBBERS.md
+x86/x86-64: docs/native/X86_IMPLICIT_REGISTER_CLOBBERS.md
+AArch64: docs/native/AARCH64_IMPLICIT_REGISTER_CLOBBERS.md
+ARM32: docs/native/ARM32_IMPLICIT_REGISTER_CLOBBERS.md
 
 Use the grep results to verify whether any instruction has implicit register/state inputs or outputs that could invalidate the suspected register-liveness assumptions.
 
@@ -105,7 +105,7 @@ Reusable image-diff/diagnostic tests for investigating rendering fidelity live h
 
 ## Rendering & Native filters
 
-Rendering hot-path rules, the software/GPU filter backend selection (`RenderOptions.softwareFiltering`), JNI/NDK entry rules, and validated native-filtering lessons live in `RENDERING_FILTERING.md` (§2.2, §4–§6) — read it before touching render/filter code.
+Rendering hot-path rules, the software/GPU filter backend selection (`RenderOptions.softwareFiltering`), JNI/NDK entry rules, and validated native-filtering lessons live in `docs/RENDERING_FILTERING.md` (§2.2, §4–§6) — read it before touching render/filter code.
 
 ## Reports
 

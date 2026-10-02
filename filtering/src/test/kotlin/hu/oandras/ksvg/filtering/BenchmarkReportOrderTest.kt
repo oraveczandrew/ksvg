@@ -22,7 +22,7 @@ import java.io.File
 
 /**
  * The host benchmark CSV/MD report must follow the ISA superset row convention
- * (`BENCHMARKS.md`), not the arbitrary matrix execution order.
+ * (`docs/BENCHMARKS.md`), not the arbitrary matrix execution order.
  */
 class BenchmarkReportOrderTest {
 

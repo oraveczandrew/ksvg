@@ -170,7 +170,7 @@ dokka {
     dokkaPublications.html {
         suppressInheritedMembers.set(true)
         failOnWarning.set(true)
-        outputDirectory.set(rootProject.layout.projectDirectory.dir("doc"))
+        outputDirectory.set(rootProject.layout.buildDirectory.dir("dokka"))
     }
     dokkaSourceSets {
         create("main") {
