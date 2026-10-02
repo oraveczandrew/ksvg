@@ -154,7 +154,8 @@ internal sealed class Animation(
                 SVGAttr.repeatCount -> repeatCount = if (value == "indefinite") {
                     REPEAT_INDEFINITE
                 } else {
-                    value.toFloatOrNull()?.takeIf { it >= 0f } ?: 1f
+                    val parsedRepeatCount = value.toFloatOrNull()
+                    if (parsedRepeatCount != null && parsedRepeatCount >= 0f) parsedRepeatCount else 1f
                 }
                 SVGAttr.repeatDur -> repeatDurMs = if (value == "indefinite") {
                     REPEAT_INDEFINITE.toLong()
@@ -168,12 +169,14 @@ internal sealed class Animation(
                 SVGAttr.min -> minMs = if (value.trim().equals("indefinite", ignoreCase = true)) {
                     Long.MAX_VALUE
                 } else {
-                    parseClockValueMillisOrNull(value)?.takeIf { it >= 0L } ?: 0L
+                    val parsedMin = parseClockValueMillisOrNull(value)
+                    if (parsedMin != null && parsedMin >= 0L) parsedMin else 0L
                 }
                 SVGAttr.max -> maxMs = if (value.trim().equals("indefinite", ignoreCase = true)) {
                     Long.MAX_VALUE
                 } else {
-                    parseClockValueMillisOrNull(value)?.takeIf { it >= 0L } ?: Long.MAX_VALUE
+                    val parsedMax = parseClockValueMillisOrNull(value)
+                    if (parsedMax != null && parsedMax >= 0L) parsedMax else Long.MAX_VALUE
                 }
                 SVGAttr.fill -> fillFreeze = (value == "freeze")
                 SVGAttr.additive -> additiveSum = (value == "sum")

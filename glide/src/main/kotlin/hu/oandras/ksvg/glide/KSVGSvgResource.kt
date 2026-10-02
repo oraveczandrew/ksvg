@@ -32,8 +32,10 @@ public class KSVGSvgResource(private val svg: SVG) : Resource<SVG> {
     override fun getSize(): Int {
         // Cache-weighing estimate: one intrinsic-sized frame. Falls back to
         // 192px per axis for viewBox-only documents without intrinsics.
-        val width = svg.documentWidth.takeIf { it > 0f } ?: FALLBACK_DIMENSION_PX
-        val height = svg.documentHeight.takeIf { it > 0f } ?: FALLBACK_DIMENSION_PX
+        val documentWidth = svg.documentWidth
+        val width = if (documentWidth > 0f) documentWidth else FALLBACK_DIMENSION_PX
+        val documentHeight = svg.documentHeight
+        val height = if (documentHeight > 0f) documentHeight else FALLBACK_DIMENSION_PX
         return (width.toLong() * height.toLong() * BYTES_PER_PIXEL)
             .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
