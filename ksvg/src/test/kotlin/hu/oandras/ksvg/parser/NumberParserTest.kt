@@ -123,7 +123,7 @@ class NumberParserTest {
     fun testParseNumberPackedEndPosEmpty() {
         val result = NumberParser.parseNumberPacked("", 0, 0)
         assertTrue(result.value.isNaN())
-        assertEquals(0, result.endPos)
+        assertEquals(-1, result.endPos)
     }
 
     @Test
@@ -145,5 +145,6 @@ class NumberParserTest {
         val result = NumberParserResult(-12.5f, 7)
         assertEquals(-12.5f, result.value)
         assertEquals(7, result.endPos)
+        assertEquals(-1, NumberParserResult.INVALID.endPos)
     }
 }

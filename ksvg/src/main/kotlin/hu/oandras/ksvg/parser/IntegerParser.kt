@@ -22,31 +22,48 @@ package hu.oandras.ksvg.parser
  * We use our own parser to gain a bit of speed.  This routine is
  * around twice as fast as the system one.
  */
-internal object IntegerParser {
-
-    class Result(
-        @JvmField
-        val value: Int,
-        /*
-         * Return the value of pos after the parse.
-         */
-        @JvmField
-        val endPos: Int
+/**
+ * A parsed integer and the position where parsing stopped, packed into a single
+ * [Long] so integer parsing never allocates a holder object: the value lives in
+ * the low 32 bits (the first thing callers need), the end position in the high
+ * 32 bits. A failed parse packs end position -1; the value is meaningless then
+ * and must not be read.
+ */
+@Suppress("NOTHING_TO_INLINE")
+@JvmInline
+internal value class IntegerParserResult(val packed: Long) {
+    constructor(value: Int, endPos: Int) : this(
+        (endPos.toLong() shl 32) or (value.toLong() and 0xFFFFFFFFL)
     )
+
+    inline val value: Int
+        get() = packed.toInt()
+
+    inline val endPos: Int
+        get() = (packed shr 32).toInt()
+
+    inline fun isInvalid(): Boolean = endPos == -1
+
+    companion object {
+        /** Failure sentinel: end position -1, value meaningless. */
+        val INVALID = IntegerParserResult(0, -1)
+    }
+}
+
+internal object IntegerParser {
 
     /*
     * Scan the string for an SVG integer.
     * Assumes maxPos will not be greater than input.length().
     */
     @JvmStatic
-    fun parseInt(input: String, startPos: Int, len: Int, includeSign: Boolean): Result? {
+    fun parseInt(input: String, startPos: Int, len: Int, includeSign: Boolean): IntegerParserResult {
         var pos = startPos
         var isNegative = false
         var value = 0L
         var ch: Char
 
-        if (pos >= len) return null // String is empty - no number found
-
+        if (pos >= len) return IntegerParserResult.INVALID // String is empty - no number found
 
         if (includeSign) {
             ch = input[pos]
@@ -67,10 +84,10 @@ internal object IntegerParser {
             if (d in 0..9) {
                 if (isNegative) {
                     value = value * 10L - d
-                    if (value < Int.MIN_VALUE) return null
+                    if (value < Int.MIN_VALUE) return IntegerParserResult.INVALID
                 } else {
                     value = value * 10L + d
-                    if (value > Int.MAX_VALUE) return null
+                    if (value > Int.MAX_VALUE) return IntegerParserResult.INVALID
                 }
             } else break
             pos++
@@ -78,10 +95,10 @@ internal object IntegerParser {
 
         // Have we seen anything number-ish at all so far?
         if (pos == sigStart) {
-            return null
+            return IntegerParserResult.INVALID
         }
 
-        return Result(value.toInt(), pos)
+        return IntegerParserResult(value.toInt(), pos)
     }
 
     /*
@@ -89,8 +106,8 @@ internal object IntegerParser {
     * Assumes maxPos will not be greater than input.length().
     */
     @JvmStatic
-    fun parseHex(input: String, startPos: Int, len: Int): Result? {
-        if (startPos >= len) return null // String is empty - no number found
+    fun parseHex(input: String, startPos: Int, len: Int): IntegerParserResult {
+        if (startPos >= len) return IntegerParserResult.INVALID // String is empty - no number found
 
         var pos = startPos
         var value: Long = 0
@@ -108,16 +125,16 @@ internal object IntegerParser {
                 } else break
             }
 
-            if (value > 0xffffffffL) return null
+            if (value > 0xffffffffL) return IntegerParserResult.INVALID
 
             pos++
         }
 
         // Have we seen anything number-ish at all so far?
         if (pos == startPos) {
-            return null
+            return IntegerParserResult.INVALID
         }
 
-        return Result(value.toInt(), pos)
+        return IntegerParserResult(value.toInt(), pos)
     }
 }

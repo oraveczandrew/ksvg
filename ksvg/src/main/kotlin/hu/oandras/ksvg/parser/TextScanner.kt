@@ -76,9 +76,9 @@ internal open class TextScanner(input: String) {
 
     fun nextFloat(): Float {
         val packed = NumberParser.parseNumberPacked(input, position, inputLength)
-        val value = packed.value
-        if (!value.isNaN()) position = packed.endPos
-        return value
+        if (packed.isInvalid()) return Float.NaN
+        position = packed.endPos
+        return packed.value
     }
 
     /*
@@ -90,9 +90,9 @@ internal open class TextScanner(input: String) {
         skipCommaWhitespace()
         if (empty()) return Float.NaN
         val packed = NumberParser.parseNumberPacked(input, position, inputLength)
-        val value = packed.value
-        if (!value.isNaN()) position = packed.endPos
-        return value
+        if (packed.isInvalid()) return Float.NaN
+        position = packed.endPos
+        return packed.value
     }
 
     /*
@@ -119,7 +119,8 @@ internal open class TextScanner(input: String) {
     }
 
     fun nextInteger(withSign: Boolean): Int? {
-        val ip = parseInt(input, position, inputLength, withSign) ?: return null
+        val ip = parseInt(input, position, inputLength, withSign)
+        if (ip.isInvalid()) return null
         position = ip.endPos
         return ip.value
     }

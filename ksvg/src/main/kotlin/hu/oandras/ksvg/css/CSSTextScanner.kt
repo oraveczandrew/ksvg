@@ -18,8 +18,8 @@
 package hu.oandras.ksvg.css
 
 import hu.oandras.ksvg.parser.INVALID_CHAR
-import hu.oandras.ksvg.parser.IntegerParser
 import hu.oandras.ksvg.parser.IntegerParser.parseInt
+import hu.oandras.ksvg.parser.IntegerParserResult
 import hu.oandras.ksvg.parser.TextScanner
 import hu.oandras.ksvg.parser.checkCssState
 import hu.oandras.ksvg.utils.forEachElement
@@ -273,14 +273,14 @@ internal class CSSTextScanner(input: String) : TextScanner(
                     bSign = -1
                 }
                 // Then an integer
-                var a: IntegerParser.Result? = null
+                var a = IntegerParserResult.INVALID
                 var b = parseInt(input, position, inputLength, false)
-                if (b != null) position = b.endPos
+                if (!b.isInvalid()) position = b.endPos
                 // If an 'n' is next then that last part was the 'a' part. Now check for the 'b' part.
                 if (consume('n') || consume('N')) {
-                    a = b ?: IntegerParser.Result(1, position)
+                    a = if (b.isInvalid()) IntegerParserResult(1, position) else b
                     aSign = bSign
-                    b = null
+                    b = IntegerParserResult.INVALID
                     bSign = 1
                     skipWhitespace()
                     // Check for the sign for the b part
@@ -293,7 +293,7 @@ internal class CSSTextScanner(input: String) : TextScanner(
                     if (hasB) {
                         skipWhitespace()
                         b = parseInt(input, position, inputLength, false)
-                        if (b != null) {
+                        if (!b.isInvalid()) {
                             position = b.endPos
                         } else {
                             position = start
@@ -303,8 +303,8 @@ internal class CSSTextScanner(input: String) : TextScanner(
                 }
                 // Construct the result in anticipation that we will get the end bracket next
                 AnPlusB(
-                    if (a == null) 0 else aSign * a.value,
-                    if (b == null) 0 else bSign * b.value
+                    if (a.isInvalid()) 0 else aSign * a.value,
+                    if (b.isInvalid()) 0 else bSign * b.value
                 )
             }
         }

@@ -35,19 +35,28 @@ package hu.oandras.ksvg.parser
  * A parsed number and the position where parsing stopped, packed into a single
  * [Long] so number parsing never allocates a holder object: the value bits go
  * in the low 32 bits (the first thing callers need), the end position in the
- * high 32 bits.
+ * high 32 bits. A failed parse packs end position -1.
  */
-internal typealias NumberParserResult = Long
+@Suppress("NOTHING_TO_INLINE")
+@JvmInline
+internal value class NumberParserResult(val packed: Long) {
+    constructor(value: Float, endPos: Int) : this(
+        (endPos.toLong() shl 32) or (value.toRawBits().toLong() and 0xFFFFFFFFL)
+    )
 
-internal fun NumberParserResult(value: Float, endPos: Int): NumberParserResult {
-    return (endPos.toLong() shl 32) or (value.toRawBits().toLong() and 0xFFFFFFFFL)
+    inline val value: Float
+        get() = Float.fromBits(packed.toInt())
+
+    inline val endPos: Int
+        get() = (packed shr 32).toInt()
+
+    inline fun isInvalid(): Boolean = endPos == -1
+
+    companion object {
+        /** Failure sentinel: end position -1, value meaningless. */
+        val INVALID = NumberParserResult(Float.NaN, -1)
+    }
 }
-
-internal val NumberParserResult.value: Float
-    get() = Float.fromBits(toInt())
-
-internal val NumberParserResult.endPos: Int
-    get() = (this shr 32).toInt()
 
 internal object NumberParser {
 
@@ -71,7 +80,7 @@ internal object NumberParser {
         var endPos = startPos
 
         if (endPos >= len) {
-            return NumberParserResult(Float.NaN, endPos) // String is empty - no number found
+            return NumberParserResult.INVALID // String is empty - no number found
         }
 
         var ch = input[endPos]
@@ -102,7 +111,7 @@ internal object NumberParser {
                     numDigits += numTrailingZeroes
                     while (numTrailingZeroes > 0) {
                         if (significand > TOO_BIG_L) {
-                            return NumberParserResult(Float.NaN, endPos)
+                            return NumberParserResult.INVALID
                         }
                         significand *= 10
                         numTrailingZeroes--
@@ -110,13 +119,13 @@ internal object NumberParser {
 
                     if (significand > TOO_BIG_L) {
                         // We will overflow if we continue...
-                        return NumberParserResult(Float.NaN, endPos)
+                        return NumberParserResult.INVALID
                     }
                     significand = significand * 10 + d
                     numDigits++
 
                     if (significand < 0) {
-                        return NumberParserResult(Float.NaN, endPos) // overflowed from +ve to -ve
+                        return NumberParserResult.INVALID // overflowed from +ve to -ve
                     }
                 }
             } else if (ch == '.') {
@@ -133,14 +142,14 @@ internal object NumberParser {
         if (decimalSeen && endPos == (decimalPos + 1)) {
             // No digits following decimal point (e.g., "1.")
             //Log.e("Missing fraction part of number");
-            return NumberParserResult(Float.NaN, endPos)
+            return NumberParserResult.INVALID
         }
 
         // Have we seen anything number-ish at all so far?
         if (numDigits == 0) {
             if (numLeadingZeroes == 0) {
                 //Log.e("Number not found");
-                return NumberParserResult(Float.NaN, endPos)
+                return NumberParserResult.INVALID
             }
             // Leading zeroes have been seen, though, so we
             // treat that as a '0'.
@@ -163,7 +172,7 @@ internal object NumberParser {
 
                 endPos++
                 if (endPos == len) {
-                    return NumberParserResult(Float.NaN, endPos)
+                    return NumberParserResult.INVALID
                 }
 
                 when (input[endPos]) {
@@ -186,7 +195,7 @@ internal object NumberParser {
                         val d = input[endPos] - '0'
                         if (d in 0..9) {
                             if (expVal > TOO_BIG_I) {
-                                return NumberParserResult(Float.NaN, endPos)
+                                return NumberParserResult.INVALID
                             }
                             expVal = expVal * 10 + d
                             endPos++
@@ -195,7 +204,7 @@ internal object NumberParser {
 
                     // Check that at least some exponent digits were read
                     if (endPos == expStart) {
-                        return NumberParserResult(Float.NaN, endPos)
+                        return NumberParserResult.INVALID
                     }
 
                     if (expIsNegative) exponent -= expVal
@@ -212,7 +221,7 @@ internal object NumberParser {
         // However, they will be very rare and not worth slowing down
         // the parse for.
         if ((exponent + numDigits) > 39 || (exponent + numDigits) < -44) {
-            return NumberParserResult(Float.NaN, endPos)
+            return NumberParserResult.INVALID
         }
 
         var f = significand.toFloat()

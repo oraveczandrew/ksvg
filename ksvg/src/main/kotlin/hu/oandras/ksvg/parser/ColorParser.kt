@@ -37,9 +37,10 @@ internal object ColorParser {
 
         if (value[0] == '#') {
             val ip = IntegerParser.parseHex(value, 1, value.length)
-                ?: throw KSVGParseException("Invalid hex color: $value")
+            val endPos = ip.endPos
+            if (ip.isInvalid()) throw KSVGParseException("Invalid hex color: $value")
 
-            return when (ip.endPos) {
+            return when (endPos) {
                 4 -> ColorValue.of(pack3Hex(ip.value))
                 5 -> ColorValue.of(pack4Hex(ip.value))
                 7 -> ColorValue.of(COLOR_BLACK or ip.value)
