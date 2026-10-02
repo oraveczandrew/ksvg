@@ -279,22 +279,26 @@ internal class PaintConfiguration {
 
 internal object PaintConfigSync {
     /**
-     * Writes every field unconditionally, except `typeface` when the caller
-     * already knows what the paint holds ([knownTypefaceValid]): a fresh
-     * `Paint()` starts with a null typeface, and writing any typeface value —
-     * even an unchanged one — trips OEM typeface hooks (OnePlus
-     * `OplusFontUtils` builds a String cache-key graph per write), so
-     * redundant writes are skipped.
+     * Writes every field unconditionally, except the font fields when the caller
+     * already knows what the paint holds: a fresh `Paint()` starts with a null
+     * typeface and no variation/feature settings, and writing any font value —
+     * even an unchanged one — trips OEM font hooks (OnePlus `OplusFontUtils`
+     * builds a String cache-key graph per `typeface` write and
+     * `Typeface.createFromTypefaceWithVariation` runs per
+     * `fontVariationSettings` write), so redundant writes are skipped.
      *
-     * A null typeface renders identically to `Typeface.DEFAULT`; the lazy diff
-     * path (`writeConfigDiff`) already writes the raw value, so the two paths
-     * agree. Nothing in the codebase reads `Paint.typeface` back.
+     * A null typeface renders identically to `Typeface.DEFAULT`, and empty
+     * variation/feature settings are a no-op on a fresh paint; the lazy diff
+     * path (`writeConfigDiff`) already writes the raw values, so the two paths
+     * agree. Nothing in the codebase reads these `Paint` getters back.
      */
     fun apply(
         paint: Paint,
         cfg: PaintConfiguration,
         knownTypeface: Typeface? = null,
         knownTypefaceValid: Boolean = false,
+        knownFontVariation: String? = null,
+        knownFontFeature: String? = null,
     ) {
         paint.color = cfg.color
         paint.shader = cfg.shader
@@ -316,8 +320,12 @@ internal object PaintConfigSync {
         if (!knownTypefaceValid || knownTypeface !== cfg.typeface) {
             paint.typeface = cfg.typeface ?: Typeface.DEFAULT
         }
-        paint.fontFeatureSettings = cfg.fontFeatureSettings
-        paint.fontVariationSettings = cfg.fontVariationSettings
+        if (knownFontFeature == null || knownFontFeature != cfg.fontFeatureSettings) {
+            paint.fontFeatureSettings = cfg.fontFeatureSettings
+        }
+        if (knownFontVariation == null || knownFontVariation != cfg.fontVariationSettings) {
+            paint.fontVariationSettings = cfg.fontVariationSettings
+        }
         paint.isAntiAlias = cfg.antiAlias
     }
 }

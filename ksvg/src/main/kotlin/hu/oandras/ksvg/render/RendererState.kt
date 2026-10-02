@@ -92,6 +92,14 @@ internal class RendererState private constructor(
     // (OEM-hook-tripping) typeface write entirely.
     private var detachedFillTypeface: Typeface? = null
     private var detachedStrokeTypeface: Typeface? = null
+    // Last variation/feature settings written into each detached paint. A fresh
+    // Paint() holds none, so the caches start at the configuration defaults:
+    // repeated host-less reads with an unchanged configuration skip the
+    // (OEM-hook-tripping) font writes entirely.
+    private var detachedFillVariation: String = ""
+    private var detachedFillFeature: String = ""
+    private var detachedStrokeVariation: String = ""
+    private var detachedStrokeFeature: String = ""
 
     /** Read access resolves against the active node's lazily-synced paint. */
     val fillPaint: Paint
@@ -105,9 +113,13 @@ internal class RendererState private constructor(
                 paint = Paint()
                 detachedFillPaint = paint
                 detachedFillTypeface = null
+                detachedFillVariation = ""
+                detachedFillFeature = ""
             }
-            return syncDetached(paint, fillConfig, detachedFillTypeface).also {
+            return syncDetached(paint, fillConfig, detachedFillTypeface, detachedFillVariation, detachedFillFeature).also {
                 detachedFillTypeface = fillConfig.typeface
+                detachedFillVariation = fillConfig.fontVariationSettings
+                detachedFillFeature = fillConfig.fontFeatureSettings
             }
         }
 
@@ -126,14 +138,31 @@ internal class RendererState private constructor(
                 paint.style = Paint.Style.STROKE
                 detachedStrokePaint = paint
                 detachedStrokeTypeface = null
+                detachedStrokeVariation = ""
+                detachedStrokeFeature = ""
             }
-            return syncDetached(paint, strokeConfig, detachedStrokeTypeface).also {
+            return syncDetached(paint, strokeConfig, detachedStrokeTypeface, detachedStrokeVariation, detachedStrokeFeature).also {
                 detachedStrokeTypeface = strokeConfig.typeface
+                detachedStrokeVariation = strokeConfig.fontVariationSettings
+                detachedStrokeFeature = strokeConfig.fontFeatureSettings
             }
         }
 
-    private fun syncDetached(paint: Paint, cfg: PaintConfiguration, knownTypeface: Typeface?): Paint {
-        PaintConfigSync.apply(paint, cfg, knownTypeface, knownTypefaceValid = true)
+    private fun syncDetached(
+        paint: Paint,
+        cfg: PaintConfiguration,
+        knownTypeface: Typeface?,
+        knownFontVariation: String,
+        knownFontFeature: String,
+    ): Paint {
+        PaintConfigSync.apply(
+            paint,
+            cfg,
+            knownTypeface,
+            knownTypefaceValid = true,
+            knownFontVariation,
+            knownFontFeature,
+        )
         return paint
     }
 

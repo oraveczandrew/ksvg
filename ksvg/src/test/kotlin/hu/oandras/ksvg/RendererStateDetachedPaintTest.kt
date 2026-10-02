@@ -140,6 +140,19 @@ class RendererStateDetachedPaintTest {
     }
 
     @Test
+    fun detachedFillPaintSkipsFontStylingWritesWhenDefault() {
+        // Same OEM-hook reasoning as the typeface write: a fresh Paint() holds
+        // no variation/feature settings, so syncing the defaults must not
+        // touch them.
+        val state = RendererState()
+
+        assertNull(state.fillPaint.fontVariationSettings)
+        assertNull(state.fillPaint.fontFeatureSettings)
+        assertNull(state.fillPaint.fontVariationSettings)
+        assertNull(state.fillPaint.fontFeatureSettings)
+    }
+
+    @Test
     fun detachedFillPaintWritesConfiguredTypefaceOnce() {
         val state = RendererState()
         state.fillConfig.setTypeface(Typeface.DEFAULT)

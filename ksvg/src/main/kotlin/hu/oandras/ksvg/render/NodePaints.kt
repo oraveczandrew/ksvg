@@ -38,10 +38,18 @@ internal fun RenderNode<*>.obtainFillPaint(cfg: PaintConfiguration): Paint {
         }
         nodeFillPaint = p
         // Fresh paint: unconditionally write everything once. The paint is
-        // brand new, so its typeface is the platform-default null: pass that
-        // as known to skip the redundant (OEM-hook-tripping) write when the
-        // configuration carries no typeface either.
-        PaintConfigSync.apply(p, cfg, knownTypeface = null, knownTypefaceValid = true)
+        // brand new, so its typeface is the platform-default null and it holds
+        // no variation/feature settings: pass those as known to skip the
+        // redundant (OEM-hook-tripping) writes when the configuration carries
+        // the defaults either.
+        PaintConfigSync.apply(
+            p,
+            cfg,
+            knownTypeface = null,
+            knownTypefaceValid = true,
+            knownFontVariation = "",
+            knownFontFeature = "",
+        )
         appliedFillConfig = PaintConfiguration().also { it.setFromQuietly(cfg) }
         return p
     }
@@ -60,7 +68,14 @@ internal fun RenderNode<*>.obtainStrokePaint(cfg: PaintConfiguration): Paint {
             style = Paint.Style.STROKE
         }
         nodeStrokePaint = p
-        PaintConfigSync.apply(p, cfg, knownTypeface = null, knownTypefaceValid = true)
+        PaintConfigSync.apply(
+            p,
+            cfg,
+            knownTypeface = null,
+            knownTypefaceValid = true,
+            knownFontVariation = "",
+            knownFontFeature = "",
+        )
         appliedStrokeConfig = PaintConfiguration().also { it.setFromQuietly(cfg) }
         return p
     }
