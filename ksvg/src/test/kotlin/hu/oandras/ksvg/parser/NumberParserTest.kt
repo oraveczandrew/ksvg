@@ -110,37 +110,40 @@ class NumberParserTest {
         assertEquals(1.5f, NumberParser.parseNumber("1.5.5", 0, 5), 0.001f)
     }
 
-    // --- parseNumber with EndPosRef ---
+    // --- parseNumberPacked packs value and end position into one Long ---
 
     @Test
-    fun testParseNumberEndPosRef() {
-        val ref = NumberParser.EndPosRef(0)
-        val value = NumberParser.parseNumber("42abc", 0, 5, ref)
-        assertEquals(42f, value)
-        assertEquals(2, ref.endPos)
+    fun testParseNumberPackedEndPos() {
+        val result = NumberParser.parseNumberPacked("42abc", 0, 5)
+        assertEquals(42f, result.value)
+        assertEquals(2, result.endPos)
     }
 
     @Test
-    fun testParseNumberEndPosRefEmpty() {
-        val ref = NumberParser.EndPosRef(0)
-        val value = NumberParser.parseNumber("", 0, 0, ref)
-        assertTrue(value.isNaN())
-        assertEquals(0, ref.endPos)
+    fun testParseNumberPackedEndPosEmpty() {
+        val result = NumberParser.parseNumberPacked("", 0, 0)
+        assertTrue(result.value.isNaN())
+        assertEquals(0, result.endPos)
     }
 
     @Test
-    fun testParseNumberEndPosRefWithDecimal() {
-        val ref = NumberParser.EndPosRef(0)
-        val value = NumberParser.parseNumber("3.14rest", 0, 8, ref)
-        assertEquals(3.14f, value, 0.001f)
-        assertEquals(4, ref.endPos)
+    fun testParseNumberPackedEndPosWithDecimal() {
+        val result = NumberParser.parseNumberPacked("3.14rest", 0, 8)
+        assertEquals(3.14f, result.value, 0.001f)
+        assertEquals(4, result.endPos)
     }
 
     @Test
-    fun testParseNumberEndPosRefWithExponent() {
-        val ref = NumberParser.EndPosRef(0)
-        val value = NumberParser.parseNumber("1e3 ", 0, 4, ref)
-        assertEquals(1000f, value)
-        assertEquals(3, ref.endPos)
+    fun testParseNumberPackedEndPosWithExponent() {
+        val result = NumberParser.parseNumberPacked("1e3 ", 0, 4)
+        assertEquals(1000f, result.value)
+        assertEquals(3, result.endPos)
+    }
+
+    @Test
+    fun testNumberParserResultRoundTrip() {
+        val result = NumberParserResult(-12.5f, 7)
+        assertEquals(-12.5f, result.value)
+        assertEquals(7, result.endPos)
     }
 }

@@ -19,33 +19,47 @@ package hu.oandras.ksvg.parser
 /**
  * Parse an SVG 'number' or a CSS 'number' from a String.
  * 
- * We use our own parser because the one in Android (from Harmony I think) is slow.
+ * We use our own parser because the one in Android (from Harmony, I think) is slow.
  * 
  * An SVG 'number' is defined as
  * integer (\[Ee] integer)?
  * | [+-]? [0-9]* "." [0-9]+ (\[Ee] integer)?
- * Where 'integer' is
+ * Where is 'integer'
  * [+-]? [0-9]+
  * CSS numbers were different, but have now been updated to a compatible definition (see 2.1 Errata)
  * [+-]?([0-9]+|[0-9]*\.[0-9]+)(e[+-]?[0-9]+)?
  * 
  */
+
+/**
+ * A parsed number and the position where parsing stopped, packed into a single
+ * [Long] so number parsing never allocates a holder object: the value bits go
+ * in the low 32 bits (the first thing callers need), the end position in the
+ * high 32 bits.
+ */
+internal typealias NumberParserResult = Long
+
+internal fun NumberParserResult(value: Float, endPos: Int): NumberParserResult {
+    return (endPos.toLong() shl 32) or (value.toRawBits().toLong() and 0xFFFFFFFFL)
+}
+
+internal val NumberParserResult.value: Float
+    get() = Float.fromBits(toInt())
+
+internal val NumberParserResult.endPos: Int
+    get() = (this shr 32).toInt()
+
 internal object NumberParser {
 
-    class EndPosRef(
-        @JvmField
-        var endPos: Int,
-    )
-
     fun parseNumber(input: String, startPos: Int, len: Int): Float {
-        return parseNumber(input = input, startPos = startPos, len = len, endPosRefOut = null)
+        return parseNumberPacked(input = input, startPos = startPos, len = len).value
     }
 
     /*
      * Scan the string for an SVG number.
      * Assumes maxPos will not be greater than str.length().
      */
-    fun parseNumber(input: String, startPos: Int, len: Int, endPosRefOut: EndPosRef?): Float {
+    fun parseNumberPacked(input: String, startPos: Int, len: Int): NumberParserResult {
         var isNegative = false
         var significand: Long = 0
         var numDigits = 0
@@ -57,10 +71,8 @@ internal object NumberParser {
         var endPos = startPos
 
         if (endPos >= len) {
-            endPosRefOut?.endPos = endPos
-            return Float.NaN // String is empty - no number found
+            return NumberParserResult(Float.NaN, endPos) // String is empty - no number found
         }
-
 
         var ch = input[endPos]
         when (ch) {
@@ -90,8 +102,7 @@ internal object NumberParser {
                     numDigits += numTrailingZeroes
                     while (numTrailingZeroes > 0) {
                         if (significand > TOO_BIG_L) {
-                            endPosRefOut?.endPos = endPos
-                            return Float.NaN
+                            return NumberParserResult(Float.NaN, endPos)
                         }
                         significand *= 10
                         numTrailingZeroes--
@@ -99,15 +110,13 @@ internal object NumberParser {
 
                     if (significand > TOO_BIG_L) {
                         // We will overflow if we continue...
-                        endPosRefOut?.endPos = endPos
-                        return Float.NaN
+                        return NumberParserResult(Float.NaN, endPos)
                     }
                     significand = significand * 10 + d
                     numDigits++
 
                     if (significand < 0) {
-                        endPosRefOut?.endPos = endPos
-                        return Float.NaN // overflowed from +ve to -ve
+                        return NumberParserResult(Float.NaN, endPos) // overflowed from +ve to -ve
                     }
                 }
             } else if (ch == '.') {
@@ -124,18 +133,16 @@ internal object NumberParser {
         if (decimalSeen && endPos == (decimalPos + 1)) {
             // No digits following decimal point (e.g., "1.")
             //Log.e("Missing fraction part of number");
-            endPosRefOut?.endPos = endPos
-            return Float.NaN
+            return NumberParserResult(Float.NaN, endPos)
         }
 
         // Have we seen anything number-ish at all so far?
         if (numDigits == 0) {
             if (numLeadingZeroes == 0) {
                 //Log.e("Number not found");
-                endPosRefOut?.endPos = endPos
-                return Float.NaN
+                return NumberParserResult(Float.NaN, endPos)
             }
-            // Leading zeroes have been seen though, so we
+            // Leading zeroes have been seen, though, so we
             // treat that as a '0'.
             numDigits = 1
         }
@@ -156,8 +163,7 @@ internal object NumberParser {
 
                 endPos++
                 if (endPos == len) {
-                    endPosRefOut?.endPos = endPos
-                    return Float.NaN
+                    return NumberParserResult(Float.NaN, endPos)
                 }
 
                 when (input[endPos]) {
@@ -180,8 +186,7 @@ internal object NumberParser {
                         val d = input[endPos] - '0'
                         if (d in 0..9) {
                             if (expVal > TOO_BIG_I) {
-                                endPosRefOut?.endPos = endPos
-                                return Float.NaN
+                                return NumberParserResult(Float.NaN, endPos)
                             }
                             expVal = expVal * 10 + d
                             endPos++
@@ -190,8 +195,7 @@ internal object NumberParser {
 
                     // Check that at least some exponent digits were read
                     if (endPos == expStart) {
-                        endPosRefOut?.endPos = endPos
-                        return Float.NaN
+                        return NumberParserResult(Float.NaN, endPos)
                     }
 
                     if (expIsNegative) exponent -= expVal
@@ -201,15 +205,14 @@ internal object NumberParser {
         }
 
         // Quick check to eliminate huge exponents.
-        // Biggest float is (2 - 2^23) . 2^127 ~== 3.4e38
+        // The biggest float is (2 - 2^23). 2^127 ~== 3.4e38
         // Biggest negative float is 2^-149 ~== 1.4e-45
         // Some numbers that will overflow will get through the scan
         // and be returned as 'valid', yet fail when value() is called.
         // However, they will be very rare and not worth slowing down
         // the parse for.
         if ((exponent + numDigits) > 39 || (exponent + numDigits) < -44) {
-            endPosRefOut?.endPos = endPos
-            return Float.NaN
+            return NumberParserResult(Float.NaN, endPos)
         }
 
         var f = significand.toFloat()
@@ -227,8 +230,7 @@ internal object NumberParser {
             }
         }
 
-        endPosRefOut?.endPos = endPos
-        return if (isNegative) -f else f
+        return NumberParserResult(if (isNegative) -f else f, endPos)
     }
 
     private val positivePowersOf10: FloatArray = floatArrayOf(

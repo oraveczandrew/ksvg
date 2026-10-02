@@ -38,8 +38,6 @@ internal open class TextScanner(input: String) {
     @JvmField
     protected var inputLength: Int = this.input.length
 
-    private val tempEndPosRef = NumberParser.EndPosRef(0)
-
     /**
      * Returns true if we have reached the end of the input.
      */
@@ -77,13 +75,9 @@ internal open class TextScanner(input: String) {
 
 
     fun nextFloat(): Float {
-        val value = NumberParser.parseNumber(
-            input = input,
-            startPos = position,
-            len = inputLength,
-            endPosRefOut = tempEndPosRef
-        )
-        if (!value.isNaN()) position = tempEndPosRef.endPos
+        val packed = NumberParser.parseNumberPacked(input, position, inputLength)
+        val value = packed.value
+        if (!value.isNaN()) position = packed.endPos
         return value
     }
 
@@ -94,20 +88,17 @@ internal open class TextScanner(input: String) {
     */
     fun possibleNextFloat(): Float {
         skipCommaWhitespace()
-        val value = NumberParser.parseNumber(
-            input = input,
-            startPos = position,
-            len = inputLength,
-            endPosRefOut = tempEndPosRef
-        )
-        if (!value.isNaN()) position = tempEndPosRef.endPos
+        if (empty()) return Float.NaN
+        val packed = NumberParser.parseNumberPacked(input, position, inputLength)
+        val value = packed.value
+        if (!value.isNaN()) position = packed.endPos
         return value
     }
 
     /*
-    * Scans for comma-whitespace sequence with a float following it.
+    * Scans for a comma-whitespace sequence with a float following it.
     * But only if the provided 'lastFloat' (representing the last coord
-    * scanned was non-null (ie parsed correctly).)
+    * scanned was non-null (i.e., parsed correctly).)
     */
     fun checkedNextFloat(lastRead: Float): Float {
         return if (lastRead.isNaN()) {
@@ -195,8 +186,7 @@ internal open class TextScanner(input: String) {
         skipWhitespace()
         if (!input.regionMatches(position, word, 0, word.length, ignoreCase = true)) return false
         val after = position + word.length
-        if (after < inputLength && (input[after].isLetterOrDigit() || input[after] == '-')) return false
-        return true
+        return !(after < inputLength && (input[after].isLetterOrDigit() || input[after] == '-'))
     }
 
     internal fun consumeKeyword(word: String): Boolean {
@@ -250,8 +240,8 @@ internal open class TextScanner(input: String) {
     /*
     * Scans the input starting immediately at 'position' for the next token.
     * A token is a sequence of characters terminating at a whitespace character.
-    * Note that this routine only checks for whitespace characters.  Use nextToken(char)
-    * if token might end with another character.
+    * Note that this routine only checks for whitespace characters. Use nextToken(char)
+    * if the token might end with another character.
     */
     fun nextToken(): String? {
         return nextToken(' ', false)
@@ -282,7 +272,7 @@ internal open class TextScanner(input: String) {
     /*
     * Scans the input starting immediately at 'position' for the next token.
     * A token is a sequence of characters terminating at either the supplied terminating
-    * character, or (optionally) a whitespace character.
+    * character or (optionally) a whitespace character.
     */
     fun nextToken(terminator: Char, allowWhitespace: Boolean): String? {
         if (empty()) return null
