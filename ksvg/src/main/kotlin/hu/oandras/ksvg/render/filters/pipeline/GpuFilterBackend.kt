@@ -188,6 +188,11 @@ internal open class GpuFilterBackend internal constructor(
     // render operation and never shared between threads.
     private var recordingActive: Boolean = false
     private var activeSlot: GpuFilterSlot? = null
+    // Chain-build scratch: reused across builds (per frame for animated filters,
+    // on every scroll reposition on cache miss) instead of reallocated per build.
+    // MutableScatterSet/Map.clear() only resets occupancy, so the backing
+    // storage survives; cleared at the start of every build.
+    private val scratchResultEffects = MutableScatterMap<String, RenderEffect>()
 
     final override fun supports(primitives: FilterPrimitiveSet): Boolean {
         return primitives.bits != 0 && (primitives.bits and supportedMask.inv()) == 0
@@ -271,7 +276,7 @@ internal open class GpuFilterBackend internal constructor(
         val packed = calculateTotalPadding(filterNode, scaleX, scaleY, sx, sy)
         val totalPadX = (packed shr 32).toInt()
         val totalPadY = (packed and 0xFFFFFFFFL).toInt()
-        val resultEffects = MutableScatterMap<String, RenderEffect>()
+        val resultEffects = scratchResultEffects.also { it.clear() }
 
         filterNode.primitives.forEachElement { primitive ->
             val sourceElement = primitive.sourceElement
