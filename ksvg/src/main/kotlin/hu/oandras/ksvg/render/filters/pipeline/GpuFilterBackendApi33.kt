@@ -58,9 +58,9 @@ import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.calculatePrimitiveRegion
 import hu.oandras.ksvg.render.filters.buildColorMatrix
-import hu.oandras.ksvg.render.filters.buildColorMatrixValues
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
+import hu.oandras.ksvg.render.filters.getOrCreateLinearMatrix
 import hu.oandras.ksvg.render.filters.pipeline.effects.createArithmeticCompositeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createColorMatrixShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createComponentTransferShaderEffect
@@ -328,7 +328,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                 // arithmetic path); the sRGB shader below is
                                 // gamma-space only.
                                 createLinearColorMatrixShaderEffect(
-                                    matrix = buildColorMatrixValues(colorMatrix.type, colorMatrix.values),
+                                    matrix = primitive.getOrCreateLinearMatrix(),
                                     primitiveRegion = primitiveRegion,
                                     inputUniformName = "uInput",
                                 )

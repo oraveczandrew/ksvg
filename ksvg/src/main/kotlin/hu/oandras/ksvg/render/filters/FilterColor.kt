@@ -67,20 +67,14 @@ internal fun doFeColorMatrixFilter(
 ): Bitmap {
     // Linear-space matrix (the default color-interpolation-filters="linearRGB"):
     // the canvas ColorMatrixColorFilter path works in gamma space, which reads
-    // ~70/255 too dark vs the reference on plain matrices. Explicit sRGB keeps
+    // ~70/255 too dark vs. the reference on plain matrices. Explicit sRGB keeps
     // the old canvas path.
     if (primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB) {
         return colorMatrixFilterLinear(
             primitiveNode, inputBitmap, primitiveRegion, filterRegion,
         )
     }
-    val paint = primitiveNode.paint
-        ?: createFilterPaint(
-            type = primitiveNode.type,
-            values = primitiveNode.values
-        ).also {
-            primitiveNode.paint = it
-        }
+    val paint = primitiveNode.getOrCreatePaint()
 
     val res = renderContext.bitmapPool.acquireSameAs(inputBitmap)
     renderContext.canvasPool.withPooledObject { c ->
@@ -128,7 +122,7 @@ internal fun colorMatrixFilterLinear(
         clipTop = clipTop,
         clipRight = clipRight,
         clipBottom = clipBottom,
-        matrix = buildColorMatrixValues(primitiveNode.type, primitiveNode.values),
+        matrix = primitiveNode.getOrCreateLinearMatrix(),
         useLinear = primitiveNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB,
     )
 
@@ -139,44 +133,82 @@ internal fun colorMatrixFilterLinear(
 
 /** 4x5 matrix in SVG semantics (channels and offsets as 0..1 fractions).
  * android.graphics.ColorMatrix takes 0..255 offsets, so [buildColorMatrix]
- * scales the offset column after this. */
-internal fun buildColorMatrixValues(type: FeColorMatrixType, values: FloatArray?): FloatArray = when (type) {
+ * scales the offset column after filling. */
+internal fun buildColorMatrixValues(type: FeColorMatrixType, values: FloatArray?): FloatArray {
+    val dst = FloatArray(20)
+    fillColorMatrixValues(dst, type, values)
+    return dst
+}
+
+private fun fillColorMatrixValues(dst: FloatArray, type: FeColorMatrixType, values: FloatArray?) {
+    when (type) {
         FeColorMatrixType.matrix -> {
             // android.graphics.ColorMatrix requires exactly 20 elements (it throws
             // otherwise). Short lists fall back to identity (matching browsers, where
             // the malformed primitive is ignored); long lists keep the first 20.
-            when {
-                values == null || values.size < 20 -> identity.copyOf()
-                else -> values.copyOf(20)
+            if (values == null || values.size < 20) {
+                identity.copyInto(dst)
+            } else {
+                values.copyInto(dst, endIndex = 20)
             }
         }
-
-        FeColorMatrixType.saturate -> saturateMatrixValues(values?.get(0) ?: 1f)
-
-        FeColorMatrixType.hueRotate -> createHueRotateMatrix(values?.get(0) ?: 0f)
-
-        FeColorMatrixType.luminanceToAlpha -> luminanceToAlphaFloatArray.copyOf()
+        FeColorMatrixType.saturate -> fillSaturateMatrixValues(dst, values?.get(0) ?: 1f)
+        FeColorMatrixType.hueRotate -> fillHueRotateMatrix(dst, values?.get(0) ?: 0f)
+        FeColorMatrixType.luminanceToAlpha -> luminanceToAlphaFloatArray.copyInto(dst)
     }
+}
+
+/** Lazily built node cache of [buildColorMatrixValues]: the linear-RGB kernel
+ * runs every frame, so rebuilding (plus `cos`/`sin` for hueRotate) on each
+ * render is pure overhead for a snapshot that never changes. */
+internal fun FeColorMatrixRenderNode.getOrCreateLinearMatrix(): FloatArray {
+    var cached = linearMatrix
+    if (cached == null) {
+        cached = buildColorMatrixValues(type, values)
+        linearMatrix = cached
+    }
+    return cached
+}
+
+/** Lazily built node cache of the gamma-space [Paint] (see [buildColorMatrix]). */
+internal fun FeColorMatrixRenderNode.getOrCreatePaint(): Paint {
+    var cached = paint
+    if (cached == null) {
+        cached = createFilterPaint(type = type, values = values)
+        paint = cached
+    }
+    return cached
+}
+
+/** Clears both derived caches; call it if [FeColorMatrixRenderNode.values]
+ * ever becomes animatable (currently nothing mutates it post-build). */
+internal fun FeColorMatrixRenderNode.invalidateColorMatrixCache() {
+    paint = null
+    linearMatrix = null
+}
 
 /** saturate matrix with the SVG 1.1 luminance weights — identical to what
  * android.graphics.ColorMatrix.setSaturation computes, spelled out so the
  * kernel path shares it. */
-internal fun saturateMatrixValues(saturation: Float): FloatArray {
-    return floatArrayOf(
-        0.213f + 0.787f * saturation, 0.715f - 0.715f * saturation, 0.072f - 0.072f * saturation, 0f, 0f,
-        0.213f - 0.213f * saturation, 0.715f + 0.285f * saturation, 0.072f - 0.072f * saturation, 0f, 0f,
-        0.213f - 0.213f * saturation, 0.715f - 0.715f * saturation, 0.072f + 0.928f * saturation, 0f, 0f,
-        0f, 0f, 0f, 1f, 0f
-    )
+private fun fillSaturateMatrixValues(dst: FloatArray, saturation: Float) {
+    dst[0] = 0.213f + 0.787f * saturation; dst[1] = 0.715f - 0.715f * saturation; dst[2] = 0.072f - 0.072f * saturation; dst[3] = 0f; dst[4] = 0f
+    dst[5] = 0.213f - 0.213f * saturation; dst[6] = 0.715f + 0.285f * saturation; dst[7] = 0.072f - 0.072f * saturation; dst[8] = 0f; dst[9] = 0f
+    dst[10] = 0.213f - 0.213f * saturation; dst[11] = 0.715f - 0.715f * saturation; dst[12] = 0.072f + 0.928f * saturation; dst[13] = 0f; dst[14] = 0f
+    dst[15] = 0f; dst[16] = 0f; dst[17] = 0f; dst[18] = 1f; dst[19] = 0f
 }
 
 internal fun buildColorMatrix(type: FeColorMatrixType, values: FloatArray?): ColorMatrix {
-    val mapped = buildColorMatrixValues(type, values)
+    // ColorMatrix.getArray() exposes the internal array, so fill it in place
+    // instead of allocating a temporary FloatArray that ColorMatrix(float[])
+    // would copy once more.
+    val result = ColorMatrix()
+    val mapped = result.array
+    fillColorMatrixValues(mapped, type, values)
     mapped[4] *= 255f
     mapped[9] *= 255f
     mapped[14] *= 255f
     mapped[19] *= 255f
-    return ColorMatrix(mapped)
+    return result
 }
 
 internal fun createFilterPaint(type: FeColorMatrixType, values: FloatArray?): Paint {
@@ -185,35 +217,33 @@ internal fun createFilterPaint(type: FeColorMatrixType, values: FloatArray?): Pa
     return paint
 }
 
-private fun createHueRotateMatrix(degrees: Float): FloatArray {
+private fun fillHueRotateMatrix(dst: FloatArray, degrees: Float) {
     val angle = degrees.toRadians()
     val cos = cos(angle)
     val sin = sin(angle)
     val r = LUMINANCE_TO_ALPHA_RED
     val g = LUMINANCE_TO_ALPHA_GREEN
     val b = LUMINANCE_TO_ALPHA_BLUE
-    return floatArrayOf(
-        r + cos * (1f - r) + sin * -r,
-        g + cos * -g + sin * -g,
-        b + cos * -b + sin * (1f - b),
-        0f,
-        0f,
-        r + cos * -r + sin * 0.143f,
-        g + cos * (1f - g) + sin * 0.140f,
-        b + cos * -b + sin * -0.283f,
-        0f,
-        0f,
-        r + cos * -r + sin * -(1f - r),
-        g + cos * -g + sin * g,
-        b + cos * (1f - b) + sin * b,
-        0f,
-        0f,
-        0f,
-        0f,
-        0f,
-        1f,
-        0f
-    )
+    dst[0] = r + cos * (1f - r) + sin * -r
+    dst[1] = g + cos * -g + sin * -g
+    dst[2] = b + cos * -b + sin * (1f - b)
+    dst[3] = 0f
+    dst[4] = 0f
+    dst[5] = r + cos * -r + sin * 0.143f
+    dst[6] = g + cos * (1f - g) + sin * 0.140f
+    dst[7] = b + cos * -b + sin * -0.283f
+    dst[8] = 0f
+    dst[9] = 0f
+    dst[10] = r + cos * -r + sin * -(1f - r)
+    dst[11] = g + cos * -g + sin * g
+    dst[12] = b + cos * (1f - b) + sin * b
+    dst[13] = 0f
+    dst[14] = 0f
+    dst[15] = 0f
+    dst[16] = 0f
+    dst[17] = 0f
+    dst[18] = 1f
+    dst[19] = 0f
 }
 
 context(renderContext: RenderContext)

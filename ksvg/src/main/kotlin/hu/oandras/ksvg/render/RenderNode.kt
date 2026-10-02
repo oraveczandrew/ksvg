@@ -897,6 +897,14 @@ internal class FeColorMatrixRenderNode(
      * Cached [Paint] used to apply the color matrix, built lazily on first use.
      */
     @JvmField var paint: Paint? = null
+    /**
+     * Cached 4x5 matrix in SVG 0..1 semantics for the linear-RGB kernel and
+     * the linear shader path, built lazily on first use. [type] is immutable
+     * and [values] is a post-parse snapshot (SMIL does not animate
+     * feColorMatrix), so no invalidation hook is wired; if that ever changes,
+     * clear both caches together.
+     */
+    @JvmField var linearMatrix: FloatArray? = null
     @JvmField val srcPixels: IntArrayBucket = IntArrayBucket()
     @JvmField val outPixels: IntArrayBucket = IntArrayBucket()
 
