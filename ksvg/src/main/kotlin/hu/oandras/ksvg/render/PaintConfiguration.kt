@@ -279,10 +279,23 @@ internal class PaintConfiguration {
 
 internal object PaintConfigSync {
     /**
-     * Writes every field unconditionally. Used for detached (host-less) paints,
-     * where we cannot diff against a previous configuration cheaply.
+     * Writes every field unconditionally, except `typeface` when the caller
+     * already knows what the paint holds ([knownTypefaceValid]): a fresh
+     * `Paint()` starts with a null typeface, and writing any typeface value —
+     * even an unchanged one — trips OEM typeface hooks (OnePlus
+     * `OplusFontUtils` builds a String cache-key graph per write), so
+     * redundant writes are skipped.
+     *
+     * A null typeface renders identically to `Typeface.DEFAULT`; the lazy diff
+     * path (`writeConfigDiff`) already writes the raw value, so the two paths
+     * agree. Nothing in the codebase reads `Paint.typeface` back.
      */
-    fun apply(paint: Paint, cfg: PaintConfiguration) {
+    fun apply(
+        paint: Paint,
+        cfg: PaintConfiguration,
+        knownTypeface: Typeface? = null,
+        knownTypefaceValid: Boolean = false,
+    ) {
         paint.color = cfg.color
         paint.shader = cfg.shader
         paint.pathEffect = cfg.pathEffect
@@ -300,7 +313,9 @@ internal object PaintConfigSync {
         paint.strokeCap = cfg.strokeCap
         paint.strokeJoin = cfg.strokeJoin
         paint.strokeMiter = cfg.strokeMiter
-        paint.typeface = cfg.typeface ?: Typeface.DEFAULT
+        if (!knownTypefaceValid || knownTypeface !== cfg.typeface) {
+            paint.typeface = cfg.typeface ?: Typeface.DEFAULT
+        }
         paint.fontFeatureSettings = cfg.fontFeatureSettings
         paint.fontVariationSettings = cfg.fontVariationSettings
         paint.isAntiAlias = cfg.antiAlias

@@ -16,9 +16,11 @@
 package hu.oandras.ksvg
 
 import android.graphics.Paint
+import android.graphics.Typeface
 import hu.oandras.ksvg.render.RendererState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -124,5 +126,28 @@ class RendererStateDetachedPaintTest {
         assertEquals(0xFF00FF00.toInt(), paint.color)
         assertEquals(3.5f, paint.strokeWidth, 0.001f)
         assertEquals(Paint.Style.STROKE, paint.style)
+    }
+
+    @Test
+    fun detachedFillPaintSkipsTypefaceWriteWhenConfigurationHasNone() {
+        // A fresh Paint() already holds the platform-default null typeface, so
+        // syncing a configuration without a typeface must not touch it: every
+        // typeface write trips OEM hooks on affected ROMs.
+        val state = RendererState()
+
+        assertNull(state.fillPaint.typeface)
+        assertNull(state.fillPaint.typeface)
+    }
+
+    @Test
+    fun detachedFillPaintWritesConfiguredTypefaceOnce() {
+        val state = RendererState()
+        state.fillConfig.setTypeface(Typeface.DEFAULT)
+
+        val paint = state.fillPaint
+
+        assertSame(Typeface.DEFAULT, paint.typeface)
+        assertSame(paint, state.fillPaint)
+        assertSame(Typeface.DEFAULT, paint.typeface)
     }
 }

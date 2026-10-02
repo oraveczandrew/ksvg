@@ -20,6 +20,7 @@ package hu.oandras.ksvg.render
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Typeface
 import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.css.CSSLength
@@ -85,6 +86,12 @@ internal class RendererState private constructor(
     // graph), so paying for two of them eagerly is pure overhead.
     private var detachedFillPaint: Paint? = null
     private var detachedStrokePaint: Paint? = null
+    // Last typeface written into each detached paint by syncDetached. A fresh
+    // Paint() holds the platform-default null typeface, so the cache starts
+    // valid: repeated host-less reads with an unchanged configuration skip the
+    // (OEM-hook-tripping) typeface write entirely.
+    private var detachedFillTypeface: Typeface? = null
+    private var detachedStrokeTypeface: Typeface? = null
 
     /** Read access resolves against the active node's lazily-synced paint. */
     val fillPaint: Paint
@@ -97,8 +104,11 @@ internal class RendererState private constructor(
             if (paint == null) {
                 paint = Paint()
                 detachedFillPaint = paint
+                detachedFillTypeface = null
             }
-            return syncDetached(paint, fillConfig)
+            return syncDetached(paint, fillConfig, detachedFillTypeface).also {
+                detachedFillTypeface = fillConfig.typeface
+            }
         }
 
     val strokePaint: Paint
@@ -115,12 +125,15 @@ internal class RendererState private constructor(
                 paint = Paint()
                 paint.style = Paint.Style.STROKE
                 detachedStrokePaint = paint
+                detachedStrokeTypeface = null
             }
-            return syncDetached(paint, strokeConfig)
+            return syncDetached(paint, strokeConfig, detachedStrokeTypeface).also {
+                detachedStrokeTypeface = strokeConfig.typeface
+            }
         }
 
-    private fun syncDetached(paint: Paint, cfg: PaintConfiguration): Paint {
-        PaintConfigSync.apply(paint, cfg)
+    private fun syncDetached(paint: Paint, cfg: PaintConfiguration, knownTypeface: Typeface?): Paint {
+        PaintConfigSync.apply(paint, cfg, knownTypeface, knownTypefaceValid = true)
         return paint
     }
 
