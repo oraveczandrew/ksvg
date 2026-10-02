@@ -415,7 +415,9 @@ private class SceneUpdateContext(
     override val dPI: Float = dpi
     override val currentFontSize: Float = DEFAULT_TEXT_SIZE
     override val currentFontXHeight: Float = currentFontSize / 2f
+    @JvmField
     var walkViewPort: Box? = null
+    @JvmField
     var walkViewBox: Box? = null
     override val effectiveViewPortInUserUnits: Box
         get() = walkViewBox ?: checkNotNull(walkViewPort) { "Viewport is null" }

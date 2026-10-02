@@ -114,9 +114,10 @@ internal class PathConverter : PathInterface {
 * Used during <animate attributeName="d"> path morphing to avoid per-frame allocations.
 */
 internal class PathAppender : PathInterface {
+    @JvmField
     var target: Path? = null
-    var lastX: Float = 0f
-    var lastY: Float = 0f
+    private var lastX: Float = 0f
+    private var lastY: Float = 0f
 
     override fun moveTo(x: Float, y: Float) {
         target!!.moveTo(x, y)

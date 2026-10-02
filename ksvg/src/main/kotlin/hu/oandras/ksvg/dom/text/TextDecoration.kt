@@ -21,7 +21,7 @@ import hu.oandras.ksvg.dom.style.NONE
 import hu.oandras.ksvg.parser.TextScanner
 import kotlin.jvm.JvmSynthetic
 
-internal class TextDecoration(val mask: Int) {
+internal class TextDecoration(@JvmField val mask: Int) {
     fun hasUnderline(): Boolean = (mask and UNDERLINE) != 0
     fun hasOverline(): Boolean = (mask and OVERLINE) != 0
     fun hasLineThrough(): Boolean = (mask and LINE_THROUGH) != 0

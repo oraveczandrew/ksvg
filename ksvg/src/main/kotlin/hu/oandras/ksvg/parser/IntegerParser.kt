@@ -31,7 +31,7 @@ package hu.oandras.ksvg.parser
  */
 @Suppress("NOTHING_TO_INLINE")
 @JvmInline
-internal value class IntegerParserResult(val packed: Long) {
+internal value class IntegerParserResult(@JvmField val packed: Long) {
     constructor(value: Int, endPos: Int) : this(
         (endPos.toLong() shl 32) or (value.toLong() and 0xFFFFFFFFL)
     )

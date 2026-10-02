@@ -46,6 +46,7 @@ internal class RenderOptionsImpl internal constructor(
      * Deliberately excluded from equals/hashCode and rebuild semantics (scene
      * content is backend-independent).
      */
+    @JvmField
     internal var gpuBackendFactory: FilterBackendFactory = FilterBackendFactory.forApi(),
     private val loggerContext: LoggerContext,
 ) : RenderOptions {

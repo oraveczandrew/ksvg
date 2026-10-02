@@ -200,7 +200,9 @@ internal sealed class ResolvedPaint {
          * and one entry per child <stop>. Non-null lets the renderer animate gradient stops and
          * inherited styles without reading the DOM `animations` at render time.
          */
+        @JvmField
         var ancestorAnimationNodes: List<List<AnimationNode>?>? = null
+        @JvmField
         var stopNodes: List<StopRenderNode> = emptyList()
 
         fun updateGeometry(

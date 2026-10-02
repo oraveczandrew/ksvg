@@ -94,26 +94,47 @@ internal sealed class Animation(
         document: SVGImpl,
         parent: Container?,
     ) : ElementBase.Builder<T>(document, parent) {
+        @JvmField
         protected var attributeName: SVGAttr? = null
+        @JvmField
         protected var durMs: Long = 0L
+        @JvmField
         protected var durSpecified: Boolean = false
+        @JvmField
         protected var beginMs: Long = 0L
+
+        @JvmField
         protected var repeatCount: Float = 1f
+        @JvmField
         protected var repeatDurMs: Long = 0L
+        @JvmField
         protected var endMs: Long = Long.MAX_VALUE
+        @JvmField
         protected var restart: Restart = Restart.always
+        @JvmField
         protected var minMs: Long = 0L
+        @JvmField
         protected var maxMs: Long = Long.MAX_VALUE
+        @JvmField
         protected var fillFreeze: Boolean = false
+        @JvmField
         protected var additiveSum: Boolean = false
+        @JvmField
         protected var accumulateSum: Boolean = false
+        @JvmField
         protected var keyTimes: FloatList? = null
+        @JvmField
         internal var calcMode: CalcMode = CalcMode.linear
+        @JvmField
         protected var keySplines: String? = null
 
+        @JvmField
         protected var valuesStr: String? = null
+        @JvmField
         protected var fromStr: String? = null
+        @JvmField
         protected var toStr: String? = null
+        @JvmField
         protected var byStr: String? = null
 
         /**

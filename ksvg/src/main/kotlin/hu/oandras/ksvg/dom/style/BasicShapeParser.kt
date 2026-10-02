@@ -64,7 +64,12 @@ internal fun parseClipPath(value: String): CSSClipPath? {
     }
 }
 
-private data class Shaped<T : BasicShape>(val shape: T, val refBox: GeometryBox?)
+private data class Shaped<T : BasicShape>(
+    @JvmField
+    val shape: T,
+    @JvmField
+    val refBox: GeometryBox?
+)
 
 private fun parseCircle(body: String): Shaped<BasicShape.Circle>? {
     val scan = TextScanner(body)

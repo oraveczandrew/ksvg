@@ -156,16 +156,22 @@ internal sealed class RenderNode<T: SvgObject>(
 
     // Node-owned paints: synced lazily (field-diff) against renderState's
     // PaintConfigurations right before this node contributes draw operations.
-    // Null until first needed, so container-only subtrees never allocate.
+    // Null until first needed, so container-only subtrees are never allocated.
+    @JvmField
     var nodeFillPaint: Paint? = null
+    @JvmField
     var nodeStrokePaint: Paint? = null
     // SNAPSHOT copies (never aliased to a live config!) used as diff base.
+    @JvmField
     var appliedFillConfig: PaintConfiguration? = null
+    @JvmField
     var appliedStrokeConfig: PaintConfiguration? = null
 
     // Off-screen display-list capture for static subtrees (CanvasRenderNodeCompat).
     // Populated only for eligible (non-animated) nodes on hardware canvases.
+    @JvmField
     var displayList: CanvasRenderNodeCompat? = null
+    @JvmField
     var displayListKey: Long = Long.MIN_VALUE
 
     // Pre-calculated bounding box in user units

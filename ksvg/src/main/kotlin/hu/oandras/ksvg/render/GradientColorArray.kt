@@ -28,7 +28,7 @@ internal sealed class GradientColorArray {
     abstract fun setOnPaint(paint: Paint, index: Int)
     abstract fun contentHashCode(): Int
 
-    class Ints(val array: IntArray) : GradientColorArray() {
+    class Ints(@JvmField val array: IntArray) : GradientColorArray() {
         override val size: Int get() = array.size
         override fun set(index: Int, color: Int) {
             array[index] = color
@@ -42,7 +42,7 @@ internal sealed class GradientColorArray {
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
-    class Longs(val array: LongArray) : GradientColorArray() {
+    class Longs(@JvmField val array: LongArray) : GradientColorArray() {
         override val size: Int get() = array.size
         override fun set(index: Int, color: Int) {
             array[index] = Color.pack(color)

@@ -100,6 +100,7 @@ internal class SVGImpl internal constructor(
      * `getFrom*` entry points), or null. Anchors relative `xml:base` chains and
      * `&lt;?xml-stylesheet?&gt;` hrefs; unknown when parsing from a bare stream.
      */
+    @JvmField
     internal val documentBaseUrl: String?,
     /**
      * The [LoggerContext] used for parser and renderer logging for this document.
