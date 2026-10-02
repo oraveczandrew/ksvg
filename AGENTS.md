@@ -22,6 +22,7 @@ Before touching render/filter code, re-read `RENDERING_FILTERING.md` — it is t
 - **`SVG_REFERENCE_v2.md`**: AI-facing, audit-first reference for implementing/reviewing SVG behavior (SVG 2 + SVG 1.1 + delegated CSS/graphics specs). It is a map and audit framework, not a substitute for the specifications.
 - **`RENDERING_FILTERING.md`**: Living architecture and validation notes for the rendering/filtering pipeline. Re-read it before touching render/filter code.
 - **`BENCHMARKS.md`**: Kernel benchmark tables (native SIMD vs. scalar C++ vs. Kotlin reference). Rows follow the ISA superset order (see "Benchmark table conventions").
+- **`docs/HEADLESS_GRAZIE.md`**: Reproducible headless Grazie grammar-check procedure (IDEA `inspect.sh`, Grazie-only profile, triage rules, known cloud/NLP limitations).
 - **`native-docs/`**: Low-level native docs — `ASSEMBLY_CONVENTIONS.md` (ABI/argument/register/PIC contract plus parity gate), `ASSEMBLY_FORMATTING_REQUIREMENTS.md` (mandatory formatting, indentation, mnemonic padding, and semantic commenting requirements for handwritten assembly), `SIMD_KERNEL_TRICKS.md` (transferable SIMD optimization checklist distilled from the top-performing filter kernels), and per-ISA implicit-register-clobber tables (`X86_IMPLICIT_REGISTER_CLOBBERS.md`, `AARCH64_IMPLICIT_REGISTER_CLOBBERS.md`, `ARM32_IMPLICIT_REGISTER_CLOBBERS.md`): reference lists of which instructions read/write registers or architectural state implicitly (e.g., `MUL`/`DIV` clobbering `EDX`, `CPUID` clobbering `EBX`, string/SP/flags state, pointer-auth/exclusive-monitor state) so handwritten assembly never relies on value survival that the ISA does not guarantee.
 - **`README.md`**: Public project overview, key enhancements, and usage.
 - **qemu-trace-bridge** (external repo, https://github.com/oraveczandrew/qemu-trace-bridge): instruction-by-instruction tracer for native assembly kernels under QEMU (i386+AVX2 with full 256-bit YMM via a patched GDB stub, ARM32/ARM64 NEON on stock QEMU). Use it to observe the exact before/after machine state when static audit (§5) is inconclusive.
@@ -92,6 +93,8 @@ If static audit is inconclusive, trace one instruction live with qemu-trace-brid
 *   **`stroke-dasharray`**: Requires normalization (doubling the array if length is odd) before it can be used with Android's `DashPathEffect`.
 *   **`accumulate="sum"`**: For colors (ARGB), "sum" is ignored per SVG spec.
 *   **CSS keyword matching is case-insensitive**: use `equals(KEYWORD, ignoreCase = true)` (or `Locale.US` lowercase tokens) in `parse*` funcs, never `==`/`when(value)`.
+*   **`e.g.,` / `i.e.,` always carry a trailing comma**: American style, enforced by the Grazie grammar check — a bare `e.g.`/`i.e.` without comma (or with a single period, `eg.`) is flagged. Template placeholders like `[e.g. ...]` are exempt.
+*   **Recurring Grazie traps (4×+)**: one word — `antialiasing`, `handwritten`, `spotlight(s)`; American `afterward` (no `-s`).
 
 ## AI Helper Test Package (`hu.oandras.ksvg.aihelpers`)
 Reusable image-diff/diagnostic tests for investigating rendering fidelity live here. Keep them in the codebase so future sessions can reuse them.
