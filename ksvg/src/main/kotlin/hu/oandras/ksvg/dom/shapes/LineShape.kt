@@ -40,7 +40,7 @@ internal class LineShape(
     @JvmField
     val y2: CSSLength?,
     @JvmField
-    val pathLength: Float? = null,
+    val pathLength: Float,
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -59,7 +59,7 @@ internal class LineShape(
         private var y1: CSSLength? = null
         private var x2: CSSLength? = null
         private var y2: CSSLength? = null
-        private var pathLength: Float? = null
+        private var pathLength: Float = Float.NaN
 
         override fun onAttribute(
             attributes: Attributes,

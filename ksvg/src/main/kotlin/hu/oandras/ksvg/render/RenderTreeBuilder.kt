@@ -26,6 +26,7 @@ import androidx.collection.ArraySet
 import androidx.collection.FloatList
 import androidx.collection.MutableFloatList
 import androidx.collection.MutableIntList
+import androidx.collection.ScatterSet
 import hu.oandras.ksvg.DelegatingLoggerContext
 import hu.oandras.ksvg.ExternalFileResolver
 import hu.oandras.ksvg.LoggerContext
@@ -478,18 +479,36 @@ internal class RenderTreeBuilder(
         }
     }
 
-    private fun buildAncestorAnimationNodes(obj: SvgObject): List<List<AnimationNode>> {
-        val chain = ArrayList<ElementBase>()
+    private fun buildAncestorAnimationNodes(obj: SvgObject): List<List<AnimationNode>>? {
+        // Fast path: chains usually have no animations at all — one walk and
+        // zero lists. (The result must stay position-aligned with the ancestor
+        // chain — the renderer indexes it with ancestors[i] — so animated-only
+        // filtering is not an option.) The same walk also counts ancestors
+        // for the result capacity below, so no separate chain list is needed.
         var current: SvgObject? = obj
+        var ancestorCount = 0
+        var anyAnimated = false
         while (current != null) {
             if (current is ElementBase) {
-                chain.add(0, current)
+                ancestorCount++
+                if (!anyAnimated && current.animations != null) {
+                    anyAnimated = true
+                }
             }
             current = current.parent
         }
-        val result = ArrayList<List<AnimationNode>>(chain.size)
-        chain.forEachElement { ancestor ->
-            result.add(ancestor.animations?.mapNotNullElements { buildAnimationNode(it) }.orEmpty())
+
+        if (!anyAnimated) {
+            return null
+        }
+
+        val result = ArrayList<List<AnimationNode>>(ancestorCount)
+        current = obj
+        while (current != null) {
+            if (current is ElementBase) {
+                result.add(0, current.animations?.mapNotNullElements { buildAnimationNode(it) }.orEmpty())
+            }
+            current = current.parent
         }
         return result.optimizeReadOnlyList()
     }
@@ -675,7 +694,7 @@ internal class RenderTreeBuilder(
             is AnimateFloat -> {
                 var baseRelative = false
                 var endValue = 0f
-                var byValue: Float? = null
+                var byValue: Float = Float.NaN
                 val effectiveValues = animation.values ?: run {
                     val fromVal = animation.from
                     val toVal = animation.to
@@ -686,39 +705,39 @@ internal class RenderTreeBuilder(
                     // forces discrete mode); discrete by-only freezes at base + by.
                     val discrete = animation.calcMode == CalcMode.discrete
                     when {
-                        fromVal != null && toVal != null -> {
+                        !fromVal.isNaN() && !toVal.isNaN() -> {
                             val list = MutableFloatList(2)
                             list.add(fromVal)
                             list.add(toVal)
                             list
                         }
 
-                        fromVal != null && byVal != null -> {
+                        !fromVal.isNaN() && !byVal.isNaN() -> {
                             val list = MutableFloatList(2)
                             list.add(fromVal)
                             list.add(fromVal + byVal)
                             list
                         }
 
-                        byVal != null && !discrete -> {
+                        !byVal.isNaN() && !discrete -> {
                             baseRelative = true
                             byValue = byVal
                             rampFloatList()
                         }
 
-                        byVal != null -> {
+                        !byVal.isNaN() -> {
                             baseRelative = true
                             byValue = byVal
                             frozenFloatList(byVal)
                         }
 
-                        toVal != null && !discrete -> {
+                        !toVal.isNaN() && !discrete -> {
                             baseRelative = true
                             endValue = toVal
                             rampFloatList()
                         }
 
-                        toVal != null -> {
+                        !toVal.isNaN() -> {
                             frozenFloatList(toVal)
                         }
 
@@ -1098,29 +1117,30 @@ internal class RenderTreeBuilder(
     }
 
     private fun isRequiredFormatsSupported(
-        reqFormats: Collection<String>,
+        reqFormats: ScatterSet<String>,
         externalFileResolver: ExternalFileResolver?
     ): Boolean {
         if (reqFormats.isEmpty() || externalFileResolver == null) {
             return true
         }
-        // Build-time only; DOM stores these as Set<String>.
-        for (format in reqFormats) {
-            if (externalFileResolver.isFormatSupported(format)) {
+        // Build-time only; DOM stores these as ScatterSet, whose inline
+        // forEach walks the table without an Iterator.
+        reqFormats.forEach {
+            if (externalFileResolver.isFormatSupported(it)) {
                 return true
             }
         }
         return false
     }
 
-    private fun isRequiredFontsSupported(reqFonts: Collection<String>): Boolean {
+    private fun isRequiredFontsSupported(reqFonts: ScatterSet<String>): Boolean {
         if (reqFonts.isEmpty()) {
             return true
         }
         if (externalFileResolver == null) {
             return false
         }
-        for (fontName in reqFonts) {
+        reqFonts.forEach { fontName ->
             val style = state.style
             if (externalFileResolver.resolveFont(
                     fontFamily = fontName,
@@ -1509,8 +1529,8 @@ internal class RenderTreeBuilder(
      * Both lengthAdjust modes resolve the target here; the mode travels in
      * [scaleGlyphs] (spacingAndGlyphs scales glyphs, spacing only advances).
      */
-    private fun effectiveTextLength(obj: TextPositionedContainer): Float? {
-        return obj.textLength?.floatValueXInContext()
+    private fun effectiveTextLength(obj: TextPositionedContainer): Float {
+        return obj.textLength?.floatValueXInContext() ?: Float.NaN
     }
 
     private fun scaleGlyphs(obj: TextPositionedContainer): Boolean {
@@ -1602,10 +1622,10 @@ internal class RenderTreeBuilder(
             val str = StringBuilder()
             extractRawText(ref, str, state.spacePreserve)
 
-            val x = obj.x?.map { it.floatValueXInContext() }?.toFloatArray()
-            val y = obj.y?.map { it.floatValueYInContext() }?.toFloatArray()
-            val dx = obj.dx?.map { it.floatValueXInContext() }?.toFloatArray()
-            val dy = obj.dy?.map { it.floatValueYInContext() }?.toFloatArray()
+            val x = obj.x?.mapToFloatArray { it.floatValueXInContext() }
+            val y = obj.y?.mapToFloatArray { it.floatValueYInContext() }
+            val dx = obj.dx?.mapToFloatArray { it.floatValueXInContext() }
+            val dy = obj.dy?.mapToFloatArray { it.floatValueYInContext() }
             val rotate = obj.rotate?.copyOf()
 
             val node = TRefRenderNode(
@@ -2227,11 +2247,6 @@ internal class RenderTreeBuilder(
             else -> GenericFilterPrimitiveRenderNode(primitive)
         }
 
-        node.x = primitive.x?.floatValueXInContext()
-        node.y = primitive.y?.floatValueYInContext()
-        node.width = primitive.width?.floatValueXInContext()
-        node.height = primitive.height?.floatValueYInContext()
-
         // Every primitive type carries its <animate> children (previously only
         // feFlood did — other primitives' animations were silently dropped).
         node.animationNodes = primitive.animations?.mapNotNullElements {
@@ -2353,7 +2368,7 @@ internal class RenderTreeBuilder(
             else -> return 1f
         }
 
-        val declared: Float? = when (obj) {
+        val declared: Float = when (obj) {
             is PathShape -> obj.pathLength
             is RectShape -> obj.pathLength
             is CircleShape -> obj.pathLength
@@ -2362,7 +2377,7 @@ internal class RenderTreeBuilder(
             is PolyLineShape -> obj.pathLength
         }
 
-        if (declared == null || declared <= 0f || actualLength <= 0f) return 1f
+        if (declared.isNaN() || declared <= 0f || actualLength <= 0f) return 1f
         return actualLength / declared
     }
 

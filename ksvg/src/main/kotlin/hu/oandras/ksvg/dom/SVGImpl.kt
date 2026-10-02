@@ -253,12 +253,11 @@ internal class SVGImpl internal constructor(
                 continue
             }
             obj.id?.let { id ->
+                // Fragment references resolve through idToElementCache on demand. Do not
+                // duplicate every id as "#id": ids that are never referenced would still
+                // pay for the extra cache key.
                 if (!idToElementCache.containsKey(id)) {
                     idToElementCache[id] = obj
-                    val iriKey = "#$id"
-                    if (!iriToElementCache.containsKey(iriKey)) {
-                        iriToElementCache[iriKey] = obj
-                    }
                 }
             }
             if (obj is Container) {

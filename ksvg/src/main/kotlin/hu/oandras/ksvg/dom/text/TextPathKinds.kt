@@ -14,6 +14,8 @@
  *    limitations under the License.
  */
 
+@file:Suppress("EnumEntryName")
+
 package hu.oandras.ksvg.dom.text
 
 /** SVG `textPath` `side`: which side of the path the text renders on. */

@@ -204,11 +204,22 @@ internal class Renderer internal constructor(
             return currentFontSize / 2f
         }
 
+    // Created on first use: the saved-state pool usually hands out its very
+    // first instance only once a render pass pushes a state onto the stack, and
+    // the reset snapshot of the state pool is only needed when a state is
+    // actually released. A Renderer - and therefore both defaults - is built for
+    // every render call, so allocating them eagerly costs a RendererState per
+    // call even for renders that never touch either path.
     override val savedRendererStatePool: Pool<SavedRendererState> = object : Pool<SavedRendererState>() {
-        private val defaultRenderState = RendererState()
+        private var defaultRenderState: RendererState? = null
 
         override fun createInstance(): SavedRendererState {
-            return SavedRendererState(defaultRenderState, 0)
+            var state = defaultRenderState
+            if (state == null) {
+                state = RendererState()
+                defaultRenderState = state
+            }
+            return SavedRendererState(state, 0)
         }
 
         override fun resetInstance(item: SavedRendererState) {
@@ -218,14 +229,19 @@ internal class Renderer internal constructor(
 
     override val renderStatePool: Pool<RendererState> = object : Pool<RendererState>() {
 
-        private val defaultRenderState = RendererState()
+        private var defaultRenderState: RendererState? = null
 
         override fun createInstance(): RendererState {
             return RendererState()
         }
 
         override fun resetInstance(item: RendererState) {
-            item.apply(defaultRenderState)
+            var state = defaultRenderState
+            if (state == null) {
+                state = RendererState()
+                defaultRenderState = state
+            }
+            item.apply(state)
         }
     }
 
@@ -438,7 +454,7 @@ internal class Renderer internal constructor(
                     val savedTextAdjust = processor.spacingAdjust
                     val savedTextScale = processor.glyphScale
                     val textLength = node.textLength
-                    if (textLength != null) {
+                    if (!textLength.isNaN()) {
                         with(this@Renderer) {
                             processor.applyTextLength(
                                 textLength = textLength,

@@ -199,11 +199,11 @@ internal fun countTextChars(children: List<TextNode>): Int {
  * set, traverse, and restore [TextProcessor.spacingAdjust] around it.
  */
 internal fun spacingAdjustFor(
-    textLength: Float?,
+    textLength: Float,
     charCount: Int,
     naturalWidth: Float,
 ): Float {
-    if (textLength == null || charCount <= 0) return 0f
+    if (textLength.isNaN() || charCount <= 0) return 0f
     return (textLength - naturalWidth) / charCount
 }
 
@@ -213,11 +213,11 @@ internal fun spacingAdjustFor(
  * glyphs and advances together, so the run sums to the target exactly.
  */
 internal fun glyphScaleFor(
-    textLength: Float?,
+    textLength: Float,
     scaleGlyphs: Boolean,
     naturalWidth: Float,
 ): Float {
-    if (textLength == null || !scaleGlyphs || naturalWidth <= 0f) return 1f
+    if (textLength.isNaN() || !scaleGlyphs || naturalWidth <= 0f) return 1f
     return textLength / naturalWidth
 }
 
@@ -227,12 +227,12 @@ internal fun glyphScaleFor(
  * restore. The two modes are exclusive: glyph scaling zeroes spacing.
  */
 internal fun TextProcessor.applyTextLength(
-    textLength: Float?,
+    textLength: Float,
     scaleGlyphs: Boolean,
     naturalWidth: Float,
     charCount: Int,
 ) {
-    if (textLength == null) return
+    if (textLength.isNaN()) return
     if (scaleGlyphs) {
         glyphScale = glyphScaleFor(textLength, true, naturalWidth)
     } else {
@@ -279,7 +279,7 @@ internal fun calculateTextBounds(
                 val savedAdjust = proc.spacingAdjust
                 val savedScale = proc.glyphScale
                 val tspanLength = child.textLength
-                if (tspanLength != null) {
+                if (!tspanLength.isNaN()) {
                     proc.applyTextLength(
                         textLength = tspanLength,
                         scaleGlyphs = child.scaleGlyphs,
@@ -298,7 +298,7 @@ internal fun calculateTextBounds(
                 val savedAdjust = proc.spacingAdjust
                 val savedScale = proc.glyphScale
                 val trefLength = child.textLength
-                if (trefLength != null) {
+                if (!trefLength.isNaN()) {
                     proc.applyTextLength(
                         textLength = trefLength,
                         scaleGlyphs = child.scaleGlyphs,
@@ -654,7 +654,7 @@ internal fun calculateTextPath(
                 val savedAdjust = proc.spacingAdjust
                 val savedScale = proc.glyphScale
                 val tspanLength = child.textLength
-                if (tspanLength != null) {
+                if (!tspanLength.isNaN()) {
                     proc.applyTextLength(
                         textLength = tspanLength,
                         scaleGlyphs = child.scaleGlyphs,
@@ -673,7 +673,7 @@ internal fun calculateTextPath(
                 val savedAdjust = proc.spacingAdjust
                 val savedScale = proc.glyphScale
                 val trefLength = child.textLength
-                if (trefLength != null) {
+                if (!trefLength.isNaN()) {
                     proc.applyTextLength(
                         textLength = trefLength,
                         scaleGlyphs = child.scaleGlyphs,

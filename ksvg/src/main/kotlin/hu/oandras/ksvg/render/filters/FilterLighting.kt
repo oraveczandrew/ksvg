@@ -65,8 +65,8 @@ private fun doLightingFilter(
     exponent: Float,
     premultipliedOutput: Boolean = false,
     useLinear: Boolean = false,
-    kernelUnitLengthX: Float?,
-    kernelUnitLengthY: Float?,
+    kernelUnitLengthX: Float,
+    kernelUnitLengthY: Float,
 ): Bitmap {
     val lightSource = light ?: return inputBitmap
 
@@ -78,11 +78,10 @@ private fun doLightingFilter(
     // kernelUnitLength (in filter primitive units) scales the normal-tap
     // distances; the default is one offscreen pixel. Mirrors the reference
     // model (rsvg): downscale the input, light at 1px taps, upscale back.
-    // Plain branches instead of `?.let{}?.takeIf{}`: the nullable chain boxes
-    // twice per filter evaluation, this stays unboxed.
-    val scaledStepX = if (kernelUnitLengthX != null) kernelUnitLengthX * primitiveScaleX else 0f
+    // Unboxed: 0f means "default", so the multiply folds into the > 0 check.
+    val scaledStepX = kernelUnitLengthX * primitiveScaleX
     val stepX = if (scaledStepX > 0f) scaledStepX else 1f
-    val scaledStepY = if (kernelUnitLengthY != null) kernelUnitLengthY * primitiveScaleY else 0f
+    val scaledStepY = kernelUnitLengthY * primitiveScaleY
     val stepY = if (scaledStepY > 0f) scaledStepY else 1f
     if (stepX == 1f && stepY == 1f) {
         return lightBitmap(
@@ -271,7 +270,7 @@ private fun lightBitmap(
             params[3] = lightSource.pointsAtX.toDouble()
             params[4] = lightSource.pointsAtY.toDouble()
             params[5] = lightSource.pointsAtZ.toDouble()
-            params[6] = lightSource.limitingConeAngle?.toDouble() ?: Double.NaN
+            params[6] = lightSource.limitingConeAngle.toDouble()
             // Beam-focus exponent (default 1.0). The params contract is fixed at
             // 8 entries; test corpora must match.
             params[7] = lightSource.specularExponent.toDouble()

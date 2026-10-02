@@ -18,7 +18,9 @@
 package hu.oandras.ksvg.dom.core
 
 import android.graphics.Matrix
-import androidx.collection.ArraySet
+import androidx.collection.ScatterSet
+import androidx.collection.emptyScatterSet
+import androidx.collection.mutableScatterSetOf
 import hu.oandras.ksvg.PreserveAspectRatio
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.style.parseFontFamily
@@ -43,11 +45,11 @@ internal abstract class ConditionalContainer(
         document: SVGImpl,
         parent: Container?,
     ) : Element.Builder<T>(document, parent) {
-        private var requiredFeatures: Set<String>? = null
+        private var requiredFeatures: ScatterSet<String>? = null
         private var requiredExtensions: String? = null
-        private var systemLanguage: Set<String>? = null
-        private var requiredFormats: Set<String>? = null
-        private var requiredFonts: Set<String>? = null
+        private var systemLanguage: ScatterSet<String>? = null
+        private var requiredFormats: ScatterSet<String>? = null
+        private var requiredFonts: ScatterSet<String>? = null
         private var transform: Matrix? = null
         private var preserveAspectRatio: PreserveAspectRatio? = null
 
@@ -78,9 +80,9 @@ internal abstract class ConditionalContainer(
                 SVGAttr.requiredFonts -> {
                     val fonts = parseFontFamily(value)
                     requiredFonts = if (fonts != null) {
-                        ArraySet(fonts)
+                        mutableScatterSetOf<String>().apply { addAll(fonts) }
                     } else {
-                        emptySet()
+                        emptyScatterSet()
                     }
                 }
                 SVGAttr.transform -> transform = parseTransform(value)

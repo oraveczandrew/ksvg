@@ -24,6 +24,7 @@ import hu.oandras.ksvg.dom.core.Container
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.parser.parseFloat
 import hu.oandras.ksvg.parser.parseFloatList
+import hu.oandras.ksvg.utils.parseIntOrDefault
 import org.xml.sax.Attributes
 
 internal class FeTurbulence(
@@ -85,11 +86,11 @@ internal class FeTurbulence(
             when (attr) {
                 SVGAttr.baseFrequency -> {
                     val values = parseFloatList(value)
-                    baseFrequencyX = values.getOrNull(0) ?: 0f
-                    baseFrequencyY = values.getOrNull(1) ?: baseFrequencyX
+                    baseFrequencyX = values.getOrElse(0) { 0f }
+                    baseFrequencyY = values.getOrElse(1) { baseFrequencyX }
                 }
 
-                SVGAttr.numOctaves -> numOctaves = value.toIntOrNull() ?: 1
+                SVGAttr.numOctaves -> numOctaves = value.parseIntOrDefault(1)
                 SVGAttr.seed -> seed = parseFloat(value)
                 SVGAttr.stitchTiles -> stitchTiles =
                     if (value.isEmpty()) FeStitchTiles.noStitch else try {

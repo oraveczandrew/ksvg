@@ -321,26 +321,20 @@ internal class SVGParserImpl(
                     XmlPullParser.START_DOCUMENT -> startDocument()
                     XmlPullParser.START_TAG -> {
                         val localName = parser.name
-                        var qName = localName
-                        val prefix = parser.prefix
-                        if (prefix != null) {
-                            qName = "$prefix:$qName"
-                        }
+                        // The qualified name is needed only when the parser does not supply a
+                        // local name. Do not ask for the prefix on ordinary tags.
+                        val tagPrefix = if (localName.isEmpty()) parser.prefix else null
                         try {
-                            startElement(parser.namespace, localName, qName, attributes)
+                            startElement(parser.namespace, localName, null, tagPrefix, attributes)
                         } catch (e: KSVGParseException) {
-                            skipBrokenElement(localName.ifEmpty { qName }, e)
+                            skipBrokenElement(qualifiedTagName(localName, null, tagPrefix), e)
                         }
                     }
 
                     XmlPullParser.END_TAG -> {
                         val localName = parser.name
-                        var qName = localName
-                        val prefix = parser.prefix
-                        if (prefix != null) {
-                            qName = "$prefix:$qName"
-                        }
-                        endElement(parser.namespace, localName, qName)
+                        val tagPrefix = if (localName.isEmpty()) parser.prefix else null
+                        endElement(parser.namespace, localName, null, tagPrefix)
                     }
 
                     XmlPullParser.TEXT -> {
@@ -424,7 +418,7 @@ internal class SVGParserImpl(
             attributes: Attributes
         ) {
             try {
-                this@SVGParserImpl.startElement(uri, localName, qName, attributes)
+                this@SVGParserImpl.startElement(uri, localName, qName, null, attributes)
             } catch (e: KSVGParseException) {
                 skipBrokenElement(localName.ifEmpty { qName ?: localName }, e)
             }
@@ -471,7 +465,7 @@ internal class SVGParserImpl(
 
         @Throws(SAXException::class)
         override fun endElement(uri: String?, localName: String, qName: String) {
-            this@SVGParserImpl.endElement(uri, localName, qName)
+            this@SVGParserImpl.endElement(uri, localName, qName, null)
         }
 
         override fun endDocument() {
@@ -516,13 +510,27 @@ internal class SVGParserImpl(
         ignoreDepth = 1
     }
 
+    @Suppress("IfThenToElvis")
+    private fun qualifiedTagName(localName: String, qName: String?, tagPrefix: String?): String {
+        return if (localName.isNotEmpty()) {
+            localName
+        } else if (qName != null) {
+            qName
+        } else if (tagPrefix != null) {
+            "$tagPrefix:$localName"
+        } else {
+            localName
+        }
+    }
+
     @Throws(KSVGParseException::class)
     @JvmSynthetic
     internal fun startElement(
         uri: String?,
         localName: String,
         qName: String?,
-        attributes: Attributes
+        tagPrefix: String?,
+        attributes: Attributes,
     ) {
         if (ignoring) {
             ignoreDepth++
@@ -532,7 +540,7 @@ internal class SVGParserImpl(
             return
         }
 
-        val tag = localName.ifEmpty { qName }
+        val tag = qualifiedTagName(localName, qName, tagPrefix)
 
         when (val elem = SVGTag.fromString(tag)) {
             SVGTag.svg -> svg(attributes)
@@ -602,7 +610,7 @@ internal class SVGParserImpl(
             SVGTag.style -> style(attributes)
             SVGTag.solidColor -> solidColor(attributes)
             SVGTag.UNSUPPORTED -> {
-                logger.logUnsupportedElement(tag ?: "unknown")
+                logger.logUnsupportedElement(tag)
                 ignoring = true
                 ignoreDepth = 1
             }
@@ -678,7 +686,7 @@ internal class SVGParserImpl(
 
     @Throws(KSVGParseException::class)
     @JvmSynthetic
-    internal fun endElement(uri: String?, localName: String, qName: String) {
+    internal fun endElement(uri: String?, localName: String, qName: String?, tagPrefix: String?) {
         if (ignoring) {
             if (--ignoreDepth == 0) {
                 ignoring = false
@@ -690,7 +698,7 @@ internal class SVGParserImpl(
             return
         }
 
-        val tag: String = localName.ifEmpty { qName }
+        val tag: String = qualifiedTagName(localName, qName, tagPrefix)
         when (SVGTag.fromString(tag)) {
             SVGTag.title,
             SVGTag.desc -> {

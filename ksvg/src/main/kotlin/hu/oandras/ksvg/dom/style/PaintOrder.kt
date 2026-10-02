@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.dom.style
 
 import androidx.annotation.IntDef
+import hu.oandras.ksvg.utils.splitBy
 import java.util.*
 
 /**
@@ -62,8 +63,7 @@ internal annotation class PaintOrder {
             var seen = 0
             var count = 0
             var order = 0
-            for (token in value.trim().lowercase(Locale.US).split(WHITESPACE)) {
-                if (token.isEmpty()) continue
+            for (token in value.lowercase(Locale.US).splitBy { it <= ' ' }) {
                 val component = when (token) {
                     "fill" -> FILL
                     "stroke" -> STROKE
@@ -77,14 +77,12 @@ internal annotation class PaintOrder {
             }
             if (count == 0 || count > 3) return UNSPECIFIED
             // Append unspecified components in canonical order.
-            for (component in intArrayOf(FILL, STROKE, MARKERS)) {
+            for (component in 1..3) {
                 if (seen and (1 shl component) == 0) {
                     order = order * 4 + component
                 }
             }
             return order
         }
-
-        private val WHITESPACE: Regex = Regex("\\s+")
     }
 }

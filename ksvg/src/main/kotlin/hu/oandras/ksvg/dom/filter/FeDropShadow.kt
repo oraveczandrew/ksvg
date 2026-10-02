@@ -80,8 +80,8 @@ internal class FeDropShadow(
                 SVGAttr.dy -> dy = parseLength(value)
                 SVGAttr.stdDeviation -> {
                     val values = parseFloatList(value)
-                    stdDeviationX = values.getOrNull(0) ?: 0f
-                    stdDeviationY = values.getOrNull(1) ?: stdDeviationX
+                    stdDeviationX = values.getOrElse(0) { 0f }
+                    stdDeviationY = values.getOrElse(1) { stdDeviationX }
                 }
                 else -> return super.onAttribute(attributes, index, attr, value)
             }

@@ -30,11 +30,11 @@ internal class AnimateFloat(
     @JvmField
     val values: FloatList?,
     @JvmField
-    val from: Float?,
+    val from: Float,
     @JvmField
-    val to: Float?,
+    val to: Float,
     @JvmField
-    val by: Float?,
+    val by: Float,
     durMs: Long,
     beginMs: Long,
     repeatCount: Float,
@@ -72,7 +72,7 @@ internal class AnimateFloat(
     }
 
     override fun isValid(): Boolean {
-        return super.isValid() && ((values != null && values.isNotEmpty()) || to != null || by != null)
+        return super.isValid() && ((values != null && values.isNotEmpty()) || !to.isNaN() || !by.isNaN())
     }
 
     class Builder(
@@ -80,9 +80,9 @@ internal class AnimateFloat(
         parent: Container?,
     ) : Animation.Builder<AnimateFloat>(document, parent) {
         private var values: FloatList? = null
-        private var from: Float? = null
-        private var to: Float? = null
-        private var by: Float? = null
+        private var from: Float = Float.NaN
+        private var to: Float = Float.NaN
+        private var by: Float = Float.NaN
 
         override fun onAttribute(
             attributes: Attributes,

@@ -20,6 +20,7 @@ import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
 import hu.oandras.ksvg.parser.parseLength
+import hu.oandras.ksvg.utils.splitBy
 
 /**
  * Parsed CSS `transform-origin` (`<x> [<y> [<z>]]`, keywords included).
@@ -35,7 +36,7 @@ internal data class TransformOrigin(
 
 // Parses a transform-origin value; null when invalid (ignored declaration).
 internal fun parseTransformOrigin(value: String): TransformOrigin? {
-    val tokens = value.trim().split(ORIGIN_SPLIT_REGEX).filter { it.isNotEmpty() }
+    val tokens = value.splitBy { it == ',' || it <= ' ' }
     if (tokens.isEmpty() || tokens.size > 3) return null
     val x = parseOriginComponent(tokens[0], isX = true) ?: return null
     // Single value: y defaults to center (CSS).
@@ -63,5 +64,3 @@ private fun parseOriginComponent(token: String, isX: Boolean): CSSLength? {
         null
     }
 }
-
-private val ORIGIN_SPLIT_REGEX: Regex = Regex("[\\s,]+")

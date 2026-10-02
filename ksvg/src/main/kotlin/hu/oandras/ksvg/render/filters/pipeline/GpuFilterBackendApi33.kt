@@ -27,6 +27,7 @@ import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.collection.ArrayMap
+import androidx.collection.ArraySet
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.ColorInterpolation
 import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
@@ -125,8 +126,9 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         var chain: RenderEffect? = null
         var previousResult: String? = null
         var first = true
-        val resultShaders = ArrayMap<String, RuntimeShader>()
-        val resultEffects = ArrayMap<String, RenderEffect>()
+        val primitiveCount = filterNode.primitives.size
+        val resultShaders = ArrayMap<String, RuntimeShader>(primitiveCount)
+        val resultEffects = ArrayMap<String, RenderEffect>(primitiveCount)
         // Raw-shader input bindings for downstream in2/uMap references:
         // `resultShaders` holds RAW RuntimeShaders, but the
         // chain wires inputs at the EFFECT level
@@ -139,7 +141,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         // decline the chain instead of sampling transparent.
         var lastRawShader: RuntimeShader? = null
         var lastRawBound = false
-        val boundResults = mutableSetOf<String>()
+        val boundResults = ArraySet<String>(primitiveCount)
 
         // 1. Pre-calculate total padding for the entire chain
         val packed = calculateTotalPadding(filterNode, scaleX, scaleY, sx, sy)
@@ -151,7 +153,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         // filter region), matching the software backend. `lastResultRegion` starts as the filter
         // region (the first primitive's SourceGraphic default).
         val lastResultRegion = RectF(filterRegion)
-        val hwResultRegion = ArrayMap<String, RectF>()
+        val hwResultRegion = ArrayMap<String, RectF>(primitiveCount)
 
         filterNode.primitives.forEachElement { primitive ->
             val sourceElement = primitive.sourceElement
@@ -345,8 +347,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         is FeDiffuseLightingRenderNode -> {
                             // kernelUnitLength needs downscale-light-upscale,
                             // which the GPU chain cannot represent: decline to SW.
-                            if (primitive.sourceElement.kernelUnitLengthX != null ||
-                                primitive.sourceElement.kernelUnitLengthY != null
+                            if (primitive.sourceElement.kernelUnitLengthX != 0f ||
+                                primitive.sourceElement.kernelUnitLengthY != 0f
                             ) {
                                 return null
                             }
@@ -387,8 +389,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         is FeSpecularLightingRenderNode -> {
                             // kernelUnitLength needs downscale-light-upscale,
                             // which the GPU chain cannot represent: decline to SW.
-                            if (primitive.sourceElement.kernelUnitLengthX != null ||
-                                primitive.sourceElement.kernelUnitLengthY != null
+                            if (primitive.sourceElement.kernelUnitLengthX != 0f ||
+                                primitive.sourceElement.kernelUnitLengthY != 0f
                             ) {
                                 return null
                             }
@@ -448,7 +450,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         is FeConvolveMatrixRenderNode -> {
                             // kernelUnitLength needs downscale-convolve-upscale,
                             // which the GPU chain cannot represent: decline to SW.
-                            if (primitive.kernelUnitLengthX != null || primitive.kernelUnitLengthY != null) {
+                            if (primitive.kernelUnitLengthX != 0f || primitive.kernelUnitLengthY != 0f) {
                                 return null
                             }
                             val (shader, convolveEffect) = when (primitive.sourceElement.edgeMode) {
@@ -949,7 +951,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
             inputIds = inputs,
             isMerge = isMerge,
             standardFilterRegion = filterRegion,
-            namedRegion = { id -> id?.let { hwResultRegion[it] } },
+            namedRegions = hwResultRegion,
             lastResultRegion = lastResultRegion,
             out = inputUnion,
         )

@@ -187,7 +187,7 @@ internal class AnimateFloatNode(
     @JvmField
     val endValue: Float = 0f,
     @JvmField
-    val byValue: Float? = null
+    val byValue: Float = Float.NaN
 ) : AnimationNode(sourceElement) {
     override fun toString(): String {
         return "AnimateFloatNode(effectiveValues=$effectiveValues, parsedKeySplines=$parsedKeySplines, pacedKeyTimes=$pacedKeyTimes, baseRelative=$baseRelative) ${super.toString()}"
@@ -313,7 +313,8 @@ internal class AnimateClipPathNode(
             list = ArrayList(2)
             pathEntries = list
         }
-        for (entry in list) {
+        for (i in list.indices) {
+            val entry = list[i]
             if (entry.def === def) return entry.path
         }
         val path = PathConverter(def).path

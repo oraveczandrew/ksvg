@@ -66,7 +66,7 @@ public fun rememberSvgAsset(
         isInternalEntitiesEnabled,
     ) {
         value = withContext(dispatcher) {
-            runCatching {
+            try {
                 SVG.getFromAsset(
                     assetManager = assets,
                     filename = assetPath,
@@ -75,7 +75,9 @@ public fun rememberSvgAsset(
                     externalFileResolver = externalFileResolver,
                     isInternalEntitiesEnabled = isInternalEntitiesEnabled,
                 )
-            }.getOrNull()
+            } catch (_: Exception) {
+                null
+            }
         }
     }.value
 }

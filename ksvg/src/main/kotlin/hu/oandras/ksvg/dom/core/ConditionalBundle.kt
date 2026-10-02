@@ -17,12 +17,14 @@
 
 package hu.oandras.ksvg.dom.core
 
+import androidx.collection.ScatterSet
+
 internal data class ConditionalBundle(
-    override val requiredFeatures: Set<String>?,
+    override val requiredFeatures: ScatterSet<String>?,
     override val requiredExtensions: String?,
-    override val systemLanguage: Set<String>?,
-    override val requiredFormats: Set<String>?,
-    override val requiredFonts: Set<String>?,
+    override val systemLanguage: ScatterSet<String>?,
+    override val requiredFormats: ScatterSet<String>?,
+    override val requiredFonts: ScatterSet<String>?,
 ): Conditional
 
 private var EmptySvgConditionalBundle: ConditionalBundle? = null
@@ -40,11 +42,11 @@ private fun emptyConditionalBundle(): ConditionalBundle {
 }
 
 internal fun Conditional(
-    requiredFeatures: Set<String>?,
+    requiredFeatures: ScatterSet<String>?,
     requiredExtensions: String?,
-    systemLanguage: Set<String>?,
-    requiredFormats: Set<String>?,
-    requiredFonts: Set<String>?,
+    systemLanguage: ScatterSet<String>?,
+    requiredFormats: ScatterSet<String>?,
+    requiredFonts: ScatterSet<String>?,
 ): Conditional {
     return if (requiredFeatures != null || requiredExtensions != null || systemLanguage != null || requiredFormats != null || requiredFonts != null) {
         ConditionalBundle(

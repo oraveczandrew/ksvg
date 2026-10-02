@@ -27,7 +27,7 @@ import hu.oandras.ksvg.render.animation.interpolate
 import hu.oandras.ksvg.render.animation.isFinished
 import hu.oandras.ksvg.render.animation.normalizeDashArrays
 import hu.oandras.ksvg.render.animation.parseClockValueMillis
-import hu.oandras.ksvg.render.animation.parseClockValueMillisOrNull
+import hu.oandras.ksvg.render.animation.parseClockValueMillisOrDefault
 import hu.oandras.ksvg.render.animation.parseDashArrayKeyframes
 import hu.oandras.ksvg.render.animation.parseSingleDashArray
 import hu.oandras.ksvg.render.animation.selectAnimationSegmentDiscrete
@@ -127,21 +127,21 @@ class AnimationUtilsExtendedTest {
         assertEquals(0L, parseClockValueMillis("abc"))
     }
 
-    // --- parseClockValueMillisOrNull ---
+    // --- parseClockValueMillisOrDefault ---
 
     @Test
-    fun testParseClockValueMillisOrNullUnits() {
-        assertEquals(2000L, parseClockValueMillisOrNull("2s"))
-        assertEquals(500L, parseClockValueMillisOrNull("500ms"))
-        assertEquals(1500L, parseClockValueMillisOrNull("1500"))
+    fun testParseClockValueMillisOrDefaultUnits() {
+        assertEquals(2000L, parseClockValueMillisOrDefault("2s", -1L))
+        assertEquals(500L, parseClockValueMillisOrDefault("500ms", -1L))
+        assertEquals(1500L, parseClockValueMillisOrDefault("1500", -1L))
     }
 
     @Test
-    fun testParseClockValueMillisOrNullInvalid() {
-        assertNull(parseClockValueMillisOrNull("abc"))
-        assertNull(parseClockValueMillisOrNull("abcs"))
-        assertNull(parseClockValueMillisOrNull(""))
-        assertNull(parseClockValueMillisOrNull("   "))
+    fun testParseClockValueMillisOrDefaultInvalid() {
+        assertEquals(-1L, parseClockValueMillisOrDefault("abc", -1L))
+        assertEquals(-1L, parseClockValueMillisOrDefault("abcs", -1L))
+        assertEquals(-1L, parseClockValueMillisOrDefault("", -1L))
+        assertEquals(-1L, parseClockValueMillisOrDefault("   ", -1L))
     }
 
     // --- constrainedActiveDurationMs ---

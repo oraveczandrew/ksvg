@@ -37,7 +37,7 @@ internal class FeSpotLight(
     @JvmField
     val pointsAtZ: Float,
     @JvmField
-    val limitingConeAngle: Float?,
+    val limitingConeAngle: Float,
     /**
      * Beam-focus exponent (default 1.0). The software lighting kernels evaluate
      * it per light; the GPU path declines non-default values to software.
@@ -65,7 +65,7 @@ internal class FeSpotLight(
         private var pointsAtX: Float = 0f
         private var pointsAtY: Float = 0f
         private var pointsAtZ: Float = 0f
-        private var limitingConeAngle: Float? = null
+        private var limitingConeAngle: Float = Float.NaN
         private var specularExponent: Float = 1f
 
         override fun onAttribute(

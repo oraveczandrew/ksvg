@@ -34,7 +34,7 @@ internal class PathShape(
     @JvmField
     val d: PathDefinition?,
     @JvmField
-    val pathLength: Float?,
+    val pathLength: Float,
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -50,7 +50,7 @@ internal class PathShape(
         parent: Container?,
     ) : Shape.Builder<PathShape>(document, parent) {
         private var d: PathDefinition? = null
-        private var pathLength: Float? = null
+        private var pathLength: Float = Float.NaN
 
         override fun onAttribute(
             attributes: Attributes,

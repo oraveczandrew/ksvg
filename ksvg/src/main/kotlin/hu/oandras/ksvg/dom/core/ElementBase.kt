@@ -17,6 +17,7 @@
 
 package hu.oandras.ksvg.dom.core
 
+import androidx.collection.ArrayMap
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.CSSTextScanner
 import hu.oandras.ksvg.dom.SVGImpl
@@ -141,7 +142,7 @@ internal abstract class ElementBase(
             }
 
             val localName = attributes.getLocalName(index)
-            val attributesMap = this.attributesMap ?: HashMap<String, String>().also {
+            val attributesMap = this.attributesMap ?: ArrayMap<String, String>(attributes.length).also {
                 this.attributesMap = it
             }
             attributesMap[localName] = value

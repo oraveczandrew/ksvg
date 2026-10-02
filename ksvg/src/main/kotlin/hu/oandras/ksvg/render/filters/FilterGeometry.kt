@@ -80,13 +80,10 @@ internal fun doFeConvolveMatrixFilter(
     // step; the default is one offscreen pixel. Mirrors the reference model
     // (rsvg): downscale the input by 1/step, convolve at 1px steps (native
     // eligible), then upscale the result back.
-    // Plain branches instead of `?.let{}?.takeIf{}`: the nullable chain boxes
-    // twice per filter evaluation, this stays unboxed.
-    val unitLengthX = primitiveNode.kernelUnitLengthX
-    val scaledStepX = if (unitLengthX != null) unitLengthX * primitiveScaleX else 0f
+    // Unboxed: 0f means "default", so the multiply folds into the > 0 check.
+    val scaledStepX = primitiveNode.kernelUnitLengthX * primitiveScaleX
     val stepX = if (scaledStepX > 0f) scaledStepX else 1f
-    val unitLengthY = primitiveNode.kernelUnitLengthY
-    val scaledStepY = if (unitLengthY != null) unitLengthY * primitiveScaleY else 0f
+    val scaledStepY = primitiveNode.kernelUnitLengthY * primitiveScaleY
     val stepY = if (scaledStepY > 0f) scaledStepY else 1f
     if (stepX == 1f && stepY == 1f) {
         return convolveBitmap(primitiveNode, inputBitmap)

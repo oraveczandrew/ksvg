@@ -536,7 +536,7 @@ internal class TextRenderNode(
     @JvmField var dx: Float,
     @JvmField var dy: Float,
     @JvmField var rotate: FloatArray?,
-    @JvmField var textLength: Float?,
+    @JvmField var textLength: Float,
     @JvmField var scaleGlyphs: Boolean,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<Text>(sourceElement, children) {
@@ -552,7 +552,7 @@ internal class TSpanRenderNode(
     @JvmField var dx: FloatArray?,
     @JvmField var dy: FloatArray?,
     @JvmField var rotate: FloatArray?,
-    @JvmField var textLength: Float?,
+    @JvmField var textLength: Float,
     @JvmField var scaleGlyphs: Boolean,
     children: List<TextNode>
 ) : KSVGTextContainerRenderNode<TSpan>(sourceElement, children) {
@@ -581,7 +581,7 @@ internal class TRefRenderNode(
     @JvmField var dx: FloatArray?,
     @JvmField var dy: FloatArray?,
     @JvmField var rotate: FloatArray?,
-    @JvmField var textLength: Float?,
+    @JvmField var textLength: Float,
     @JvmField var scaleGlyphs: Boolean,
 ) : RenderNode<TRef>(sourceElement), TextNode {
     // Per-node width buffer (see TextSequenceNode.textWidthBuffer).
@@ -695,44 +695,34 @@ internal class FilterRenderNode(
     @JvmField var usesBackgroundAlpha: Boolean = false
 
     init {
-        for (primitive in primitives) {
+        for (i in primitives.indices) {
             if (usesFillPaint && usesStrokePaint &&
                 usesBackgroundImage && usesBackgroundAlpha
             ) break
+            val primitive = primitives[i]
             val src = primitive.sourceElement
-            if (src.`in` == FILL_PAINT_INPUT) usesFillPaint = true
-            if (src.`in` == STROKE_PAINT_INPUT) usesStrokePaint = true
-            if (src.`in` == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
-            if (src.`in` == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
+            markSpecialInput(src.`in`)
             when (src) {
-                is FeBlend -> {
-                    if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
-                    if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
-                    if (src.in2 == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
-                    if (src.in2 == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
-                }
-                is FeComposite -> {
-                    if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
-                    if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
-                    if (src.in2 == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
-                    if (src.in2 == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
-                }
-                is FeDisplacementMap -> {
-                    if (src.in2 == FILL_PAINT_INPUT) usesFillPaint = true
-                    if (src.in2 == STROKE_PAINT_INPUT) usesStrokePaint = true
-                    if (src.in2 == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
-                    if (src.in2 == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
-                }
+                is FeBlend -> markSpecialInput(src.in2)
+                is FeComposite -> markSpecialInput(src.in2)
+                is FeDisplacementMap -> markSpecialInput(src.in2)
                 else -> {}
             }
             if (primitive is FeMergeRenderNode) {
-                for (id in primitive.mergeNodes) {
-                    if (id == FILL_PAINT_INPUT) usesFillPaint = true
-                    if (id == STROKE_PAINT_INPUT) usesStrokePaint = true
-                    if (id == BACKGROUND_IMAGE_INPUT) usesBackgroundImage = true
-                    if (id == BACKGROUND_ALPHA_INPUT) usesBackgroundAlpha = true
+                val ids = primitive.mergeNodes
+                for (j in ids.indices) {
+                    markSpecialInput(ids[j])
                 }
             }
+        }
+    }
+
+    private fun markSpecialInput(id: String?) {
+        when (id) {
+            FILL_PAINT_INPUT -> usesFillPaint = true
+            STROKE_PAINT_INPUT -> usesStrokePaint = true
+            BACKGROUND_IMAGE_INPUT -> usesBackgroundImage = true
+            BACKGROUND_ALPHA_INPUT -> usesBackgroundAlpha = true
         }
     }
 
@@ -803,10 +793,6 @@ internal sealed class FilterPrimitiveRenderNode<T: FilterPrimitive>(
 ) {
     internal abstract val primitiveFlag: Int
     @JvmField var colorInterpolationFilters: Int = ColorInterpolation.LINEAR_RGB
-    @JvmField var x: Float? = null
-    @JvmField var y: Float? = null
-    @JvmField var width: Float? = null
-    @JvmField var height: Float? = null
 
     @JvmField var version: Int = 0
     @JvmField var contentVersion: Int = 0
@@ -945,12 +931,12 @@ internal class FeConvolveMatrixRenderNode(
     @JvmField val preserveAlpha: Boolean,
     @JvmField val edgeMode: ConvolveMatrixEdgeMode,
     /**
-     * `kernelUnitLength` in filter primitive units, or null for the default
+     * `kernelUnitLength` in filter primitive units, or 0f for the default
      * (one offscreen pixel). Applied as a device-pixel sampling step of
      * `kernelUnitLength * primitiveScale`.
      */
-    @JvmField val kernelUnitLengthX: Float?,
-    @JvmField val kernelUnitLengthY: Float?,
+    @JvmField val kernelUnitLengthX: Float,
+    @JvmField val kernelUnitLengthY: Float,
 ) : FilterPrimitiveRenderNode<FeConvolveMatrix>(sourceElement) {
     override val primitiveFlag: Int get() = FilterPrimitiveSet.FLAG_CONVOLVE_MATRIX
     /**

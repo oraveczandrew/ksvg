@@ -78,8 +78,8 @@ internal class FeGaussianBlur(
             when (attr) {
                 SVGAttr.stdDeviation -> {
                     val values = parseFloatList(value)
-                    stdDeviationX = values.getOrNull(0) ?: 0f
-                    stdDeviationY = values.getOrNull(1) ?: stdDeviationX
+                    stdDeviationX = values.getOrElse(0) { 0f }
+                    stdDeviationY = values.getOrElse(1) { stdDeviationX }
                 }
                 SVGAttr.edgeMode -> edgeMode = if (value.isEmpty()) ConvolveMatrixEdgeMode.none else try {
                     ConvolveMatrixEdgeMode.valueOf(value.lowercase(Locale.US))

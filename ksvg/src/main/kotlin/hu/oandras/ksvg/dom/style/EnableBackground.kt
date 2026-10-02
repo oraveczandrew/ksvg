@@ -16,6 +16,9 @@
 
 package hu.oandras.ksvg.dom.style
 
+import hu.oandras.ksvg.utils.parseFloatOrElse
+import hu.oandras.ksvg.utils.splitBy
+
 /**
  * Parsed value of the SVG 1.1 `enable-background` property
  * (`accumulate | new [<x> <y> <width> <height>]`).
@@ -35,20 +38,24 @@ internal sealed interface EnableBackground {
     }
 
     /**
-     * @param x subregion origin x in user space, null when `new` has no bounds
-     * @param y subregion origin y in user space, null when `new` has no bounds
-     * @param width subregion width in user space, null when `new` has no bounds
-     * @param height subregion height in user space, null when `new` has no bounds
+     * @param x subregion origin x in user space, NaN when `new` has no bounds
+     * @param y subregion origin y in user space, NaN when `new` has no bounds
+     * @param width subregion width in user space, NaN when `new` has no bounds
+     * @param height subregion height in user space, NaN when `new` has no bounds
      */
     data class New(
-        val x: Float?,
-        val y: Float?,
-        val width: Float?,
-        val height: Float?,
+        @JvmField
+        val x: Float,
+        @JvmField
+        val y: Float,
+        @JvmField
+        val width: Float,
+        @JvmField
+        val height: Float,
     ) : EnableBackground {
 
         override fun toString(): String =
-            if (x == null || y == null || width == null || height == null) {
+            if (x.isNaN() || y.isNaN() || width.isNaN() || height.isNaN()) {
                 "new"
             } else {
                 "new $x $y $width $height"
@@ -58,25 +65,31 @@ internal sealed interface EnableBackground {
 
 // Parses an enable-background property value; null when invalid.
 internal fun parseEnableBackground(value: String): EnableBackground? {
-    val tokens = value.trim().split(BACKGROUND_SPLIT_REGEX).filter { it.isNotEmpty() }
+    val tokens = value.splitBy { it == ',' || it <= ' ' }
+
     if (tokens.isEmpty()) return null
+
     if (tokens[0].equals("accumulate", ignoreCase = true)) {
-        return if (tokens.size == 1) EnableBackground.Accumulate else null
+        return if (tokens.size == 1) {
+            EnableBackground.Accumulate
+        } else {
+            null
+        }
     }
+
     if (tokens[0].equals("new", ignoreCase = true)) {
         if (tokens.size == 1) {
-            return EnableBackground.New(null, null, null, null)
+            return EnableBackground.New(Float.NaN, Float.NaN, Float.NaN, Float.NaN)
         }
+
         if (tokens.size == 5) {
-            val x = tokens[1].toFloatOrNull() ?: return null
-            val y = tokens[2].toFloatOrNull() ?: return null
-            val width = tokens[3].toFloatOrNull() ?: return null
-            val height = tokens[4].toFloatOrNull() ?: return null
+            val x = tokens[1].parseFloatOrElse { return null }
+            val y = tokens[2].parseFloatOrElse { return null }
+            val width = tokens[3].parseFloatOrElse { return null }
+            val height = tokens[4].parseFloatOrElse { return null }
             return EnableBackground.New(x, y, width, height)
         }
-        return null
     }
+
     return null
 }
-
-private val BACKGROUND_SPLIT_REGEX: Regex = Regex("[\\s,]+")

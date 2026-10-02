@@ -22,8 +22,6 @@ import androidx.annotation.LongDef
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.LoggerContext
 import hu.oandras.ksvg.UnsupportedFeature
-import hu.oandras.ksvg.logUnsupportedAttribute
-import hu.oandras.ksvg.logUnsupportedFeature
 import hu.oandras.ksvg.css.CSSFontFeatureSettings
 import hu.oandras.ksvg.css.CSSFontVariationSettings
 import hu.oandras.ksvg.css.CSSLength
@@ -45,14 +43,15 @@ import hu.oandras.ksvg.dom.text.parseTextAnchor
 import hu.oandras.ksvg.dom.text.parseTextDecoration
 import hu.oandras.ksvg.dom.text.parseTextDirection
 import hu.oandras.ksvg.dom.text.parseTextTransform
+import hu.oandras.ksvg.logUnsupportedAttribute
+import hu.oandras.ksvg.logUnsupportedFeature
 import hu.oandras.ksvg.parser.ColorParser
 import hu.oandras.ksvg.parser.parseFloat
 import hu.oandras.ksvg.parser.parseLength
-import hu.oandras.ksvg.parser.parseNonNegativeLength
 import hu.oandras.ksvg.parser.parseOpacity
+import hu.oandras.ksvg.utils.parseFloatOrDefault
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
-import kotlin.jvm.JvmSynthetic
 
 // Special attribute keywords
 internal const val NONE: String = "none"
@@ -1751,14 +1750,19 @@ internal class Style internal constructor(
                     // "none" (and "auto", which needs no adjustment for the
                     // used font) means no adjustment; a non-negative number
                     // is the desired aspect value. Anything else is ignored.
-                    val adjust: Float? = when {
-                        value.equals("none", ignoreCase = true) -> Float.NaN
-                        value.equals("auto", ignoreCase = true) -> Float.NaN
-                        else -> value.toFloatOrNull()?.takeIf { it >= 0f }
-                    }
-                    if (adjust != null) {
-                        builder.fontSizeAdjust = adjust
-                        builder.addSpecifiedFlag2(SPECIFIED_FONT_SIZE_ADJUST)
+                    when {
+                        value.equals("none", ignoreCase = true) ||
+                        value.equals("auto", ignoreCase = true) -> {
+                            builder.fontSizeAdjust = Float.NaN
+                            builder.addSpecifiedFlag2(SPECIFIED_FONT_SIZE_ADJUST)
+                        }
+                        else -> {
+                            val parsed = value.parseFloatOrDefault(Float.NaN)
+                            if (parsed >= 0f) {
+                                builder.fontSizeAdjust = parsed
+                                builder.addSpecifiedFlag2(SPECIFIED_FONT_SIZE_ADJUST)
+                            }
+                        }
                     }
                 }
 

@@ -51,14 +51,14 @@ internal class FeConvolveMatrix(
     @JvmField
     val targetY: Int?,
     /**
-     * `kernelUnitLength` in filter primitive units, or null when unspecified
+     * `kernelUnitLength` in filter primitive units, or 0f when unspecified
      * (default = one offscreen pixel). Non-positive values fall back to the
-     * default per spec and are stored as null.
+     * default per spec and are stored as 0f.
      */
     @JvmField
-    val kernelUnitLengthX: Float?,
+    val kernelUnitLengthX: Float,
     @JvmField
-    val kernelUnitLengthY: Float?,
+    val kernelUnitLengthY: Float,
     @JvmField
     val edgeMode: ConvolveMatrixEdgeMode,
     @JvmField
@@ -92,8 +92,8 @@ internal class FeConvolveMatrix(
         private var bias: Float = 0f
         private var targetX: Int? = null
         private var targetY: Int? = null
-        private var kernelUnitLengthX: Float? = null
-        private var kernelUnitLengthY: Float? = null
+        private var kernelUnitLengthX: Float = 0f
+        private var kernelUnitLengthY: Float = 0f
         private var edgeMode: ConvolveMatrixEdgeMode = ConvolveMatrixEdgeMode.duplicate
         private var preserveAlpha: Boolean = false
 
@@ -106,8 +106,8 @@ internal class FeConvolveMatrix(
             when (attr) {
                 SVGAttr.order -> {
                     val values = parseFloatList(value)
-                    orderX = values.getOrNull(0)?.toInt() ?: 3
-                    orderY = values.getOrNull(1)?.toInt() ?: orderX
+                    orderX = values.getOrElse(0) { 3f }.toInt()
+                    orderY = values.getOrElse(1) { orderX.toFloat() }.toInt()
                 }
                 SVGAttr.kernelMatrix -> kernelMatrix = parseFloatList(value)
                 SVGAttr.divisor -> divisor = parseFloat(value)
@@ -121,10 +121,12 @@ internal class FeConvolveMatrix(
                 }
                 SVGAttr.kernelUnitLength -> {
                     val values = parseFloatList(value)
-                    val x = values.getOrNull(0)
-                    val y = values.getOrNull(1) ?: x
-                    kernelUnitLengthX = if (x != null && x > 0f) x else null
-                    kernelUnitLengthY = if (y != null && y > 0f) y else null
+                    // -1f sentinel instead of null: only > 0 survives below,
+                    // so a missing entry and a non-positive one agree.
+                    val x = values.getOrElse(0) { -1f }
+                    val y = values.getOrElse(1) { x }
+                    kernelUnitLengthX = if (x > 0f) x else 0f
+                    kernelUnitLengthY = if (y > 0f) y else 0f
                 }
                 SVGAttr.preserveAlpha -> preserveAlpha = value.equals("true", ignoreCase = true)
                 else -> return super.onAttribute(attributes, index, attr, value)

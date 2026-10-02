@@ -82,8 +82,8 @@ internal class FeMorphology(
                     val values = parseFloatList(value)
                     // Negative radii are clamped to 0 (passthrough): CPU and GPU paths
                     // must agree, and a 0-radius morphology is the identity anyway.
-                    radiusX = (values.getOrNull(0) ?: 0f).coerceAtLeast(0f)
-                    radiusY = (values.getOrNull(1) ?: radiusX).coerceAtLeast(0f)
+                    radiusX = values.getOrElse(0) { 0f }.coerceAtLeast(0f)
+                    radiusY = values.getOrElse(1) { radiusX }.coerceAtLeast(0f)
                 }
                 else -> return super.onAttribute(attributes, index, attr, value)
             }

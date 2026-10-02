@@ -39,7 +39,7 @@ internal class CircleShape(
     @JvmField
     val r: CSSLength?,
     @JvmField
-    val pathLength: Float? = null,
+    val pathLength: Float,
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -57,7 +57,7 @@ internal class CircleShape(
         private var cx: CSSLength? = null
         private var cy: CSSLength? = null
         private var r: CSSLength? = null
-        private var pathLength: Float? = null
+        private var pathLength: Float = Float.NaN
 
         override fun onAttribute(
             attributes: Attributes,

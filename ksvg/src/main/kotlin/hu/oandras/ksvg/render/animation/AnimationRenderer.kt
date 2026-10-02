@@ -64,6 +64,7 @@ import hu.oandras.ksvg.utils.clamp255
 import hu.oandras.ksvg.utils.forEachElement
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.interpolateColor
+import hu.oandras.ksvg.utils.parseFloatOrDefault
 import hu.oandras.ksvg.utils.red
 import hu.oandras.ksvg.utils.toDegrees
 import hu.oandras.ksvg.utils.toRadians
@@ -548,7 +549,7 @@ private fun resolveAnimatedFloat(base: Float, valAt: Float, animation: AnimateFl
         return if (animation.additiveSum) base + valAt else valAt
     }
     val by = animation.byValue
-    if (by != null) return base + by * valAt
+    if (!by.isNaN()) return base + by * valAt
     return if (animation.additiveSum) {
         base + animation.endValue * valAt
     } else {
@@ -1242,7 +1243,7 @@ internal fun AnimateMotionNode.applyMotionAt(animationTimeMs: Long, out: Matrix)
                 }
 
                 else -> {
-                    val angle = rotateVal.toFloatOrNull() ?: 0f
+                    val angle = rotateVal.parseFloatOrDefault(0f)
                     if (angle != 0f) {
                         out.preRotate(angle)
                     }

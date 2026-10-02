@@ -17,7 +17,9 @@
 
 package hu.oandras.ksvg.dom.core
 
-import androidx.collection.ArraySet
+import androidx.collection.ScatterSet
+import androidx.collection.emptyScatterSet
+import androidx.collection.mutableScatterSetOf
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.style.parseFontFamily
 import org.xml.sax.Attributes
@@ -34,11 +36,11 @@ internal abstract class ConditionalElement(
         document: SVGImpl,
         parent: Container?,
     ) : Element.Builder<T>(document, parent) {
-        private var requiredFeatures: Set<String>? = null
+        private var requiredFeatures: ScatterSet<String>? = null
         private var requiredExtensions: String? = null
-        private var systemLanguage: Set<String>? = null
-        private var requiredFormats: Set<String>? = null
-        private var requiredFonts: Set<String>? = null
+        private var systemLanguage: ScatterSet<String>? = null
+        private var requiredFormats: ScatterSet<String>? = null
+        private var requiredFonts: ScatterSet<String>? = null
 
         protected fun getSvgConditionalBundle(): Conditional {
             return Conditional(
@@ -64,9 +66,9 @@ internal abstract class ConditionalElement(
                 SVGAttr.requiredFonts -> {
                     val fonts = parseFontFamily(value)
                     requiredFonts = if (fonts != null) {
-                        ArraySet(fonts)
+                        mutableScatterSetOf<String>().apply { addAll(fonts) }
                     } else {
-                        emptySet()
+                        emptyScatterSet()
                     }
                 }
 

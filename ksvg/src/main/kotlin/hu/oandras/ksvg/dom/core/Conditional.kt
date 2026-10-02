@@ -17,7 +17,8 @@
 
 package hu.oandras.ksvg.dom.core
 
-import androidx.collection.ArraySet
+import androidx.collection.ScatterSet
+import androidx.collection.mutableScatterSetOf
 import hu.oandras.ksvg.parser.TextScanner
 import java.util.*
 
@@ -26,21 +27,21 @@ private const val TINY_FEATURE_STRING_PREFIX = "http://www.w3.org/Graphics/SVG/f
 
 // Any element that can appear inside a <switch> element.
 internal interface Conditional {
-    val requiredFeatures: Set<String>?
+    val requiredFeatures: ScatterSet<String>?
     val requiredExtensions: String?
-    val systemLanguage: Set<String>?
-    val requiredFormats: Set<String>?
-    val requiredFonts: Set<String>?
+    val systemLanguage: ScatterSet<String>?
+    val requiredFormats: ScatterSet<String>?
+    val requiredFonts: ScatterSet<String>?
 }
 
 //=========================================================================
 // Conditional processing (ie for <switch> element)
 // Parse the attribute that declares the list of SVG features that must be
 // supported if we are to render this element
-internal fun parseRequiredFeatures(value: String): Set<String> {
+internal fun parseRequiredFeatures(value: String): ScatterSet<String> {
     val scan = TextScanner(value)
-    val result = ArraySet<String>()
-
+    val result = mutableScatterSetOf<String>()
+    
     while (!scan.empty()) {
         val feature = scan.requireNextToken()
         if (feature.startsWith(FEATURE_STRING_PREFIX)) {
@@ -64,9 +65,9 @@ internal fun parseRequiredFeatures(value: String): Set<String> {
 
 // Parse the attribute that declares the list of languages, one of which
 // must be supported if we are to render this element
-internal fun parseSystemLanguage(value: String): Set<String> {
+internal fun parseSystemLanguage(value: String): ScatterSet<String> {
     val scan = TextScanner(value)
-    val result = ArraySet<String>()
+    val result = mutableScatterSetOf<String>()
 
     while (!scan.empty()) {
         var language = scan.requireNextToken()
@@ -84,9 +85,9 @@ internal fun parseSystemLanguage(value: String): Set<String> {
 
 // Parse the attribute that declares the list of MIME types that must be
 // supported if we are to render this element
-internal fun parseRequiredFormats(value: String): Set<String> {
+internal fun parseRequiredFormats(value: String): ScatterSet<String> {
     val scan = TextScanner(value)
-    val result = ArraySet<String>()
+    val result = mutableScatterSetOf<String>()
 
     while (!scan.empty()) {
         val mimetype = scan.requireNextToken()

@@ -17,6 +17,7 @@
 package hu.oandras.ksvg.render
 
 import android.graphics.RectF
+import androidx.collection.ArrayMap
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.core.Region
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
@@ -127,7 +128,7 @@ internal fun calculatePrimitiveRegion(
  * @param isMerge true for an feMerge primitive (whose inputs never inherit the previous
  * primitive's subregion).
  * @param standardFilterRegion the full filter region (default for standard inputs).
- * @param namedRegion resolves a named result id to its recorded subregion, or null if unknown
+ * @param namedRegions recorded subregions by result id, or null if unknown
  * (e.g., an unregistered standard-input name).
  * @param lastResultRegion the previous primitive's subregion (used when `in == null` on a
  * non-first, non-merge primitive).
@@ -138,18 +139,20 @@ internal fun resolvePrimitiveInputRegion(
     inputIds: List<String?>,
     isMerge: Boolean,
     standardFilterRegion: RectF,
-    namedRegion: (String?) -> RectF?,
+    namedRegions: ArrayMap<String, RectF>?,
     lastResultRegion: RectF,
     out: RectF,
 ): Boolean {
     out.setEmpty()
     var has = false
-    for (id in inputIds) {
+    for (i in inputIds.indices) {
+        val id = inputIds[i]
         val standard = id == "SourceGraphic" || id == "SourceAlpha"
         val r = when {
             isMerge && id == null -> standardFilterRegion
             !isMerge && id == null -> lastResultRegion
-            else -> namedRegion(id) ?: if (standard) standardFilterRegion else null
+            else -> (if (id != null) namedRegions?.get(id) else null)
+                ?: if (standard) standardFilterRegion else null
         } ?: continue
         if (has) {
             out.union(r)

@@ -41,7 +41,7 @@ internal class EllipseShape(
     @JvmField
     val ry: CSSLength?,
     @JvmField
-    val pathLength: Float? = null,
+    val pathLength: Float,
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -60,7 +60,7 @@ internal class EllipseShape(
         private var cy: CSSLength? = null
         private var rx: CSSLength? = null
         private var ry: CSSLength? = null
-        private var pathLength: Float? = null
+        private var pathLength: Float = Float.NaN
 
         override fun onAttribute(
             attributes: Attributes,

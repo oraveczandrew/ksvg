@@ -77,21 +77,46 @@ internal class RendererState private constructor(
     internal var paintHost: RenderNode<*>? = null
 
     // Build-time (host-less) reads fall back to detached paints owned by this
-    // state, synced exactly like node paints.
-    private val detachedFillPaint: Paint = Paint()
-    private val detachedStrokePaint: Paint = Paint().apply { style = Paint.Style.STROKE }
+    // state, synced exactly like node paints. These are created on the first
+    // host-less read instead of in the constructor: a renderer state is created
+    // for every render pass, while the vast majority of them are only ever read
+    // with a paint host attached. Constructing an android.graphics.Paint is
+    // expensive (on some OEM ROMs it also builds a String cache-key object
+    // graph), so paying for two of them eagerly is pure overhead.
+    private var detachedFillPaint: Paint? = null
+    private var detachedStrokePaint: Paint? = null
 
     /** Read access resolves against the active node's lazily-synced paint. */
     val fillPaint: Paint
         get() {
-            val host = paintHost ?: return syncDetached(detachedFillPaint, fillConfig)
-            return host.obtainFillPaint(fillConfig)
+            val host = paintHost
+            if (host != null) {
+                return host.obtainFillPaint(fillConfig)
+            }
+            var paint = detachedFillPaint
+            if (paint == null) {
+                paint = Paint()
+                detachedFillPaint = paint
+            }
+            return syncDetached(paint, fillConfig)
         }
 
     val strokePaint: Paint
         get() {
-            val host = paintHost ?: return syncDetached(detachedStrokePaint, strokeConfig)
-            return host.obtainStrokePaint(strokeConfig)
+            val host = paintHost
+            if (host != null) {
+                return host.obtainStrokePaint(strokeConfig)
+            }
+            // The detached stroke paint must be a STROKE-style paint from the
+            // start: PaintConfigSync.apply never writes `style`, it only carries
+            // the paint-driving configuration.
+            var paint = detachedStrokePaint
+            if (paint == null) {
+                paint = Paint()
+                paint.style = Paint.Style.STROKE
+                detachedStrokePaint = paint
+            }
+            return syncDetached(paint, strokeConfig)
         }
 
     private fun syncDetached(paint: Paint, cfg: PaintConfiguration): Paint {

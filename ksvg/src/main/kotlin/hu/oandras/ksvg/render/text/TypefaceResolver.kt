@@ -121,7 +121,7 @@ internal fun RendererState.selectTypefaceAndFontStyling(
 private fun resolveFontFromFontFamily(
     externalFileResolver: ExternalFileResolver?,
     fontFamily: List<String>?,
-    fontWidth: Float?,
+    fontWidth: Float,
     fontWeight: Float,
     fontStyle: FontStyle
 ): Typeface? {
@@ -140,7 +140,7 @@ private fun resolveFontFromFontFamily(
                     fontFamily = fontName,
                     fontWeight = fontWeight,
                     fontStyle = fontStyle.toString(),
-                    fontStretch = fontWidth!!
+                    fontStretch = fontWidth
                 )
 
         if (font != null) {

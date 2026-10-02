@@ -33,7 +33,7 @@ internal open class PolyLineShape(
     @JvmField
     val points: FloatArray?,
     @JvmField
-    val pathLength: Float? = null
+    val pathLength: Float,
 ) : Shape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,
@@ -49,7 +49,7 @@ internal open class PolyLineShape(
         parent: Container?,
     ) : Shape.Builder<T>(document, parent) {
         private var points: FloatArray? = null
-        private var pathLength: Float? = null
+        private var pathLength: Float = Float.NaN
 
         override fun onAttribute(
             attributes: Attributes,
@@ -80,6 +80,6 @@ internal open class PolyLineShape(
         }
 
         protected fun getPoints(): FloatArray? = points
-        protected fun getPathLength(): Float? = pathLength
+        protected fun getPathLength(): Float = pathLength
     }
 }

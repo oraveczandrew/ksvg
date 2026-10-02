@@ -41,6 +41,7 @@ import hu.oandras.ksvg.render.PaintConfiguration.Companion.DEFAULT_TEXT_SIZE
 import hu.oandras.ksvg.render.pool.BitmapPool
 import hu.oandras.ksvg.render.pool.PoolOwner
 import hu.oandras.ksvg.utils.anyElement
+import hu.oandras.ksvg.utils.mapToFloatArray
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmSynthetic
 
@@ -236,10 +237,10 @@ internal class RenderScene private constructor(
                 val obj = node.sourceElement
                 if (!obj.hasViewportDependentLengths()) return
                 with(ctx) {
-                    val x = obj.x?.map { it.floatValueXInContext() }?.toFloatArray()
-                    val y = obj.y?.map { it.floatValueYInContext() }?.toFloatArray()
-                    val dx = obj.dx?.map { it.floatValueXInContext() }?.toFloatArray()
-                    val dy = obj.dy?.map { it.floatValueYInContext() }?.toFloatArray()
+                    val x = obj.x?.mapToFloatArray { it.floatValueXInContext() }
+                    val y = obj.y?.mapToFloatArray { it.floatValueYInContext() }
+                    val dx = obj.dx?.mapToFloatArray { it.floatValueXInContext() }
+                    val dy = obj.dy?.mapToFloatArray { it.floatValueYInContext() }
                     if (!x.contentEquals(node.x) || !y.contentEquals(node.y) ||
                             !dx.contentEquals(node.dx) || !dy.contentEquals(node.dy)) {
                         node.x = x; node.y = y; node.dx = dx; node.dy = dy
@@ -264,10 +265,10 @@ internal class RenderScene private constructor(
                 val obj = node.sourceElement
                 if (!obj.hasViewportDependentLengths()) return
                 with(ctx) {
-                    val x = obj.x?.map { it.floatValueXInContext() }?.toFloatArray()
-                    val y = obj.y?.map { it.floatValueYInContext() }?.toFloatArray()
-                    val dx = obj.dx?.map { it.floatValueXInContext() }?.toFloatArray()
-                    val dy = obj.dy?.map { it.floatValueYInContext() }?.toFloatArray()
+                    val x = obj.x?.mapToFloatArray { it.floatValueXInContext() }
+                    val y = obj.y?.mapToFloatArray { it.floatValueYInContext() }
+                    val dx = obj.dx?.mapToFloatArray { it.floatValueXInContext() }
+                    val dy = obj.dy?.mapToFloatArray { it.floatValueYInContext() }
                     if (!x.contentEquals(node.x) || !y.contentEquals(node.y) ||
                             !dx.contentEquals(node.dx) || !dy.contentEquals(node.dy)) {
                         node.x = x; node.y = y; node.dx = dx; node.dy = dy

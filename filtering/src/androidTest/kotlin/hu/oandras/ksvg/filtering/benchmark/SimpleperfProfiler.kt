@@ -56,7 +56,7 @@ class SimpleperfProfiler(private val appContext: Context) {
             emptyList()
         } else {
             val available =
-                runCatching {
+                try {
                     val process =
                         ProcessBuilder("sh", "-c", "simpleperf list 2>&1")
                             .redirectErrorStream(true)
@@ -64,7 +64,9 @@ class SimpleperfProfiler(private val appContext: Context) {
                     val output = process.inputStream.bufferedReader().readText()
                     process.waitFor()
                     output.lineSequence().map { it.trim() }.toSet()
-                }.getOrElse { emptySet() }
+                } catch (_: Exception) {
+                    emptySet()
+                }
                 if (available.isEmpty()) {
                     requested
                 } else {

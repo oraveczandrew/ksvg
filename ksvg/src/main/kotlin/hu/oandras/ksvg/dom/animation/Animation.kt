@@ -23,8 +23,9 @@ import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.SVGAttr
 import hu.oandras.ksvg.logUnsupportedAttribute
 import hu.oandras.ksvg.render.animation.parseClockValueMillis
-import hu.oandras.ksvg.render.animation.parseClockValueMillisOrNull
+import hu.oandras.ksvg.render.animation.parseClockValueMillisOrDefault
 import hu.oandras.ksvg.render.animation.parseSemicolonFloatList
+import hu.oandras.ksvg.utils.parseFloatOrDefault
 import java.util.Locale
 import org.xml.sax.Attributes
 
@@ -154,8 +155,8 @@ internal sealed class Animation(
                 SVGAttr.repeatCount -> repeatCount = if (value == "indefinite") {
                     REPEAT_INDEFINITE
                 } else {
-                    val parsedRepeatCount = value.toFloatOrNull()
-                    if (parsedRepeatCount != null && parsedRepeatCount >= 0f) parsedRepeatCount else 1f
+                    val parsed = value.parseFloatOrDefault(1f)
+                    if (parsed >= 0f) parsed else 1f
                 }
                 SVGAttr.repeatDur -> repeatDurMs = if (value == "indefinite") {
                     REPEAT_INDEFINITE.toLong()
@@ -169,14 +170,12 @@ internal sealed class Animation(
                 SVGAttr.min -> minMs = if (value.trim().equals("indefinite", ignoreCase = true)) {
                     Long.MAX_VALUE
                 } else {
-                    val parsedMin = parseClockValueMillisOrNull(value)
-                    if (parsedMin != null && parsedMin >= 0L) parsedMin else 0L
+                    parseClockValueMillisOrDefault(value, 0L)
                 }
                 SVGAttr.max -> maxMs = if (value.trim().equals("indefinite", ignoreCase = true)) {
                     Long.MAX_VALUE
                 } else {
-                    val parsedMax = parseClockValueMillisOrNull(value)
-                    if (parsedMax != null && parsedMax >= 0L) parsedMax else Long.MAX_VALUE
+                    parseClockValueMillisOrDefault(value, Long.MAX_VALUE)
                 }
                 SVGAttr.fill -> fillFreeze = (value == "freeze")
                 SVGAttr.additive -> additiveSum = (value == "sum")
@@ -184,8 +183,11 @@ internal sealed class Animation(
                 SVGAttr.keyTimes -> keyTimes = parseSemicolonFloatList(value)
                 // Unknown calcMode values must not abort the whole parse (would
                 // propagate out of the SAX handler); fall back to linear per SMIL.
-                SVGAttr.calcMode -> calcMode =
-                    runCatching { CalcMode.valueOf(value.lowercase(Locale.US)) }.getOrDefault(CalcMode.linear)
+                SVGAttr.calcMode -> calcMode = try {
+                    CalcMode.valueOf(value.lowercase(Locale.US))
+                } catch (_: IllegalArgumentException) {
+                    CalcMode.linear
+                }
                 SVGAttr.keySplines -> keySplines = value
                 SVGAttr.values -> valuesStr = value
                 SVGAttr.from -> fromStr = value

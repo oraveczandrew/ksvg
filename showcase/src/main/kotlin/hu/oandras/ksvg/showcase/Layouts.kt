@@ -60,7 +60,11 @@ internal fun dpInPixels(context: Context, dp: Float): Int {
 }
 
 internal fun Context.ksvgMenuIcon(svg: String, fallbackRes: Int): Drawable {
-    runCatching { SVG.getFromString(svg).toDrawable() }.getOrNull()?.let { return it }
+    try {
+        return SVG.getFromString(svg).toDrawable()
+    } catch (_: Exception) {
+        // Fall through to the fallback drawable below.
+    }
     return checkNotNull(getDrawable(fallbackRes)) { "Missing fallback drawable resource" }
 }
 

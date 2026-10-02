@@ -329,24 +329,26 @@ internal fun parseClockValueMillis(value: String): Long {
 }
 
 /**
- * Nullable clock-value parse: null when the value is not a valid clock
- * (unlike [parseClockValueMillis], which folds invalid to 0). Needed for
- * `min`/`max`, where 0 is a meaningful constraint, not an error signal.
+ * Clock-value parse with a fallback default (plain = millis): invalid, empty
+ * and negative values all yield [default] — unlike [parseClockValueMillis],
+ * which folds invalid to 0. Needed for `min`/`max`, where 0 is a meaningful
+ * constraint, not an error signal. The `>= 0` check runs after `toLong`, so
+ * `-0.5` still yields `0`, not [default].
  */
-internal fun parseClockValueMillisOrNull(value: String): Long? {
+internal fun parseClockValueMillisOrDefault(value: String, default: Long): Long {
     val trimmed = value.trim()
-    if (trimmed.isEmpty()) return null
+    if (trimmed.isEmpty()) return default
     return try {
-        // Same units as parseClockValueMillis (plain = millis); NaN means
-        // "no number found" (NumberParser never throws), not zero.
         val ms: Float = when {
             trimmed.endsWith("ms") -> NumberParser.parseNumber(trimmed, 0, trimmed.length - 2)
             trimmed.endsWith("s") -> NumberParser.parseNumber(trimmed, 0, trimmed.length - 1) * 1000f
             else -> trimmed.toFloat()
         }
-        if (ms.isNaN()) null else ms.toLong()
+        if (ms.isNaN()) return default
+        val parsed = ms.toLong()
+        if (parsed >= 0L) parsed else default
     } catch (_: NumberFormatException) {
-        null
+        default
     }
 }
 

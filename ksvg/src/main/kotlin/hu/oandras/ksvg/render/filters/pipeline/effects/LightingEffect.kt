@@ -384,7 +384,7 @@ private fun createLightingShader(
                     (spotDy / spotLen).toFloat(),
                     (spotDz / spotLen).toFloat(),
                 )
-                val cone = light.limitingConeAngle?.toDouble() ?: Double.NaN
+                val cone = light.limitingConeAngle.toDouble()
                 shader.setFloatUniform(
                     "uSpotCosine",
                     if (cone.isNaN()) -1f else cos(cone * Math.PI / 180.0).toFloat(),

@@ -27,7 +27,7 @@ internal class PolygonShape(
     conditionalBundle: Conditional,
     transform: Matrix?,
     points: FloatArray?,
-    pathLength: Float? = null
+    pathLength: Float = Float.NaN
 ) : PolyLineShape(
     baseParams = baseParams,
     conditionalBundle = conditionalBundle,

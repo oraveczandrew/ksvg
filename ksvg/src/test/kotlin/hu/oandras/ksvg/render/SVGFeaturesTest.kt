@@ -17,6 +17,8 @@
 package hu.oandras.ksvg.render
 
 import org.junit.Assert.assertFalse
+import androidx.collection.emptyScatterSet
+import androidx.collection.mutableScatterSetOf
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,7 +26,7 @@ class SVGFeaturesTest {
 
     @Test
     fun testSvgFeatureGroupSupported() {
-        val groups = listOf("SVG", "SVGDOM", "SVG-static", "SVGDOM-static",
+        val groups = mutableScatterSetOf("SVG", "SVGDOM", "SVG-static", "SVGDOM-static",
             "SVG-animation", "SVGDOM-animation", "SVG-dynamic", "SVGDOM-dynamic")
         assertTrue(isSupportedFeatures(groups))
     }
@@ -66,12 +68,12 @@ class SVGFeaturesTest {
 
     @Test
     fun testEmptyCollectionIsSupported() {
-        assertTrue(isSupportedFeatures(emptyList()))
+        assertTrue(isSupportedFeatures(emptyScatterSet()))
     }
 
     @Test
     fun testMixedSupportedAndUnsupported() {
-        val mixed = listOf("Shape", "Font", "Text")
+        val mixed = mutableScatterSetOf("Shape", "Font", "Text")
         assertFalse(isSupportedFeatures(mixed))
     }
 }

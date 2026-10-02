@@ -17,14 +17,16 @@
 
 package hu.oandras.ksvg.render
 
+import androidx.collection.ScatterSet
+
 /**
  * Checks if all the given SVG features are supported by the renderer.
  */
-// Note: Collection (not List) because the DOM stores required* as Set<String>;
-// this runs at tree-build time only, so the iterator allocation is acceptable.
-internal fun isSupportedFeatures(features: Collection<String>): Boolean {
-    for (feature in features) {
-        if (!isSupportedFeature(feature)) {
+// Note: ScatterSet (not List) because the DOM stores required* as such;
+// the inline forEach walks the table with no Iterator allocation.
+internal fun isSupportedFeatures(features: ScatterSet<String>): Boolean {
+    features.forEach {
+        if (!isSupportedFeature(it)) {
             return false
         }
     }

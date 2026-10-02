@@ -1255,7 +1255,7 @@ class StylePropertyParsingTest {
     @Test
     fun testEnableBackgroundNew() {
         val s = process("enable-background", "new", isFromAttribute = true).buildAndGet()
-        assertEquals(EnableBackground.New(null, null, null, null), s.enableBackground)
+        assertEquals(EnableBackground.New(Float.NaN, Float.NaN, Float.NaN, Float.NaN), s.enableBackground)
         assertTrue(specified(s.specifiedFlags2, Style.SPECIFIED_ENABLE_BACKGROUND))
     }
 

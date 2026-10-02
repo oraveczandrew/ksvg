@@ -40,11 +40,21 @@ internal interface PoolOwner {
 
 private class PoolOwnerImpl: PoolOwner {
 
+    // The default states below are created on first use, not eagerly: a
+    // PoolOwner is instantiated for every renderToCanvas() call, while these
+    // two pools are only ever consumed by a Renderer, which overrides them with
+    // its own. Building the defaults in the constructor would allocate two
+    // RendererState objects per render call for nothing.
     override val savedRendererStatePool: Pool<SavedRendererState> = object : Pool<SavedRendererState>() {
-        private val defaultRenderState = RendererState()
+        private var defaultRenderState: RendererState? = null
 
         override fun createInstance(): SavedRendererState {
-            return SavedRendererState(defaultRenderState, 0)
+            var state = defaultRenderState
+            if (state == null) {
+                state = RendererState()
+                defaultRenderState = state
+            }
+            return SavedRendererState(state, 0)
         }
 
         override fun resetInstance(item: SavedRendererState) {
@@ -54,14 +64,19 @@ private class PoolOwnerImpl: PoolOwner {
 
     override val renderStatePool: Pool<RendererState> = object : Pool<RendererState>() {
 
-        private val defaultRenderState = RendererState()
+        private var defaultRenderState: RendererState? = null
 
         override fun createInstance(): RendererState {
             return RendererState()
         }
 
         override fun resetInstance(item: RendererState) {
-            item.apply(defaultRenderState)
+            var state = defaultRenderState
+            if (state == null) {
+                state = RendererState()
+                defaultRenderState = state
+            }
+            item.apply(state)
         }
     }
 
