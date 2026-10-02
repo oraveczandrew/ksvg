@@ -587,7 +587,7 @@ internal class RenderTreeBuilder(
                 }
 
                 val path = if (pathDef != null) {
-                    PathConverter(pathDef).path
+                    pathConverter.convertDefinitionInto(pathDef, Path())
                 } else {
                     null
                 }
@@ -1333,14 +1333,23 @@ internal class RenderTreeBuilder(
         if (!display() || !visible()) return null
 
         val pathDefinition = obj.d ?: return null
-        val path = PathConverter(pathDefinition).path
+        val path = pathConverter.convertDefinitionInto(pathDefinition, Path())
 
         if (obj.boundingBox == null) {
             obj.boundingBox = calculatePathBounds(path, null)
         }
         updateParentBoundingBox(obj)
 
-        val node = PathRenderNode(obj, path, MarkerPositionCalculator(obj.d).markers)
+        val style = state.style
+        // Marker geometry is needed only when the path actually references a
+        // marker. Calculating it unconditionally allocates one MarkerVector per
+        // path segment, even for the overwhelmingly common markerless case.
+        val markers = if (style.markerStart != null || style.markerMid != null || style.markerEnd != null) {
+            MarkerPositionCalculator(obj.d).markers
+        } else {
+            null
+        }
+        val node = PathRenderNode(obj, path, markers)
         assignTransform(node, obj)
         node.renderState.apply(state)
         node.boundingBox = obj.boundingBox
@@ -1461,14 +1470,12 @@ internal class RenderTreeBuilder(
             }
             // Text-level textLength widens the measured bounds like the draw path.
             val textLength = effectiveTextLength(obj)
-            if (textLength != null) {
-                proc.applyTextLength(
-                    textLength = textLength,
-                    scaleGlyphs = scaleGlyphs(obj),
-                    naturalWidth = calculateTextWidth(children, state),
-                    charCount = countTextChars(children)
-                )
-            }
+            proc.applyTextLength(
+                textLength = textLength,
+                scaleGlyphs = scaleGlyphs(obj),
+                naturalWidth = calculateTextWidth(children, state),
+                charCount = countTextChars(children)
+            )
             // Measurement only: TextBoundsCalculator never draws, so a throwaway canvas is fine (build time, not hot path).
             calculateTextBounds(canvas = Canvas(), children = children, proc = proc, parentState = state)
             obj.boundingBox = Box(proc.boundingBox)
@@ -1738,7 +1745,7 @@ internal class RenderTreeBuilder(
      */
     private fun resolveShapeClip(shape: BasicShape, refBox: Box): ResolvedShapeClip {
         val clipPath = (shape as? BasicShape.Path)?.let { pathShape ->
-            val path = PathConverter(pathShape.path).path
+            val path = pathConverter.convertDefinitionInto(pathShape.path, Path())
             // `path()` data is written in the referencing element's own user
             // space, whose origin is the reference box corner - the same
             // origin every other basic shape resolves against.
@@ -1809,6 +1816,11 @@ internal class RenderTreeBuilder(
     }
 
     private val tempAncestors = ArrayList<ElementBase>()
+    // Reused path-conversion scratch state for a single build. The builder is
+    // single-threaded, so these need no synchronization; every retained path
+    // still gets its own freshly allocated android Path.
+    private val pathConverter = PathConverter()
+    private val pathMeasure = PathMeasure()
     private fun findInheritFromAncestorState(obj: SvgObject): RendererState {
         val newState = RendererState()
         obj.styleBuilder.also { builder ->
@@ -2312,12 +2324,29 @@ internal class RenderTreeBuilder(
         // build-time viewport context (percent geometry + later resizes can stale
         // the scale the same way other precomputed geometry stales; the common
         // absolute-geometry case stays exact).
+        val declared: Float = when (obj) {
+            is PathShape -> obj.pathLength
+            is RectShape -> obj.pathLength
+            is CircleShape -> obj.pathLength
+            is EllipseShape -> obj.pathLength
+            is LineShape -> obj.pathLength
+            is PolyLineShape -> obj.pathLength
+            else -> Float.NaN
+        }
+
+        // Without a declared pathLength the scale is 1 by definition: skip the
+        // actual-length measurement entirely, in particular the temporary Path
+        // conversion + PathMeasure pair for <path> elements.
+        if (declared.isNaN() || declared <= 0f) return 1f
+
         val actualLength = when (obj) {
             is PathShape -> {
                 val d = obj.d ?: return 1f
-                val measure = PathMeasure()
-                measure.setPath(PathConverter(d).path, false)
-                measure.length
+                pathPool.withPooledObject { tmp ->
+                    pathConverter.convertDefinitionInto(d, tmp)
+                    pathMeasure.setPath(tmp, false)
+                    pathMeasure.length
+                }
             }
 
             is RectShape -> {
@@ -2368,16 +2397,7 @@ internal class RenderTreeBuilder(
             else -> return 1f
         }
 
-        val declared: Float = when (obj) {
-            is PathShape -> obj.pathLength
-            is RectShape -> obj.pathLength
-            is CircleShape -> obj.pathLength
-            is EllipseShape -> obj.pathLength
-            is LineShape -> obj.pathLength
-            is PolyLineShape -> obj.pathLength
-        }
-
-        if (declared.isNaN() || declared <= 0f || actualLength <= 0f) return 1f
+        if (actualLength <= 0f) return 1f
         return actualLength / declared
     }
 

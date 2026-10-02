@@ -936,8 +936,8 @@ internal class SVGImpl internal constructor(
             val pathDef = with(logger) {
                 hu.oandras.ksvg.parser.parsePath(pathDefinition)
             }
-            val pathConv = PathConverter(pathDef)
-            return pathConv.path
+            val pathConv = PathConverter()
+            return pathConv.convertDefinitionInto(pathDef, Path())
         }
     }
 }

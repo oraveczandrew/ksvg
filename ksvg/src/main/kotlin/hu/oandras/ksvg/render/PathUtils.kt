@@ -192,7 +192,10 @@ internal fun updatePathAndBoundingBox(
 ): Boolean {
     val pathDef = obj.d
     return if (pathDef != null) {
-        outPath.set(PathConverter(pathDef).path)
+        // Convert straight into the caller's path: outPath.set(fresh) would
+        // allocate a temporary Path only to copy it over.
+        outPath.reset()
+        PathConverter().convertDefinitionInto(pathDef, outPath)
         true
     } else {
         false

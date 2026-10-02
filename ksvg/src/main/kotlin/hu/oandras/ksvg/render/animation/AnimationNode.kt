@@ -317,7 +317,7 @@ internal class AnimateClipPathNode(
             val entry = list[i]
             if (entry.def === def) return entry.path
         }
-        val path = PathConverter(def).path
+        val path = PathConverter().convertDefinitionInto(def, Path())
         if (box.minX != 0f || box.minY != 0f) {
             path.offset(box.minX, box.minY)
         }

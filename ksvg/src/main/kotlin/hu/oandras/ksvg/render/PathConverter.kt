@@ -33,45 +33,48 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
-
 //==============================================================================
 /*
-*  Convert an internal PathDefinition to an android.graphics.Path object
+*  Convert an internal PathDefinition to an android.graphics.Path object.
+*
+*  Reusable: a single instance converts any number of definitions, each into a
+*  caller-supplied [Path]. The converter itself owns no path, so pooled or
+*  retained targets work alike; per-conversion scratch state is reset on entry.
 */
-internal class PathConverter internal constructor(pathDef: PathDefinition?) : PathInterface {
-    @JvmField
-    val path: Path = Path()
+internal class PathConverter : PathInterface {
+    private var target: Path? = null
+    private var lastX: Float = 0f
+    private var lastY: Float = 0f
 
-    @JvmField
-    var lastX: Float = 0f
-
-    @JvmField
-    var lastY: Float = 0f
-
-    init {
-        pathDef?.enumeratePath(this)
+    fun convertDefinitionInto(def: PathDefinition?, path: Path): Path {
+        target = path
+        lastX = 0f
+        lastY = 0f
+        def?.enumeratePath(this)
+        target = null
+        return path
     }
 
     override fun moveTo(x: Float, y: Float) {
-        path.moveTo(x, y)
+        target!!.moveTo(x, y)
         lastX = x
         lastY = y
     }
 
     override fun lineTo(x: Float, y: Float) {
-        path.lineTo(x, y)
+        target!!.lineTo(x, y)
         lastX = x
         lastY = y
     }
 
     override fun cubicTo(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float) {
-        path.cubicTo(x1, y1, x2, y2, x3, y3)
+        target!!.cubicTo(x1, y1, x2, y2, x3, y3)
         lastX = x3
         lastY = y3
     }
 
     override fun quadTo(x1: Float, y1: Float, x2: Float, y2: Float) {
-        path.quadTo(x1, y1, x2, y2)
+        target!!.quadTo(x1, y1, x2, y2)
         lastX = x2
         lastY = y2
     }
@@ -102,7 +105,7 @@ internal class PathConverter internal constructor(pathDef: PathDefinition?) : Pa
     }
 
     override fun close() {
-        path.close()
+        target!!.close()
     }
 }
 
