@@ -1542,7 +1542,7 @@ internal class Style internal constructor(
         // equals the defaults, instead of one fresh default instance per call.
         // NOTE: this is NOT DEFAULT_STYLE (resolved values, different flavor);
         // the full field comparison in build() keeps the two apart.
-        private val EMPTY: Style = Style()
+        internal val EMPTY: Style = Style()
         @JvmSynthetic
         @JvmField
         internal val DEFAULT_STYLE: Style = run {

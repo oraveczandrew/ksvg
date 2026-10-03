@@ -2441,7 +2441,9 @@ internal class RenderTreeBuilder(
         // Pass 2: apply tiers in ascending priority; suppressedFlags hides concrete
         // declarations that lost to a CSS-wide keyword or to '!important'.
         fun apply(source: Style?, importantOnly: Boolean) {
-            if (source == null) return
+            // The canonical empty style specifies nothing: no flags to merge,
+            // no properties to copy, and its suppressedFlags dance is a no-op.
+            if (source == null || source === Style.EMPTY) return
             source.suppressedFlags = cssWideOverrides or
                     if (importantOnly) source.importantFlags.inv() else source.importantFlags
             updateStyle(state, builder, source)
