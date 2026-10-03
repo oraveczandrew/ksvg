@@ -21,6 +21,7 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
+import androidx.tracing.Trace
 import hu.oandras.ksvg.compat.setBlendModeCompat
 import hu.oandras.ksvg.compat.toBlendModeCompat
 import hu.oandras.ksvg.dom.core.Box
@@ -38,6 +39,7 @@ import hu.oandras.ksvg.render.FeDropShadowRenderNode
 import hu.oandras.ksvg.render.FeFloodRenderNode
 import hu.oandras.ksvg.render.FeGaussianBlurRenderNode
 import hu.oandras.ksvg.render.FeImageRenderNode
+import hu.oandras.ksvg.render.GenericFilterPrimitiveRenderNode
 import hu.oandras.ksvg.render.FeMergeRenderNode
 import hu.oandras.ksvg.render.FeMorphologyRenderNode
 import hu.oandras.ksvg.render.FeOffsetRenderNode
@@ -421,110 +423,120 @@ internal class SoftwareFilterBackend internal constructor(
                 primitives.forEachElement { primitiveNode ->
                     val child = primitiveNode.sourceElement
 
-                    // Compute the union of the referenced input node(s)' subregions in user
-                    // space. When a primitive omits x/y/width/height and its input is a
-                    // referenced node's result, its subregion defaults to this union (per the
-                    // SVG Filter Effects spec) instead of the whole filter region.
-                    inputUnion.setEmpty()
-                    var hasInputRegion = false
-                    when (primitiveNode) {
-                        is FeMergeRenderNode -> primitiveNode.mergeNodes.forEachElement { inputId ->
-                            // Standard inputs (no `in`, SourceGraphic, SourceAlpha) span the whole
-                            // filter region, so they contribute the filter region to the union.
-                            val r = if (inputId == null || inputId == "SourceGraphic" || inputId == "SourceAlpha") {
-                                filterRegion
-                            } else {
-                                results.getResultRegion(inputId)
-                            }
-                            if (r != null) {
-                                if (hasInputRegion) inputUnion.union(r) else inputUnion.set(r)
-                                hasInputRegion = true
-                            }
-                        }
-
-                        else -> {
-                            // `in` == null on a non-first primitive means "the result of the
-                            // previous primitive", so the default subregion inherits the previous
-                            // primitive's subregion (lastResultRegion, initialized to the filter
-                            // region for the first primitive / SourceGraphic). A named result uses
-                            // its recorded subregion. Other standard-input names are never
-                            // registered results, so `getResultRegion` returns null and the
-                            // default falls back to the filter region (spec-correct).
-                            val r = if (child.`in` == null) {
-                                lastResultRegion
-                            } else {
-                                results.getResultRegion(child.`in`)
-                            }
-                            if (r != null) {
-                                inputUnion.set(r)
-                                hasInputRegion = true
-                            }
-                        }
-                    }
-                    val inputRegion = if (hasInputRegion) inputUnion else null
-
-                    val res = renderContext.rectFPool.withPooledObject { primitiveRegion ->
-                        calculatePrimitiveRegion(
-                            primitive = child,
-                            filterRegion = filterRegion,
-                            unitsAreUser = primitiveUnitsAreUser,
-                            originalObjBBox = originalObjBBox,
-                            outRect = primitiveRegion,
-                            inputRegion = inputRegion,
-                        )
-
-                        // Record the primitive's own user-space subregion (used by a following
-                        // primitive that references this result) before remapping below.
-                        results.setResultRegion(child.result, primitiveRegion)
-                        lastResultRegion.set(primitiveRegion)
-
-                        // Remap `primitiveRegion` from user space to bitmap-pixel space so
-                        // the per-primitive subregion clipping (which uses the bitmap's
-                        // pixel dimensions) lines up correctly at any render scale.
-                        val frW = filterRegion.width()
-                        val frH = filterRegion.height()
-                        if (frW > 0f && frH > 0f) {
-                            val scaleX = sourceBitmap.width / frW
-                            val scaleY = sourceBitmap.height / frH
-                            primitiveRegion.set(
-                                (primitiveRegion.left - filterRegion.left) * scaleX,
-                                (primitiveRegion.top - filterRegion.top) * scaleY,
-                                (primitiveRegion.right - filterRegion.left) * scaleX,
-                                (primitiveRegion.bottom - filterRegion.top) * scaleY,
-                            )
-                        }
-
+                    // Per-primitive systrace section (visible as KSVG.filter.sw
+                    // children). Zero-cost when tracing is off: a single
+                    // isEnabled check, no label allocation; the label comes
+                    // from a constant table (primitiveTraceName).
+                    val tracing = Trace.isEnabled()
+                    if (tracing) Trace.beginSection(primitiveTraceName(primitiveNode))
+                    try {
+                        // Compute the union of the referenced input node(s)' subregions in user
+                        // space. When a primitive omits x/y/width/height and its input is a
+                        // referenced node's result, its subregion defaults to this union (per the
+                        // SVG Filter Effects spec) instead of the whole filter region.
+                        inputUnion.setEmpty()
+                        var hasInputRegion = false
                         when (primitiveNode) {
-                            is FeMergeRenderNode -> doFeMergeFilter(
-                                merge = primitiveNode,
-                                results = results,
-                                lastResult = lastResult,
-                                region = primitiveRegion
-                            )
+                            is FeMergeRenderNode -> primitiveNode.mergeNodes.forEachElement { inputId ->
+                                // Standard inputs (no `in`, SourceGraphic, SourceAlpha) span the whole
+                                // filter region, so they contribute the filter region to the union.
+                                val r = if (inputId == null || inputId == "SourceGraphic" || inputId == "SourceAlpha") {
+                                    filterRegion
+                                } else {
+                                    results.getResultRegion(inputId)
+                                }
+                                if (r != null) {
+                                    if (hasInputRegion) inputUnion.union(r) else inputUnion.set(r)
+                                    hasInputRegion = true
+                                }
+                            }
 
-                            else -> applyPrimitive(
-                                primitiveNode = primitiveNode,
-                                results = results,
-                                lastResult = lastResult,
-                                primitiveScaleX = primitiveScaleX,
-                                primitiveScaleY = primitiveScaleY,
-                                primitiveOriginX = primitiveOriginX,
-                                primitiveOriginY = primitiveOriginY,
-                                canvasScaleX = sx,
-                                canvasScaleY = sy,
-                                primitiveUnitsAreUser = primitiveUnitsAreUser,
-                                filterRegion = filterRegion,
-                                filterRegionPx = filterRegionPx,
-                                primitiveRegion = primitiveRegion,
-                                state = state,
-                                terminalNode = terminalNode,
-                            )
+                            else -> {
+                                // `in` == null on a non-first primitive means "the result of the
+                                // previous primitive", so the default subregion inherits the previous
+                                // primitive's subregion (lastResultRegion, initialized to the filter
+                                // region for the first primitive / SourceGraphic). A named result uses
+                                // its recorded subregion. Other standard-input names are never
+                                // registered results, so `getResultRegion` returns null and the
+                                // default falls back to the filter region (spec-correct).
+                                val r = if (child.`in` == null) {
+                                    lastResultRegion
+                                } else {
+                                    results.getResultRegion(child.`in`)
+                                }
+                                if (r != null) {
+                                    inputUnion.set(r)
+                                    hasInputRegion = true
+                                }
+                            }
                         }
-                    }
+                        val inputRegion = if (hasInputRegion) inputUnion else null
 
-                    if (res != null) {
-                        results.set(child.result, res)
-                        lastResult = res
+                        val res = renderContext.rectFPool.withPooledObject { primitiveRegion ->
+                            calculatePrimitiveRegion(
+                                primitive = child,
+                                filterRegion = filterRegion,
+                                unitsAreUser = primitiveUnitsAreUser,
+                                originalObjBBox = originalObjBBox,
+                                outRect = primitiveRegion,
+                                inputRegion = inputRegion,
+                            )
+
+                            // Record the primitive's own user-space subregion (used by a following
+                            // primitive that references this result) before remapping below.
+                            results.setResultRegion(child.result, primitiveRegion)
+                            lastResultRegion.set(primitiveRegion)
+
+                            // Remap `primitiveRegion` from user space to bitmap-pixel space so
+                            // the per-primitive subregion clipping (which uses the bitmap's
+                            // pixel dimensions) lines up correctly at any render scale.
+                            val frW = filterRegion.width()
+                            val frH = filterRegion.height()
+                            if (frW > 0f && frH > 0f) {
+                                val scaleX = sourceBitmap.width / frW
+                                val scaleY = sourceBitmap.height / frH
+                                primitiveRegion.set(
+                                    (primitiveRegion.left - filterRegion.left) * scaleX,
+                                    (primitiveRegion.top - filterRegion.top) * scaleY,
+                                    (primitiveRegion.right - filterRegion.left) * scaleX,
+                                    (primitiveRegion.bottom - filterRegion.top) * scaleY,
+                                )
+                            }
+
+                            when (primitiveNode) {
+                                is FeMergeRenderNode -> doFeMergeFilter(
+                                    merge = primitiveNode,
+                                    results = results,
+                                    lastResult = lastResult,
+                                    region = primitiveRegion
+                                )
+
+                                else -> applyPrimitive(
+                                    primitiveNode = primitiveNode,
+                                    results = results,
+                                    lastResult = lastResult,
+                                    primitiveScaleX = primitiveScaleX,
+                                    primitiveScaleY = primitiveScaleY,
+                                    primitiveOriginX = primitiveOriginX,
+                                    primitiveOriginY = primitiveOriginY,
+                                    canvasScaleX = sx,
+                                    canvasScaleY = sy,
+                                    primitiveUnitsAreUser = primitiveUnitsAreUser,
+                                    filterRegion = filterRegion,
+                                    filterRegionPx = filterRegionPx,
+                                    primitiveRegion = primitiveRegion,
+                                    state = state,
+                                    terminalNode = terminalNode,
+                                )
+                            }
+                        }
+
+                        if (res != null) {
+                            results.set(child.result, res)
+                            lastResult = res
+                        }
+                    } finally {
+                        if (tracing) Trace.endSection()
                     }
                 }
 
@@ -548,6 +560,33 @@ internal class SoftwareFilterBackend internal constructor(
             }
         }
     }
+
+    /**
+     * Systrace section label per filter primitive. Constant strings (zero
+     * allocation); exhaustive over the sealed node hierarchy so a new
+     * primitive fails compilation until it gets a label here.
+     */
+    private fun primitiveTraceName(node: FilterPrimitiveRenderNode<*>): String =
+        when (node) {
+            is FeBlendRenderNode -> "KSVG.filter.sw.feBlend"
+            is FeColorMatrixRenderNode -> "KSVG.filter.sw.feColorMatrix"
+            is FeComponentTransferRenderNode -> "KSVG.filter.sw.feComponentTransfer"
+            is FeCompositeRenderNode -> "KSVG.filter.sw.feComposite"
+            is FeConvolveMatrixRenderNode -> "KSVG.filter.sw.feConvolveMatrix"
+            is FeDiffuseLightingRenderNode -> "KSVG.filter.sw.feDiffuseLighting"
+            is FeDisplacementMapRenderNode -> "KSVG.filter.sw.feDisplacementMap"
+            is FeDropShadowRenderNode -> "KSVG.filter.sw.feDropShadow"
+            is FeFloodRenderNode -> "KSVG.filter.sw.feFlood"
+            is FeGaussianBlurRenderNode -> "KSVG.filter.sw.feGaussianBlur"
+            is FeImageRenderNode -> "KSVG.filter.sw.feImage"
+            is FeMergeRenderNode -> "KSVG.filter.sw.feMerge"
+            is FeMorphologyRenderNode -> "KSVG.filter.sw.feMorphology"
+            is FeOffsetRenderNode -> "KSVG.filter.sw.feOffset"
+            is FeSpecularLightingRenderNode -> "KSVG.filter.sw.feSpecularLighting"
+            is FeTileRenderNode -> "KSVG.filter.sw.feTile"
+            is FeTurbulenceRenderNode -> "KSVG.filter.sw.feTurbulence"
+            is GenericFilterPrimitiveRenderNode -> "KSVG.filter.sw.generic"
+        }
 
     private fun applyPrimitive(
         primitiveNode: FilterPrimitiveRenderNode<*>,
