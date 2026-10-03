@@ -18,7 +18,10 @@ package hu.oandras.ksvg.showcase
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.profileinstaller.ProfileVerifier
 
 // Launcher entry point: two buttons leading to the View-based gallery and the Compose tests.
 class HomeActivity : AppCompatActivity() {
@@ -32,6 +35,40 @@ class HomeActivity : AppCompatActivity() {
         }
         binding.composeButton.setOnClickListener {
             startActivity(Intent(this, ComposeTestActivity::class.java))
+        }
+        logBaselineProfileStatus()
+    }
+
+    /** One-line diagnostics: is the shipped baseline profile compiled in? */
+    private fun logBaselineProfileStatus() {
+        val future = ProfileVerifier.getCompilationStatusAsync()
+        future.addListener({
+            val status = try {
+                future.get()
+            } catch (e: Exception) {
+                Log.w(TAG, "profile status check failed", e)
+                return@addListener
+            }
+            Log.i(TAG, "baseline profile: ${describe(status.profileInstallResultCode)}" +
+                ", compiled=${status.isCompiledWithProfile}")
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    companion object {
+        private const val TAG = "BaselineProfile"
+
+        private fun describe(code: Int): String = when (code) {
+            ProfileVerifier.CompilationStatus.RESULT_CODE_COMPILED_WITH_PROFILE ->
+                "COMPILED_WITH_PROFILE"
+            ProfileVerifier.CompilationStatus.RESULT_CODE_PROFILE_ENQUEUED_FOR_COMPILATION ->
+                "ENQUEUED_FOR_COMPILATION"
+            ProfileVerifier.CompilationStatus.RESULT_CODE_COMPILED_WITH_PROFILE_NON_MATCHING ->
+                "COMPILED_WITH_PROFILE_NON_MATCHING (stale profile?)"
+            ProfileVerifier.CompilationStatus.RESULT_CODE_NO_PROFILE_INSTALLED ->
+                "NO_PROFILE_INSTALLED"
+            ProfileVerifier.CompilationStatus.RESULT_CODE_ERROR_NO_PROFILE_EMBEDDED ->
+                "ERROR_NO_PROFILE_EMBEDDED"
+            else -> "code=$code"
         }
     }
 }

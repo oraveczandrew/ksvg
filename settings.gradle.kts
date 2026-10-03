@@ -41,4 +41,5 @@ include(listOf(
     ":glide",
     ":compose",
     ":showcase",
+    ":baselineprofile",
 ))

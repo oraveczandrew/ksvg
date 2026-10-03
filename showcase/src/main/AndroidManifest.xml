@@ -36,6 +36,12 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop" />
+        <!-- Baseline-profile helper (no launcher): renders all example SVGs
+            offscreen. Started by explicit intent from the baselineprofile
+            generator. -->
+        <activity
+            android:name=".RenderAllActivity"
+            android:exported="true" />
         <activity
             android:name=".SvgTestActivity"
             android:exported="true" />

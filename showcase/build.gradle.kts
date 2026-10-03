@@ -34,13 +34,23 @@ android {
 
     buildTypes.apply {
         getByName("release") {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Baseline-profile generation runs against the non-minified build
+            // (KSVG_NOMINIFY=1): readable rules, remapped by R8 at ship time.
+            // Real releases stay minified.
+            val noMinify = System.getenv("KSVG_NOMINIFY") == "1"
+            isMinifyEnabled = !noMinify
+            isShrinkResources = !noMinify
             isProfileable = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Baseline-profile generation installs the release APK on-device;
+            // an unsigned APK cannot be installed. Sign with the debug key only
+            // for that flow (KSVG_SIGN_DEBUG=1); real releases stay untouched.
+            if (System.getenv("KSVG_SIGN_DEBUG") == "1") {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
         getByName("debug") {
             isMinifyEnabled = false
@@ -107,6 +117,11 @@ dependencies {
     implementation(libs.coroutines.android)
 
     implementation(libs.glide)
+
+    // Baseline-profile installer (backports profile installs below API 33).
+    implementation(libs.profileinstaller)
+    // Enables ProfileInstallerInitializer discovery via androidx.startup.
+    implementation(libs.startup.runtime)
 
     ksp(libs.glide.ksp)
 }
