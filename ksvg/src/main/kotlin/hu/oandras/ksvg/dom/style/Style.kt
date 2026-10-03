@@ -1262,6 +1262,202 @@ internal class Style internal constructor(
         )
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Style) return false
+        // Mirrors Builder.isDataEqualsWith field for field (NaN-safe where it
+        // is NaN-safe there). suppressedFlags is transient working state and is
+        // intentionally excluded.
+        return specifiedFlags == other.specifiedFlags &&
+                specifiedFlags2 == other.specifiedFlags2 &&
+                cssWideKeywordFlags == other.cssWideKeywordFlags &&
+                importantFlags == other.importantFlags &&
+                paintOrder == other.paintOrder &&
+                fill == other.fill &&
+                fillRule == other.fillRule &&
+                (fillOpacity == other.fillOpacity || (fillOpacity.isNaN() && other.fillOpacity.isNaN())) &&
+                stroke == other.stroke &&
+                (strokeOpacity == other.strokeOpacity || (strokeOpacity.isNaN() && other.strokeOpacity.isNaN())) &&
+                strokeWidth == other.strokeWidth &&
+                strokeLineCap == other.strokeLineCap &&
+                strokeLineJoin == other.strokeLineJoin &&
+                strokeMiterLimit == other.strokeMiterLimit &&
+                strokeDashArray.contentEquals(other.strokeDashArray) &&
+                strokeDashOffset == other.strokeDashOffset &&
+                strokeDashArrayResolved.contentEquals(other.strokeDashArrayResolved) &&
+                (strokeDashOffsetResolved == other.strokeDashOffsetResolved || (strokeDashOffsetResolved.isNaN() && other.strokeDashOffsetResolved.isNaN())) &&
+                opacity == other.opacity &&
+                color == other.color &&
+                fontFamily == other.fontFamily &&
+                fontSize == other.fontSize &&
+                (fontSizeAdjust == other.fontSizeAdjust || (fontSizeAdjust.isNaN() && other.fontSizeAdjust.isNaN())) &&
+                whiteSpace == other.whiteSpace &&
+                pointerEvents == other.pointerEvents &&
+                unicodeBidi == other.unicodeBidi &&
+                (fontWeight == other.fontWeight || (fontWeight.isNaN() && other.fontWeight.isNaN())) &&
+                fontStyle == other.fontStyle &&
+                (fontWidth == other.fontWidth || (fontWidth.isNaN() && other.fontWidth.isNaN())) &&
+                textDecoration == other.textDecoration &&
+                direction == other.direction &&
+                textAnchor == other.textAnchor &&
+                dominantBaseline == other.dominantBaseline &&
+                alignmentBaseline == other.alignmentBaseline &&
+                baselineShift == other.baselineShift &&
+                textTransform == other.textTransform &&
+                overflow == other.overflow &&
+                clip == other.clip &&
+                markerStart == other.markerStart &&
+                markerMid == other.markerMid &&
+                markerEnd == other.markerEnd &&
+                display == other.display &&
+                visibility == other.visibility &&
+                stopColor == other.stopColor &&
+                (stopOpacity == other.stopOpacity || (stopOpacity.isNaN() && other.stopOpacity.isNaN())) &&
+                clipPath == other.clipPath &&
+                clipRule == other.clipRule &&
+                mask == other.mask &&
+                maskType == other.maskType &&
+                filter == other.filter &&
+                floodColor == other.floodColor &&
+                (floodOpacity == other.floodOpacity || (floodOpacity.isNaN() && other.floodOpacity.isNaN())) &&
+                lightingColor == other.lightingColor &&
+                solidColor == other.solidColor &&
+                (solidOpacity == other.solidOpacity || (solidOpacity.isNaN() && other.solidOpacity.isNaN())) &&
+                viewportFill == other.viewportFill &&
+                (viewportFillOpacity == other.viewportFillOpacity || (viewportFillOpacity.isNaN() && other.viewportFillOpacity.isNaN())) &&
+                vectorEffect == other.vectorEffect &&
+                imageRendering == other.imageRendering &&
+                isolation == other.isolation &&
+                mixBlendMode == other.mixBlendMode &&
+                enableBackground == other.enableBackground &&
+                shapeRendering == other.shapeRendering &&
+                textRendering == other.textRendering &&
+                colorRendering == other.colorRendering &&
+                transformOrigin == other.transformOrigin &&
+                transformBox == other.transformBox &&
+                fontKerning == other.fontKerning &&
+                fontVariantLigatures == other.fontVariantLigatures &&
+                fontVariantPosition == other.fontVariantPosition &&
+                fontVariantCaps == other.fontVariantCaps &&
+                fontVariantNumeric == other.fontVariantNumeric &&
+                fontVariantEastAsian == other.fontVariantEastAsian &&
+                fontFeatureSettings == other.fontFeatureSettings &&
+                fontVariationSettings == other.fontVariationSettings &&
+                writingMode == other.writingMode &&
+                glyphOrientationVertical == other.glyphOrientationVertical &&
+                textOrientation == other.textOrientation &&
+                colorInterpolationFilters == other.colorInterpolationFilters &&
+                colorInterpolation == other.colorInterpolation &&
+                letterSpacing == other.letterSpacing &&
+                wordSpacing == other.wordSpacing &&
+                geomX == other.geomX &&
+                geomY == other.geomY &&
+                geomWidth == other.geomWidth &&
+                geomHeight == other.geomHeight &&
+                geomCx == other.geomCx &&
+                geomCy == other.geomCy &&
+                geomR == other.geomR &&
+                geomRx == other.geomRx &&
+                geomRy == other.geomRy
+    }
+
+    override fun hashCode(): Int {
+        // Consistent with equals above: NaN normalizes to 0 exactly for the
+        // fields whose equality is NaN-safe; arrays use content hashes.
+        var result = specifiedFlags.hashCode()
+        result = 31 * result + specifiedFlags2.hashCode()
+        result = 31 * result + cssWideKeywordFlags.hashCode()
+        result = 31 * result + importantFlags.hashCode()
+        result = 31 * result + paintOrder.hashCode()
+        result = 31 * result + (fill?.hashCode() ?: 0)
+        result = 31 * result + fillRule.hashCode()
+        result = 31 * result + nanSafeHashCode(fillOpacity)
+        result = 31 * result + (stroke?.hashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(strokeOpacity)
+        result = 31 * result + (strokeWidth?.hashCode() ?: 0)
+        result = 31 * result + strokeLineCap.hashCode()
+        result = 31 * result + strokeLineJoin.hashCode()
+        result = 31 * result + strokeMiterLimit.hashCode()
+        result = 31 * result + (strokeDashArray?.contentHashCode() ?: 0)
+        result = 31 * result + (strokeDashOffset?.hashCode() ?: 0)
+        result = 31 * result + (strokeDashArrayResolved?.contentHashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(strokeDashOffsetResolved)
+        result = 31 * result + opacity.hashCode()
+        result = 31 * result + (color?.hashCode() ?: 0)
+        result = 31 * result + (fontFamily?.hashCode() ?: 0)
+        result = 31 * result + (fontSize?.hashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(fontSizeAdjust)
+        result = 31 * result + (whiteSpace?.hashCode() ?: 0)
+        result = 31 * result + (pointerEvents?.hashCode() ?: 0)
+        result = 31 * result + (unicodeBidi?.hashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(fontWeight)
+        result = 31 * result + (fontStyle?.hashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(fontWidth)
+        result = 31 * result + (textDecoration?.hashCode() ?: 0)
+        result = 31 * result + (direction?.hashCode() ?: 0)
+        result = 31 * result + (textAnchor?.hashCode() ?: 0)
+        result = 31 * result + (dominantBaseline?.hashCode() ?: 0)
+        result = 31 * result + (alignmentBaseline?.hashCode() ?: 0)
+        result = 31 * result + (baselineShift?.hashCode() ?: 0)
+        result = 31 * result + (textTransform?.hashCode() ?: 0)
+        result = 31 * result + (overflow?.hashCode() ?: 0)
+        result = 31 * result + (clip?.hashCode() ?: 0)
+        result = 31 * result + (markerStart?.hashCode() ?: 0)
+        result = 31 * result + (markerMid?.hashCode() ?: 0)
+        result = 31 * result + (markerEnd?.hashCode() ?: 0)
+        result = 31 * result + (display?.hashCode() ?: 0)
+        result = 31 * result + (visibility?.hashCode() ?: 0)
+        result = 31 * result + (stopColor?.hashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(stopOpacity)
+        result = 31 * result + (clipPath?.hashCode() ?: 0)
+        result = 31 * result + (clipRule?.hashCode() ?: 0)
+        result = 31 * result + (mask?.hashCode() ?: 0)
+        result = 31 * result + (maskType?.hashCode() ?: 0)
+        result = 31 * result + (filter?.hashCode() ?: 0)
+        result = 31 * result + (floodColor?.hashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(floodOpacity)
+        result = 31 * result + (lightingColor?.hashCode() ?: 0)
+        result = 31 * result + (solidColor?.hashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(solidOpacity)
+        result = 31 * result + (viewportFill?.hashCode() ?: 0)
+        result = 31 * result + nanSafeHashCode(viewportFillOpacity)
+        result = 31 * result + (vectorEffect?.hashCode() ?: 0)
+        result = 31 * result + (imageRendering?.hashCode() ?: 0)
+        result = 31 * result + (isolation?.hashCode() ?: 0)
+        result = 31 * result + (mixBlendMode?.hashCode() ?: 0)
+        result = 31 * result + (enableBackground?.hashCode() ?: 0)
+        result = 31 * result + (shapeRendering?.hashCode() ?: 0)
+        result = 31 * result + (textRendering?.hashCode() ?: 0)
+        result = 31 * result + (colorRendering?.hashCode() ?: 0)
+        result = 31 * result + (transformOrigin?.hashCode() ?: 0)
+        result = 31 * result + (transformBox?.hashCode() ?: 0)
+        result = 31 * result + (fontKerning?.hashCode() ?: 0)
+        result = 31 * result + (fontVariantLigatures?.hashCode() ?: 0)
+        result = 31 * result + (fontVariantPosition?.hashCode() ?: 0)
+        result = 31 * result + (fontVariantCaps?.hashCode() ?: 0)
+        result = 31 * result + (fontVariantNumeric?.hashCode() ?: 0)
+        result = 31 * result + (fontVariantEastAsian?.hashCode() ?: 0)
+        result = 31 * result + (fontFeatureSettings?.hashCode() ?: 0)
+        result = 31 * result + (fontVariationSettings?.hashCode() ?: 0)
+        result = 31 * result + (writingMode?.hashCode() ?: 0)
+        result = 31 * result + (glyphOrientationVertical?.hashCode() ?: 0)
+        result = 31 * result + (textOrientation?.hashCode() ?: 0)
+        result = 31 * result + (colorInterpolationFilters?.hashCode() ?: 0)
+        result = 31 * result + (colorInterpolation?.hashCode() ?: 0)
+        result = 31 * result + (letterSpacing?.hashCode() ?: 0)
+        result = 31 * result + (wordSpacing?.hashCode() ?: 0)
+        result = 31 * result + (geomX?.hashCode() ?: 0)
+        result = 31 * result + (geomY?.hashCode() ?: 0)
+        result = 31 * result + (geomWidth?.hashCode() ?: 0)
+        result = 31 * result + (geomHeight?.hashCode() ?: 0)
+        result = 31 * result + (geomCx?.hashCode() ?: 0)
+        result = 31 * result + (geomCy?.hashCode() ?: 0)
+        result = 31 * result + (geomR?.hashCode() ?: 0)
+        result = 31 * result + (geomRx?.hashCode() ?: 0)
+        result = 31 * result + (geomRy?.hashCode() ?: 0)
+        return result
+    }
+
     override fun toString(): String {
         return buildString {
             append("Style(specifiedFlags=")
@@ -1543,6 +1739,11 @@ internal class Style internal constructor(
         // NOTE: this is NOT DEFAULT_STYLE (resolved values, different flavor);
         // the full field comparison in build() keeps the two apart.
         internal val EMPTY: Style = Style()
+
+        /** HashCode with all NaN variants normalized, matching NaN-safe equality. */
+        private fun nanSafeHashCode(value: Float): Int {
+            return if (value.isNaN()) 0 else value.hashCode()
+        }
         @JvmSynthetic
         @JvmField
         internal val DEFAULT_STYLE: Style = run {

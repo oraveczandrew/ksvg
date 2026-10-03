@@ -68,11 +68,11 @@ internal const val COLOR_TRANSPARENT: Int = 0
 internal const val COLOR_BLACK: Int = -0x1000000
 
 /**
- * KSVG is a library for reading, parsing and rendering SVG documents on Android devices.
+ * KSVG is a library for reading, parsing, and rendering SVG documents on Android devices.
  *
  * All interaction with KSVG is via this class.
  *
- * Typically, you will call one of the SVG loading and parsing classes then call the renderer,
+ * Typically, you will call one of the SVG loading and parsing classes, then call the renderer,
  * passing it a canvas to draw upon.
  *
  * <h3>Usage summary</h3>
@@ -91,8 +91,8 @@ internal class SVGImpl internal constructor(
     /**
      * The [ExternalFileResolver] in effect when this SVG was parsed.
      *
-     * The parser configuration settings that were used for the current instance
-     * will continue to be used for future parsing by this instance, for example
+     * The parser configuration settings used for the current instance
+     * will continue to be used for future parsing by this instance, for example,
      * when parsing additional CSS.
      */
     override val externalFileResolver: ExternalFileResolver?,
@@ -125,10 +125,40 @@ internal class SVGImpl internal constructor(
      * empty [Style]), so identical strings always produce identical results and the
      * built instance can be shared between elements. Map-like files repeat a handful
      * of style strings thousands of times. A null value means the text specifies
-     * nothing (behaves as an absent attribute); caching that avoids re-parsing it.
+     * nothing (behaves as an absent attribute); caching that avoids reparsing it.
      */
     @JvmField
     internal val inlineStyleCache: ArrayMap<String, Style?> = ArrayMap()
+
+    /**
+     * Content interner for built [Style] instances (per document, freed with it).
+     *
+     * The inline string cache above only shares identical *texts*; this shares
+     * identical *content* regardless of source (presentation attribute,
+     * inline style, or stylesheet rule all build equal Styles). Pre-seeded with
+     * [Style.EMPTY] so the canonical empty keeps its identity (see the
+     * `=== Style.EMPTY` fast path in render-tree building).
+     */
+    @JvmField
+    internal val styleInterner: HashMap<Style, Style> =
+        HashMap<Style, Style>().also { it[Style.EMPTY] = Style.EMPTY }
+
+    internal fun internStyle(style: Style): Style {
+        return styleInterner.getOrPut(style) { style }
+    }
+
+    /**
+     * Single shared base-style builder for the whole document parse.
+     *
+     * Presentation attributes are parsed strictly sequentially (one element at
+     * a time), each use starting with `reset(EMPTY)`, so sharing is safe and
+     * single-threaded parse needs no synchronization. Bonus: [Style.Builder]'s
+     * `lastBuilt` memo survives across elements, so runs of identical
+     * presentation styles build only once without allocating.
+     */
+    @JvmField
+    internal val sharedBaseStyleBuilder: Style.Builder =
+        Style.Builder().apply { reset(Style.EMPTY) }
 
     // Click listener support (lazily computed on hitTest)
     private var onSvgClickListener: OnSvgClickListener? = null
@@ -408,7 +438,7 @@ internal class SVGImpl internal constructor(
      * A View is a special element in SVG documents that describes a rectangular area in the document.
      * Calling this method with a `viewId` will result in the specified view being positioned and scaled
      * to the viewport.  In other words, use [renderToCanvas] to render the whole document, or use this
-     * method instead to render just a part of it.
+     * method instead of rendering just a part of it.
      * 
      * 
      * If the `<view>` could not be found, nothing will be drawn.
@@ -427,7 +457,7 @@ internal class SVGImpl internal constructor(
      * A View is a special element in SVG documents that describes a rectangular area in the document.
      * Calling this method with a `viewId` will result in the specified view being positioned and scaled
      * to the viewport.  In other words, use [renderToCanvas] to render the whole document, or use this
-     * method instead to render just a part of it.
+     * method instead of rendering just a part of it.
      * 
      * 
      * If the `<view>` could not be found, nothing will be drawn.
@@ -552,7 +582,7 @@ internal class SVGImpl internal constructor(
     /**
      * The aspect ratio of the document as a width/height fraction.
      * 
-     * If the width or height of the document are listed with a physical unit such as "cm",
+     * If the width or height of the document is listed with a physical unit such as "cm",
      * then the current `renderDPI` setting will be used to convert that value to pixels.
      * 
      * If the width or height cannot be determined, -1 will be returned.
@@ -607,7 +637,7 @@ internal class SVGImpl internal constructor(
             result = result.substring(1, result.lastIndex).replace("\\'", "'")
         }
 
-        // Remove escaped newline. Replace escape seq representing newline
+        // Remove escaped newline. Replace escape seq representing a newline
         return result
             .replace("\\\n", "")
             .replace("\\A", "\n")
@@ -912,7 +942,7 @@ internal class SVGImpl internal constructor(
             isInternalEntitiesEnabled: Boolean = true,
             documentBaseUrl: String? = null,
         ): SVGImpl {
-            // The parser logs with the wrapped scope, and hands the same
+            // The parser logs with the wrapped scope and hands the same
             // instance to the SVGImpl it builds (pass-through in the
             // secondary constructor), so parse- and render-time warnings
             // share one per-document dedup scope.

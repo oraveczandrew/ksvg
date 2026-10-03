@@ -110,26 +110,31 @@ internal abstract class ElementBase(
         parent: Container?,
     ) : SvgObjectImpl.Builder<T>(document, parent) {
 
-        private var baseStyleBuilder: Style.Builder? = null
+        private var baseStyleUsed: Boolean = false
         private var inlineStyle: Style? = null
         private var classNames: List<String>? = null
-        private var attributesMap: ArrayMap<String, String>? = null
+        private var attributesMap: MutableMap<String, String>? = null
 
         protected fun getBaseParams(): BaseParams {
             return BaseParams(
                 id = getId(),
                 document = document,
                 parent = parent,
-                baseStyle = baseStyleBuilder?.build(),
+                baseStyle = if (baseStyleUsed) {
+                    document.internStyle(document.sharedBaseStyleBuilder.build())
+                } else {
+                    null
+                },
                 classNames = classNames,
-                style = inlineStyle,
+                style = inlineStyle?.let(document::internStyle),
                 spacePreserve = getSpacePreserve(),
                 // Single-entry maps (the common case after id/class/style/d
                 // skipping) don't need ArrayMap's two arrays; the built map is
                 // never mutated afterward, so an immutable singleton is safe.
                 attributes = attributesMap?.let { map ->
                     if (map.size == 1) {
-                        Collections.singletonMap(map.keyAt(0), map.valueAt(0))
+                        val entry = map.entries.first()
+                        Collections.singletonMap(entry.key, entry.value)
                     } else {
                         map
                     }
@@ -175,8 +180,13 @@ internal abstract class ElementBase(
                         return true
                     }
 
-                    val baseStyleBuilder = this.baseStyleBuilder ?: Style().toBuilder().also {
-                        this.baseStyleBuilder = it
+                    // Presentation attributes share the document builder: reset
+                    // once per element, so consecutive identical styles reuse
+                    // the builder's lastBuilt instance without allocating.
+                    val baseStyleBuilder = document.sharedBaseStyleBuilder
+                    if (!baseStyleUsed) {
+                        baseStyleBuilder.reset(Style.EMPTY)
+                        baseStyleUsed = true
                     }
                     Style.processStyleProperty(
                         builder = baseStyleBuilder,
@@ -250,8 +260,9 @@ internal abstract class ElementBase(
                 return
             }
             styleBuilder.build().also {
-                cache[style] = it
-                inlineStyle = it
+                val canonical = document.internStyle(it)
+                cache[style] = canonical
+                inlineStyle = canonical
             }
         }
     }
