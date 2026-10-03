@@ -730,6 +730,17 @@ internal class Style internal constructor(
             val featureSettings = fontFeatureSettings
             val variationSettings = fontVariationSettings
 
+            // Declares nothing and still at constructor defaults: share one
+            // canonical instance. The flag pre-check rejects the common touched
+            // case cheaply; the full field comparison also guards flagless
+            // field writes and keeps the DEFAULT_STYLE flavor apart.
+            if (specifiedFlags == 0L && specifiedFlags2 == 0L &&
+                importantFlags == 0L && cssWideKeywordFlags == 0L &&
+                isDataEqualsWith(EMPTY, featureSettings, variationSettings)
+            ) {
+                return EMPTY
+            }
+
             val original = original
             if (isDataEqualsWith(original, featureSettings, variationSettings)) {
                 return original
@@ -1526,6 +1537,12 @@ internal class Style internal constructor(
         // NOTE: DEFAULT_STYLE declares nothing, so its flags
         // stay empty (all-zero); the default *values* below are what reset()
         // inherits. isSpecified() means author-declared again.
+        // Canonical empty style (constructor defaults, declares nothing).
+        // build() returns this when nothing is specified and every field still
+        // equals the defaults, instead of one fresh default instance per call.
+        // NOTE: this is NOT DEFAULT_STYLE (resolved values, different flavor);
+        // the full field comparison in build() keeps the two apart.
+        private val EMPTY: Style = Style()
         @JvmSynthetic
         @JvmField
         internal val DEFAULT_STYLE: Style = run {

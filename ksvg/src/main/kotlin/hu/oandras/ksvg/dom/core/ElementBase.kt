@@ -138,16 +138,23 @@ internal abstract class ElementBase(
                 return false
             }
 
-            val localName = attributes.getLocalName(index)
-            val attributesMap = this.attributesMap ?: ArrayMap<String, String>(attributes.length).also {
-                this.attributesMap = it
-            }
-            attributesMap[localName] = value
-
             when (attr) {
                 SVGAttr.style -> parseStyle(value)
                 SVGAttr.`class` -> classNames = CSSParser.parseClassAttribute(value)
+                // Typed by the ancestor (id/space/base) or parsed by shapes and
+                // unused as a style property (`d`): super only, never stored.
+                SVGAttr.id, SVGAttr.space, SVGAttr.base, SVGAttr.d -> {
+                    return super.onAttribute(attributes, index, attr, value)
+                }
                 else -> {
+                    val attributesMap = this.attributesMap ?: ArrayMap<String, String>(attributes.length).also {
+                        this.attributesMap = it
+                    }
+
+                    val localName = attributes.getLocalName(index)
+
+                    attributesMap[localName] = value
+
                     if (super.onAttribute(attributes, index, attr, value)) {
                         return true
                     }

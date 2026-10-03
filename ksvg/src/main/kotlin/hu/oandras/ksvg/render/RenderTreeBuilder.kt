@@ -2224,7 +2224,9 @@ internal class RenderTreeBuilder(
                     baseStyle = primitive.baseStyle,
                     style = primitive.style,
                     classNames = primitive.classNames,
-                    attributes = primitive.attributes,
+                    // Synthetic nodes are never selector-matched and nothing
+                    // reads their raw attributes; don't retain the map.
+                    attributes = null,
                     xmlBase = primitive.xmlBase,
                 )
                 val cb = primitive.conditionalBundle
