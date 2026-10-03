@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hu.oandras.ksvg.compose.KsvgAnimatedImage
 
-// Compose parity of MainActivity: same ViewModel, same categories, same 3-column grid,
+// Compose parity of ViewsTestActivity: same ViewModel, same categories, same 3-column grid,
 // same deep-link contract (`category` + `scroll_to` extras). Cells use KsvgAnimatedImage
 // with animation parsing enabled, mirroring the Glide PARSE_ANIMATIONS=true binding.
 class ComposeTestActivity : ComponentActivity() {
@@ -96,7 +96,7 @@ class ComposeTestActivity : ComponentActivity() {
     }
 
     private fun handleDeepLink(intent: Intent) {
-        val requestedCategory = when (intent.getStringExtra(MainActivity.EXTRA_CATEGORY)?.lowercase()) {
+        val requestedCategory = when (intent.getStringExtra(ViewsTestActivity.EXTRA_CATEGORY)?.lowercase()) {
             "meteocons" -> Category.METEOCONS
             "verification", "visual" -> Category.VISUAL
             else -> null
@@ -104,7 +104,7 @@ class ComposeTestActivity : ComponentActivity() {
         if (requestedCategory != null) {
             viewModel.currentCategory.value = requestedCategory
         }
-        pendingScrollTo = intent.getStringExtra(MainActivity.EXTRA_SCROLL_TO)
+        pendingScrollTo = intent.getStringExtra(ViewsTestActivity.EXTRA_SCROLL_TO)
             ?.takeIf { it.isNotBlank() }
         // Pin the target to the currently selected category so an in-flight
         // emission of the previous category cannot consume it.
@@ -112,8 +112,8 @@ class ComposeTestActivity : ComponentActivity() {
             requestedCategory ?: viewModel.currentCategory.value
         }
         // Make the intent one-shot so rotation/re-delivery cannot re-scroll.
-        intent.removeExtra(MainActivity.EXTRA_SCROLL_TO)
-        intent.removeExtra(MainActivity.EXTRA_CATEGORY)
+        intent.removeExtra(ViewsTestActivity.EXTRA_SCROLL_TO)
+        intent.removeExtra(ViewsTestActivity.EXTRA_CATEGORY)
     }
 }
 

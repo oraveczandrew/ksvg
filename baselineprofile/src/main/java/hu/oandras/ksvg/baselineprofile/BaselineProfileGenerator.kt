@@ -62,15 +62,15 @@ class BaselineProfileGenerator {
     fun scrollGrid() = rule.collect(PACKAGE) {
         pressHome()
         startActivityAndWait()
-        // Launcher is HomeActivity: open the classic (Views) gallery list.
+        // Launcher is HomeActivity: open the Views gallery list.
         // NOTE: AppCompat buttons render textAllCaps, so match case-insensitively.
         // NOTE 2: By.text(Pattern) requires a FULL match — wrap in .*.*.
-        val classic = Pattern.compile(".*classic.*", Pattern.CASE_INSENSITIVE)
-        if (!device.wait(Until.hasObject(By.text(classic)), 10_000)) {
+        val viewsButton = Pattern.compile(".*views.*", Pattern.CASE_INSENSITIVE)
+        if (!device.wait(Until.hasObject(By.text(viewsButton)), 10_000)) {
             val texts = device.findObjects(By.clickable(true)).mapNotNull { it.text }
-            throw AssertionError("classic button not found; clickable texts=$texts")
+            throw AssertionError("views button not found; clickable texts=$texts")
         }
-        device.findObject(By.text(classic)).click()
+        device.findObject(By.text(viewsButton)).click()
         device.wait(Until.hasObject(By.clazz("androidx.recyclerview.widget.RecyclerView")), 10_000)
         device.waitForIdle()
         val w = device.displayWidth

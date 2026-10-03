@@ -29,7 +29,7 @@ import com.bumptech.glide.Glide
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import kotlinx.coroutines.launch
 
-class MainActivity : AppCompatActivity() {
+class ViewsTestActivity : AppCompatActivity() {
 
     private val viewModel: IconsViewModel by viewModels()
 
@@ -47,9 +47,10 @@ class MainActivity : AppCompatActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.isAppearanceLightStatusBars = true
         windowInsetsController.isAppearanceLightNavigationBars = true
 
-        val binding = mainActivityLayout()
+        val binding = viewsTestActivityLayout()
         setContentView(binding.root)
         recyclerView = binding.recyclerView
         bottomNavigation = binding.bottomNavigation
@@ -64,7 +65,7 @@ class MainActivity : AppCompatActivity() {
         // cells: their per-frame invalidations compete with the first draws
         // of newly bound cells for the frame budget (Perfetto: Full Self-Jank
         // during fling). Only SETTLING pauses — slow drags keep animating so
-        // the freeze is never stared at. setVisible keeps pooled render state,
+        // the freeze is never stared at. setVisible keeps the pooled render state,
         // so resume draws stay cheap. Glide still owns start/stop via attach state.
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
@@ -107,7 +108,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Debug/development deep link for screenshot sessions:
-     * `adb shell am start -n hu.oandras.ksvg.showcase/.MainActivity
+     * `adb shell am start -n hu.oandras.ksvg.showcase/.ViewsTestActivity
      * --es category verification --es scroll_to blend_mode.svg`
      * Category is one of `meteocons` or `verification` (aka `visual`);
      * scroll_to matches SvgEntry.displayName exactly, falling back to the

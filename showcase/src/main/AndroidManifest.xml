@@ -33,7 +33,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".MainActivity"
+            android:name=".ViewsTestActivity"
             android:exported="true"
             android:launchMode="singleTop" />
         <!-- Baseline-profile helper (no launcher): renders all example SVGs

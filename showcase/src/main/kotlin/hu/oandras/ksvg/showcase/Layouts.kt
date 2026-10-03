@@ -68,7 +68,7 @@ internal fun Context.ksvgMenuIcon(svg: String, fallbackRes: Int): Drawable {
     return checkNotNull(getDrawable(fallbackRes)) { "Missing fallback drawable resource" }
 }
 
-internal class MainActivityBinding(
+internal class ViewsTestActivityBinding(
     @JvmField
     val root: View,
     @JvmField
@@ -77,7 +77,7 @@ internal class MainActivityBinding(
     val bottomNavigation: BottomNavigationView
 )
 
-internal fun Context.mainActivityLayout(): MainActivityBinding {
+internal fun Context.viewsTestActivityLayout(): ViewsTestActivityBinding {
     val recyclerView = RecyclerView(this).apply {
         id = R.id.recyclerView
         layoutParams = ConstraintLayout.LayoutParams(
@@ -87,7 +87,7 @@ internal fun Context.mainActivityLayout(): MainActivityBinding {
             topToTop = ConstraintLayout.LayoutParams.PARENT_ID
             bottomToTop = R.id.bottomNavigation
         }
-        layoutManager = GridLayoutManager(this@mainActivityLayout, 3)
+        layoutManager = GridLayoutManager(this@viewsTestActivityLayout, 3)
         clipToPadding = false
     }
 
@@ -122,7 +122,7 @@ internal fun Context.mainActivityLayout(): MainActivityBinding {
         addView(recyclerView)
         addView(bottomNavigation)
 
-        val statusBarScrim = View(this@mainActivityLayout).apply {
+        val statusBarScrim = View(this@viewsTestActivityLayout).apply {
             id = R.id.statusBarScrim
             setBackgroundColor(Color.WHITE)
             layoutParams = ConstraintLayout.LayoutParams(
@@ -134,7 +134,7 @@ internal fun Context.mainActivityLayout(): MainActivityBinding {
         }
         addView(statusBarScrim)
 
-        val navigationBarScrim = View(this@mainActivityLayout).apply {
+        val navigationBarScrim = View(this@viewsTestActivityLayout).apply {
             id = R.id.navigationBarScrim
             setBackgroundColor(Color.WHITE)
             layoutParams = ConstraintLayout.LayoutParams(
@@ -174,7 +174,7 @@ internal fun Context.mainActivityLayout(): MainActivityBinding {
         }
     }
 
-    return MainActivityBinding(root, recyclerView, bottomNavigation)
+    return ViewsTestActivityBinding(root, recyclerView, bottomNavigation)
 }
 
 internal class SvgItemBinding(
@@ -236,7 +236,7 @@ internal fun Context.homeLayout(): HomeActivityBinding {
     val dp16 = dpInPixels(this, 16f)
     val classicButton = Button(this).apply {
         id = R.id.homeButtonClassic
-        text = "Classic (Views)"
+        text = "Views"
     }
     val composeButton = Button(this).apply {
         id = R.id.homeButtonCompose

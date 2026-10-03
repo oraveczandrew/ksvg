@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import hu.oandras.ksvg.SVG
 
 // Simple debug activity: renders a single SVG asset from intent extras.
@@ -34,6 +35,11 @@ class SvgTestActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.isAppearanceLightStatusBars = true
+        windowInsetsController.isAppearanceLightNavigationBars = true
 
         val imageView = ImageView(this).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER

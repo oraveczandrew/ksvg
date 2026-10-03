@@ -21,6 +21,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.profileinstaller.ProfileVerifier
 
 // Launcher entry point: two buttons leading to the View-based gallery and the Compose tests.
@@ -28,10 +29,14 @@ class HomeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.isAppearanceLightStatusBars = true
+        windowInsetsController.isAppearanceLightNavigationBars = true
         val binding = homeLayout()
         setContentView(binding.root)
         binding.classicButton.setOnClickListener {
-            startActivity(Intent(this, MainActivity::class.java))
+            startActivity(Intent(this, ViewsTestActivity::class.java))
         }
         binding.composeButton.setOnClickListener {
             startActivity(Intent(this, ComposeTestActivity::class.java))
