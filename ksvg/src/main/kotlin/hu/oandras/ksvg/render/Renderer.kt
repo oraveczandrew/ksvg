@@ -770,6 +770,11 @@ internal class Renderer internal constructor(
         canvas: Canvas,
         content: (Canvas) -> Unit,
     ) {
+        // Viewport culling first: fully offscreen nodes (checked live against
+        // the current clip every frame, so animation is safe) skip recording
+        // AND drawing entirely. Markers/filters/masks can paint outside the
+        // geometric box, so those never cull; clipPath only shrinks.
+        if (isOutsideClip(this, canvas)) return
         // Software targets cannot play back display lists.
         if (!canvas.isHardwareAccelerated) { content(canvas); return }
         // Animated subtrees change every frame; caching would be pure overhead.
@@ -843,6 +848,37 @@ internal class Renderer internal constructor(
             k = k * 31 + textLayoutStyleCacheVersion(node.renderState.style)
         }
         return k
+    }
+
+    /**
+     * True when the node's geometric box (stroke-padded) is fully outside the
+     * canvas clip, so neither recording nor drawing it can produce a visible
+     * pixel. Uses the native [Canvas.quickReject], which is transform-aware
+     * (node box and clip live in different spaces once transforms apply), so
+     * no manual matrix mapping is needed. Zero allocation (pooled rect).
+     * Conservative exclusions: markers/filters/masks may paint outside the
+     * box; clipPath only ever shrinks the visible set, so it stays cullable.
+     * The pad is deliberately generous in local units (over-padding only ever
+     * skips fewer nodes, never wrongly). Stroke width comes from the node's
+     * resolved state (updated per frame by style/animation resolution before
+     * drawing).
+     */
+    private fun isOutsideClip(node: RenderNode<*>, canvas: Canvas): Boolean {
+        if (node.hasMarkers()) return false
+        if (node.hasFilters()) return false
+        if (node.maskNode != null) return false
+        // Baked pattern tiles scale geometry into paths (patternBakeMatrix),
+        // so node boxes no longer describe the drawn pixels.
+        if (patternBakeMatrix != null) return false
+        val bb = node.boundingBox ?: return false
+        val strokeWidth = node.renderState.style.strokeWidth
+        val pad = (if (strokeWidth != null && !strokeWidth.isZero) {
+            with(this@Renderer) { strokeWidth.floatValueInContext() }
+        } else 0f) * 0.5f + 1f
+        return rectFPool.withPooledObject { r ->
+            r.set(bb.minX - pad, bb.minY - pad, bb.maxX() + pad, bb.maxY() + pad)
+            canvas.quickReject(r, Canvas.EdgeType.AA)
+        }
     }
 
     /**

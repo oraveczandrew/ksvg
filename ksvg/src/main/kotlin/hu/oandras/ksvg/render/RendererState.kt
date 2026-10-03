@@ -67,8 +67,26 @@ internal class RendererState private constructor(
     @JvmField
     internal val fillConfig = PaintConfiguration()
 
+    // apply() memo: last source whose content was copied into fillConfig.
+    // Sound because configs only mutate through bumping mutators and pooled
+    // states receive configs exclusively via apply().
+    @JvmField
+    internal var lastFillSource: PaintConfiguration? = null
+    @JvmField
+    internal var lastFillVersion: Long = -1L
+    @JvmField
+    internal var lastFillReceiverVersion: Long = -1L
+
     @JvmField
     internal val strokeConfig = PaintConfiguration()
+
+    // apply() memo for strokeConfig; same contract as lastFillSource.
+    @JvmField
+    internal var lastStrokeSource: PaintConfiguration? = null
+    @JvmField
+    internal var lastStrokeVersion: Long = -1L
+    @JvmField
+    internal var lastStrokeReceiverVersion: Long = -1L
 
     /**
      * Set by the renderer whenever this state becomes active for a node; the
@@ -252,8 +270,30 @@ internal class RendererState private constructor(
         hasStroke = other.hasStroke
 
         // Config copy only: the paints are re-synced lazily on next read.
-        fillConfig.setFrom(other.fillConfig)
-        strokeConfig.setFrom(other.strokeConfig)
+        // Version-gated: configs only mutate through bumping mutators
+        // (audit: no direct field writes), so (same source identity +
+        // unchanged source version + untouched receiver) implies the receiver
+        // already holds this content. The receiver check matters: render-time
+        // style resolution (updateStyleForElement) tweaks pooled working
+        // states' configs directly between applies.
+        val srcFill = other.fillConfig
+        if (lastFillSource !== srcFill || lastFillVersion != srcFill.version ||
+            lastFillReceiverVersion != fillConfig.version
+        ) {
+            fillConfig.setFrom(srcFill)
+            lastFillSource = srcFill
+            lastFillVersion = srcFill.version
+            lastFillReceiverVersion = fillConfig.version
+        }
+        val srcStroke = other.strokeConfig
+        if (lastStrokeSource !== srcStroke || lastStrokeVersion != srcStroke.version ||
+            lastStrokeReceiverVersion != strokeConfig.version
+        ) {
+            strokeConfig.setFrom(srcStroke)
+            lastStrokeSource = srcStroke
+            lastStrokeVersion = srcStroke.version
+            lastStrokeReceiverVersion = strokeConfig.version
+        }
 
         viewPort = other.viewPort
         viewBox = other.viewBox
