@@ -41,6 +41,9 @@ class HomeActivity : AppCompatActivity() {
         binding.composeButton.setOnClickListener {
             startActivity(Intent(this, ComposeTestActivity::class.java))
         }
+        binding.mapButton.setOnClickListener {
+            startActivity(Intent(this, LargeMapViewerActivity::class.java))
+        }
         logBaselineProfileStatus()
     }
 

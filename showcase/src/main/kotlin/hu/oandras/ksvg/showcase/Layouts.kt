@@ -229,7 +229,9 @@ internal class HomeActivityBinding(
     @JvmField
     val classicButton: Button,
     @JvmField
-    val composeButton: Button
+    val composeButton: Button,
+    @JvmField
+    val mapButton: Button
 )
 
 internal fun Context.homeLayout(): HomeActivityBinding {
@@ -241,6 +243,10 @@ internal fun Context.homeLayout(): HomeActivityBinding {
     val composeButton = Button(this).apply {
         id = R.id.homeButtonCompose
         text = "Compose"
+    }
+    val mapButton = Button(this).apply {
+        id = R.id.homeButtonMap
+        text = "Large map (pinch-zoom)"
     }
     val root = LinearLayout(this).apply {
         layoutParams = ViewGroup.LayoutParams(
@@ -262,8 +268,15 @@ internal fun Context.homeLayout(): HomeActivityBinding {
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp16 }
+        )
+        addView(
+            mapButton,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
     }
-    return HomeActivityBinding(root, classicButton, composeButton)
+    return HomeActivityBinding(root, classicButton, composeButton, mapButton)
 }

@@ -27,4 +27,5 @@
     <item name="menu_verification" type="id" />
     <item name="homeButtonClassic" type="id" />
     <item name="homeButtonCompose" type="id" />
+    <item name="homeButtonMap" type="id" />
 </resources>
