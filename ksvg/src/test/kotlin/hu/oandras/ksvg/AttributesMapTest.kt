@@ -64,4 +64,20 @@ class AttributesMapTest {
         // Typed duplicates are not retained.
         assertEquals(null, attrs?.get("id"))
     }
+
+    @Test
+    fun skipsForeignNamespaceAttributes() {
+        val el = elementById(
+            """
+            <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"
+                 xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+                 xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+              <path id="p" sodipodi:nodetypes="cccc" inkscape:label="road"
+                    d="M0,0L10,10"/>
+            </svg>
+            """.trimIndent(),
+            "p"
+        )
+        assertNull(el.attributes)
+    }
 }

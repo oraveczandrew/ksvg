@@ -25,6 +25,7 @@ import hu.oandras.ksvg.dom.animation.Animation
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.utils.forEachElement
 import org.xml.sax.Attributes
+import java.util.Collections
 
 // Any object in the tree that corresponds to an SVG element
 internal abstract class ElementBase(
@@ -112,7 +113,7 @@ internal abstract class ElementBase(
         private var baseStyleBuilder: Style.Builder? = null
         private var inlineStyle: Style? = null
         private var classNames: List<String>? = null
-        private var attributesMap: MutableMap<String, String>? = null
+        private var attributesMap: ArrayMap<String, String>? = null
 
         protected fun getBaseParams(): BaseParams {
             return BaseParams(
@@ -123,7 +124,16 @@ internal abstract class ElementBase(
                 classNames = classNames,
                 style = inlineStyle,
                 spacePreserve = getSpacePreserve(),
-                attributes = attributesMap,
+                // Single-entry maps (the common case after id/class/style/d
+                // skipping) don't need ArrayMap's two arrays; the built map is
+                // never mutated afterward, so an immutable singleton is safe.
+                attributes = attributesMap?.let { map ->
+                    if (map.size == 1) {
+                        Collections.singletonMap(map.keyAt(0), map.valueAt(0))
+                    } else {
+                        map
+                    }
+                },
                 xmlBase = effectiveXmlBase(),
             )
         }
@@ -147,13 +157,19 @@ internal abstract class ElementBase(
                     return super.onAttribute(attributes, index, attr, value)
                 }
                 else -> {
-                    val attributesMap = this.attributesMap ?: ArrayMap<String, String>(attributes.length).also {
-                        this.attributesMap = it
-                    }
-
+                    // Foreign-namespace attributes (sodipodi:, inkscape:, ...)
+                    // are never selector-matched (a ':' can't appear in the
+                    // attribute-name grammar) and typed parsing uses local
+                    // names, so there is nothing to retain them for.
                     val localName = attributes.getLocalName(index)
-
-                    attributesMap[localName] = value
+                    val qName = attributes.getQName(index)
+                    if (qName == null || ':' !in qName) {
+                        val attributesMap = this.attributesMap
+                            ?: ArrayMap<String, String>(attributes.length).also {
+                                this.attributesMap = it
+                            }
+                        attributesMap[localName] = value
+                    }
 
                     if (super.onAttribute(attributes, index, attr, value)) {
                         return true
