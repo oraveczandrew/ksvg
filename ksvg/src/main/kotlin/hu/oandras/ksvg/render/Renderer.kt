@@ -774,6 +774,9 @@ internal class Renderer internal constructor(
         // the current clip every frame, so animation is safe) skip recording
         // AND drawing entirely. Markers/filters/masks can paint outside the
         // geometric box, so those never cull; clipPath only shrinks.
+        // (A subpixel variant was measured here and removed: at real sizes
+        // nothing falls below threshold, while the matrix mapping cost every
+        // node on every frame.)
         if (isOutsideClip(this, canvas)) return
         // Software targets cannot play back display lists.
         if (!canvas.isHardwareAccelerated) { content(canvas); return }
