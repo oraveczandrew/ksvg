@@ -45,6 +45,7 @@ import hu.oandras.ksvg.dom.core.ElementBase
 import hu.oandras.ksvg.dom.core.Svg
 import hu.oandras.ksvg.dom.core.SvgObject
 import hu.oandras.ksvg.dom.core.View
+import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.logger.logW
 import hu.oandras.ksvg.parser.SVGParserImpl
 import hu.oandras.ksvg.render.PathConverter
@@ -116,6 +117,18 @@ internal class SVGImpl internal constructor(
 
     @JvmField
     internal var animationsEnabled: Boolean = false
+
+    /**
+     * Cache of already-parsed inline `style=""` attributes by raw text.
+     *
+     * Inline style parsing is context-free (every declaration list is parsed from an
+     * empty [Style]), so identical strings always produce identical results and the
+     * built instance can be shared between elements. Map-like files repeat a handful
+     * of style strings thousands of times. A null value means the text specifies
+     * nothing (behaves as an absent attribute); caching that avoids re-parsing it.
+     */
+    @JvmField
+    internal val inlineStyleCache: ArrayMap<String, Style?> = ArrayMap()
 
     // Click listener support (lazily computed on hitTest)
     private var onSvgClickListener: OnSvgClickListener? = null

@@ -110,7 +110,7 @@ internal abstract class ElementBase(
     ) : SvgObjectImpl.Builder<T>(document, parent) {
 
         private var baseStyleBuilder: Style.Builder? = null
-        private var styleBuilder: Style.Builder? = null
+        private var inlineStyle: Style? = null
         private var classNames: List<String>? = null
         private var attributesMap: MutableMap<String, String>? = null
 
@@ -121,7 +121,7 @@ internal abstract class ElementBase(
                 parent = parent,
                 baseStyle = baseStyleBuilder?.build(),
                 classNames = classNames,
-                style = styleBuilder?.build(),
+                style = inlineStyle,
                 spacePreserve = getSpacePreserve(),
                 attributes = attributesMap,
                 xmlBase = effectiveXmlBase(),
@@ -170,6 +170,15 @@ internal abstract class ElementBase(
 
         private fun parseStyle(style: String) {
             if (style.isBlank()) return
+            // Inline styles are context-free: the same text always parses to the same
+            // Style, so share one built instance per document instead of reparsing.
+            // containsKey is needed: a cached null (specifies nothing) is a hit too.
+            val cache = document.inlineStyleCache
+            if (cache.containsKey(style)) {
+                inlineStyle = cache[style]
+                return
+            }
+            val styleBuilder = Style().toBuilder()
             // CSSTextScanner strips block comments itself (only when present).
             val scan = CSSTextScanner(style)
 
@@ -194,9 +203,6 @@ internal abstract class ElementBase(
                     scan.skipWhitespace()
                 }
                 if (scan.empty() || scan.consume(';')) {
-                    val styleBuilder = this.styleBuilder ?: Style().toBuilder().also {
-                        this.styleBuilder = it
-                    }
                     styleBuilder.lastTouchedFlag = 0L
                     Style.processStyleProperty(
                         builder = styleBuilder,
@@ -209,6 +215,20 @@ internal abstract class ElementBase(
                     }
                     scan.skipWhitespace()
                 }
+            }
+            // An attribute that specifies nothing behaves as absent (null Style),
+            // exactly like before; cache the null so repeats skip parsing too.
+            // Note CSS-wide keywords (inherit/initial/unset) land in
+            // cssWideKeywordFlags, not in the specified/important masks.
+            if (styleBuilder.specifiedFlags == 0L && styleBuilder.specifiedFlags2 == 0L &&
+                styleBuilder.importantFlags == 0L && styleBuilder.cssWideKeywordFlags == 0L
+            ) {
+                cache[style] = null
+                return
+            }
+            styleBuilder.build().also {
+                cache[style] = it
+                inlineStyle = it
             }
         }
     }
