@@ -24,9 +24,7 @@ import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.animation.Animation
 import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.utils.forEachElement
-import hu.oandras.ksvg.utils.toPattern
 import org.xml.sax.Attributes
-import java.util.regex.Matcher
 
 // Any object in the tree that corresponds to an SVG element
 internal abstract class ElementBase(
@@ -172,9 +170,9 @@ internal abstract class ElementBase(
         }
 
         private fun parseStyle(style: String) {
-            val scan = CSSTextScanner(
-                input = blockCommentsMatcher.reset(style).replaceAll("")
-            ) // regex strips block comments
+            if (style.isBlank()) return
+            // CSSTextScanner strips block comments itself (only when present).
+            val scan = CSSTextScanner(style)
 
             while (!scan.empty()) {
                 scan.skipWhitespace()
@@ -213,11 +211,6 @@ internal abstract class ElementBase(
                     scan.skipWhitespace()
                 }
             }
-        }
-
-        companion object {
-            private val PATTERN_BLOCK_COMMENTS = "/\\*.*?\\*/".toPattern()
-            private val blockCommentsMatcher: Matcher = PATTERN_BLOCK_COMMENTS.matcher("")
         }
     }
 }

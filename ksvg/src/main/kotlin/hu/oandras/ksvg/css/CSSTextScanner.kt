@@ -43,7 +43,14 @@ internal val AnPlusB.b: Int
     get() = toInt()
 
 internal class CSSTextScanner(input: String) : TextScanner(
-    input = PATTERN_BLOCK_COMMENTS.matcher(input).replaceAll("")
+    // Comment-stripping needs a regex Matcher + a copied String per input;
+    // most inputs (single values, class attributes) never contain comments,
+    // so only pay for it when '/*' is actually present. Same result either way.
+    input = if (input.indexOf("/*") >= 0) {
+        PATTERN_BLOCK_COMMENTS.matcher(input).replaceAll("")
+    } else {
+        input
+    }
 ) {
 
     /*

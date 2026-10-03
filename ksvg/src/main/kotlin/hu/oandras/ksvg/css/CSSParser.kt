@@ -528,10 +528,15 @@ internal class CSSParser internal constructor(
 
         /**
          * Used by SVGParser to parse the "class" attribute.
-         * Follows ordered set parser algorithm: https://dom.spec.whatwg.org/#concept-ordered-set-parser
+         * Follows the ordered set parser algorithm: https://dom.spec.whatwg.org/#concept-ordered-set-parser
          */
         fun parseClassAttribute(value: String): List<String>? {
             if (value.isEmpty()) return null
+            // Fast path: the common single-class case needs no scanner,
+            // token list or comment handling at all.
+            if (value.none { it == ' ' || it == '\t' || it == '\n' || it == '\r' || it == '\u000C' || it == '/' }) {
+                return listOf(value)
+            }
 
             val scan = CSSTextScanner(value)
             var classNameList: MutableList<String>? = null
