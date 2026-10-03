@@ -60,7 +60,17 @@ internal class Svg(
         preserveAspectRatio: PreserveAspectRatio? = this.preserveAspectRatio
     ): Svg {
         return Svg(
-            baseParams = baseParams,
+            baseParams = BaseParams(
+                id = id,
+                document = document,
+                parent = parent,
+                spacePreserve = spacePreserve,
+                baseStyle = baseStyle,
+                style = style,
+                classNames = classNames,
+                attributes = attributes,
+                xmlBase = xmlBase,
+            ),
             conditionalBundle = this@Svg.conditionalBundle,
             preserveAspectRatio = preserveAspectRatio,
             viewBox = viewBox,

@@ -28,8 +28,7 @@ import org.xml.sax.Attributes
 
 // Any object in the tree that corresponds to an SVG element
 internal abstract class ElementBase(
-    @JvmField
-    val baseParams: BaseParams,
+    baseParams: BaseParams,
 ) : SvgObjectImpl(
     id = baseParams.id,
     document = baseParams.document,

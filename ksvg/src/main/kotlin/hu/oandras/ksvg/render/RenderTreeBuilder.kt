@@ -2216,7 +2216,17 @@ internal class RenderTreeBuilder(
 
             is FeTile -> FeTileRenderNode(primitive)
             is FeDropShadow -> {
-                val bp = primitive.baseParams
+                val bp = ElementBase.BaseParams(
+                    id = primitive.id,
+                    document = primitive.document,
+                    parent = primitive.parent,
+                    spacePreserve = primitive.spacePreserve,
+                    baseStyle = primitive.baseStyle,
+                    style = primitive.style,
+                    classNames = primitive.classNames,
+                    attributes = primitive.attributes,
+                    xmlBase = primitive.xmlBase,
+                )
                 val cb = primitive.conditionalBundle
                 val blurNode = FeGaussianBlurRenderNode(
                     sourceElement = FeGaussianBlur(
