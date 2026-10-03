@@ -19,6 +19,7 @@ package hu.oandras.ksvg.render
 import android.graphics.Matrix
 import hu.oandras.ksvg.HitRegion
 import hu.oandras.ksvg.dom.style.PointerEvents
+import hu.oandras.ksvg.dom.style.Style
 import hu.oandras.ksvg.dom.text.A
 import hu.oandras.ksvg.utils.forEachElement
 
@@ -56,7 +57,9 @@ private fun collectHitRegionsRecursive(
         if (sourceElement is A) {
             val href = sourceElement.href
             val bb = node.boundingBox
-            if (href != null && bb != null && sourceElement.isHitTestable()) {
+            // Resolved style from the render node (not the element's scratch
+            // builder): pointer-events/visibility as computed for this frame.
+            if (href != null && bb != null && node.renderState.style.isHitTestable()) {
                 val world = Matrix(parentMatrix)
                 node.transform?.let { world.postConcat(it) }
                 node.viewBoxTransform?.let { world.postConcat(it) }
@@ -86,10 +89,9 @@ private fun collectHitRegionsRecursive(
  * (hit-test walk), never on the render hot path — plain property reads,
  * no allocation.
  */
-private fun A.isHitTestable(): Boolean {
-    val computed = styleBuilder
-    if (computed.pointerEvents == PointerEvents.none) return false
-    if (computed.visibility == false) return false
+private fun Style.isHitTestable(): Boolean {
+    if (pointerEvents == PointerEvents.none) return false
+    if (visibility == false) return false
     return true
 }
 
