@@ -223,7 +223,7 @@ internal class RendererState private constructor(
     }
 
     @JvmField
-    val dashIntervalBuffer = FloatArrayBucket()
+    var dashIntervalBuffer: FloatArrayBucket? = null
 
     // Scale applied to stroke-dasharray / dashoffset when the shape declares a
     // `pathLength`. Computed from (actual path length / declared pathLength).
@@ -325,7 +325,8 @@ internal class RendererState private constructor(
             var intervalSum = 0f
             val n = strokeDashArrayResolved?.size ?: strokeDashArray?.size ?: 0
             val arrayLen = if (n % 2 == 0) n else n * 2
-            val intervals = dashIntervalBuffer.getWithSize(arrayLen)
+            val intervals = (dashIntervalBuffer
+                ?: FloatArrayBucket().also { dashIntervalBuffer = it }).getWithSize(arrayLen)
             
             if (strokeDashArrayResolved != null) {
                 for (i in 0 until arrayLen) {

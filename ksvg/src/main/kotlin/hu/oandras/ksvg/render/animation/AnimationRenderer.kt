@@ -54,6 +54,7 @@ import hu.oandras.ksvg.render.ResolvedShapeClip
 import hu.oandras.ksvg.render.applyTransformOrigin
 import hu.oandras.ksvg.render.calculatePathBounds
 import hu.oandras.ksvg.render.pool.withPooledObject
+import hu.oandras.ksvg.render.pool.FloatArrayBucket
 import hu.oandras.ksvg.render.updatePathAndBoundingBox
 import hu.oandras.ksvg.utils.alpha
 import hu.oandras.ksvg.utils.argb
@@ -216,7 +217,8 @@ internal fun updatePathAndBoundingBox(
 
     node.animationNodes?.forEachElement { anim ->
         if (anim is AnimateFloatNode && anim.attributeName == SVGAttr.points) {
-            val buf = node.pointsBuffer.getWithSize(stride)
+            val buf = (node.pointsBuffer
+                ?: FloatArrayBucket().also { node.pointsBuffer = it }).getWithSize(stride)
             if (anim.withPointsAt(animationTimeMs, stride, buf)) {
                 animatedPoints = buf
             }

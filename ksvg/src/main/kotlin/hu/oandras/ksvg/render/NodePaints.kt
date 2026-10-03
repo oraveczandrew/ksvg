@@ -54,7 +54,7 @@ internal fun RenderNode<*>.obtainFillPaint(cfg: PaintConfiguration): Paint {
         return p
     }
     val applied = appliedFillConfig!!
-    writeConfigDiff(p, applied, cfg)
+    writeFillConfigDiff(p, applied, cfg)
     applied.setFromQuietly(cfg)
     return p
 }
@@ -80,12 +80,35 @@ internal fun RenderNode<*>.obtainStrokePaint(cfg: PaintConfiguration): Paint {
         return p
     }
     val applied = appliedStrokeConfig!!
-    writeConfigDiff(p, applied, cfg)
+    writeStrokeConfigDiff(p, applied, cfg)
     applied.setFromQuietly(cfg)
     return p
 }
 
-private fun writeConfigDiff(p: Paint, applied: PaintConfiguration, cfg: PaintConfiguration) {
+/**
+ * Fill paints never observe stroke geometry: paths and glyphs drawn with
+ * FILL ignore strokeWidth/Cap/Join/Miter, so those writes are skipped
+ * entirely (fewer JNI crossings per sync). Everything else matches the
+ * stroke diff below.
+ */
+private fun writeFillConfigDiff(p: Paint, applied: PaintConfiguration, cfg: PaintConfiguration) {
+    if (applied.color != cfg.color) p.color = cfg.color
+    if (applied.shader !== cfg.shader) p.shader = cfg.shader
+    if (applied.pathEffect !== cfg.pathEffect) p.pathEffect = cfg.pathEffect
+    if (applied.textSize != cfg.textSize) p.textSize = cfg.textSize
+    if (applied.letterSpacing != cfg.letterSpacing) p.letterSpacing = cfg.letterSpacing
+    if (applied.strikeThruText != cfg.strikeThruText) p.isStrikeThruText = cfg.strikeThruText
+    if (applied.underlineText != cfg.underlineText) p.isUnderlineText = cfg.underlineText
+    if (applied.typeface !== cfg.typeface) p.typeface = cfg.typeface
+    if (applied.fontVariationSettings != cfg.fontVariationSettings) p.fontVariationSettings = cfg.fontVariationSettings
+    if (applied.fontFeatureSettings != cfg.fontFeatureSettings) p.fontFeatureSettings = cfg.fontFeatureSettings
+    if (applied.wordSpacing != cfg.wordSpacing && !cfg.wordSpacing.isNaN()) {
+        p.setWordSpacingCompat(cfg.wordSpacing)
+    }
+    if (applied.antiAlias != cfg.antiAlias) p.isAntiAlias = cfg.antiAlias
+}
+
+private fun writeStrokeConfigDiff(p: Paint, applied: PaintConfiguration, cfg: PaintConfiguration) {
     if (applied.color != cfg.color) p.color = cfg.color
     if (applied.shader !== cfg.shader) p.shader = cfg.shader
     if (applied.pathEffect !== cfg.pathEffect) p.pathEffect = cfg.pathEffect

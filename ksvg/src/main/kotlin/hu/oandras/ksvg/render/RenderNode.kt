@@ -494,7 +494,9 @@ internal class PathRenderNode(
     @JvmField val path: Path,
     @JvmField val markers: List<MarkerVector>? = null
 ) : RenderNode<Shape>(sourceElement) {
-    @JvmField val pointsBuffer = FloatArrayBucket()
+    // Animation scratch (points animations only): null until first needed,
+    // so static paths never allocate the shell.
+    @JvmField var pointsBuffer: FloatArrayBucket? = null
 
     override fun hasMarkers(): Boolean {
         return super.hasMarkers() || markers?.isNotEmpty() == true
@@ -505,7 +507,7 @@ internal class PathRenderNode(
     }
 
     override fun retainedByteCount(): Long =
-        super.retainedByteCount() + pointsBuffer.retainedBytes()
+        super.retainedByteCount() + (pointsBuffer?.retainedBytes() ?: 0)
 
     override fun toString(): String {
         return "PathRenderNode(${super.toString()}, path=$path, markers=$markers)"
