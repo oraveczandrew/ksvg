@@ -1,73 +1,34 @@
 # KSVG
 
-KSVG is a high-performance SVG parser and renderer for Android. It is an optimized fork and evolution of the original [AndroidSVG](https://github.com/BigBadaboom/androidsvg) library, designed for modern Android development with a focus on memory efficiency, immutability, and expanded feature support.
+[![CI](https://github.com/oraveczandrew/ksvg/actions/workflows/ci.yml/badge.svg)](https://github.com/oraveczandrew/ksvg/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/hu.oandras.ksvg/ksvg)](https://central.sonatype.com/artifact/hu.oandras.ksvg/ksvg)
+[![Release](https://img.shields.io/github/v/release/oraveczandrew/ksvg)](https://github.com/oraveczandrew/ksvg/releases)
+[![License](https://img.shields.io/github/license/oraveczandrew/ksvg)](http://www.apache.org/licenses/LICENSE-2.0)
 
-The framework is **100% Kotlin**; filters run through a GPU pipeline on API 33+ (AGSL shaders; `RenderEffect` chain on API 31+) with automatic decline to the CPU software path, backed by a native SIMD engine (x86_64/x86 SSSE3 baselines with AVX2 rows; ARMv7/ARM64 NEON) and a bit-exact pure-Kotlin CPU fallback.
+**KSVG is a modern, standards-focused SVG renderer for Android.** It started as an evolution of the original [AndroidSVG](https://github.com/BigBadaboom/androidsvg) library and has grown into a substantially expanded renderer with broad SVG feature coverage, GPU-accelerated filtering, native SIMD kernels, animation, and modern typography support.
+
+![KSVG rendering showcase](docs/images/showcase-collage.png)
+
+Try it yourself: the showcase app is downloadable from the [releases page](https://github.com/oraveczandrew/ksvg/releases).
+
+The public API and rendering core are written in Kotlin; filters run through a GPU pipeline on API 33+ (AGSL shaders; `RenderEffect` chain on API 31+) with automatic decline to the CPU software path, backed by a native SIMD engine (x86_64/x86 SSSE3 baselines with AVX2 rows; ARMv7/ARM64 NEON) and a pure-Kotlin CPU fallback (parity-gated against the native kernels, with documented ±1 LSB per-kernel tolerances).
 
 *KSVG is licensed under the [Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0)*.
 
-## Key Enhancements
+## Why KSVG?
 
-- **Modern Language**: Fully rewritten in Kotlin, leveraging modern language features and coroutines compatibility.
-- **Immutable DOM**: `Style`, `CSSFontFeatureSettings`, and `CSSFontVariationSettings` are immutable. The builder pattern is optimized to return existing instances if no changes are detected during a build, significantly reducing object churn.
-- **Aggressive Pooling**: Extensive use of object pooling for high-frequency objects (`Matrix`, `Canvas`, `PathShape`, `RectF`, `Bitmap`, and `Style.Builder`) to minimize Garbage Collection (GC) pressure and prevent frame drops during complex rendering or animations.
-- **Expanded SVG Support**:
-    - **Filters**: Comprehensive support for SVG filter primitives (e.g., `feGaussianBlur`, `feColorMatrix`, `feComposite`, `feTurbulence`, `feDisplacementMap`, and more).
-    - **Animations**: Support for declarative SVG animations including `<animate>`, `<animateTransform>`, and `<animateColor>`.
-    - **Modern Typography**: First-class support for **Variable Fonts** (`font-variation-settings`) and **OpenType features** (`font-feature-settings`).
-- **Native Filter Engine**: per-ABI handwritten SIMD kernels (x86_64 and 32-bit x86: SSE2/SSSE3 baselines with AVX2 rows — except the arithmetic-composite kernel, which is scalar-only on 32-bit x86; ARMv7/ARM64: NEON), each bit-exact against the portable Kotlin reference.
-- **Dual Filter Backends**: GPU `RenderEffect` pipeline on hardware canvases (AGSL shaders on API 33+, `RenderEffect` chain on API 31+) with automatic decline to the CPU software path; `RenderOptions.softwareFiltering(true)` forces deterministic software rendering.
-- **Rendering Performance**: Optimized rendering pipeline with lazy builder initialization and smart style inheritance.
+- **Broad SVG feature coverage**: filters, masking, clipping, gradients, animations, and modern typography — see the [feature support matrix](docs/SVG-SUPPORT.md).
+- **GPU-accelerated filtering** with automatic fallback to the CPU software path; `RenderOptions.softwareFiltering(true)` forces deterministic software rendering.
+- **Native SIMD filter engine** (x86_64/x86 SSSE3 baselines with AVX2 rows; ARMv7/ARM64 NEON) with a pure-Kotlin fallback (parity-gated, documented ±1 LSB per-kernel tolerances) — see the [benchmarks](docs/BENCHMARKS.md).
+- **Declarative SMIL animations**: `<animate>`, `<animateTransform>`, `<animateColor>`.
+- **Modern typography**: variable fonts (`font-variation-settings`) and OpenType features (`font-feature-settings`).
+- **Easy integration**: optional Glide and Jetpack Compose artifacts; immutable DOM with object pooling to keep GC pressure low.
 
-## KSVG vs. AndroidSVG Comparison
+## Feature Support
 
-| Feature                 | AndroidSVG (Original)  | KSVG                                         |
-|:------------------------|:-----------------------|:---------------------------------------------|
-| **Language**            | Java                   | 100% Kotlin                                  |
-| **Style State**         | Mutable Objects        | **Immutable** (Memory Optimized)             |
-| **Memory Management**   | Standard Allocation    | **Object Pooling** (`PoolOwner`)             |
-| **SVG Filters**         | Very Limited / Missing | **Comprehensive** (Most Primitives)          |
-| **SVG Animations**      | Not Supported          | **Supported** (`animate`, `transform`, etc.) |
-| **Variable Fonts**      | Not Supported          | **Supported** (`font-variation-settings`)    |
-| **Font Features**       | Not Supported          | **Supported** (`font-feature-settings`)      |
-| **Modern Graphics API** | PorterDuff only        | PorterDuff + **BlendMode** (API 29+)         |
-| **GC Pressure**         | Regular                | **Minimal** (Optimized for 60/120 FPS)       |
+KSVG provides broad SVG 1.1 and modern SVG feature coverage, including filters, masking, clipping, gradients, SMIL animation, and modern typography.
 
-## Modules
-
-| Module       | Artifact                                 | Description                       |
-|:-------------|:-----------------------------------------|:----------------------------------|
-| `:ksvg`      | `hu.oandras.ksvg:ksvg`                   | Parser, DOM, renderer, public API |
-| `:filtering` | `hu.oandras.ksvg:filtering` (transitive) | Native + Kotlin filter kernels    |
-| `:glide`     | `hu.oandras.ksvg:glide`                  | Glide integration (optional)      |
-| `:compose`   | `hu.oandras.ksvg:compose`                | Jetpack Compose integration (optional) |
-| `:showcase`  | — (demo app, not published)              | Sample application                |
-
-## Detailed Feature Support
-
-### SVG Filter Primitives
-KSVG provides a highly optimized implementation for almost all SVG 1.1 filter primitives:
-- `feGaussianBlur`, `feOffset`, `feColorMatrix`
-- `feComponentTransfer` (including `feFuncR`, `feFuncG`, `feFuncB`, `feFuncA` with `identity`, `table`, `discrete`, `linear`, `gamma`)
-- `feComposite`, `feBlend` (including modern CSS blend modes on API 29+)
-- `feTurbulence` (fractal noise and turbulence)
-- `feDisplacementMap`
-- `feDiffuseLighting`, `feSpecularLighting`
-- `feMorphology` (erode and dilate)
-- `feConvolveMatrix`, `feTile`, `feFlood`, `feImage`, `feMerge`, `feDropShadow`
-
-### SVG Animations (SMIL)
-Supported declarative animation elements:
-- `<animate>`: Animate float and color attributes.
-- `<animateTransform>`: Animate `translate`, `scale`, `rotate`, `skewX`, `skewY`.
-- `<animateColor>`: Dedicated color transitions.
-- Supports `additive` (sum), `accumulate` (sum), `repeatCount` (including `indefinite`), and `fill` (freeze/remove).
-- Keyframe-based animations with `keyTimes` and `values` interpolation.
-
-### Modern Typography
-- **Variable Fonts**: Full support for `font-variation-settings` (e.g., `'wght' 700, 'wdth' 100`).
-- **OpenType Features**: Support for `font-feature-settings` (e.g., `'liga', 'kern', 'smcp'`).
-- **Relative Font Weights**: Correct handling of `lighter` and `bolder` keywords according to CSS Fonts 4.
+See the full [SVG feature support matrix](docs/SVG-SUPPORT.md).
 
 ## Installation
 
@@ -131,6 +92,42 @@ For animated SVGs (SMIL), use `KsvgAnimatedImage` (parses with `parseAnimations 
 For more advanced usage, including `RenderOptions` (custom CSS, viewPorts, target
 element rendering, `softwareFiltering(true)` for deterministic CPU rendering),
 see the `RenderOptions` documentation.
+
+## KSVG vs. AndroidSVG Comparison
+
+| Feature                 | AndroidSVG (Original) | KSVG                                         |
+|:------------------------|:----------------------|:---------------------------------------------|
+| **Language**            | Java                  | 100% Kotlin                                  |
+| **Style State**         | Mutable Objects       | **Immutable** (Memory Optimized)             |
+| **Memory Management**   | Standard Allocation   | **Object Pooling** (`PoolOwner`)             |
+| **SVG Filters**         | Limited               | **Comprehensive** (Most Primitives)          |
+| **SVG Animations**      | Not Supported         | **Supported** (`animate`, `transform`, etc.) |
+| **Variable Fonts**      | Not Supported         | **Supported** (`font-variation-settings`)    |
+| **Font Features**       | Not Supported         | **Supported** (`font-feature-settings`)      |
+| **Modern Graphics API** | PorterDuff only       | PorterDuff + **BlendMode** (API 29+)         |
+| **GC Pressure**         | Regular               | **Reduced** (Object Pooling)                 |
+
+## Modules
+
+| Module       | Artifact                                 | Description                                                                         |
+|:-------------|:-----------------------------------------|:------------------------------------------------------------------------------------|
+| `:ksvg`      | `hu.oandras.ksvg:ksvg`                   | Parser, DOM, renderer, public API                                                   |
+| `:filtering` | `hu.oandras.ksvg:filtering` (transitive) | Native + Kotlin filter kernels                                                      |
+| `:glide`     | `hu.oandras.ksvg:glide`                  | Glide integration (optional)                                                        |
+| `:compose`   | `hu.oandras.ksvg:compose`                | Jetpack Compose integration (optional)                                              |
+| `:showcase`  | — (demo app, not published)              | Sample application ([download APK](https://github.com/oraveczandrew/ksvg/releases)) |
+
+## Documentation
+
+API reference (Dokka) at [oraveczandrew.github.io/ksvg](https://oraveczandrew.github.io/ksvg/).
+
+Design and validation notes:
+
+- [SVG feature support matrix](docs/SVG-SUPPORT.md)
+- [Rendering and filter architecture](docs/RENDERING_FILTERING.md)
+- [Chrome SVG filter usage analysis](docs/SVG_FILTER_USAGE.md)
+- [Benchmarks](docs/BENCHMARKS.md)
+- [Known limitations](docs/KNOWN_ISSUES.md)
 
 ## Contributing
 
