@@ -5,7 +5,7 @@
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *        https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,23 +18,16 @@ package hu.oandras.ksvg.showcase
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.drawable.Drawable
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import hu.oandras.ksvg.SVG
 
 // Official Material Symbols ("list", "check_circle"), rendered by KSVG itself so the
 // legacy gallery uses the same icons as the Compose bottom bar.
@@ -50,23 +43,6 @@ private const val MENU_CHECK_CIRCLE_SVG: String =
         "<path d=\"m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480" +
         "q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197" +
         "q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z\"/></svg>"
-
-internal fun dpInPixels(context: Context, dp: Float): Int {
-    return TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP,
-        dp,
-        context.resources.displayMetrics
-    ).toInt()
-}
-
-internal fun Context.ksvgMenuIcon(svg: String, fallbackRes: Int): Drawable {
-    try {
-        return SVG.getFromString(svg).toDrawable()
-    } catch (_: Exception) {
-        // Fall through to the fallback drawable below.
-    }
-    return checkNotNull(getDrawable(fallbackRes)) { "Missing fallback drawable resource" }
-}
 
 internal class ViewsTestActivityBinding(
     @JvmField
@@ -175,95 +151,4 @@ internal fun Context.viewsTestActivityLayout(): ViewsTestActivityBinding {
     }
 
     return ViewsTestActivityBinding(root, recyclerView, bottomNavigation)
-}
-
-internal class SvgItemBinding(
-    @JvmField
-    val root: View,
-    @JvmField
-    val imageView: ImageView,
-    @JvmField
-    val textView: TextView
-)
-
-internal fun Context.svgItemLayout(): SvgItemBinding {
-    val context = this
-    val dp8 = dpInPixels(context, 8f)
-    val dp100 = dpInPixels(context, 100f)
-
-    val imageView = ImageView(context).apply {
-        id = R.id.imageView
-        layoutParams = LinearLayout.LayoutParams(dp100, dp100).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-        }
-        scaleType = ImageView.ScaleType.FIT_CENTER
-    }
-
-    val textView = TextView(context).apply {
-        id = R.id.textView
-        layoutParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
-        gravity = Gravity.CENTER
-        textSize = 12f
-    }
-
-    val root = LinearLayout(context).apply {
-        layoutParams = RecyclerView.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp8, dp8, dp8, dp8)
-        addView(imageView)
-        addView(textView)
-    }
-
-    return SvgItemBinding(root, imageView, textView)
-}
-
-internal class HomeActivityBinding(
-    @JvmField
-    val root: View,
-    @JvmField
-    val classicButton: Button,
-    @JvmField
-    val composeButton: Button
-)
-
-internal fun Context.homeLayout(): HomeActivityBinding {
-    val dp16 = dpInPixels(this, 16f)
-    val classicButton = Button(this).apply {
-        id = R.id.homeButtonClassic
-        text = "Views"
-    }
-    val composeButton = Button(this).apply {
-        id = R.id.homeButtonCompose
-        text = "Compose"
-    }
-    val root = LinearLayout(this).apply {
-        layoutParams = ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        )
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
-        setPadding(dp16, dp16, dp16, dp16)
-        addView(
-            classicButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp16 }
-        )
-        addView(
-            composeButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
-    }
-    return HomeActivityBinding(root, classicButton, composeButton)
 }
