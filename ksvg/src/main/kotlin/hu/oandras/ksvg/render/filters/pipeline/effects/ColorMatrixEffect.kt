@@ -25,6 +25,10 @@ import android.graphics.RuntimeShader
 import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
+import hu.oandras.ksvg.dom.filter.ColorInterpolation
+import hu.oandras.ksvg.render.FeColorMatrixRenderNode
+import hu.oandras.ksvg.render.filters.buildColorMatrix
+import hu.oandras.ksvg.render.filters.getOrCreateLinearMatrix
 
 /**
  * Straight-tap color matrix with premultiplied output, clipped to
@@ -52,6 +56,42 @@ private const val COLOR_MATRIX_SHADER: String = """
                 return half4(res.r * res.a, res.g * res.a, res.b * res.a, res.a);
             }
         """
+
+/**
+ * Builds the color-matrix step of an Impl33 chain, dispatching to the
+ * linear-light or the sRGB factory. The caller remaps [primitiveRegion] to
+ * buffer space, chains the effect onto the primitive input and registers
+ * the returned shader.
+ *
+ * @param node the color-matrix render node (mode, matrix values)
+ * @param primitiveRegion the primitive subregion in buffer space (already
+ * remapped from user space by the caller); the CPU kernel writes the clip
+ * only
+ * @param inputUniformName the shader-input uniform name (`uInput`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createColorMatrixShaderEffect(
+    node: FeColorMatrixRenderNode,
+    primitiveRegion: RectF,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect> {
+    // Linear-light matrix runs linearized (like the arithmetic path); the
+    // sRGB shader below is gamma-space only.
+    return if (node.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB) {
+        createLinearColorMatrixShaderEffect(
+            matrix = node.getOrCreateLinearMatrix(),
+            primitiveRegion = primitiveRegion,
+            inputUniformName = inputUniformName,
+        )
+    } else {
+        val matrix = buildColorMatrix(node.sourceElement.type, node.sourceElement.values)
+        createColorMatrixShaderEffect(
+            matrix = matrix.array,
+            primitiveRegion = primitiveRegion,
+            inputUniformName = inputUniformName,
+        )
+    }
+}
 
 /**
  * Builds the color-matrix step of an Impl33 chain: the configured

@@ -114,6 +114,37 @@ internal fun createArithmeticCompositeShaderEffect(
 }
 
 /**
+ * Builds the arithmetic-composite step of an Impl33 chain, dispatching to
+ * the linear-light or the sRGB factory. The caller remaps [primitiveRegion]
+ * to buffer space, resolves [in2Shader] and registers the returned shader.
+ *
+ * @param k1 k2 k3 k4 the arithmetic coefficients
+ * @param useLinear true runs the polynomial linearized with an sRGB EOTF
+ * on the output, false runs it in sRGB gamma space
+ * @param primitiveRegion the primitive subregion in buffer space (already
+ * remapped from user space by the caller); the CPU kernel writes the clip
+ * only
+ * @param in2Shader the already-configured chain shader feeding `uIn2`
+ * @param inputUniformName the shader-input uniform name (`uInput`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createCompositeShaderEffect(
+    k1: Float,
+    k2: Float,
+    k3: Float,
+    k4: Float,
+    useLinear: Boolean,
+    primitiveRegion: RectF,
+    in2Shader: RuntimeShader,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect> =
+    if (useLinear) {
+        createLinearArithmeticCompositeShaderEffect(k1, k2, k3, k4, primitiveRegion, in2Shader, inputUniformName)
+    } else {
+        createArithmeticCompositeShaderEffect(k1, k2, k3, k4, primitiveRegion, in2Shader, inputUniformName)
+    }
+
+/**
  * Linear-light arithmetic transfer lookup. Same clip rule as the sRGB
  * branch, but the k-polynomial runs on linearized taps (exact sRGB→linear
  * table, mirroring the CPU `useLinear` path, which linearizes via LUTs)

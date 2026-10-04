@@ -23,6 +23,7 @@ import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
+import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.render.FeConvolveMatrixRenderNode
 
 /**
@@ -104,14 +105,21 @@ private const val CONVOLVE_MATRIX_SHADER: String = """
         """
 
 /**
- * Builds the duplicate-mode convolve-matrix step of an Impl33 chain: the
- * configured [RuntimeShader] (kept by the caller for downstream
- * `resultShaders` lookups) plus the [RenderEffect] wrapping it under
- * [inputUniformName]. See [createConvolveWrapShaderEffect] for the shared
- * semantics; the mode is pinned per factory (no caller-side flag).
+ * Builds the convolve-matrix step of an Impl33 chain, selecting the edge
+ * mode. The caller chains the effect onto the primitive input
+ * and registers the returned shader. Returns null when the chain must be
+ * declined: a `kernelUnitLength` needs a downscale-convolve-upscale
+ * sequence, which the GPU chain cannot represent, or when the kernel
+ * exceeds the shader limit.
+ *
+ * @param node the convolve render node (order, kernel, edge mode)
+ * @param filterRegion the filter region in user space
+ * @param scaleX scaleY the buffer scale
+ * @param padX padY the chain padding in buffer pixels
+ * @param inputUniformName the shader-input uniform name (`uInput`)
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-internal fun createConvolveDuplicateShaderEffect(
+internal fun createConvolveMatrixShaderEffect(
     node: FeConvolveMatrixRenderNode,
     filterRegion: RectF,
     scaleX: Float,
@@ -120,43 +128,25 @@ internal fun createConvolveDuplicateShaderEffect(
     padY: Int,
     inputUniformName: String,
 ): Pair<RuntimeShader, RenderEffect>? {
-    return createConvolveShaderEffect(node, 0, filterRegion, scaleX, scaleY, padX, padY, inputUniformName)
-}
-
-/**
- * Builds the wrap-mode convolve-matrix step of an Impl33 chain (out-of-
- * bounds taps wrap around the input extent). See
- * [createConvolveDuplicateShaderEffect] for the shared semantics.
- */
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
-internal fun createConvolveWrapShaderEffect(
-    node: FeConvolveMatrixRenderNode,
-    filterRegion: RectF,
-    scaleX: Float,
-    scaleY: Float,
-    padX: Int,
-    padY: Int,
-    inputUniformName: String,
-): Pair<RuntimeShader, RenderEffect>? {
-    return createConvolveShaderEffect(node, 1, filterRegion, scaleX, scaleY, padX, padY, inputUniformName)
-}
-
-/**
- * Builds the none-mode convolve-matrix step of an Impl33 chain
- * (out-of-bounds taps read transparent). See
- * [createConvolveDuplicateShaderEffect] for the shared semantics.
- */
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
-internal fun createConvolveNoneShaderEffect(
-    node: FeConvolveMatrixRenderNode,
-    filterRegion: RectF,
-    scaleX: Float,
-    scaleY: Float,
-    padX: Int,
-    padY: Int,
-    inputUniformName: String,
-): Pair<RuntimeShader, RenderEffect>? {
-    return createConvolveShaderEffect(node, 2, filterRegion, scaleX, scaleY, padX, padY, inputUniformName)
+    if (node.kernelUnitLengthX != 0f || node.kernelUnitLengthY != 0f) {
+        return null
+    }
+    // uEdgeMode: 0 = duplicate/clamp, 1 = wrap, 2 = none/transparent.
+    val edgeMode = when (node.sourceElement.edgeMode) {
+        ConvolveMatrixEdgeMode.wrap -> 1
+        ConvolveMatrixEdgeMode.none -> 2
+        else -> 0
+    }
+    return createConvolveShaderEffect(
+        node = node,
+        edgeMode = edgeMode,
+        filterRegion = filterRegion,
+        scaleX = scaleX,
+        scaleY = scaleY,
+        padX = padX,
+        padY = padY,
+        inputUniformName = inputUniformName,
+    )
 }
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)

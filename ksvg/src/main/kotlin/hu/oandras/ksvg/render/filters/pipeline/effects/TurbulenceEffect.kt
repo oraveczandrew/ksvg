@@ -240,6 +240,77 @@ private const val TURBULENCE_SHADER: String = """
  * exact for full-region clips, best-effort mirrored formula otherwise)
  * @param inputUniformName the shader-input uniform name (`in_source`)
  */
+/**
+ * Builds the turbulence step of an Impl33 chain, deriving the clip origin
+ * and remapping the region host-side. The caller registers the returned
+ * shader (generative — the effect is NOT chained onto the input).
+ *
+ * @param node the turbulence render node
+ * @param primitiveRegion the primitive's user-space subregion in, buffer
+ * space out (remapped inside: the stitch wrap origin below must be mirrored
+ * from user space BEFORE the mapping, same formula as the CPU remap)
+ * @param filterRegion the filter region in user space
+ * @param primitiveScaleX primitiveScaleY the primitive-unit scale;
+ * canvasScaleX canvasScaleY the buffer scale
+ * @param padX padY the chain padding in buffer pixels
+ * @param unlinearize true for terminal turbulence under linearRGB
+ * (linear->sRGB transfer, the CPU unLinearizeBitmap equivalent)
+ * @param primitiveUnitsAreUser false when primitive units are
+ * objectBoundingBox (origin at the bounding box instead of 0,0)
+ * @param boundingBox the filtered element bounding box (only read when
+ * primitive units are objectBoundingBox)
+ * @param inputUniformName the shader-input uniform name (`in_source`)
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+internal fun createTurbulenceShaderEffect(
+    node: FeTurbulenceRenderNode,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    primitiveScaleX: Float,
+    primitiveScaleY: Float,
+    canvasScaleX: Float,
+    canvasScaleY: Float,
+    padX: Int,
+    padY: Int,
+    unlinearize: Boolean,
+    primitiveUnitsAreUser: Boolean,
+    boundingBox: Box,
+    inputUniformName: String,
+): Pair<RuntimeShader, RenderEffect> {
+    // Stitch wrap origin: CPU `clipLeft`/`clipTop` mirrored from user space
+    // BEFORE the buffer-space mapping below (same formula as the CPU remap).
+    val clipLeft = ((primitiveRegion.left - filterRegion.left) * canvasScaleX).toInt()
+        .coerceIn(0, (filterRegion.width() * canvasScaleX).toInt())
+    val clipTop = ((primitiveRegion.top - filterRegion.top) * canvasScaleY).toInt()
+        .coerceIn(0, (filterRegion.height() * canvasScaleY).toInt())
+    primitiveRegion.set(
+        (primitiveRegion.left - filterRegion.left) * canvasScaleX + padX,
+        (primitiveRegion.top - filterRegion.top) * canvasScaleY + padY,
+        (primitiveRegion.right - filterRegion.left) * canvasScaleX + padX,
+        (primitiveRegion.bottom - filterRegion.top) * canvasScaleY + padY
+    )
+
+    // stitchTiles="stitch" is served by the shader itself (uTilePeriod —
+    // same adjusted-frequency math as FilterGeneration).
+    return createTurbulenceShaderEffect(
+        node = node,
+        primitiveScaleX = primitiveScaleX,
+        primitiveScaleY = primitiveScaleY,
+        filterRegion = filterRegion,
+        canvasScaleX = canvasScaleX,
+        canvasScaleY = canvasScaleY,
+        padX = padX,
+        padY = padY,
+        unlinearize = unlinearize,
+        primitiveUnitsAreUser = primitiveUnitsAreUser,
+        boundingBox = boundingBox,
+        primitiveRegion = primitiveRegion,
+        clipLeft = clipLeft,
+        clipTop = clipTop,
+        inputUniformName = inputUniformName,
+    )
+}
+
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 internal fun createTurbulenceShaderEffect(
     node: FeTurbulenceRenderNode,

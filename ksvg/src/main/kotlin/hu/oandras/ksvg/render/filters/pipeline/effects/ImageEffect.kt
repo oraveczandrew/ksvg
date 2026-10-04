@@ -18,8 +18,8 @@
 
 package hu.oandras.ksvg.render.filters.pipeline.effects
 
-import android.graphics.Bitmap
 import android.graphics.BitmapShader
+import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.graphics.Shader
@@ -70,22 +70,54 @@ private const val IMAGE_SHADER: String = """
  * the caller declines so software renders instead.
  *
  * @param node the image render node (decoded bitmap)
+ * @param primitiveRegion the primitive's user-space subregion (read only)
+ * @param filterRegion the filter region in user space
+ * @param sx sy the buffer scale
  * @param padX padY the device-space padding of the filter region top-left
  * (bitmap index space starts here, like the turbulence `uOffset`; the
  * image bounds are `pad + bitmap size`. Only used when the CPU output is
  * the same unscaled blit — i.e., no preserveAspectRatio mapping, subregion
- * at the region origin, matching bitmap size; the caller declines
- * otherwise and software renders instead)
+ * at the region origin, matching bitmap size; returns null otherwise and
+ * software renders instead)
  * @param inputUniformName the shader-input uniform name (`uInput`)
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 internal fun createImageShaderEffect(
     node: FeImageRenderNode,
+    primitiveRegion: RectF,
+    filterRegion: RectF,
+    sx: Float,
+    sy: Float,
     padX: Int,
     padY: Int,
     inputUniformName: String,
 ): Pair<RuntimeShader, RenderEffect>? {
+    // Raster feImage only: element references (`referencedNode`) have no
+    // decoded bitmap — only the CPU backend rasterizes them — so decline
+    // and let software render instead. Pre-rasterizing into a BitmapShader
+    // input is deliberately NOT done: chains are cached per element slot
+    // across frames, so baked content would go stale (and freeze animations
+    // inside the referenced subtree).
+    //
+    // preserveAspectRatio mapping lives on the CPU path only (the chain
+    // draws unscaled at the region origin): decline whenever the software
+    // output would differ — an explicit PAR, or a subregion that is not
+    // exactly the unscaled bitmap at the region origin. Spurious declines
+    // (float dust) only cost software rendering, never correctness.
     val image = node.image ?: return null
+    if (node.sourceElement.preserveAspectRatio != null) {
+        return null
+    }
+    val subLeft = (primitiveRegion.left - filterRegion.left) * sx + padX
+    val subTop = (primitiveRegion.top - filterRegion.top) * sy + padY
+    val subRight = (primitiveRegion.right - filterRegion.left) * sx + padX
+    val subBottom = (primitiveRegion.bottom - filterRegion.top) * sy + padY
+    if (subLeft != padX.toFloat() || subTop != padY.toFloat() ||
+        subRight - subLeft != image.width.toFloat() ||
+        subBottom - subTop != image.height.toFloat()
+    ) {
+        return null
+    }
     val shader = RuntimeShader(IMAGE_SHADER)
     shader.setInputShader(
         "uImage",

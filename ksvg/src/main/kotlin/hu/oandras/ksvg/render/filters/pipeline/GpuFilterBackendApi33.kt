@@ -18,8 +18,6 @@ package hu.oandras.ksvg.render.filters.pipeline
 
 import android.graphics.BlendMode
 import android.graphics.Canvas
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
 import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
@@ -34,7 +32,6 @@ import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
 import hu.oandras.ksvg.dom.filter.FeBlendMode
 import hu.oandras.ksvg.dom.filter.FeCompositeOperator
 import hu.oandras.ksvg.dom.filter.FilterPrimitive
-import hu.oandras.ksvg.render.ALPHA_MATRIX_COLOR_FILTER
 import hu.oandras.ksvg.render.FeBlendRenderNode
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeComponentTransferRenderNode
@@ -57,23 +54,18 @@ import hu.oandras.ksvg.render.RenderContext
 import hu.oandras.ksvg.render.RenderNode
 import hu.oandras.ksvg.render.RendererState
 import hu.oandras.ksvg.render.calculatePrimitiveRegion
-import hu.oandras.ksvg.render.filters.buildColorMatrix
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthX
 import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
-import hu.oandras.ksvg.render.filters.getOrCreateLinearMatrix
-import hu.oandras.ksvg.render.filters.pipeline.effects.createArithmeticCompositeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createColorMatrixShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createComponentTransferShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveDuplicateShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveNoneShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveWrapShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createCompositeShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createConvolveMatrixShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createDiffuseLightingShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createDisplacementMapShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createDropShadowEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createFloodShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createImageShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearArithmeticCompositeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearBlendShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearColorMatrixShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createOffsetShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createSpecularLightingShaderEffect
@@ -224,14 +216,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                             if (dx == 0f && dy == 0f) {
                                 inputEffect
                             } else {
-                                // Map to buffer space: (user - filterRegion.left) * sx + padX
-                                // (the CPU kernel writes the clip only).
-                                primitiveRegion.set(
-                                    (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                    (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                    (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                    (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                                )
+                                mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
                                 val (shader, offsetEffect) = createOffsetShaderEffect(
                                     offsetX = dx,
@@ -324,35 +309,13 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeColorMatrixRenderNode -> {
-                            val colorMatrix = primitive.sourceElement
-                            // Map to buffer space: (user - filterRegion.left) * sx + padX
-                            // (the CPU kernel writes the clip only).
-                            primitiveRegion.set(
-                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                            )
+                            mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
-                            val (shader, colorMatrixEffect) = if (
-                                primitive.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
-                            ) {
-                                // Linear-light matrix runs linearized (like the
-                                // arithmetic path); the sRGB shader below is
-                                // gamma-space only.
-                                createLinearColorMatrixShaderEffect(
-                                    matrix = primitive.getOrCreateLinearMatrix(),
-                                    primitiveRegion = primitiveRegion,
-                                    inputUniformName = "uInput",
-                                )
-                            } else {
-                                val matrix = buildColorMatrix(colorMatrix.type, colorMatrix.values)
-                                createColorMatrixShaderEffect(
-                                    matrix = matrix.array,
-                                    primitiveRegion = primitiveRegion,
-                                    inputUniformName = "uInput",
-                                )
-                            }
+                            val (shader, colorMatrixEffect) = createColorMatrixShaderEffect(
+                                node = primitive,
+                                primitiveRegion = primitiveRegion,
+                                inputUniformName = "uInput",
+                            )
                             lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             colorMatrixEffect.chainWith(inputEffect)
                         }
@@ -360,17 +323,10 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         is FeDiffuseLightingRenderNode -> {
                             // kernelUnitLength needs downscale-light-upscale,
                             // which the GPU chain cannot represent: decline to SW.
-                            if (primitive.sourceElement.kernelUnitLengthX != 0f ||
-                                primitive.sourceElement.kernelUnitLengthY != 0f
-                            ) {
+                            if (hasKernelUnitLength(primitive.sourceElement.kernelUnitLengthX, primitive.sourceElement.kernelUnitLengthY)) {
                                 return null
                             }
-                            primitiveRegion.set(
-                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                            )
+                            mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
                             // No light source: the CPU passes the input through
                             // (`doLightingFilter`: `light ?: return inputBitmap`).
@@ -403,17 +359,10 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         is FeSpecularLightingRenderNode -> {
                             // kernelUnitLength needs downscale-light-upscale,
                             // which the GPU chain cannot represent: decline to SW.
-                            if (primitive.sourceElement.kernelUnitLengthX != 0f ||
-                                primitive.sourceElement.kernelUnitLengthY != 0f
-                            ) {
+                            if (hasKernelUnitLength(primitive.sourceElement.kernelUnitLengthX, primitive.sourceElement.kernelUnitLengthY)) {
                                 return null
                             }
-                            primitiveRegion.set(
-                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                            )
+                            mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
                             // Terminal specular emits premultiplied output on the CPU
                             // path (full light color + intensity alpha); mirror it.
@@ -446,14 +395,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeComponentTransferRenderNode -> {
-                            // Map to buffer space: (user - filterRegion.left) * sx + padX
-                            // (the CPU kernel writes the clip only).
-                            primitiveRegion.set(
-                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                            )
+                            mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
                             val (shader, transferEffect) = createComponentTransferShaderEffect(
                                 primitive, primitiveRegion, "uInput",
@@ -463,40 +405,15 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeConvolveMatrixRenderNode -> {
-                            // kernelUnitLength needs downscale-convolve-upscale,
-                            // which the GPU chain cannot represent: decline to SW.
-                            if (primitive.kernelUnitLengthX != 0f || primitive.kernelUnitLengthY != 0f) {
-                                return null
-                            }
-                            val (shader, convolveEffect) = when (primitive.sourceElement.edgeMode) {
-                                ConvolveMatrixEdgeMode.wrap -> createConvolveWrapShaderEffect(
-                                    node = primitive,
-                                    filterRegion = filterRegion,
-                                    scaleX = sx,
-                                    scaleY = sy,
-                                    padX = totalPadX,
-                                    padY = totalPadY,
-                                    inputUniformName = "uInput",
-                                )
-                                ConvolveMatrixEdgeMode.none -> createConvolveNoneShaderEffect(
-                                    node = primitive,
-                                    filterRegion = filterRegion,
-                                    scaleX = sx,
-                                    scaleY = sy,
-                                    padX = totalPadX,
-                                    padY = totalPadY,
-                                    inputUniformName = "uInput",
-                                )
-                                else -> createConvolveDuplicateShaderEffect(
-                                    node = primitive,
-                                    filterRegion = filterRegion,
-                                    scaleX = sx,
-                                    scaleY = sy,
-                                    padX = totalPadX,
-                                    padY = totalPadY,
-                                    inputUniformName = "uInput",
-                                )
-                            } ?: return null
+                            val (shader, convolveEffect) = createConvolveMatrixShaderEffect(
+                                node = primitive,
+                                filterRegion = filterRegion,
+                                scaleX = sx,
+                                scaleY = sy,
+                                padX = totalPadX,
+                                padY = totalPadY,
+                                inputUniformName = "uInput",
+                            ) ?: return null
                             lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             convolveEffect.chainWith(inputEffect)
                         }
@@ -513,22 +430,8 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                 // (spec), named in2 to a bound result — decline
                                 // otherwise and let the (correct) software backend
                                 // take the filter.
-                                val in2Name = blend.in2
-                                val in2Shader = if (in2Name == null) {
-                                    if (!lastRawBound) return null
-                                    lastRawShader ?: return null
-                                } else {
-                                    if (in2Name !in boundResults) return null
-                                    resultShaders[in2Name] ?: return null
-                                }
-                                // Map to buffer space: (user - filterRegion.left) * sx + padX
-                                // (the CPU kernel writes the clip only).
-                                primitiveRegion.set(
-                                    (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                    (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                    (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                    (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                                )
+                                val in2Shader = resolveRawInputShader(blend.in2, lastRawShader, lastRawBound, resultShaders, boundResults) ?: return null
+                                mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
                                 val (shader, blendEffect) = createLinearBlendShaderEffect(
                                     mode = primitive.mode.ordinal.toFloat(),
@@ -570,50 +473,25 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                                     lastRawBound = false
                                     createBlendModeRenderEffect(in2Effect, inputEffect, BlendMode.PLUS)
                                 } else {
-                                    val in2Name = composite.in2
                                     // Null in2 defaults to the previous result
                                     // (spec): reuse its raw shader when bound,
                                     // decline otherwise.
-                                    val in2Shader = if (in2Name == null) {
-                                        if (!lastRawBound) return null
-                                        lastRawShader ?: return null
-                                    } else {
-                                        if (in2Name !in boundResults) return null
-                                        resultShaders[in2Name] ?: return null
-                                    }
-                                        // Map to buffer space: (user - filterRegion.left) * sx + padX
-                                        // (the CPU kernel writes the clip only).
-                                        primitiveRegion.set(
-                                            (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                            (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                            (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                            (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                                        )
+                                    val in2Shader = resolveRawInputShader(composite.in2, lastRawShader, lastRawBound, resultShaders, boundResults) ?: return null
+                                    mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
-                                        val (shader, compositeEffect) = if (useLinear) {
-                                            createLinearArithmeticCompositeShaderEffect(
-                                                k1 = composite.k1,
-                                                k2 = composite.k2,
-                                                k3 = composite.k3,
-                                                k4 = composite.k4,
-                                                primitiveRegion = primitiveRegion,
-                                                in2Shader = in2Shader,
-                                                inputUniformName = "uInput",
-                                            )
-                                        } else {
-                                            createArithmeticCompositeShaderEffect(
-                                                k1 = composite.k1,
-                                                k2 = composite.k2,
-                                                k3 = composite.k3,
-                                                k4 = composite.k4,
-                                                primitiveRegion = primitiveRegion,
-                                                in2Shader = in2Shader,
-                                                inputUniformName = "uInput",
-                                            )
-                                        }
+                                    val (shader, compositeEffect) = createCompositeShaderEffect(
+                                        k1 = composite.k1,
+                                        k2 = composite.k2,
+                                        k3 = composite.k3,
+                                        k4 = composite.k4,
+                                        useLinear = useLinear,
+                                        primitiveRegion = primitiveRegion,
+                                        in2Shader = in2Shader,
+                                        inputUniformName = "uInput",
+                                    )
 
-                                        lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
-                                        compositeEffect.chainWith(inputEffect)
+                                    lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
+                                    compositeEffect.chainWith(inputEffect)
                                 }
                             } else {
                                 val mode = composite.operator.toBlendMode() ?: return null
@@ -624,18 +502,10 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeDisplacementMapRenderNode -> {
-                            val disp = primitive.sourceElement
-                            val mapName = disp.in2
                             // Null in2 defaults to the previous result (spec):
                             // reuse its raw shader when bound, decline
                             // otherwise. Bound gate like composite in2.
-                            val mapShader = if (mapName == null) {
-                                if (!lastRawBound) return null
-                                lastRawShader ?: return null
-                            } else {
-                                if (mapName !in boundResults) return null
-                                resultShaders[mapName] ?: return null
-                            }
+                            val mapShader = resolveRawInputShader(primitive.sourceElement.in2, lastRawShader, lastRawBound, resultShaders, boundResults) ?: return null
                             val (shader, displacementEffect) = createDisplacementMapShaderEffect(
                                 node = primitive,
                                 scaleX = scaleX,
@@ -648,45 +518,23 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeTurbulenceRenderNode -> {
-                            // Stitch wrap origin: CPU `clipLeft`/`clipTop`
-                            // mirrored from user space BEFORE the buffer-space
-                            // mapping below (same formula as the CPU remap).
-                            val clipLeft = ((primitiveRegion.left - filterRegion.left) * sx).toInt()
-                                .coerceIn(0, (filterRegion.width() * sx).toInt())
-                            val clipTop = ((primitiveRegion.top - filterRegion.top) * sy).toInt()
-                                .coerceIn(0, (filterRegion.height() * sy).toInt())
-                            // Map to buffer space: (user - filterRegion.left) * sx + padX
-                            primitiveRegion.set(
-                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                            )
-
-                            // stitchTiles="stitch" is served by the shader itself
-                            // (uTilePeriod — same adjusted-frequency math
-                            // as FilterGeneration).
-
                             // Terminal turbulence under linearRGB gets the linear->sRGB transfer
                             // (CPU unLinearizeBitmap equivalent); anything else stays linear.
                             val unlinearize = primitive === filterNode.primitives.lastOrNull() &&
                                 filterNode.colorInterpolationFilters == ColorInterpolation.LINEAR_RGB
-                            val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
                             val (shader, turbulenceEffect) = createTurbulenceShaderEffect(
                                 node = primitive,
+                                primitiveRegion = primitiveRegion,
+                                filterRegion = filterRegion,
                                 primitiveScaleX = scaleX,
                                 primitiveScaleY = scaleY,
-                                filterRegion = filterRegion,
                                 canvasScaleX = sx,
                                 canvasScaleY = sy,
                                 padX = totalPadX,
                                 padY = totalPadY,
                                 unlinearize = unlinearize,
-                                primitiveUnitsAreUser = primitiveUnitsAreUser,
+                                primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
                                 boundingBox = boundingBox,
-                                primitiveRegion = primitiveRegion,
-                                clipLeft = clipLeft,
-                                clipTop = clipTop,
                                 inputUniformName = "in_source",
                             )
 
@@ -695,12 +543,7 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeFloodRenderNode -> {
-                            primitiveRegion.set(
-                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                            )
+                            mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
                             val color = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
                             val (shader, floodEffect) = createFloodShaderEffect(color, primitiveRegion, "uInput")
@@ -735,57 +578,23 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeImageRenderNode -> {
-                            // Raster feImage only: element references
-                            // (`referencedNode`) have no decoded bitmap — only
-                            // the CPU backend rasterizes them — so
-                            // decline and let software render instead.
-                            // Pre-rasterizing into a BitmapShader input is
-                            // deliberately NOT done: chains are cached per
-                            // element slot across frames, so baked content
-                            // would go stale (and freeze animations inside
-                            // the referenced subtree).
-                            //
-                            // preserveAspectRatio mapping lives on the CPU
-                            // path only (the chain draws unscaled at the
-                            // region origin): decline whenever the software
-                            // output would differ — an explicit PAR, or a
-                            // subregion that is not exactly the unscaled
-                            // bitmap at the region origin. Spurious declines
-                            // (float dust) only cost software rendering,
-                            // never correctness.
-                            val image = primitive.image
-                            if (primitive.sourceElement.preserveAspectRatio != null) {
-                                return null
-                            }
-                            if (image != null) {
-                                val subLeft = (primitiveRegion.left - filterRegion.left) * sx + totalPadX
-                                val subTop = (primitiveRegion.top - filterRegion.top) * sy + totalPadY
-                                val subRight = (primitiveRegion.right - filterRegion.left) * sx + totalPadX
-                                val subBottom = (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                                if (subLeft != totalPadX.toFloat() || subTop != totalPadY.toFloat() ||
-                                    subRight - subLeft != image.width.toFloat() ||
-                                    subBottom - subTop != image.height.toFloat()
-                                ) {
-                                    return null
-                                }
-                            }
                             val (shader, imageEffect) = createImageShaderEffect(
-                                primitive,
-                                totalPadX,
-                                totalPadY,
-                                "uInput",
+                                node = primitive,
+                                primitiveRegion = primitiveRegion,
+                                filterRegion = filterRegion,
+                                sx = sx,
+                                sy = sy,
+                                padX = totalPadX,
+                                padY = totalPadY,
+                                inputUniformName = "uInput",
                             ) ?: return null
                             lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, true, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
                             imageEffect
                         }
 
-                        is FeTileRenderNode -> {                            // Transform user-space tile region to device-pixel space relative to the deviceRegion
-                            primitiveRegion.set(
-                                (primitiveRegion.left - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.top - filterRegion.top) * sy + totalPadY,
-                                (primitiveRegion.right - filterRegion.left) * sx + totalPadX,
-                                (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                            )
+                        is FeTileRenderNode -> {
+                            // Transform user-space tile region to device-pixel space relative to the deviceRegion
+                            mapPrimitiveToBufferSpace(primitiveRegion, filterRegion, sx, sy, totalPadX, totalPadY)
 
                             val (shader, tileEffect) = createTileShaderEffect(primitiveRegion, "uInput")
                             lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
@@ -793,64 +602,19 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
                         }
 
                         is FeDropShadowRenderNode -> {
-                            // The Skia dropShadow composite ignores the
-                            // primitive subregion (like the blur/offset
-                            // declines): an explicit x/y/width/height would
-                            // silently paint the whole input. Decline so
-                            // software renders instead.
-                            val shadowElement = primitive.sourceElement
-                            if (shadowElement.x != null || shadowElement.y != null ||
-                                shadowElement.width != null || shadowElement.height != null
-                            ) {
-                                return null
-                            }
-                            val alphaEffect = if (inputEffect == IDENTITY_EFFECT) {
-                                SOURCE_ALPHA_EFFECT
-                            } else {
-                                RenderEffect.createColorFilterEffect(
-                                    ALPHA_MATRIX_COLOR_FILTER,
-                                    inputEffect
-                                )
-                            }
-
-                            val blurNode = primitive.blurNode
-                            val sigmaX = blurNode.stdDeviationX * scaleX
-                            val sigmaY = blurNode.stdDeviationY * scaleY
-                            val blurredEffect = if (sigmaX > 0f || sigmaY > 0f) {
-                                RenderEffect.createBlurEffect(
-                                    /* radiusX = */ skiaBlurRadiusForSigma(sigmaX),
-                                    /* radiusY = */ skiaBlurRadiusForSigma(sigmaY),
-                                    /* inputEffect = */ alphaEffect,
-                                    /* edgeTreatment = */ Shader.TileMode.CLAMP,
-                                )
-                            } else {
-                                alphaEffect
-                            }
-
-                            val primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false
-                            val dx = filterPrimitiveLengthX(
-                                length = primitive.sourceElement.dx,
-                                primitiveUnitsAreUser = primitiveUnitsAreUser,
+                            val shadowed = createDropShadowEffect(
+                                node = primitive,
+                                inputEffect = inputEffect,
+                                primitiveUnitsAreUser = filterNode.sourceElement.primitiveUnitsAreUser != false,
                                 primitiveScaleX = scaleX,
-                                canvasScaleX = sx
-                            )
-                            val dy = filterPrimitiveLengthY(
-                                length = primitive.sourceElement.dy,
-                                primitiveUnitsAreUser = primitiveUnitsAreUser,
                                 primitiveScaleY = scaleY,
-                                canvasScaleY = sy
-                            )
-                            val offsetEffect = RenderEffect.createOffsetEffect(dx, dy, blurredEffect)
-
-                            val floodColor = renderContext.resolveFloodColor(primitive, filterNode.renderState.style)
-                            val coloredShadowEffect = RenderEffect.createColorFilterEffect(
-                                PorterDuffColorFilter(floodColor, PorterDuff.Mode.SRC_IN),
-                                offsetEffect
-                            )
-
+                                canvasScaleX = sx,
+                                canvasScaleY = sy,
+                                baseStyle = filterNode.renderState.style,
+                            ) ?: return null
                             lastRawShader = null
                             lastRawBound = false
-                            createBlendModeRenderEffect(coloredShadowEffect, inputEffect, BlendMode.SRC_OVER)
+                            createBlendModeRenderEffect(shadowed, inputEffect, BlendMode.SRC_OVER)
                         }
 
                         else -> return null
@@ -889,6 +653,57 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
         val s = if (src == IDENTITY_EFFECT) RenderEffect.createOffsetEffect(0f, 0f) else src
         return RenderEffect.createBlendModeEffect(d, s, blendMode)
     }
+
+    /**
+     * Remaps the primitive's user-space subregion into buffer space in
+     * place: `(user - filterRegion.origin) * s + pad` (the CPU kernels
+     * write the clip only). Shared by every region-guarded shader branch.
+     */
+    private fun mapPrimitiveToBufferSpace(
+        primitiveRegion: RectF,
+        filterRegion: RectF,
+        sx: Float,
+        sy: Float,
+        padX: Int,
+        padY: Int,
+    ) {
+        primitiveRegion.set(
+            (primitiveRegion.left - filterRegion.left) * sx + padX,
+            (primitiveRegion.top - filterRegion.top) * sy + padY,
+            (primitiveRegion.right - filterRegion.left) * sx + padX,
+            (primitiveRegion.bottom - filterRegion.top) * sy + padY
+        )
+    }
+
+    /**
+     * Resolves a secondary (`in2`/`uMap`) raw-shader operand: a null name
+     * defaults to the previous result (spec) and reuses its raw shader when
+     * bound, a named one to a bound result. Returns null when the chain must
+     * be declined instead of sampling transparent. Shared by the linear
+     * blend, arithmetic composite and displacement branches.
+     */
+    private fun resolveRawInputShader(
+        name: String?,
+        lastRawShader: RuntimeShader?,
+        lastRawBound: Boolean,
+        resultShaders: MutableScatterMap<String, RuntimeShader>,
+        boundResults: MutableScatterSet<String>,
+    ): RuntimeShader? {
+        if (name == null) {
+            if (!lastRawBound) return null
+            return lastRawShader
+        }
+        if (name !in boundResults) return null
+        return resultShaders[name]
+    }
+
+    /**
+     * `kernelUnitLength` needs a downscale-filter-upscale sequence, which
+     * the GPU chain cannot represent: the caller declines to software when
+     * this returns true.
+     */
+    private fun hasKernelUnitLength(unitLengthX: Float, unitLengthY: Float): Boolean =
+        unitLengthX != 0f || unitLengthY != 0f
 
     /**
      * Binds a raw shader's `uInput` to the previous bound result (or a named
