@@ -27,8 +27,10 @@ internal class StringDictionary(
     init {
         @Suppress("KotlinConstantConditions")
         if (BuildConfig.DEBUG) {
+            // CharSequence overload: verifies without the per-name toCharArray
+            // copy (that was 254k transient char[] per gallery load in debug).
             for (i in names.indices) {
-                assert(hashCode(names[i].toCharArray(), 0, names[i].length) == hashCodes[i])
+                assert(hashCode(names[i], 0, names[i].length) == hashCodes[i])
             }
 
             assert(hashCodes.sortedArray().contentEquals(hashCodes))

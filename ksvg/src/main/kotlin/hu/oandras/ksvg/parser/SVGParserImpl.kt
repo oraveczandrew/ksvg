@@ -127,6 +127,13 @@ import kotlin.jvm.JvmSynthetic
 /*
  * SVG parser code. Used by SVG class. Should not be called directly.
  */
+
+// Single stateless dictionary over the static tables, shared by every parse:
+// wrapping the same arrays anew per document only re-ran the debug self-check
+// (and allocated a throwaway holder each time).
+private val sharedDictionary: StringDictionary =
+    StringDictionary(SvgDictionary.names, SvgDictionary.hashCodes)
+
 internal class SVGParserImpl(
     private val enableInternalEntities: Boolean = true,
     private val externalFileResolver: ExternalFileResolver? = null,
@@ -308,7 +315,7 @@ internal class SVGParserImpl(
             val parser: XmlPullParser = KXmlParser().also {
                 // Canonical tag/attribute/value instances straight from the parser:
                 // repeated names share one String instead of allocating per occurrence.
-                it.dictionary = StringDictionary(SvgDictionary.names, SvgDictionary.hashCodes)
+                it.dictionary = sharedDictionary
             }
             val attributes = XPPAttributesWrapper(parser)
 
