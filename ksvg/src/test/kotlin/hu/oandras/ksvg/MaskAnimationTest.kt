@@ -24,6 +24,7 @@ import hu.oandras.ksvg.test.countPixels
 import hu.oandras.ksvg.utils.blue
 import hu.oandras.ksvg.utils.green
 import hu.oandras.ksvg.utils.red
+import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -94,5 +95,26 @@ class MaskAnimationTest {
         assertTrue("start area: $start, want 39500..40000", start in 39500..40000)
         val end = redPixels(renderAt(svg, 1000))
         assertTrue("end area: $end, want 0..100", end in 0..100)
+    }
+
+    @Test
+    fun raindropWaterLevelFollowsMaskRectAnimation() {
+        // meteocons raindrop-measure: "Water Level" rect in the mask animates
+        // y (64;56;64) and height (30;38;30), 3 s spline loop. Mid-animation
+        // the level is higher and taller, so strictly more water must show.
+        val source = File("test-data/meteocons/animated/fill/raindrop-measure.svg").readText()
+        fun waterAt(timeMs: Long): Int {
+            val doc = SVG.getFromString(source, parseAnimations = true) as SVGImpl
+            doc.animationTimeMs = timeMs
+            val bitmap = createBitmap(128, 128)
+            doc.renderToCanvas(Canvas(bitmap))
+            return countPixels(bitmap) { color ->
+                color.blue > 120 && color.blue > color.red + 40 && color.blue > color.green + 20
+            }
+        }
+        val still = waterAt(0L)
+        val mid = waterAt(1500L)
+        assertTrue("expected water at t=0, got $still", still > 0)
+        assertTrue("water level frozen: t=0 has $still, t=1500 has $mid", mid > still)
     }
 }
