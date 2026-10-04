@@ -21,6 +21,18 @@ internal class PaintReference(
     @JvmField val href: String,
     @JvmField val fallback: SvgPaint?
 ) : SvgPaint() {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PaintReference) return false
+        return href == other.href && fallback == other.fallback
+    }
+
+    override fun hashCode(): Int {
+        var result = href.hashCode()
+        result = 31 * result + fallback.hashCode()
+        return result
+    }
+
     override fun toString(): String {
         return "$href $fallback"
     }
