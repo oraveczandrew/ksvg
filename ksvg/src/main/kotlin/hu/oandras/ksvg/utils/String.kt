@@ -92,11 +92,17 @@ internal fun textXMLSpaceTransform(
 }
 
 internal fun String.trimLowerThanSpace(): String {
-    // Fast path: nothing to trim (the common case) — return `this` instead
-    // of paying for trim's substring copy on every scanner/attribute read.
-    if (isEmpty() || (this[0] > ' ' && this[length - 1] > ' ')) return this
-    return trim {
-        it <= ' '
+    // Own two-pointer trim: leading/trailing chars <= ' ' go, nothing else is
+    // touched, and an already-clean string returns `this` (no substring copy,
+    // which is the common case on scanner/attribute reads).
+    var start = 0
+    var end = length
+    while (start < end && this[start] <= ' ') start++
+    while (end > start && this[end - 1] <= ' ') end--
+    return if (start == 0 && end == length) {
+        this
+    } else {
+        substring(start, end)
     }
 }
 

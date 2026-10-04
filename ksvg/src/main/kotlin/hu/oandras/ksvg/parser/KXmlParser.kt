@@ -126,7 +126,7 @@ internal class KXmlParser : XmlPullParser {
             val cut = attrName!!.indexOf(':')
             val prefix: String
             if (cut != -1) {
-                prefix = attrName.take(cut)
+                prefix = canonicalPrefix(attrName, cut)
                 attrName = attrName.substring(cut + 1)
             } else if (attrName == "xmlns") {
                 prefix = attrName
@@ -167,7 +167,7 @@ internal class KXmlParser : XmlPullParser {
                 if (cut == 0 && !relaxed) {
                     throw RuntimeException("illegal attribute name: $attrName at $this")
                 } else if (cut != -1) {
-                    val attrPrefix = attrName.take(cut)
+                    val attrPrefix = canonicalPrefix(attrName, cut)
                     attrName = attrName.substring(cut + 1)
                     val attrNs = getNamespace(attrPrefix)
                     if (attrNs == null && !relaxed) {
@@ -187,7 +187,7 @@ internal class KXmlParser : XmlPullParser {
             onError { "illegal tag name: $name" }
         }
         if (cut != -1) {
-            prefix = name.take(cut)
+            prefix = canonicalPrefix(name, cut)
             this.name = name.substring(cut + 1)
         }
 
