@@ -21,7 +21,6 @@ import hu.oandras.ksvg.parser.ColorParser
 import hu.oandras.ksvg.utils.equalsWindow
 import hu.oandras.ksvg.utils.skipLeading
 import hu.oandras.ksvg.utils.skipTrailing
-import hu.oandras.ksvg.utils.trimLowerThanSpace
 
 internal const val CURRENT_COLOR: String = "currentColor"
 
@@ -37,36 +36,51 @@ internal fun parseFunctionalIRI(text: String, start: Int, end: Int): String? {
     return text.substring(trimmedStart, trimmedEnd)
 }
 
-internal fun parsePaintSpecifier(valueParam: String): SvgPaint {
-    val trimmed = valueParam.trimLowerThanSpace()
-    if (trimmed.equals("context-stroke", ignoreCase = true)) return ContextStroke
-    if (trimmed.equals("context-fill", ignoreCase = true)) return ContextFill
+internal fun parsePaintSpecifier(valueParam: String): SvgPaint =
+    parsePaintSpecifier(valueParam, 0, valueParam.length)
 
-    var value = valueParam
-    return if (value.startsWith("url(", ignoreCase = true)) {
-        val closeBracket = value.indexOf(')')
-        if (closeBracket != -1) {
-            val href = value.substring(4, closeBracket).trimLowerThanSpace()
-            value = value.substring(closeBracket + 1).trimLowerThanSpace()
-            val fallback: SvgPaint? = if (value.isNotEmpty()) {
-                parseColorSpecifier(value)
+internal fun parsePaintSpecifier(text: String, start: Int, end: Int): SvgPaint {
+    val se = start.coerceIn(0, text.length)
+    val ee = end.coerceIn(se, text.length)
+    val s = skipLeading(text, se, ee)
+    val e = skipTrailing(text, s, ee)
+    if (text.equalsWindow(s, e, "context-stroke", ignoreCase = true)) return ContextStroke
+    if (text.equalsWindow(s, e, "context-fill", ignoreCase = true)) return ContextFill
+
+    // NOTE: like the original, the url test runs on the UNtrimmed window start
+    // (a leading space means "not a url()"), while name/href/tail windows below
+    // are trimmed. Only the stored href is ever copied.
+    if (ee - se >= 4 && text.regionMatches(se, "url(", 0, 4, ignoreCase = true)) {
+        var close = se + 4
+        while (close < e && text[close] != ')') close++
+        if (close < e) {
+            val hs = skipLeading(text, se + 4, close)
+            val he = skipTrailing(text, hs, close)
+            val href = text.substring(hs, he)
+            val fs = skipLeading(text, close + 1, e)
+            val fe = skipTrailing(text, fs, e)
+            val fallback: SvgPaint? = if (fs < fe) {
+                parseColorSpecifier(text, fs, fe)
             } else {
                 null
             }
-            PaintReference(href, fallback)
+            return PaintReference(href, fallback)
         } else {
-            val href = value.substring(4).trimLowerThanSpace()
-            PaintReference(href, null)
+            val hs = skipLeading(text, se + 4, e)
+            val he = skipTrailing(text, hs, e)
+            return PaintReference(text.substring(hs, he), null)
         }
     } else {
-        parseColorSpecifier(value)
+        return parseColorSpecifier(text, s, e)
     }
 }
 
-internal fun parseColorSpecifier(value: String): SvgColor {
+internal fun parseColorSpecifier(value: String): SvgColor = parseColorSpecifier(value, 0, value.length)
+
+internal fun parseColorSpecifier(text: String, start: Int, end: Int): SvgColor {
     return when {
-        value.equals(NONE, ignoreCase = true) -> ColorValue.TRANSPARENT
-        value.equals(CURRENT_COLOR, ignoreCase = true) -> CurrentColor
-        else -> ColorParser.parseColor(value)
+        text.equalsWindow(start, end, NONE, ignoreCase = true) -> ColorValue.TRANSPARENT
+        text.equalsWindow(start, end, CURRENT_COLOR, ignoreCase = true) -> CurrentColor
+        else -> ColorParser.parseColor(text, start, end)
     }
 }
