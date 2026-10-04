@@ -22,7 +22,6 @@ import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import hu.oandras.ksvg.SVG
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +47,7 @@ class LargeMapViewerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        applyLightSystemBars()
 
         val binding = largeMapViewerLayout()
         setContentView(binding.root)

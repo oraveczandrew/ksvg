@@ -19,6 +19,8 @@ package hu.oandras.ksvg.showcase
 import android.content.Context
 import android.graphics.drawable.Drawable
 import android.util.TypedValue
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import hu.oandras.ksvg.SVG
 
 internal fun dpInPixels(context: Context, dp: Float): Int {
@@ -36,4 +38,13 @@ internal fun Context.ksvgMenuIcon(svg: String, fallbackRes: Int): Drawable {
         // Fall through to the fallback drawable below.
     }
     return checkNotNull(getDrawable(fallbackRes)) { "Missing fallback drawable resource" }
+}
+
+// Edge-to-edge with dark icons on both system bars (all showcase screens are
+// light).
+internal fun AppCompatActivity.applyLightSystemBars() {
+    WindowCompat.setDecorFitsSystemWindows(window, false)
+    val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+    windowInsetsController.isAppearanceLightStatusBars = true
+    windowInsetsController.isAppearanceLightNavigationBars = true
 }
