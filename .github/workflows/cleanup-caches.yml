@@ -1,0 +1,57 @@
+# Prunes stale GitHub Actions caches so the 10 GB quota never fills up.
+# Root cause: actions/setup-java `cache: gradle` saves a NEW ~400-600 MiB blob
+# on every dependency-hash change and never deletes the old ones; over weeks
+# this buries the SDK (~1.9 GB) and emulator (~0.8 GB) caches.
+# This job keeps the newest 2 gradle blobs per arch (+ wrapper dists) and the
+# pinned SDK/emulator keys, deleting everything older. Safe to re-run manually.
+name: Cleanup caches
+
+on:
+  schedule:
+    # Sundays 03:00 UTC, after the weekend's CI runs have settled.
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: cleanup-caches
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Prune stale caches, keep newest per prefix
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          echo "--- before:"
+          gh cache list --limit 100 || true
+          # NOTE: `gh cache list` is branch-scoped, so enumerate via the API
+          # (all refs — PR-branch blobs escape pruning otherwise).
+          # Keep newest 2 per setup-java gradle prefix (non-wrapper), newest 1
+          # per wrapper prefix; SDK/emulator keys are pinned singletons.
+          for prefix in "setup-java-Linux-x64-gradle-" "setup-java-Linux-arm64-gradle-"; do
+            echo "--- prefix: $prefix"
+            ids=$(gh api "repos/$REPO/actions/caches?per_page=100" --paginate \
+              -q "[.actions_caches[] | select(.key | startswith(\"$prefix\") and (contains(\"gradle-wrapper\") | not))]"' | sort_by(.last_accessed_at) | reverse | .[2:][]?.id')
+            if [ -z "$ids" ]; then echo "nothing to prune"; continue; fi
+            # shellcheck disable=SC2086
+            for id in $ids; do echo "deleting $id"; gh cache delete "$id" --repo "$REPO"; done
+          done
+          for prefix in "setup-java-Linux-x64-gradle-wrapper-" "setup-java-Linux-arm64-gradle-wrapper-"; do
+            echo "--- prefix: $prefix"
+            ids=$(gh api "repos/$REPO/actions/caches?per_page=100" --paginate \
+              -q "[.actions_caches[] | select(.key | startswith(\"$prefix\"))]"' | sort_by(.last_accessed_at) | reverse | .[1:][]?.id')
+            if [ -z "$ids" ]; then echo "nothing to prune"; continue; fi
+            # shellcheck disable=SC2086
+            for id in $ids; do echo "deleting $id"; gh cache delete "$id" --repo "$REPO"; done
+          done
+          echo "--- after:"
+          gh cache list --limit 100 || true
