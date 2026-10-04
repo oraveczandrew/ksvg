@@ -456,7 +456,9 @@ internal open class PlainTextDrawer(
     private fun processTextHorizontal(canvas: Canvas, text: String, widths: FloatArrayBucket) {
         val letterspacingAdj = state.style.letterSpacing!!.floatValueInContext() / 2
         val paint = state.fillPaint
-        val strokePaint = state.strokePaint
+        // Stroke paint is synced lazily on read (a sync can cost a ~12 ms native
+        // variation derive), so it is only touched when something actually strokes.
+        val strokePaint: Paint? = if (state.hasStroke) state.strokePaint else null
         val baselineOffset = calculateBaselineOffset(paint, state.style)
         // Resolve font metrics once for the whole run. drawManualDecorations is
         // called per glyph in the positioning branch, so reading paint.fontMetrics
@@ -494,7 +496,7 @@ internal open class PlainTextDrawer(
                 if (state.hasFill) {
                     canvas.drawText(text, i, i + 1, adjustedX, baselineY, paint)
                 }
-                if (state.hasStroke) {
+                if (strokePaint != null) {
                     canvas.drawText(text, i, i + 1, adjustedX, baselineY, strokePaint)
                 }
                 val advance = buffer[i] * glyphScaleX + spacingAdjust
@@ -510,7 +512,7 @@ internal open class PlainTextDrawer(
             if (state.hasFill) {
                 canvas.drawText(text, adjustedX, baselineY, paint)
             }
-            if (state.hasStroke) {
+            if (strokePaint != null) {
                 canvas.drawText(text, adjustedX, baselineY, strokePaint)
             }
             val advance = measureText(text, paint, widths)
@@ -567,7 +569,8 @@ internal open class PlainTextDrawer(
             // Draw character by character
             var currentY = y
             val paint = state.fillPaint
-            val strokePaint = state.strokePaint
+            // Same lazy-stroke gating as the horizontal path above.
+            val strokePaint: Paint? = if (state.hasStroke) state.strokePaint else null
             val fm = paint.fontMetrics
             val charAdvance = fm.bottom - fm.top
 
@@ -575,7 +578,7 @@ internal open class PlainTextDrawer(
                 if (state.hasFill) {
                     canvas.drawText(text, i, i + 1, x, currentY, paint)
                 }
-                if (state.hasStroke) {
+                if (strokePaint != null) {
                     canvas.drawText(text, i, i + 1, x, currentY, strokePaint)
                 }
                 // Upright vertical has no per-glyph rotation support (positioned
