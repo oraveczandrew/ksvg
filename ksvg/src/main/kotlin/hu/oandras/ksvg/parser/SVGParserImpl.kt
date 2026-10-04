@@ -249,7 +249,7 @@ internal class SVGParserImpl(
     /*
     * Implements the SAX Attributes class so that our parser can share a common attributes object
     */
-    private class XPPAttributesWrapper(private val parser: XmlPullParser) : Attributes {
+    private class XPPAttributesWrapper(private val parser: XmlPullParser) : Attributes, QualifiedNameInfo {
         override fun getLength(): Int {
             return parser.attributeCount
         }
@@ -273,6 +273,13 @@ internal class SVGParserImpl(
                 }
             }
             return qName
+        }
+
+        // Zero-allocation prefix test for the foreign-namespace check in
+        // `ElementBase.onAttribute`: `getAttributePrefix` returns a stored
+        // reference (never a copy), so no qualified name is ever built here.
+        override fun hasAttributePrefix(index: Int): Boolean {
+            return !parser.getAttributePrefix(index).isNullOrEmpty()
         }
 
         override fun getValue(index: Int): String? {

@@ -23,6 +23,8 @@ import hu.oandras.ksvg.css.CSSTextScanner
 import hu.oandras.ksvg.dom.SVGImpl
 import hu.oandras.ksvg.dom.animation.Animation
 import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.parser.QualifiedNameInfo
+import hu.oandras.ksvg.parser.isPrefixedName
 import hu.oandras.ksvg.utils.forEachElement
 import org.xml.sax.Attributes
 import java.util.Collections
@@ -168,12 +170,12 @@ internal abstract class ElementBase(
                     // names, so there is nothing to retain them for. The prefix
                     // test tolerates both conventions for "no prefix": a bare
                     // local name (platform parser) and ":name" (empty prefix).
+                    // The qualified-name string is only materialized on parsers
+                    // without prefix knowledge; ours answers from a stored
+                    // reference with no allocation.
                     val localName = attributes.getLocalName(index)
-                    val qName = attributes.getQName(index)
-                    val prefixed = qName != null && localName != null &&
-                        qName.length > localName.length + 1 &&
-                        qName.endsWith(localName) &&
-                        qName[qName.length - localName.length - 1] == ':'
+                    val prefixed = (attributes as? QualifiedNameInfo)?.hasAttributePrefix(index)
+                        ?: isPrefixedName(attributes.getQName(index), localName)
                     if (!prefixed) {
                         val attributesMap = this.attributesMap
                             ?: ArrayMap<String, String>(attributes.length).also {

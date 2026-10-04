@@ -49,3 +49,25 @@ internal fun Attributes.getAttributeValueByLocalName(name: String): String? {
 
     return null
 }
+
+/**
+ * Narrow capability for attribute sets that know their prefixes without
+ * materializing qualified names (see `XPPAttributesWrapper`): lets callers
+ * test for foreign-namespace (`prefix:local`) attributes with zero allocation
+ * instead of building the `getQName` string just to inspect its shape.
+ */
+internal interface QualifiedNameInfo {
+    fun hasAttributePrefix(index: Int): Boolean
+}
+
+/**
+ * The same prefix test on a materialized qualified name, for attribute sets
+ * without [QualifiedNameInfo] (platform SAX parsers). Tolerates both
+ * conventions for "no prefix": a bare local name and ":name" (empty prefix).
+ */
+internal fun isPrefixedName(qName: String?, localName: String?): Boolean {
+    return qName != null && localName != null &&
+        qName.length > localName.length + 1 &&
+        qName.endsWith(localName) &&
+        qName[qName.length - localName.length - 1] == ':'
+}
