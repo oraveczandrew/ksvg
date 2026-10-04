@@ -4,6 +4,19 @@ name: PR checks
 
 on:
   pull_request:
+    paths-ignore:
+      # CI-exempt housekeeping: changes here cannot affect build/test results.
+      # (Deliberately NOT exempt: ci.yml/pr.yml themselves, the shared
+      # setup-android-sdk action, modules, Gradle files.)
+      - '.github/workflows/cleanup-caches.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/static.yml'
+      - '.github/FUNDING.yml'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
+      - '.idea/**'
   workflow_dispatch:
 
 permissions:
