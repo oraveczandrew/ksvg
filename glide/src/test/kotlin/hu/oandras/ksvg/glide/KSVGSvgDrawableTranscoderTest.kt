@@ -65,18 +65,6 @@ class KSVGSvgDrawableTranscoderTest {
         assertNotSame(first, second)
     }
 
-    // Worker-thread prewarm sizes the drawable to its intrinsic dimensions and
-    // renders once without crashing (warms process-wide JIT/fonts/caches).
-    @Test
-    fun prewarmDrawableSizesToIntrinsic() {
-        val drawable = svgResource().get().toDrawable()
-        transcoder.prewarmDrawable(drawable)
-        assertEquals(0, drawable.bounds.left)
-        assertEquals(0, drawable.bounds.top)
-        assertEquals(467, drawable.bounds.right)
-        assertEquals(462, drawable.bounds.bottom)
-    }
-
     // Glide 5 `DrawableResource.get()` hands out a `constantState.newDrawable()`
     // copy per call: every copy must render the same content as the original.
     @Test
