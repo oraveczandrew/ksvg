@@ -17,7 +17,7 @@
 package hu.oandras.ksvg.filtering
 
 /**
- * feColorMatrix kernel over unpremultiplied ARGB_8888 ([matrix] holds 20
+ * feColorMatrix kernel over unpremultiplied ARGB_8888 (`matrix` holds 20
  * values in SVG 0..1 semantics, row-major; see `KotlinKernels.colorMatrix`).
  *
  * SIMD backends per ABI: NEON64 on arm64, SSSE3 on x86_64/i386, AVX2 on

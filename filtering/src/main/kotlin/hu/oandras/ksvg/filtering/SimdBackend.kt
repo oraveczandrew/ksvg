@@ -20,7 +20,7 @@ import androidx.annotation.IntDef
 
 /**
  * Backend identifiers mirrored from `cpu_dispatch.h`'s `SimdBackend` enum.
- * These are flags so [nativeBackend] can return all available implementations.
+ * These are flags so `nativeBackend` can return all available implementations.
  */
 @Retention(AnnotationRetention.SOURCE)
 @IntDef(

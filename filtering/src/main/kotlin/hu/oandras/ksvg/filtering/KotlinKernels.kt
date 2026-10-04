@@ -354,7 +354,7 @@ public object KotlinKernels {
      * Linear→sRGB (unLinearize) filter-output transfer over straight ARGB_8888
      * pixels. Each pixel's straight R/G/B channel is looked up using [linearToSrgb]
      * and alpha is passed through unchanged (identical to
-     * [unLinearizeArgb]). Element-wise byte map, so [src] and [dst] may be the
+     * [unLinearizeArgb]). Element-wise byte map, so `src` and `dst` may be the
      * same array (in-place). Bit-exact reference for `unlinearize.cpp`.
      */
     context(linearToSrgb: LinearToSrgb)
@@ -726,7 +726,7 @@ public object KotlinKernels {
     }
 
     /**
-     * feComposite operator="arithmetic". [useLinear] applies the
+     * feComposite operator="arithmetic". `useLinear` applies the
      * sRGB<->linear folding around each RGB channel exactly like the original
      * implementation in `:ksvg`.
      */
@@ -828,7 +828,7 @@ public object KotlinKernels {
      * Implements the CSS Compositing and Blending L1 general formula
      * (backdrop/source compositing around the per-mode blend function), so a
      * translucent backdrop mixes the source through instead of snapping to
-     * black like raw PorterDuff MULTIPLY does. [useLinear] folds each channel
+     * black like raw PorterDuff MULTIPLY does. `useLinear` folds each channel
      * through the sRGB<->linear LUTs around the blend (this is what the
      * default `color-interpolation-filters="linearRGB"` requires; the canvas
      * xfermode path blends in gamma space and renders ~60/255 too dark).
@@ -1093,8 +1093,8 @@ public object KotlinKernels {
 
     /**
      * feColorMatrix for the matrix/saturate/hueRotate/luminanceToAlpha types,
-     * which all lower to a 4x5 matrix. [matrix] holds the 20 values in SVG
-     * semantics (channels and offsets as 0..1 fractions, row-major). [useLinear]
+     * which all lower to a 4x5 matrix. `matrix` holds the 20 values in SVG
+     * semantics (channels and offsets as 0..1 fractions, row-major). `useLinear`
      * folds each RGB channel through the sRGB<->linear LUTs around the matrix
      * (what the default `color-interpolation-filters="linearRGB"` requires;
      * the canvas ColorMatrixColorFilter path always works in gamma space).

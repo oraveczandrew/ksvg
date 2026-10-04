@@ -18,7 +18,7 @@ package hu.oandras.ksvg.filtering
 
 /**
  * feBlend kernel over unpremultiplied ARGB_8888 (all non-normal modes, see
- * [FeBlendMode]; [src] is `in`, [dst] is the backdrop `in2`).
+ * [FeBlendMode]; `src` is `in`, `dst` is the backdrop `in2`).
  *
  * SIMD backends for the separable modes: SSSE3 on x86_64/i386, AVX2 on
  * x86_64; scalar everywhere as the fallback and for the non-separable
