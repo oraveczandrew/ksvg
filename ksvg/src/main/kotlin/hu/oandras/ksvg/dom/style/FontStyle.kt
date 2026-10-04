@@ -17,6 +17,8 @@
 
 package hu.oandras.ksvg.dom.style
 
+import hu.oandras.ksvg.utils.equalsWindow
+
 @Suppress("EnumEntryName")
 internal enum class FontStyle {
     normal,
@@ -31,6 +33,16 @@ internal fun parseFontStyle(value: String): FontStyle? {
         value.equals("italic", ignoreCase = true) -> FontStyle.italic
         value.equals("normal", ignoreCase = true) -> FontStyle.normal
         value.equals("oblique", ignoreCase = true) -> FontStyle.oblique
+        else -> null
+    }
+}
+
+// Windowed twin: no token substring for scanner-driven callers.
+internal fun parseFontStyle(text: String, start: Int, end: Int): FontStyle? {
+    return when {
+        text.equalsWindow(start, end, "italic", ignoreCase = true) -> FontStyle.italic
+        text.equalsWindow(start, end, "normal", ignoreCase = true) -> FontStyle.normal
+        text.equalsWindow(start, end, "oblique", ignoreCase = true) -> FontStyle.oblique
         else -> null
     }
 }

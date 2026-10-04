@@ -18,14 +18,20 @@
 package hu.oandras.ksvg.parser
 
 import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.utils.equalsWindow
 
 internal object FontWeightKeywords {
     fun get(fontWeight: String?): Float {
+        if (fontWeight == null) return Float.NaN
+        return get(fontWeight, 0, fontWeight.length)
+    }
+
+    fun get(text: String, start: Int, end: Int): Float {
         return when {
-            fontWeight.equals("normal", ignoreCase = true) -> Style.FONT_WEIGHT_NORMAL
-            fontWeight.equals("bold", ignoreCase = true) -> Style.FONT_WEIGHT_BOLD
-            fontWeight.equals("bolder", ignoreCase = true) -> Style.FONT_WEIGHT_BOLDER
-            fontWeight.equals("lighter", ignoreCase = true) -> Style.FONT_WEIGHT_LIGHTER
+            text.equalsWindow(start, end, "normal", ignoreCase = true) -> Style.FONT_WEIGHT_NORMAL
+            text.equalsWindow(start, end, "bold", ignoreCase = true) -> Style.FONT_WEIGHT_BOLD
+            text.equalsWindow(start, end, "bolder", ignoreCase = true) -> Style.FONT_WEIGHT_BOLDER
+            text.equalsWindow(start, end, "lighter", ignoreCase = true) -> Style.FONT_WEIGHT_LIGHTER
             else -> Float.NaN
         }
     }

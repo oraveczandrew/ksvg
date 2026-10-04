@@ -19,6 +19,7 @@ package hu.oandras.ksvg.parser
 
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
+import hu.oandras.ksvg.utils.equalsWindow
 
 internal object FontSizeKeywords {
     private val XX_SMALL = CSSLength(0.694f, CssUnit.pt)
@@ -31,16 +32,21 @@ internal object FontSizeKeywords {
     private val SMALLER = CSSLength(83.33f, CssUnit.percent)
     private val LARGER = CSSLength(120f, CssUnit.percent)
 
-    fun get(fontSize: String?): CSSLength? = when {
-        fontSize.equals("xx-small", ignoreCase = true) -> XX_SMALL
-        fontSize.equals("x-small", ignoreCase = true) -> X_SMALL
-        fontSize.equals("small", ignoreCase = true) -> SMALL
-        fontSize.equals("medium", ignoreCase = true) -> MEDIUM
-        fontSize.equals("large", ignoreCase = true) -> LARGE
-        fontSize.equals("x-large", ignoreCase = true) -> X_LARGE
-        fontSize.equals("xx-large", ignoreCase = true) -> XX_LARGE
-        fontSize.equals("smaller", ignoreCase = true) -> SMALLER
-        fontSize.equals("larger", ignoreCase = true) -> LARGER
+    fun get(fontSize: String?): CSSLength? {
+        if (fontSize == null) return null
+        return get(fontSize, 0, fontSize.length)
+    }
+
+    fun get(text: String, start: Int, end: Int): CSSLength? = when {
+        text.equalsWindow(start, end, "xx-small", ignoreCase = true) -> XX_SMALL
+        text.equalsWindow(start, end, "x-small", ignoreCase = true) -> X_SMALL
+        text.equalsWindow(start, end, "small", ignoreCase = true) -> SMALL
+        text.equalsWindow(start, end, "medium", ignoreCase = true) -> MEDIUM
+        text.equalsWindow(start, end, "large", ignoreCase = true) -> LARGE
+        text.equalsWindow(start, end, "x-large", ignoreCase = true) -> X_LARGE
+        text.equalsWindow(start, end, "xx-large", ignoreCase = true) -> XX_LARGE
+        text.equalsWindow(start, end, "smaller", ignoreCase = true) -> SMALLER
+        text.equalsWindow(start, end, "larger", ignoreCase = true) -> LARGER
         else -> null
     }
 }

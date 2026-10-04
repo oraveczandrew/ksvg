@@ -20,7 +20,7 @@ package hu.oandras.ksvg.parser
 import hu.oandras.ksvg.KSVGParseException
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
-import java.util.Locale
+import hu.oandras.ksvg.utils.equalsWindow
 
 
 //=========================================================================
@@ -32,29 +32,41 @@ import java.util.Locale
 */
 @Throws(KSVGParseException::class)
 internal fun parseLength(value: String): CSSLength {
-    checkState(value.isNotEmpty()) { "Invalid length value (empty string)" }
+    return parseLength(value, 0, value.length)
+}
 
-    var end = value.length
+// Windowed twin: parses `[start, end)` with no substring or lowercase copy.
+// Unit matching mirrors the `CssUnit.valueOf(lowercase)` table above exactly.
+@Throws(KSVGParseException::class)
+internal fun parseLength(text: String, start: Int, end: Int): CSSLength {
+    checkState(start < end) { "Invalid length value (empty string)" }
+
+    var e = end
     var unit = CssUnit.px
-    val lastChar = value[end - 1]
+    val lastChar = text[e - 1]
 
     if (lastChar == '%') {
-        end -= 1
+        e -= 1
         unit = CssUnit.percent
-    } else if (end > 2 && lastChar.isLetter() && value[end - 2].isLetter()) {
-        end -= 2
-        val unitStr = value.substring(end)
-        try {
-            unit = CssUnit.valueOf(unitStr.lowercase(Locale.US))
-        } catch (_: IllegalArgumentException) {
-            throw KSVGParseException("Invalid length unit specifier: $value")
+    } else if (e - start > 2 && lastChar.isLetter() && text[e - 2].isLetter()) {
+        e -= 2
+        unit = when {
+            text.equalsWindow(e, end, "px", ignoreCase = true) -> CssUnit.px
+            text.equalsWindow(e, end, "em", ignoreCase = true) -> CssUnit.em
+            text.equalsWindow(e, end, "ex", ignoreCase = true) -> CssUnit.ex
+            text.equalsWindow(e, end, "in", ignoreCase = true) -> CssUnit.`in`
+            text.equalsWindow(e, end, "cm", ignoreCase = true) -> CssUnit.cm
+            text.equalsWindow(e, end, "mm", ignoreCase = true) -> CssUnit.mm
+            text.equalsWindow(e, end, "pt", ignoreCase = true) -> CssUnit.pt
+            text.equalsWindow(e, end, "pc", ignoreCase = true) -> CssUnit.pc
+            else -> throw KSVGParseException("Invalid length unit specifier: ${text.substring(start, end)}")
         }
     }
     try {
-        val scalar: Float = parseFloat(value, 0, end)
+        val scalar: Float = parseFloat(text, start, e)
         return CSSLength.of(scalar, unit)
     } catch (e: NumberFormatException) {
-        throw KSVGParseException("Invalid length value: $value", e)
+        throw KSVGParseException("Invalid length value: ${text.substring(start, end)}", e)
     }
 }
 

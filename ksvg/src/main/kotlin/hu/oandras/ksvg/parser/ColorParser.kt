@@ -32,35 +32,43 @@ internal object ColorParser {
      * Parse a color definition.
      */
     @JvmStatic
-    fun parseColor(value: String): ColorValue {
-        require(value.isNotEmpty()) { "Color string is empty" }
+    fun parseColor(value: String): ColorValue = parseColor(value, 0, value.length)
 
-        if (value[0] == '#') {
-            val ip = IntegerParser.parseHex(value, 1, value.length)
+    @JvmStatic
+    fun parseColor(input: String, start: Int, end: Int): ColorValue {
+        var s = start.coerceIn(0, input.length)
+        var e = end.coerceIn(s, input.length)
+        while (s < e && input[s] <= ' ') s++
+        while (e > s && input[e - 1] <= ' ') e--
+        require(s < e) { "Color string is empty" }
+
+        if (input[s] == '#') {
+            val ip = IntegerParser.parseHex(input, s + 1, e)
             val endPos = ip.endPos
-            if (ip.isInvalid()) throw KSVGParseException("Invalid hex color: $value")
+            if (ip.isInvalid()) throw KSVGParseException("Invalid hex color: ${input.substring(s, e)}")
 
-            return when (endPos) {
+            return when (endPos - s) {
                 4 -> ColorValue.of(pack3Hex(ip.value))
                 5 -> ColorValue.of(pack4Hex(ip.value))
                 7 -> ColorValue.of(COLOR_BLACK or ip.value)
                 9 -> ColorValue.of(pack8Hex(ip.value))
                 else -> {
-                    throw KSVGParseException("Invalid hex color length: $value")
+                    throw KSVGParseException("Invalid hex color length: ${input.substring(s, e)}")
                 }
             }
         }
 
         // Parse a rgb() or rgba() color.
         // In CSS Color 4, these are synonyms, and the alpha parameter is optional in both cases.
-        val valueLowerCase = value.lowercase(Locale.US)
-        val isRGBA = valueLowerCase.startsWith("rgba(")
-        if (isRGBA || valueLowerCase.startsWith("rgb(")) {
-            val scan = TextScanner(value.substring(if (isRGBA) 5 else 4))
+        // Prefix checks are case-insensitive region matches, so no lowercase copy is allocated.
+        val remaining = e - s
+        val isRGBA = remaining >= 5 && input.regionMatches(s, "rgba(", 0, 5, ignoreCase = true)
+        if (isRGBA || (remaining >= 4 && input.regionMatches(s, "rgb(", 0, 4, ignoreCase = true))) {
+            val scan = TextScanner(input, s + if (isRGBA) 5 else 4, e)
             scan.skipWhitespace()
 
             var red = scan.nextFloat()
-            require(!red.isNaN()) { "Invalid red component in rgb color: $value" }
+            require(!red.isNaN()) { "Invalid red component in rgb color: ${input.substring(s, e)}" }
             if (scan.consume('%')) {
                 red = red * 256 / 100
             }
@@ -70,19 +78,19 @@ internal object ColorParser {
             val isLegacyCSSColor3 = scan.skipCommaWhitespace()
 
             var green = scan.nextFloat()
-            require(!green.isNaN()) { "Invalid green component in rgb color: $value" }
+            require(!green.isNaN()) { "Invalid green component in rgb color: ${input.substring(s, e)}" }
             if (scan.consume('%')) {
                 green = green * 256 / 100
             }
 
             if (isLegacyCSSColor3) {
-                require(scan.skipCommaWhitespace()) { "Missing comma in legacy rgb color: $value" }
+                require(scan.skipCommaWhitespace()) { "Missing comma in legacy rgb color: ${input.substring(s, e)}" }
             } else {
                 scan.skipWhitespace()
             }
 
             var blue = scan.nextFloat()
-            require(!blue.isNaN()) { "Invalid blue component in rgb color: $value" }
+            require(!blue.isNaN()) { "Invalid blue component in rgb color: ${input.substring(s, e)}" }
             if (scan.consume('%')) {
                 blue = blue * 256 / 100
             }
@@ -92,7 +100,7 @@ internal object ColorParser {
             if (isLegacyCSSColor3) {
                 if (scan.skipCommaWhitespace()) {
                     alpha = scan.nextFloat()
-                    require(!alpha.isNaN()) { "Invalid alpha component in legacy rgb color: $value" }
+                    require(!alpha.isNaN()) { "Invalid alpha component in legacy rgb color: ${input.substring(s, e)}" }
                     if (scan.consume('%')) {
                         alpha /= 100f
                     }
@@ -102,7 +110,7 @@ internal object ColorParser {
                 if (scan.consume('/')) {
                     scan.skipWhitespace()
                     alpha = scan.nextFloat()
-                    require(!alpha.isNaN()) { "Invalid alpha component in rgb color: $value" }
+                    require(!alpha.isNaN()) { "Invalid alpha component in rgb color: ${input.substring(s, e)}" }
                     if (scan.consume('%')) {
                         alpha /= 100f
                     }
@@ -110,18 +118,18 @@ internal object ColorParser {
             }
             scan.skipWhitespace()
 
-            require(scan.consume(')')) { "Missing closing bracket in rgb color: $value" }
+            require(scan.consume(')')) { "Missing closing bracket in rgb color: ${input.substring(s, e)}" }
             return ColorValue.of(packRgba(red, green, blue, alpha))
         } else {
             // Parse a hsl() or hsla() color.
             // In CSS Color 4, these are synonyms, and the alpha parameter is optional in both cases.
-            val isHSLA = valueLowerCase.startsWith("hsla(")
-            if (isHSLA || valueLowerCase.startsWith("hsl(")) {
-                val scan = TextScanner(value.substring(if (isHSLA) 5 else 4))
+            val isHSLA = remaining >= 5 && input.regionMatches(s, "hsla(", 0, 5, ignoreCase = true)
+            if (isHSLA || (remaining >= 4 && input.regionMatches(s, "hsl(", 0, 4, ignoreCase = true))) {
+                val scan = TextScanner(input, s + if (isHSLA) 5 else 4, e)
                 scan.skipWhitespace()
 
                 val hue = scan.nextFloat()
-                require(!hue.isNaN()) { "Invalid hue component in hsl color: $value" }
+                require(!hue.isNaN()) { "Invalid hue component in hsl color: ${input.substring(s, e)}" }
                 scan.consumeIgnoreCase("deg") // Optional units
 
                 // If there is a comma, then it is the "legacy" format: rgb(r, g, b, a?).
@@ -129,25 +137,25 @@ internal object ColorParser {
                 val isLegacyCSSColor3 = scan.skipCommaWhitespace()
 
                 val saturation = scan.nextFloat()
-                require(!saturation.isNaN()) { "Invalid saturation component in hsl color: $value" }
-                require(scan.consume('%')) { "Missing % in saturation component of hsl color: $value" }
+                require(!saturation.isNaN()) { "Invalid saturation component in hsl color: ${input.substring(s, e)}" }
+                require(scan.consume('%')) { "Missing % in saturation component of hsl color: ${input.substring(s, e)}" }
 
                 if (isLegacyCSSColor3) {
-                    require(scan.skipCommaWhitespace()) { "Missing comma in legacy hsl color: $value" }
+                    require(scan.skipCommaWhitespace()) { "Missing comma in legacy hsl color: ${input.substring(s, e)}" }
                 } else {
                     scan.skipWhitespace()
                 }
 
                 val lightness = scan.nextFloat()
-                require(!lightness.isNaN()) { "Invalid lightness component in hsl color: $value" }
-                require(scan.consume('%')) { "Missing % in lightness component of hsl color: $value" }
+                require(!lightness.isNaN()) { "Invalid lightness component in hsl color: ${input.substring(s, e)}" }
+                require(scan.consume('%')) { "Missing % in lightness component of hsl color: ${input.substring(s, e)}" }
 
                 // Now look for optional alpha
                 var alpha = Float.NaN
                 if (isLegacyCSSColor3) {
                     if (scan.skipCommaWhitespace()) {
                         alpha = scan.nextFloat()
-                        require(!alpha.isNaN()) { "Invalid alpha component in legacy hsl color: $value" }
+                        require(!alpha.isNaN()) { "Invalid alpha component in legacy hsl color: ${input.substring(s, e)}" }
                         if (scan.consume('%')) {
                             alpha /= 100f
                         }
@@ -157,25 +165,31 @@ internal object ColorParser {
                     if (scan.consume('/')) {
                         scan.skipWhitespace()
                         alpha = scan.nextFloat()
-                        require(!alpha.isNaN()) { "Invalid alpha component in hsl color: $value" }
+                        require(!alpha.isNaN()) { "Invalid alpha component in hsl color: ${input.substring(s, e)}" }
                         if (scan.consume('%')) {
                             alpha /= 100f
                         }
                     }
                 }
                 scan.skipWhitespace()
-                require(scan.consume(')')) { "Missing closing bracket in hsl color: $value" }
+                require(scan.consume(')')) { "Missing closing bracket in hsl color: ${input.substring(s, e)}" }
                 return ColorValue.of(packHsla(hue, saturation, lightness, alpha))
             }
         }
 
         // Must be a color keyword
-        val color = parseColorKeyword(valueLowerCase)
-        checkState(color != ColorValue.BLACK || valueLowerCase == "black") { "Invalid color keyword: $value" }
-        return color
+        return if (s == 0 && e == input.length) parseColorKeyword(input)
+        else parseColorKeyword(input.substring(s, e))
     }
 
-    private fun parseColorKeyword(nameLowerCase: String): ColorValue {
-        return ColorValue.of(ColorKeywords.get(nameLowerCase))
+    private fun parseColorKeyword(value: String): ColorValue {
+        // Fast path: already-lowercase names (the common case) need no copy.
+        // Only BLACK-or-unknown falls through to a single lowercase attempt.
+        val direct = ColorKeywords.get(value)
+        if (direct != COLOR_BLACK || value == "black") return ColorValue.of(direct)
+        val lower = value.lowercase(Locale.US)
+        val color = ColorKeywords.get(lower)
+        checkState(color != COLOR_BLACK || lower == "black") { "Invalid color keyword: $value" }
+        return ColorValue.of(color)
     }
 }

@@ -17,6 +17,7 @@
 package hu.oandras.ksvg
 
 import hu.oandras.ksvg.parser.TextScanner
+import hu.oandras.ksvg.utils.equalsWindow
 
 /**
  * The PreserveAspectRatio class tells the renderer how to scale and position the
@@ -234,41 +235,49 @@ public data class PreserveAspectRatio internal constructor(
             val scan = TextScanner(value)
             scan.skipWhitespace()
 
-            var word = scan.nextToken()
-            if ("defer" == word?.lowercase()) {    // Ignore defer keyword
-                scan.skipWhitespace()
-                word = scan.nextToken()
+            // Single pass, zero-allocation dispatch: the first token is either "defer"
+            // (ignored, the alignment comes from the next token) or the alignment
+            // keyword itself. The nested probe is inline, so no window, token, or
+            // lowercase copy is allocated on the happy path.
+            val align = scan.consumeNextToken(' ', false) { text, s, e ->
+                if (text.equalsWindow(s, e, "defer", ignoreCase = true)) {    // Ignore defer keyword
+                    scan.skipWhitespace()
+                    scan.consumeNextToken(' ', false) { t2, s2, e2 ->
+                        resolveAspectRatioKeyword(t2, s2, e2)
+                    }
+                } else {
+                    resolveAspectRatioKeyword(text, s, e)
+                }
             }
-
-            val align = resolveAspectRatioKeyword(word)
 
             scan.skipWhitespace()
 
             var scale: Scale? = null
             if (!scan.empty()) {
-                val meetOrSlice = scan.nextToken()
-                scale = when (meetOrSlice?.lowercase()) {
-                    "meet" -> Scale.meet
-                    "slice" -> Scale.slice
-                    else -> throw KSVGParseException("Invalid preserveAspectRatio definition: $value")
+                scale = scan.consumeNextToken(' ', false) { text, s, e ->
+                    when {
+                        text.equalsWindow(s, e, "meet", ignoreCase = true) -> Scale.meet
+                        text.equalsWindow(s, e, "slice", ignoreCase = true) -> Scale.slice
+                        else -> throw KSVGParseException("Invalid preserveAspectRatio definition: $value")
+                    }
                 }
             }
 
             return PreserveAspectRatio(align, scale)
         }
 
-        private fun resolveAspectRatioKeyword(keyword: String?): Alignment? {
-            return when (keyword?.lowercase()) {
-                "none" -> Alignment.none
-                "xminymin" -> Alignment.xMinYMin
-                "xmidymin" -> Alignment.xMidYMin
-                "xmaxymin" -> Alignment.xMaxYMin
-                "xminymid" -> Alignment.xMinYMid
-                "xmidymid" -> Alignment.xMidYMid
-                "xmaxymid" -> Alignment.xMaxYMid
-                "xminymax" -> Alignment.xMinYMax
-                "xmidymax" -> Alignment.xMidYMax
-                "xmaxymax" -> Alignment.xMaxYMax
+        private fun resolveAspectRatioKeyword(text: String, start: Int, end: Int): Alignment? {
+            return when {
+                text.equalsWindow(start, end, "none", ignoreCase = true) -> Alignment.none
+                text.equalsWindow(start, end, "xminymin", ignoreCase = true) -> Alignment.xMinYMin
+                text.equalsWindow(start, end, "xmidymin", ignoreCase = true) -> Alignment.xMidYMin
+                text.equalsWindow(start, end, "xmaxymin", ignoreCase = true) -> Alignment.xMaxYMin
+                text.equalsWindow(start, end, "xminymid", ignoreCase = true) -> Alignment.xMinYMid
+                text.equalsWindow(start, end, "xmidymid", ignoreCase = true) -> Alignment.xMidYMid
+                text.equalsWindow(start, end, "xmaxymid", ignoreCase = true) -> Alignment.xMaxYMid
+                text.equalsWindow(start, end, "xminymax", ignoreCase = true) -> Alignment.xMinYMax
+                text.equalsWindow(start, end, "xmidymax", ignoreCase = true) -> Alignment.xMidYMax
+                text.equalsWindow(start, end, "xmaxymax", ignoreCase = true) -> Alignment.xMaxYMax
                 else -> null
             }
         }

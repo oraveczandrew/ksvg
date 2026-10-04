@@ -18,19 +18,25 @@
 package hu.oandras.ksvg.parser
 
 import hu.oandras.ksvg.dom.style.Style
+import hu.oandras.ksvg.utils.equalsWindow
 
 internal object FontWidthKeywords {
     fun get(fontWidth: String?): Float {
+        if (fontWidth == null) return Float.NaN
+        return get(fontWidth, 0, fontWidth.length)
+    }
+
+    fun get(text: String, start: Int, end: Int): Float {
         return when {
-            fontWidth.equals("ultra-condensed", ignoreCase = true) -> 50f
-            fontWidth.equals("extra-condensed", ignoreCase = true) -> 62.5f
-            fontWidth.equals("condensed", ignoreCase = true) -> 75f
-            fontWidth.equals("semi-condensed", ignoreCase = true) -> 87.5f
-            fontWidth.equals("normal", ignoreCase = true) -> Style.FONT_WIDTH_NORMAL
-            fontWidth.equals("semi-expanded", ignoreCase = true) -> 112.5f
-            fontWidth.equals("expanded", ignoreCase = true) -> 125f
-            fontWidth.equals("extra-expanded", ignoreCase = true) -> 150f
-            fontWidth.equals("ultra-expanded", ignoreCase = true) -> 200f
+            text.equalsWindow(start, end, "ultra-condensed", ignoreCase = true) -> 50f
+            text.equalsWindow(start, end, "extra-condensed", ignoreCase = true) -> 62.5f
+            text.equalsWindow(start, end, "condensed", ignoreCase = true) -> 75f
+            text.equalsWindow(start, end, "semi-condensed", ignoreCase = true) -> 87.5f
+            text.equalsWindow(start, end, "normal", ignoreCase = true) -> Style.FONT_WIDTH_NORMAL
+            text.equalsWindow(start, end, "semi-expanded", ignoreCase = true) -> 112.5f
+            text.equalsWindow(start, end, "expanded", ignoreCase = true) -> 125f
+            text.equalsWindow(start, end, "extra-expanded", ignoreCase = true) -> 150f
+            text.equalsWindow(start, end, "ultra-expanded", ignoreCase = true) -> 200f
             else -> Float.NaN
         }
     }

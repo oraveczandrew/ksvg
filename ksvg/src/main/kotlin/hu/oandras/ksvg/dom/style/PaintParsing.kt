@@ -18,23 +18,23 @@
 package hu.oandras.ksvg.dom.style
 
 import hu.oandras.ksvg.parser.ColorParser
+import hu.oandras.ksvg.utils.equalsWindow
+import hu.oandras.ksvg.utils.skipLeading
+import hu.oandras.ksvg.utils.skipTrailing
 import hu.oandras.ksvg.utils.trimLowerThanSpace
 
 internal const val CURRENT_COLOR: String = "currentColor"
 
 
-internal fun parseFunctionalIRI(value: String): String? {
-    return when {
-        value.equals(NONE, ignoreCase = true) -> null
-        !value.startsWith("url(", ignoreCase = true) -> null
-        else -> {
-            if (value.endsWith(')')) {
-                value.substring(4, value.length - 1)
-            } else {
-                value.substring(4)
-            }.trimLowerThanSpace()
-        }
-    }
+internal fun parseFunctionalIRI(value: String): String? = parseFunctionalIRI(value, 0, value.length)
+
+internal fun parseFunctionalIRI(text: String, start: Int, end: Int): String? {
+    if (text.equalsWindow(start, end, NONE, ignoreCase = true)) return null
+    if (!(end - start >= 4 && text.regionMatches(start, "url(", 0, 4, ignoreCase = true))) return null
+    val innerEnd = if (end > start && text[end - 1] == ')') end - 1 else end
+    val trimmedStart = skipLeading(text, start + 4, innerEnd)
+    val trimmedEnd = skipTrailing(text, trimmedStart, innerEnd)
+    return text.substring(trimmedStart, trimmedEnd)
 }
 
 internal fun parsePaintSpecifier(valueParam: String): SvgPaint {

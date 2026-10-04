@@ -106,6 +106,39 @@ internal fun String.trimLowerThanSpace(): String {
     }
 }
 
+/**
+ * Start of the `[start, end)` window in [input] with leading chars `<= ' '`
+ * excluded. Zero-allocation trim primitive for scanners; [input] is never sliced.
+ */
+internal fun skipLeading(input: String, start: Int, end: Int): Int {
+    var i = start
+    while (i < end && input[i] <= ' ') i++
+    return i
+}
+
+/**
+ * End of the `[start, end)` window in [input] with trailing chars `<= ' '`
+ * excluded. Zero-allocation trim primitive for scanners; [input] is never sliced.
+ */
+internal fun skipTrailing(input: String, start: Int, end: Int): Int {
+    var e = end
+    while (e > start && input[e - 1] <= ' ') e--
+    return e
+}
+
+internal fun skipLeading(input: String): Int = skipLeading(input, 0, input.length)
+
+internal fun skipTrailing(input: String, start: Int): Int = skipTrailing(input, start, input.length)
+
+/**
+ * Exact match of the `[start, end)` window against [word]. The length check
+ * comes first, so a window that merely starts with [word] (or ends early)
+ * never matches; the rest is a single `regionMatches` — no lowercase or
+ * substring copy on either outcome.
+ */
+internal fun String.equalsWindow(start: Int, end: Int, word: String, ignoreCase: Boolean): Boolean =
+    end - start == word.length && regionMatches(start, word, 0, word.length, ignoreCase)
+
 @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
 internal fun String.toPattern(): Pattern {
     return Pattern.compile(this)!!

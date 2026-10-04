@@ -24,6 +24,8 @@ import androidx.collection.mutableFloatListOf
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
 import hu.oandras.ksvg.parser.IntegerParser.parseInt
+import hu.oandras.ksvg.utils.skipLeading
+import hu.oandras.ksvg.utils.skipTrailing
 
 internal const val INVALID_CHAR: Char = (-1).toChar()
 
@@ -33,13 +35,25 @@ internal open class TextScanner(
 ) {
 
     // Window into [input] with leading/trailing chars <= ' ' excluded, so no
-    // trimmed copy is ever allocated (not even for dirty inputs). All parsing
+    // trimmed copy is ever allocated (not even for dirty inputs). Parsing always
     // goes through [position]/[inputLength]; [input] itself is never sliced.
     @JvmField
     protected var position: Int = skipLeading(input)
 
     @JvmField
     protected var inputLength: Int = skipTrailing(input, position)
+
+    /**
+     * Windowed view over [input] in `[start, end)` with leading/trailing chars
+     * `<= ' '` excluded, so no trimmed copy is ever allocated. Parsing always
+     * goes through [position]/[inputLength]; [input] itself is never sliced.
+     */
+    constructor(input: String, start: Int, end: Int) : this(input) {
+        val se = start.coerceIn(0, input.length)
+        val ee = end.coerceIn(se, input.length)
+        position = skipLeading(input, se, ee)
+        inputLength = skipTrailing(input, position, ee)
+    }
 
     /**
      * Returns true if we have reached the end of the input.
@@ -175,37 +189,69 @@ internal open class TextScanner(
         return found
     }
 
-    internal fun getPosition(): Int = position
+    fun getPosition(): Int = position
 
-    internal fun setPosition(p: Int) {
+    fun setPosition(p: Int) {
         position = p.coerceIn(0, inputLength)
     }
 
-    internal fun peekChar(): Char? = if (position < inputLength) input[position] else null
+    fun peekChar(): Char? = if (position < inputLength) input[position] else null
 
-    internal fun substring(start: Int, end: Int): String =
+    fun substring(start: Int, end: Int): String =
         input.substring(start.coerceIn(0, inputLength), end.coerceIn(0, inputLength))
 
-    internal fun peekKeyword(word: String): Boolean {
+    fun peekKeyword(word: String): Boolean {
         skipWhitespace()
         if (!input.regionMatches(position, word, 0, word.length, ignoreCase = true)) return false
         val after = position + word.length
         return !(after < inputLength && (input[after].isLetterOrDigit() || input[after] == '-'))
     }
 
-    internal fun consumeKeyword(word: String): Boolean {
+    fun consumeKeyword(word: String): Boolean {
         if (!peekKeyword(word)) return false
         position += word.length
         skipWhitespace()
         return true
     }
 
-    internal fun nextIdent(): String? {
+    fun nextIdent(): String? {
+        return consumeIdent { text, s, e -> text.substring(s, e) }
+    }
+
+    /**
+     * Zero-allocation core behind [nextIdent]: skips whitespace, then reports the
+     * `[letters '-']` run as `[input, start, end)` instead of a substring copy,
+     * so callers can match windowed (e.g. `equalsWindow`) without intermediate
+     * strings. Inline, so the callback itself never allocates either; the scan
+     * loop itself lives in [skipIdentChars], so it is not duplicated into every
+     * inline expansion.
+     */
+    inline fun <T> consumeIdent(block: (text: String, startPos: Int, endPos: Int) -> T): T? {
         skipWhitespace()
         val start = position
+        if (!skipIdentChars()) return null
+        return block(input, start, position)
+    }
+
+    /**
+     * Consumes an ident (`[letters '-']` run) and discards it. Zero-allocation
+     * alternative to `nextIdent()` for peek-then-skip call sites.
+     */
+    fun skipIdent(): Boolean {
+        skipWhitespace()
+        return skipIdentChars()
+    }
+
+    /**
+     * Advances past an ident run; true when at least one char was consumed.
+     * Single home of the ident-char predicate (non-inline, so the inline
+     * ident consumers above share it instead of duplicating the loop).
+     */
+    @JvmSynthetic
+    fun skipIdentChars(): Boolean {
+        val start = position
         while (position < inputLength && (input[position].isLetter() || input[position] == '-')) position++
-        if (start == position) return null
-        return input.substring(start, position)
+        return start != position
     }
 
     fun consume(str: String): Boolean {
@@ -277,23 +323,50 @@ internal open class TextScanner(
     * Scans the input starting immediately at 'position' for the next token.
     * A token is a sequence of characters terminating at either the supplied terminating
     * character or (optionally) a whitespace character.
+    *
+    * Zero-allocation core: reports the token as `[input, start, end)` instead of a
+    * substring copy, so callers can match/parse windowed (e.g. `equalsWindow`,
+    * `ColorParser.parseColor(input, s, e)`) without intermediate strings. Inline,
+    * so the callback itself never allocates either.
     */
-    fun nextToken(terminator: Char, allowWhitespace: Boolean): String? {
+    inline fun <T> consumeNextToken(
+        terminator: Char,
+        allowWhitespace: Boolean,
+        block: (text: String, startPos: Int, endPos: Int) -> T
+    ): T? {
         if (empty()) return null
 
-        var ch = input[position]
+        val ch = input[position]
         if (!allowWhitespace && isWhitespace(ch) || ch == terminator) return null
 
         val start = position
-        ch = advanceChar()
+        skipTokenChars(terminator, allowWhitespace)
+        return block(input, start, position)
+    }
+
+    /**
+     * Advances past token chars (up to the terminator, optional whitespace,
+     * or the input end). Single home of the token-scan loop (non-inline, so the
+     * inline token consumers above share it instead of duplicating the loop).
+     */
+    @JvmSynthetic
+    fun skipTokenChars(terminator: Char, allowWhitespace: Boolean) {
+        var ch = advanceChar()
         while (ch != INVALID_CHAR) {
             if (ch == terminator) break
             if (!allowWhitespace && isWhitespace(ch)) break
             ch = advanceChar()
         }
-        return input.substring(start, position)
     }
 
+    /*
+    * Scans the input starting immediately at 'position' for the next token.
+    * A token is a sequence of characters terminating at either the supplied terminating
+    * character or (optionally) a whitespace character.
+    */
+    fun nextToken(terminator: Char, allowWhitespace: Boolean): String? {
+        return consumeNextToken(terminator, allowWhitespace) { text, s, e -> text.substring(s, e) }
+    }
 
     /*
     * Scans the input starting immediately at 'position' looking for a continuous
@@ -337,6 +410,42 @@ internal open class TextScanner(
         return null
     }
 
+    /**
+     * Tries to consume a function call with the exact (case-sensitive) name [name]:
+     * the maximal letter run must equal [name], followed by optional whitespace and
+     * `'('` — mirroring what `when (nextFunction())` accepted. On any mismatch
+     * [position] is reset, so alternatives can be tried in sequence. Zero-allocation
+     * on both hit and miss; hot-path callers (e.g., transform lists) avoid the
+     * per-command name substring entirely.
+     */
+    fun consumeFunction(name: String): Boolean {
+        val start = position
+        var i = 0
+        while (i < name.length) {
+            if (position >= inputLength || input[position] != name[i]) {
+                position = start
+                return false
+            }
+            position++
+            i++
+        }
+        // Boundary: the name must not continue with another letter
+        // (e.g. "matrixx" is not "matrix").
+        if (position < inputLength &&
+            (input[position] in 'a'..'z' || input[position] in 'A'..'Z')
+        ) {
+            position = start
+            return false
+        }
+        while (position < inputLength && isWhitespace(input[position])) position++
+        if (position < inputLength && input[position] == '(') {
+            position++
+            return true
+        }
+        position = start
+        return false
+    }
+
     /*
     * Get the next few chars. Mainly used for error messages.
     */
@@ -348,7 +457,7 @@ internal open class TextScanner(
         return str
     }
 
-    internal fun nextUnit(): CssUnit? {
+    fun nextUnit(): CssUnit? {
         if (empty()) return null
         val ch = input[position]
         if (ch == '%') {
@@ -428,6 +537,18 @@ internal open class TextScanner(
         }
     }
 
+    /**
+     * Hands the unscanned remainder to [block] as `[input, start, end)` instead
+     * of a substring copy, so callers can parse windowed without the tail
+     * allocation of [restOfText]. Consumes the rest, like [restOfText]. Inline,
+     * so the callback itself never allocates either.
+     */
+    inline fun <T> consumeRestOfText(block: (text: String, startPos: Int, endPos: Int) -> T): T {
+        val start = position
+        position = inputLength
+        return block(input, start, inputLength)
+    }
+
     fun skipSemicolonWhitespace(): Boolean {
         skipWhitespace()
         if (empty()) return false
@@ -465,31 +586,15 @@ internal open class TextScanner(
     fun nextSemicolonColorList(): IntList {
         val result = MutableIntList()
         while (!empty()) {
-            val token = nextToken(';', true)?.trim()
-            if (!token.isNullOrEmpty()) {
-                val color = ColorParser.parseColor(token)
-                result.add(color.value)
+            val value = consumeNextToken(';', true) { text, s, e ->
+                val ts = skipLeading(text, s, e)
+                val te = skipTrailing(text, ts, e)
+                if (ts >= te) null else ColorParser.parseColor(text, ts, te).value
             }
+            if (value != null) result.add(value)
             if (!skipSemicolonWhitespace()) break
         }
         return result
-    }
-
-    companion object {
-
-        @JvmSynthetic
-        internal fun skipLeading(input: String): Int {
-            var i = 0
-            while (i < input.length && input[i] <= ' ') i++
-            return i
-        }
-
-        @JvmSynthetic
-        internal fun skipTrailing(input: String, start: Int): Int {
-            var e = input.length
-            while (e > start && input[e - 1] <= ' ') e--
-            return e
-        }
     }
 }
 

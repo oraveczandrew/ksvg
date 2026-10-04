@@ -26,6 +26,9 @@ import hu.oandras.ksvg.parser.FontWeightKeywords
 import hu.oandras.ksvg.parser.FontWidthKeywords
 import hu.oandras.ksvg.parser.TextScanner
 import hu.oandras.ksvg.parser.parseLength
+import hu.oandras.ksvg.utils.equalsWindow
+import hu.oandras.ksvg.utils.skipLeading
+import hu.oandras.ksvg.utils.skipTrailing
 
 internal const val NORMAL = "normal"
 
@@ -49,65 +52,82 @@ internal fun parseFont(builder: Style.Builder, value: String) {
     // Start by checking for the fixed size standard system font names (which we don't support)
     if (isSystemFont(value)) return
 
-    // First part: style/variant/weight (opt - one or more)
+    // First part: style/variant/weight (opt - one or more).
+    // Windowed dispatch: each token is classified on its `[start, end)` window
+    // with no token substring. Both loop exits consume exactly one token (the
+    // size candidate) and record its window for `parseFontSize` below.
     val scan = TextScanner(value)
-    var item: String?
+    var sizeStart = 0
+    var sizeEnd = 0
     while (true) {
-        item = scan.nextToken('/')
+        val tokenStart = scan.getPosition()
+        val isSize = scan.consumeNextToken('/', false) { text, s, e ->
+            if (!fontWeight.isNaN() && fontStyle != null) return@consumeNextToken true
+            if (text.equalsWindow(s, e, NORMAL, ignoreCase = true)) {
+                // indeterminate right now which of these this refers to
+                return@consumeNextToken false
+            }
+            if (fontWeight.isNaN()) {
+                val fw = FontWeightKeywords.get(text, s, e)
+                if (!fw.isNaN()) {
+                    fontWeight = fw
+                    return@consumeNextToken false
+                }
+            }
+            if (fontStyle == null) {
+                val style = parseFontStyle(text, s, e)
+                if (style != null) {
+                    fontStyle = style
+                    return@consumeNextToken false
+                }
+            }
+            // Must be a font-variant keyword?
+            if (fontVariantSmallCaps == null &&
+                text.equalsWindow(s, e, CSSFontFeatureSettings.FONT_VARIANT_SMALL_CAPS, ignoreCase = true)
+            ) {
+                fontVariantSmallCaps = true
+                return@consumeNextToken false
+            }
+            if (fontWidth.isNaN()) {
+                val fw = FontWidthKeywords.get(text, s, e)
+                if (!fw.isNaN()) {
+                    fontWidth = fw
+                    return@consumeNextToken false
+                }
+            }
+            // Not any of these. Break and try next section
+            true
+        } ?: return
+        val tokenEnd = scan.getPosition()
         scan.skipWhitespace()
-        if (item == null) return
-        if (!fontWeight.isNaN() && fontStyle != null) break
-        if (item.equals(NORMAL, ignoreCase = true)) {
-            // indeterminate right now which of these this refers to
-            continue
+        if (isSize) {
+            sizeStart = tokenStart
+            sizeEnd = tokenEnd
+            break
         }
-        if (fontWeight.isNaN()) {
-            val fw = FontWeightKeywords.get(item)
-            if (!fw.isNaN()) {
-                fontWeight = fw
-                continue
-            }
-        }
-        if (fontStyle == null) {
-            fontStyle = parseFontStyle(item)
-            if (fontStyle != null) continue
-        }
-        // Must be a font-variant keyword?
-        if (fontVariantSmallCaps == null && item.equals(CSSFontFeatureSettings.FONT_VARIANT_SMALL_CAPS, ignoreCase = true)) {
-            fontVariantSmallCaps = true
-            continue
-        }
-        if (fontWidth.isNaN()) {
-            val fw = FontWidthKeywords.get(item)
-            if (!fw.isNaN()) {
-                fontWidth = fw
-                continue
-            }
-        }
-        // Not any of these. Break and try next section
-        break
     }
 
     // Second part: font size (required) and line-height (optional)
-    val fontSize: CSSLength? = parseFontSize(item)
+    val fontSize: CSSLength? = parseFontSize(value, sizeStart, sizeEnd)
 
     // Check for line-height (which we don't support)
     if (scan.consume('/')) {
         scan.skipWhitespace()
-        item = scan.nextToken()
-        if (item != null) {
+        val lineHeightOk = scan.consumeNextToken(' ', false) { text, s, e ->
             try {
-                parseLength(item)
+                parseLength(text, s, e)
+                true
             } catch (_: KSVGParseException) {
-                return
+                false
             }
         }
+        if (lineHeightOk == false) return
         scan.skipWhitespace()
     }
 
 
-    // Third part: font family
-    builder.fontFamily = parseFontFamily(scan.restOfText())
+    // Third part: font family (the scanner remainder, no tail copy)
+    builder.fontFamily = scan.consumeRestOfText { text, s, e -> parseFontFamily(text, s, e) }
 
     builder.fontSize = fontSize
     builder.fontWeight = if (fontWeight.isNaN()) {
@@ -143,19 +163,43 @@ internal fun parseFont(builder: Style.Builder, value: String) {
 // Parse a font family list
 internal fun parseFontFamily(value: String?): List<String>? {
     if (value == null) return null
+    return parseFontFamily(value, 0, value.length)
+}
 
+// Windowed twin: the scanner covers `[start, end)` with no tail copy, quoted
+// items keep their single content copy, and unquoted items are trimmed on the
+// window, so only stored family names allocate.
+internal fun parseFontFamily(text: String, start: Int, end: Int): List<String>? {
     var fonts: MutableList<String>? = null
-    val scan = TextScanner(value)
+    val scan = TextScanner(text, start, end)
     while (true) {
-        // Outer whitespace is already trimmed by TextScanner, but interior
-        // whitespace around separators survives ("Arial ,serif" keeps "Arial ");
-        // CSS treats it as insignificant, so trim every item.
-        val item = (scan.nextQuotedString() ?: scan.nextTokenWithWhitespace(',') ?: break).trim()
-        if (item.isNotEmpty()) {
-            if (fonts == null) {
-                fonts = ArrayList()
+        val quoted = scan.nextQuotedString()
+        if (quoted != null) {
+            // Quoted content keeps interior whitespace, but surrounding
+            // whitespace is insignificant (matches the old trim()).
+            val qs = skipLeading(quoted, 0, quoted.length)
+            val qe = skipTrailing(quoted, qs, quoted.length)
+            if (qs < qe) {
+                if (fonts == null) {
+                    fonts = ArrayList()
+                }
+                fonts.add(quoted.substring(qs, qe))
             }
-            fonts.add(item)
+        } else {
+            // Blank-but-present tokens (`"Arial, ,serif"`) are skipped like the
+            // old trim-then-isNotEmpty check; only a missing token breaks. The
+            // shared empty string allocates nothing.
+            val item = scan.consumeNextToken(',', true) { t, s, e ->
+                val ts = skipLeading(t, s, e)
+                val te = skipTrailing(t, ts, e)
+                if (ts >= te) "" else t.substring(ts, te)
+            } ?: break
+            if (item.isNotEmpty()) {
+                if (fonts == null) {
+                    fonts = ArrayList()
+                }
+                fonts.add(item)
+            }
         }
         scan.skipCommaWhitespace()
         if (scan.empty()) break
@@ -164,9 +208,12 @@ internal fun parseFontFamily(value: String?): List<String>? {
 }
 
 // Parse a font size keyword or numerical value
-internal fun parseFontSize(value: String): CSSLength? {
+internal fun parseFontSize(value: String): CSSLength? = parseFontSize(value, 0, value.length)
+
+// Windowed twin: no token substring for scanner-driven callers.
+internal fun parseFontSize(text: String, start: Int, end: Int): CSSLength? {
     return try {
-        FontSizeKeywords.get(value) ?: parseLength(value)
+        FontSizeKeywords.get(text, start, end) ?: parseLength(text, start, end)
     } catch (_: KSVGParseException) {
         null
     }

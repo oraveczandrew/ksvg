@@ -22,42 +22,62 @@ import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.logger.logUnsupportedFeature
 import hu.oandras.ksvg.parser.TextScanner
 import hu.oandras.ksvg.parser.parsePath
+import hu.oandras.ksvg.utils.equalsWindow
+import hu.oandras.ksvg.utils.skipLeading
+import hu.oandras.ksvg.utils.skipTrailing
 
 context(loggerContext: LoggerContext)
-internal fun parseClipPath(value: String): CSSClipPath? {
-    val v = value.trim()
-    if (v.equals("none", ignoreCase = true)) return null
-    if (v.startsWith("url(", ignoreCase = true)) {
+internal fun parseClipPath(value: String): CSSClipPath? = parseClipPath(value, 0, value.length)
+
+context(loggerContext: LoggerContext)
+internal fun parseClipPath(text: String, start: Int, end: Int): CSSClipPath? {
+    val se = start.coerceIn(0, text.length)
+    val ee = end.coerceIn(se, text.length)
+    val s = skipLeading(text, se, ee)
+    val e = skipTrailing(text, s, ee)
+    if (s >= e) return null
+    if (text.equalsWindow(s, e, "none", ignoreCase = true)) return null
+    if (e - s >= 4 && text.regionMatches(s, "url(", 0, 4, ignoreCase = true)) {
         // url() with a shape fallback is invalid per grammar; shape wins (documented).
-        val close = v.lastIndexOf(')')
-        if (close != -1) {
-            val after = v.substring(close + 1).trim()
-            if (after.isNotEmpty()) {
-                return parseClipPath(after)
+        var close = e - 1
+        while (close >= s && text[close] != ')') close--
+        if (close >= s) {
+            val afterStart = skipLeading(text, close + 1, e)
+            val afterEnd = skipTrailing(text, afterStart, e)
+            if (afterStart < afterEnd) {
+                return parseClipPath(text, afterStart, afterEnd)
             }
         }
-        val iri = parseFunctionalIRI(v) ?: return null
+        val iri = parseFunctionalIRI(text, s, e) ?: return null
         return CSSClipPath.UrlClip(iri)
     }
-    val open = v.indexOf('(')
-    val close = v.lastIndexOf(')')
-    if (open == -1 || close < open) return null
-    val name = v.substring(0, open).trim().lowercase()
-    val body = v.substring(open + 1, close)
-    val trailing = v.substring(close + 1).trim()
-    if (trailing.contains('(') || trailing.contains(')')) return null
+    var open = s
+    while (open < e && text[open] != '(') open++
+    var close = e - 1
+    while (close >= s && text[close] != ')') close--
+    if (open >= e || close < open) return null
+    val nameStart = skipLeading(text, s, open)
+    val nameEnd = skipTrailing(text, nameStart, open)
+    val trailStart = skipLeading(text, close + 1, e)
+    val trailEnd = skipTrailing(text, trailStart, e)
+    var ti = trailStart
+    while (ti < trailEnd) {
+        val c = text[ti]
+        if (c == '(' || c == ')') return null
+        ti++
+    }
     return try {
-        val shape = when (name) {
-            "circle" -> parseCircle(body)
-            "ellipse" -> parseEllipse(body)
-            "inset" -> parseInset(body)
-            "rect" -> parseRect(body)
-            "xywh" -> parseXywh(body)
-            "polygon" -> parsePolygon(body)
-            "path" -> parsePathShape(body)
+        val shape = when {
+            text.equalsWindow(nameStart, nameEnd, "circle", ignoreCase = true) -> parseCircle(text, open + 1, close)
+            text.equalsWindow(nameStart, nameEnd, "ellipse", ignoreCase = true) -> parseEllipse(text, open + 1, close)
+            text.equalsWindow(nameStart, nameEnd, "inset", ignoreCase = true) -> parseInset(text, open + 1, close)
+            text.equalsWindow(nameStart, nameEnd, "rect", ignoreCase = true) -> parseRect(text, open + 1, close)
+            text.equalsWindow(nameStart, nameEnd, "xywh", ignoreCase = true) -> parseXywh(text, open + 1, close)
+            text.equalsWindow(nameStart, nameEnd, "polygon", ignoreCase = true) -> parsePolygon(text, open + 1, close)
+            text.equalsWindow(nameStart, nameEnd, "path", ignoreCase = true) -> parsePathShape(text, open + 1, close)
             else -> return null
         } ?: return null
-        val refBox = shape.refBox ?: parseGeometryBoxWord(trailing) ?: return null
+        val refBox = shape.refBox ?: parseGeometryBoxWord(text, trailStart, trailEnd) ?: return null
         CSSClipPath.ShapeClip(shape.shape, refBox)
     } catch (_: Exception) {
         null
@@ -71,8 +91,8 @@ private data class Shaped<T : BasicShape>(
     val refBox: GeometryBox?
 )
 
-private fun parseCircle(body: String): Shaped<BasicShape.Circle>? {
-    val scan = TextScanner(body)
+private fun parseCircle(text: String, start: Int, end: Int): Shaped<BasicShape.Circle>? {
+    val scan = TextScanner(text, start, end)
     scan.skipWhitespace()
     val r = parseClipRadius(scan) ?: return null
     var cx: ClipPosition = ClipPosition.Center
@@ -87,16 +107,16 @@ private fun parseCircle(body: String): Shaped<BasicShape.Circle>? {
     scan.skipWhitespace()
     var refBox: GeometryBox? = null
     if (!scan.empty()) {
-        val word = scan.nextIdent() ?: return null
-        refBox = parseGeometryBoxName(word) ?: return null
+        // Windowed geometry-box match: no ident substring is allocated.
+        refBox = scan.consumeIdent { text, s, e -> parseGeometryBoxName(text, s, e) } ?: return null
         scan.skipWhitespace()
     }
     if (!scan.empty()) return null
     return Shaped(BasicShape.Circle(r, cx, cy), refBox)
 }
 
-private fun parseEllipse(body: String): Shaped<BasicShape.Ellipse>? {
-    val scan = TextScanner(body)
+private fun parseEllipse(text: String, start: Int, end: Int): Shaped<BasicShape.Ellipse>? {
+    val scan = TextScanner(text, start, end)
     scan.skipWhitespace()
     val rx = parseClipRadius(scan) ?: return null
     scan.skipWhitespace()
@@ -116,8 +136,8 @@ private fun parseEllipse(body: String): Shaped<BasicShape.Ellipse>? {
     scan.skipWhitespace()
     var refBox: GeometryBox? = null
     if (!scan.empty()) {
-        val word = scan.nextIdent() ?: return null
-        refBox = parseGeometryBoxName(word) ?: return null
+        // Windowed geometry-box match: no ident substring is allocated.
+        refBox = scan.consumeIdent { text, s, e -> parseGeometryBoxName(text, s, e) } ?: return null
         scan.skipWhitespace()
     }
     if (!scan.empty()) return null
@@ -125,8 +145,8 @@ private fun parseEllipse(body: String): Shaped<BasicShape.Ellipse>? {
 }
 
 context(loggerContext: LoggerContext)
-private fun parseInset(body: String): Shaped<BasicShape.Inset>? {
-    val scan = TextScanner(body)
+private fun parseInset(text: String, start: Int, end: Int): Shaped<BasicShape.Inset>? {
+    val scan = TextScanner(text, start, end)
     scan.skipWhitespace()
     val first = scan.nextLength() ?: return null
     val second = nextInsetLength(scan)
@@ -144,8 +164,8 @@ private fun parseInset(body: String): Shaped<BasicShape.Inset>? {
     scan.skipWhitespace()
     var refBox: GeometryBox? = null
     if (!scan.empty()) {
-        val word = scan.nextIdent() ?: return null
-        refBox = parseGeometryBoxName(word) ?: return null
+        // Windowed geometry-box match: no ident substring is allocated.
+        refBox = scan.consumeIdent { text, s, e -> parseGeometryBoxName(text, s, e) } ?: return null
         scan.skipWhitespace()
     }
     if (!scan.empty()) return null
@@ -174,11 +194,11 @@ private fun nextInsetLength(scan: TextScanner): CSSLength? {
 private fun parseClipRadius(scan: TextScanner): ClipRadius? {
     scan.skipWhitespace()
     if (scan.peekKeyword("closest-side")) {
-        scan.nextIdent()
+        scan.skipIdent()
         return ClipRadius.ClosestSide
     }
     if (scan.peekKeyword("farthest-side")) {
-        scan.nextIdent()
+        scan.skipIdent()
         return ClipRadius.FarthestSide
     }
     val len = scan.nextLength() ?: return null
@@ -187,8 +207,8 @@ private fun parseClipRadius(scan: TextScanner): ClipRadius? {
 }
 
 context(loggerContext: LoggerContext)
-private fun parseRect(body: String): Shaped<BasicShape.Rect>? {
-    val scan = TextScanner(body)
+private fun parseRect(text: String, start: Int, end: Int): Shaped<BasicShape.Rect>? {
+    val scan = TextScanner(text, start, end)
     scan.skipWhitespace()
     // rect() takes absolute top/right/bottom/left (unlike inset() offsets).
     val edges = ArrayList<CSSLength>(4)
@@ -204,8 +224,8 @@ private fun parseRect(body: String): Shaped<BasicShape.Rect>? {
     scan.skipWhitespace()
     var refBox: GeometryBox? = null
     if (!scan.empty()) {
-        val word = scan.nextIdent() ?: return null
-        refBox = parseGeometryBoxName(word) ?: return null
+        // Windowed geometry-box match: no ident substring is allocated.
+        refBox = scan.consumeIdent { text, s, e -> parseGeometryBoxName(text, s, e) } ?: return null
         scan.skipWhitespace()
     }
     if (!scan.empty()) return null
@@ -223,8 +243,8 @@ private fun parseRect(body: String): Shaped<BasicShape.Rect>? {
 }
 
 context(loggerContext: LoggerContext)
-private fun parseXywh(body: String): Shaped<BasicShape.Xywh>? {
-    val scan = TextScanner(body)
+private fun parseXywh(text: String, start: Int, end: Int): Shaped<BasicShape.Xywh>? {
+    val scan = TextScanner(text, start, end)
     scan.skipWhitespace()
     val nums = ArrayList<CSSLength>(4)
     repeat(4) { i ->
@@ -240,8 +260,8 @@ private fun parseXywh(body: String): Shaped<BasicShape.Xywh>? {
     scan.skipWhitespace()
     var refBox: GeometryBox? = null
     if (!scan.empty()) {
-        val word = scan.nextIdent() ?: return null
-        refBox = parseGeometryBoxName(word) ?: return null
+        // Windowed geometry-box match: no ident substring is allocated.
+        refBox = scan.consumeIdent { text, s, e -> parseGeometryBoxName(text, s, e) } ?: return null
         scan.skipWhitespace()
     }
     if (!scan.empty()) return null
@@ -297,15 +317,23 @@ private fun parseRoundRadii(scan: TextScanner): Pair<CSSLength?, CSSLength?>? {
 }
 
 context(loggerContext: LoggerContext)
-private fun parsePathShape(body: String): Shaped<BasicShape.Path>? {
-    val scan = TextScanner(body)
+private fun parsePathShape(text: String, start: Int, end: Int): Shaped<BasicShape.Path>? {
+    val scan = TextScanner(text, start, end)
     scan.skipWhitespace()
     var fillRule = FillRule.UNSPECIFIED
     // optional "<fill-rule>," prefix (same as polygon())
     val save = scan.getPosition()
-    val word = scan.nextIdent()
-    if (word != null && (word.equals("nonzero", ignoreCase = true) || word.equals("evenodd", ignoreCase = true))) {
-        fillRule = parseFillRule(word)
+    // Speculative fill-rule match on the ident window: rewinds when absent,
+    // so no substring is allocated on any outcome.
+    val rule = scan.consumeIdent { text, s, e ->
+        when {
+            text.equalsWindow(s, e, "nonzero", ignoreCase = true) -> FillRule.NON_ZERO
+            text.equalsWindow(s, e, "evenodd", ignoreCase = true) -> FillRule.EVEN_ODD
+            else -> null
+        }
+    }
+    if (rule != null) {
+        fillRule = rule
         scan.skipWhitespace()
         if (!scan.consume(',')) return null
         scan.skipWhitespace()
@@ -326,23 +354,31 @@ private fun parsePathShape(body: String): Shaped<BasicShape.Path>? {
     scan.skipWhitespace()
     var refBox: GeometryBox? = null
     if (!scan.empty()) {
-        val boxWord = scan.nextIdent() ?: return null
-        refBox = parseGeometryBoxName(boxWord) ?: return null
+        // Windowed geometry-box match: no ident substring is allocated.
+        refBox = scan.consumeIdent { text, s, e -> parseGeometryBoxName(text, s, e) } ?: return null
         scan.skipWhitespace()
     }
     if (!scan.empty()) return null
     return Shaped(BasicShape.Path(pathDef, fillRule), refBox)
 }
 
-private fun parsePolygon(body: String): Shaped<BasicShape.Polygon>? {
-    val scan = TextScanner(body)
+private fun parsePolygon(text: String, start: Int, end: Int): Shaped<BasicShape.Polygon>? {
+    val scan = TextScanner(text, start, end)
     scan.skipWhitespace()
     var fillRule = FillRule.UNSPECIFIED
     // optional "<fill-rule>," prefix
     val save = scan.getPosition()
-    val word = scan.nextIdent()
-    if (word != null && (word.equals("nonzero", ignoreCase = true) || word.equals("evenodd", ignoreCase = true))) {
-        fillRule = parseFillRule(word)
+    // Speculative fill-rule match on the ident window: rewinds when absent,
+    // so no substring is allocated on any outcome.
+    val rule = scan.consumeIdent { text, s, e ->
+        when {
+            text.equalsWindow(s, e, "nonzero", ignoreCase = true) -> FillRule.NON_ZERO
+            text.equalsWindow(s, e, "evenodd", ignoreCase = true) -> FillRule.EVEN_ODD
+            else -> null
+        }
+    }
+    if (rule != null) {
+        fillRule = rule
         scan.skipWhitespace()
         if (!scan.consume(',')) {
             // fill-rule without comma is invalid per grammar; require comma
@@ -366,8 +402,8 @@ private fun parsePolygon(body: String): Shaped<BasicShape.Polygon>? {
     scan.skipWhitespace()
     var refBox: GeometryBox? = null
     if (!scan.empty()) {
-        val word = scan.nextIdent() ?: return null
-        refBox = parseGeometryBoxName(word) ?: return null
+        // Windowed geometry-box match: no ident substring is allocated.
+        refBox = scan.consumeIdent { text, s, e -> parseGeometryBoxName(text, s, e) } ?: return null
         scan.skipWhitespace()
     }
     if (!scan.empty()) return null
@@ -394,17 +430,22 @@ private fun parsePositionPair(scan: TextScanner): Pair<ClipPosition, ClipPositio
 private fun nextPositionValue(scan: TextScanner): ClipPosition? {
     val save = scan.getPosition()
     scan.skipCommaWhitespace()
-    val keyword = scan.nextIdent()
-    if (keyword != null) {
-        when (keyword.lowercase()) {
-            "left" -> return ClipPosition.Left
-            "center" -> return ClipPosition.Center
-            "right" -> return ClipPosition.Right
-            "top" -> return ClipPosition.Top
-            "bottom" -> return ClipPosition.Bottom
+    val mark = scan.getPosition()
+    // Windowed edge-keyword match. Rewind only when an ident was consumed but
+    // unrecognized; with no ident at all the position is already correct for
+    // the length read below. No ident substring is allocated on any outcome.
+    val pos = scan.consumeIdent { text, s, e ->
+        when {
+            text.equalsWindow(s, e, "left", ignoreCase = true) -> ClipPosition.Left
+            text.equalsWindow(s, e, "center", ignoreCase = true) -> ClipPosition.Center
+            text.equalsWindow(s, e, "right", ignoreCase = true) -> ClipPosition.Right
+            text.equalsWindow(s, e, "top", ignoreCase = true) -> ClipPosition.Top
+            text.equalsWindow(s, e, "bottom", ignoreCase = true) -> ClipPosition.Bottom
+            else -> null
         }
-        scan.setPosition(save)
     }
+    if (pos != null) return pos
+    if (scan.getPosition() != mark) scan.setPosition(save)
     val length = scan.nextLength()
     return if (length == null) {
         scan.setPosition(save)
@@ -480,24 +521,34 @@ private fun ClipPosition.isV() = isEdgeY() || this == ClipPosition.Center
 
 private fun ClipPosition.asLen() = (this as? ClipPosition.Len)?.v
 
-private fun parseGeometryBoxWord(trailing: String): GeometryBox? {
-    val t = trailing.trim()
+private fun parseGeometryBoxWord(text: String, start: Int, end: Int): GeometryBox? {
+    val ts = skipLeading(text, start, end)
+    val te = skipTrailing(text, ts, end)
     // No box: CSS default is `border-box`; SVG has no CSS boxes, so the
     // object bounding box (`fill-box`) is the faithful analog (a `view-box`
     // default would misplace shapes on off-origin elements vs browsers).
-    if (t.isEmpty()) return GeometryBox.FILL_BOX
-    if (t.any { it.isWhitespace() }) return null
-    return parseGeometryBoxName(t)
+    if (ts >= te) return GeometryBox.FILL_BOX
+    var i = ts
+    while (i < te) {
+        if (text[i].isWhitespace()) return null
+        i++
+    }
+    return parseGeometryBoxName(text, ts, te)
 }
 
 // Shared with transform-box parsing (same keyword table and SVG fallbacks).
-internal fun parseGeometryBoxName(word: String): GeometryBox? {
-    return when (word.lowercase()) {
-        "fill-box" -> GeometryBox.FILL_BOX
-        "stroke-box" -> GeometryBox.STROKE_BOX
-        "view-box" -> GeometryBox.VIEW_BOX
+internal fun parseGeometryBoxName(word: String): GeometryBox? = parseGeometryBoxName(word, 0, word.length)
+
+internal fun parseGeometryBoxName(text: String, start: Int, end: Int): GeometryBox? {
+    return when {
+        text.equalsWindow(start, end, "fill-box", ignoreCase = true) -> GeometryBox.FILL_BOX
+        text.equalsWindow(start, end, "stroke-box", ignoreCase = true) -> GeometryBox.STROKE_BOX
+        text.equalsWindow(start, end, "view-box", ignoreCase = true) -> GeometryBox.VIEW_BOX
         // border-box maps to view-box in SVG (documented approximation)
-        "border-box", "padding-box", "content-box", "margin-box" -> GeometryBox.VIEW_BOX
+        text.equalsWindow(start, end, "border-box", ignoreCase = true) ||
+            text.equalsWindow(start, end, "padding-box", ignoreCase = true) ||
+            text.equalsWindow(start, end, "content-box", ignoreCase = true) ||
+            text.equalsWindow(start, end, "margin-box", ignoreCase = true) -> GeometryBox.VIEW_BOX
         else -> null
     }
 }
@@ -517,12 +568,16 @@ internal fun parseSemicolonClipPathList(value: String): List<CSSClipPath>? {
     while (i <= len) {
         if (i == len || value[i] == ';') {
             if (i > start) {
-                val segment = value.substring(start, i).trim()
-                if (segment.isNotEmpty()) {
-                    if (segment.equals("none", ignoreCase = true)) {
+                // Windowed segment: trimmed on indices, so no segment
+                // substring is allocated. Blank segments are skipped, an
+                // invalid one still drops the whole list.
+                val ts = skipLeading(value, start, i)
+                val te = skipTrailing(value, ts, i)
+                if (ts < te) {
+                    if (value.equalsWindow(ts, te, "none", ignoreCase = true)) {
                         result.add(CSSClipPath.NoClip)
                     } else {
-                        result.add(parseClipPath(segment) ?: return null)
+                        result.add(parseClipPath(value, ts, te) ?: return null)
                     }
                 }
             }

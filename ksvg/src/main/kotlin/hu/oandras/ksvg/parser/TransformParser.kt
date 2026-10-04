@@ -31,11 +31,11 @@ internal fun parseTransform(value: String): Matrix {
     scan.skipWhitespace()
 
     while (!scan.empty()) {
-        val cmd = scan.nextFunction()
-            ?: throw KSVGParseException("Bad transform function encountered in transform list: $value")
-
-        when (cmd) {
-            "matrix" -> {
+        // Zero-allocation dispatch: each probe resets the position on mismatch,
+        // so alternatives are tried in sequence with no name substring. The
+        // `nextFunction()` fallback below runs only on the error path.
+        when {
+            scan.consumeFunction("matrix") -> {
                 scan.skipWhitespace()
                 val a = scan.nextFloat()
                 scan.skipCommaWhitespace()
@@ -57,7 +57,7 @@ internal fun parseTransform(value: String): Matrix {
                 matrix.preConcat(m)
             }
 
-            "translate" -> {
+            scan.consumeFunction("translate") -> {
                 scan.skipWhitespace()
                 val tx = scan.nextFloat()
                 val ty = scan.possibleNextFloat()
@@ -69,7 +69,7 @@ internal fun parseTransform(value: String): Matrix {
                 else matrix.preTranslate(tx, ty)
             }
 
-            "scale" -> {
+            scan.consumeFunction("scale") -> {
                 scan.skipWhitespace()
                 val sx = scan.nextFloat()
                 val sy = scan.possibleNextFloat()
@@ -81,7 +81,7 @@ internal fun parseTransform(value: String): Matrix {
                 else matrix.preScale(sx, sy)
             }
 
-            "rotate" -> {
+            scan.consumeFunction("rotate") -> {
                 scan.skipWhitespace()
                 val ang = scan.nextFloat()
                 val cx = scan.possibleNextFloat()
@@ -99,7 +99,7 @@ internal fun parseTransform(value: String): Matrix {
                 }
             }
 
-            "skewX" -> {
+            scan.consumeFunction("skewX") -> {
                 scan.skipWhitespace()
                 val ang = scan.nextFloat()
                 scan.skipWhitespace()
@@ -109,7 +109,7 @@ internal fun parseTransform(value: String): Matrix {
                 matrix.preSkew(tan(ang.toRadians()), 0f)
             }
 
-            "skewY" -> {
+            scan.consumeFunction("skewY") -> {
                 scan.skipWhitespace()
                 val ang = scan.nextFloat()
                 scan.skipWhitespace()
@@ -119,7 +119,12 @@ internal fun parseTransform(value: String): Matrix {
                 matrix.preSkew(0f, tan(ang.toRadians()))
             }
 
-            else -> throw KSVGParseException("Invalid transform list fn: $cmd)")
+            else -> {
+                // Cold error path only: reproduce the exact historical errors.
+                val bad = scan.nextFunction()
+                if (bad != null) throw KSVGParseException("Invalid transform list fn: $bad)")
+                else throw KSVGParseException("Bad transform function encountered in transform list: $value")
+            }
         }
 
         if (scan.empty()) break

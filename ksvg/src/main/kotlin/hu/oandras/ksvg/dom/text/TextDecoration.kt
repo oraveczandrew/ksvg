@@ -19,6 +19,7 @@ package hu.oandras.ksvg.dom.text
 
 import hu.oandras.ksvg.dom.style.NONE
 import hu.oandras.ksvg.parser.TextScanner
+import hu.oandras.ksvg.utils.equalsWindow
 import kotlin.jvm.JvmSynthetic
 
 internal class TextDecoration(@JvmField val mask: Int) {
@@ -68,13 +69,18 @@ internal fun parseTextDecoration(value: String): TextDecoration? {
     val scanner = TextScanner(value)
     while (!scanner.empty()) {
         scanner.skipWhitespace()
-        val token = scanner.nextToken() ?: break
-        when {
-            token.equals("underline", ignoreCase = true) -> mask = mask or TextDecoration.UNDERLINE
-            token.equals("overline", ignoreCase = true) -> mask = mask or TextDecoration.OVERLINE
-            token.equals("line-through", ignoreCase = true) -> mask = mask or TextDecoration.LINE_THROUGH
-            token.equals("blink", ignoreCase = true) -> mask = mask or TextDecoration.BLINK
-        }
+        // Single scan per token; the 4-way keyword match runs on the window,
+        // so neither the token substring nor per-keyword copies are allocated.
+        val flags = scanner.consumeNextToken(' ', false) { text, s, e ->
+            when {
+                text.equalsWindow(s, e, "underline", ignoreCase = true) -> TextDecoration.UNDERLINE
+                text.equalsWindow(s, e, "overline", ignoreCase = true) -> TextDecoration.OVERLINE
+                text.equalsWindow(s, e, "line-through", ignoreCase = true) -> TextDecoration.LINE_THROUGH
+                text.equalsWindow(s, e, "blink", ignoreCase = true) -> TextDecoration.BLINK
+                else -> 0
+            }
+        } ?: break
+        mask = mask or flags
         scanner.skipWhitespace()
     }
     return if (mask != 0) TextDecoration(mask) else null
