@@ -70,7 +70,13 @@ jobs:
       - name: Collect demo APK
         # Release APK (R8-minified, profileable) signed with the release key
         # when the keystore secret is present, unsigned otherwise.
+        # NOTE: test-fixtures AARs are inter-module test reuse only
+        # (testFixtures(project(":filtering"))) — AGP attaches them to the
+        # release publication automatically, so delete them here: the
+        # action-gh-release `files:` list does NOT honor `!` negations.
+        # Central upload (D-track) needs the same exclusion at publishing time.
         run: |
+          find dist/repo -name "*-test-fixtures.aar" -delete
           ls showcase/build/outputs/apk/release/
           cp showcase/build/outputs/apk/release/showcase-release*.apk \
             "dist/ksvg-showcase-$KSVG_VERSION.apk"
@@ -79,14 +85,11 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # NOTE: test-fixtures AARs are inter-module test reuse only
-          # (testFixtures(project(":filtering"))) — AGP attaches them to the
-          # release publication automatically; they must not ship. Central
-          # upload (D-track) needs the same exclusion at publishing time.
+          # NOTE: test-fixtures AARs were deleted above (the `files:` list
+          # does not honor `!` negations).
           files: |
             dist/*.apk
             dist/repo/**/*.aar
-            !dist/repo/**/*-test-fixtures.aar
             dist/repo/**/*-sources.jar
             dist/repo/**/*-javadoc.jar
             dist/repo/**/*.pom
