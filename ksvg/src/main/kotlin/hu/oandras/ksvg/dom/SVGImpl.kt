@@ -237,7 +237,10 @@ internal class SVGImpl internal constructor(
     internal var rootElement: Svg? = null
 
     internal fun requireRootElement(): Svg {
-        return requireNotNull(rootElement) { "SVG document is empty" }
+        // Parse failure, not a precondition violation: an empty document must
+        // surface as KSVGParseException (never IllegalArgumentException), so
+        // decoder entry points can wrap it into IOException uniformly.
+        return rootElement ?: throw KSVGParseException("SVG document is empty")
     }
 
     // Metadata
