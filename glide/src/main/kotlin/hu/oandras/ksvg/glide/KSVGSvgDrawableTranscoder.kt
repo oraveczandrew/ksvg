@@ -71,8 +71,12 @@ public class KSVGSvgDrawableTranscoder : ResourceTranscoder<SVG, Drawable> {
      * its cost never lands on the frame path.
      */
     internal fun prewarmDrawable(drawable: KSVGDrawable) {
-        val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: FALLBACK_DIMENSION_PX
-        val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: FALLBACK_DIMENSION_PX
+        // Plain ifs, not takeIf: the intrinsic sizes are platform Ints and the
+        // generic takeIf would box each one (Integer per transcoded drawable).
+        val rawWidth = drawable.intrinsicWidth
+        val width = if (rawWidth > 0) rawWidth else FALLBACK_DIMENSION_PX
+        val rawHeight = drawable.intrinsicHeight
+        val height = if (rawHeight > 0) rawHeight else FALLBACK_DIMENSION_PX
         val scratch = createBitmap(width, height, Bitmap.Config.ARGB_8888)
         try {
             drawable.setBounds(0, 0, width, height)
