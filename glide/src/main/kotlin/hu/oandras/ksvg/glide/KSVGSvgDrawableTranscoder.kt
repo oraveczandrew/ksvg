@@ -31,15 +31,18 @@ import hu.oandras.ksvg.SVG
  * per request — including per memory-cache key (Glide keys include the target
  * size), which is what gives each target its own drawable.
  *
- * If animations are enabled via [KSVGOptions.PARSE_ANIMATIONS], the result is
- * a [hu.oandras.ksvg.KSVGAnimatedDrawable].
+ * If animations are enabled via [KSVGOptions.PARSE_ANIMATIONS] **and** the
+ * parsed document actually contains animations ([SVG.hasAnimations]), the
+ * result is a [hu.oandras.ksvg.KSVGAnimatedDrawable]; otherwise it is a plain
+ * [hu.oandras.ksvg.KSVGDrawable], which renders identically for static
+ * documents without owning an animation clock.
  */
 public class KSVGSvgDrawableTranscoder : ResourceTranscoder<SVG, Drawable> {
 
     override fun transcode(toTranscode: Resource<SVG>, options: Options): Resource<Drawable> {
         val svg = toTranscode.get()
         val parseAnimations = options.get(KSVGOptions.PARSE_ANIMATIONS) ?: false
-        val drawable: KSVGDrawable = if (parseAnimations) {
+        val drawable: KSVGDrawable = if (parseAnimations && svg.hasAnimations) {
             svg.toAnimatedDrawable()
         } else {
             svg.toDrawable()

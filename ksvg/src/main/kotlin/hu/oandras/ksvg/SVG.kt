@@ -70,6 +70,17 @@ public interface SVG {
     public val renderDPI: Float
 
     /**
+     * Whether this document contains animation elements.
+     *
+     * False when the document was parsed with `parseAnimations = false` (animation
+     * elements are skipped then) or when it simply declares none. Hosts that
+     * unconditionally request animated drawables (e.g., Glide with
+     * `PARSE_ANIMATIONS=true`) should consult this first: a static document
+     * renders identically into a plain drawable, without the animation clock.
+     */
+    public val hasAnimations: Boolean
+
+    /**
      * Returns this SVG document as a [Drawable].
      *
      * The returned drawable renders the SVG into its current bounds when drawn. If no bounds have

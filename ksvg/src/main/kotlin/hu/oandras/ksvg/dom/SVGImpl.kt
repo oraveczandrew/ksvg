@@ -119,6 +119,16 @@ internal class SVGImpl internal constructor(
     internal var animationsEnabled: Boolean = false
 
     /**
+     * Parse-sealed animation probe (see [sealAfterParse]): whether the parsed
+     * document holds animation elements. Read by hosts to decide between plain
+     * and animated drawables without paying for a per-target DOM walk.
+     */
+    override val hasAnimations: Boolean
+        get() = hasAnimationsSealed
+
+    private var hasAnimationsSealed: Boolean = false
+
+    /**
      * Cache of already-parsed inline `style=""` attributes by raw text.
      *
      * Inline style parsing is context-free (every declaration list is parsed from an
@@ -283,6 +293,7 @@ internal class SVGImpl internal constructor(
     internal fun sealAfterParse() {
         val root = rootElement ?: return
         indexElementIds(root)
+        hasAnimationsSealed = root.hasAnimationsOnTree()
         if (cachedDocumentDimensions == null) {
             cachedDocumentDimensions = getDocumentDimensions(renderDPI)
             cachedDocumentDimensionsMod = modificationCount

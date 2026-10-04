@@ -23,6 +23,7 @@ import com.bumptech.glide.load.Options
 import hu.oandras.ksvg.KSVGAnimatedDrawable
 import hu.oandras.ksvg.KSVGDrawable
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,8 +52,39 @@ class KSVGSvgDrawableTranscoderTest {
     @Test
     fun transcodeWithAnimationsReturnsAnimatedDrawable() {
         val options = Options().set(KSVGOptions.PARSE_ANIMATIONS, true)
-        val resource = transcoder.transcode(svgResource(), options)
+        val resource = transcoder.transcode(animatedSvgResource(parseAnimations = true), options)
         assertTrue(resource.get() is KSVGAnimatedDrawable)
+    }
+
+    @Test
+    fun transcodeStaticDocumentWithAnimationsReturnsPlainDrawable() {
+        val options = Options().set(KSVGOptions.PARSE_ANIMATIONS, true)
+        val resource = transcoder.transcode(svgResource(), options)
+        assertTrue(resource.get() is KSVGDrawable)
+        assertFalse(resource.get() is KSVGAnimatedDrawable)
+    }
+
+    @Test
+    fun transcodeAnimationsDroppedAtParseReturnsPlainDrawable() {
+        val options = Options().set(KSVGOptions.PARSE_ANIMATIONS, true)
+        val resource = transcoder.transcode(animatedSvgResource(parseAnimations = false), options)
+        assertTrue(resource.get() is KSVGDrawable)
+        assertFalse(resource.get() is KSVGAnimatedDrawable)
+    }
+
+    private fun animatedSvgResource(parseAnimations: Boolean): KSVGSvgResource {
+        val bytes = """
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+              <g>
+                <animateTransform attributeName="transform" type="translate" values="0 0;10 0" dur="1s"/>
+                <rect width="10" height="10"/>
+              </g>
+            </svg>
+        """.trimIndent().toByteArray()
+        val options = Options().set(KSVGOptions.PARSE_ANIMATIONS, parseAnimations)
+        return bytes.inputStream().use {
+            KSVGSvgDecoder().decode(it, 20, 20, options) as KSVGSvgResource
+        }
     }
 
     // Every transcode must hand out a fresh instance: drawables own per-view

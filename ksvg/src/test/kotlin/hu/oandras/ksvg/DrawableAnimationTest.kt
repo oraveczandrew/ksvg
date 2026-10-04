@@ -24,6 +24,7 @@ import hu.oandras.ksvg.mocks.MockPaint
 import hu.oandras.ksvg.mocks.MockPath
 import hu.oandras.ksvg.mocks.asShadow
 import hu.oandras.ksvg.render.createBitmap
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +55,50 @@ class DrawableAnimationTest {
 
         val drawable: Drawable = svg.toAnimatedDrawable()
         assertIs<Animatable2>(drawable)
+    }
+
+    @Test
+    fun staticDocumentReportsNoAnimations() {
+        val svg = SVG.getFromString(
+            svg = """<svg width="10" height="10"><rect width="10" height="10"/></svg>""",
+            parseAnimations = true
+        )
+
+        assertFalse(svg.hasAnimations)
+    }
+
+    @Test
+    fun animatedDocumentReportsAnimationsWhenParsed() {
+        val svg = SVG.getFromString(
+            svg = """
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                      <g>
+                        <animateTransform attributeName="transform" type="translate" values="0 0;10 0" dur="1s"/>
+                        <rect width="10" height="10"/>
+                      </g>
+                    </svg>
+                    """.trimIndent(),
+            parseAnimations = true
+        )
+
+        assertTrue(svg.hasAnimations)
+    }
+
+    @Test
+    fun animatedDocumentReportsNoAnimationsWhenSkipped() {
+        val svg = SVG.getFromString(
+            svg = """
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                      <g>
+                        <animateTransform attributeName="transform" type="translate" values="0 0;10 0" dur="1s"/>
+                        <rect width="10" height="10"/>
+                      </g>
+                    </svg>
+                    """.trimIndent(),
+            parseAnimations = false
+        )
+
+        assertFalse(svg.hasAnimations)
     }
 
     @Test
