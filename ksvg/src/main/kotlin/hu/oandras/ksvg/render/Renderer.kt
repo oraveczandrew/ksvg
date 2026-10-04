@@ -766,21 +766,6 @@ internal class Renderer internal constructor(
      * recording new content into one, or drawing directly -- then invokes
      * `content` with the correct target canvas.
      */
-    // TEMPORARY display-list instrumentation (remove after measurement): attempt
-    // / outcome counters for cache-level analysis. Render runs single-threaded.
-    private var dlAttempts: Long = 0L
-    private var dlCulls: Long = 0L
-    private var dlSoftware: Long = 0L
-    private var dlAnimated: Long = 0L
-    private var dlReplays: Long = 0L
-    private var dlRecords: Long = 0L
-    private var dlCreates: Long = 0L
-    private var dlViewport: Long = 0L
-    private var dlDisabled: Long = 0L
-    private var dlNoBb: Long = 0L
-    private var dlTransform: Long = 0L
-    private var dlUnsupported: Long = 0L
-
     private inline fun RenderNode<*>.withNodeDisplayList(
         canvas: Canvas,
         content: (Canvas) -> Unit,
@@ -792,27 +777,15 @@ internal class Renderer internal constructor(
         // (A subpixel variant was measured here and removed: at real sizes
         // nothing falls below threshold, while the matrix mapping cost every
         // node on every frame.)
-        dlAttempts++
-        if (dlAttempts % 5000L == 0L) {
-            android.util.Log.d(
-                "KSVG-DL",
-                "attempts=$dlAttempts culls=$dlCulls software=$dlSoftware " +
-                    "animated=$dlAnimated replays=$dlReplays records=$dlRecords creates=$dlCreates " +
-                    "viewport=$dlViewport disabled=$dlDisabled nobb=$dlNoBb transform=$dlTransform unsupported=$dlUnsupported"
-            )
-        }
         if (isOutsideClip(this, canvas)) {
-            dlCulls++
             return
         }
         // Software targets cannot play back display lists.
         if (!canvas.isHardwareAccelerated) {
-            dlSoftware++
             content(canvas); return
         }
         // Animated subtrees change every frame; caching would be pure overhead.
         if (hasAnimationsInSubtree) {
-            dlAnimated++
             content(canvas); return
         }
         // Nodes that establish their own viewport (<symbol>/nested <svg>, i.e., a
@@ -821,15 +794,12 @@ internal class Renderer internal constructor(
         // display list. Draw them directly so the (correct) content is captured
         // by the enclosing display list, matching the CPU path.
         if ((this as? GroupRenderNode<*>)?.viewportSpec != null) {
-            dlViewport++
             content(canvas); return
         }
         if (disableDisplayListCache) {
-            dlDisabled++
             content(canvas); return
         }
         val bb = boundingBox ?: run {
-            dlNoBb++
             content(canvas); return
         }
         // RenderNode replay positions the node in user-space bounds, but the HW
@@ -839,7 +809,6 @@ internal class Renderer internal constructor(
         // unless the canvas matrix is scale-only. Below API 29 the Picture replay
         // carries its own translation, so it is unaffected.
         if (canvasTransformBreaksReplay(canvas)) {
-            dlTransform++
             content(canvas); return
         }
 
@@ -847,10 +816,8 @@ internal class Renderer internal constructor(
         if (rec == null) {
             rec = CanvasRenderNodeCompatFactory.create(canvas)
             displayList = rec
-            dlCreates++
         }
         if (!rec.isSupported) {
-            dlUnsupported++
             content(canvas); return
         }
 
@@ -858,10 +825,8 @@ internal class Renderer internal constructor(
 
         // Replay existing capture if the content hasn't changed.
         if (rec.replay(canvas, key)) {
-            dlReplays++
             return
         }
-        dlRecords++
 
         // Record fresh content, then replay it once onto the real canvas.
         // If the subtree has filters (e.g., drop-shadow), filter effects can
