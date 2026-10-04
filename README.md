@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/oraveczandrew/ksvg/actions/workflows/ci.yml/badge.svg)](https://github.com/oraveczandrew/ksvg/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/hu.oandras.ksvg/ksvg)](https://central.sonatype.com/artifact/hu.oandras.ksvg/ksvg)
-[![Release](https://img.shields.io/github/v/release/oraveczandrew/ksvg)](https://github.com/oraveczandrew/ksvg/releases)
+[![Release](https://img.shields.io/github/v/release/oraveczandrew/ksvg?include_prereleases)](https://github.com/oraveczandrew/ksvg/releases)
 [![License](https://img.shields.io/github/license/oraveczandrew/ksvg)](http://www.apache.org/licenses/LICENSE-2.0)
 
 **KSVG is a modern, standards-focused SVG renderer for Android.** It started as an evolution of the original [AndroidSVG](https://github.com/BigBadaboom/androidsvg) library and has grown into a substantially expanded renderer with broad SVG feature coverage, GPU-accelerated filtering, native SIMD kernels, animation, and modern typography support.
