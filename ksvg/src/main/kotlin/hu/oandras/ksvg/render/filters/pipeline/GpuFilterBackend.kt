@@ -25,8 +25,10 @@ import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.collection.MutableScatterMap
+import androidx.tracing.Trace
 import hu.oandras.ksvg.dom.core.Box
 import hu.oandras.ksvg.dom.filter.ConvolveMatrixEdgeMode
+import hu.oandras.ksvg.logger.logW
 import hu.oandras.ksvg.render.ALPHA_MATRIX_COLOR_FILTER
 import hu.oandras.ksvg.render.FeColorMatrixRenderNode
 import hu.oandras.ksvg.render.FeDropShadowRenderNode
@@ -43,6 +45,7 @@ import hu.oandras.ksvg.render.filters.filterPrimitiveLengthY
 import hu.oandras.ksvg.render.withSave
 import hu.oandras.ksvg.utils.ceilToInt
 import hu.oandras.ksvg.utils.forEachElement
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import android.graphics.RenderNode as AndroidRenderNode
 
@@ -227,16 +230,32 @@ internal open class GpuFilterBackend internal constructor(
             return cached
         }
 
-        val chain = tryBuildChainImpl(
-            filterNode,
-            scaleX,
-            scaleY,
-            filterRegion,
-            deviceRegion,
-            sx,
-            sy,
-            boundingBox,
-        )
+        val tracing = Trace.isEnabled()
+        if (tracing) Trace.beginSection("KSVG.filter.hw.chainBuild")
+        val chain = try {
+            tryBuildChainImpl(
+                filterNode,
+                scaleX,
+                scaleY,
+                filterRegion,
+                deviceRegion,
+                sx,
+                sy,
+                boundingBox,
+            )
+        } catch (e: IllegalArgumentException) {
+            // AGSL assembly failure (e.g. "program is too large" on strict
+            // drivers): this package raises no IAE of its own (no
+            // require()/check()), so anything caught here is a framework
+            // shader rejection — decline to the software backend instead of
+            // crashing. Scratch maps are cleared at the start of every
+            // build and the slot is only stored on success, so a half-built
+            // chain leaves no residue; the next frame retries.
+            logChainDeclinedOnce(e)
+            null
+        } finally {
+            if (tracing) Trace.endSection()
+        }
 
         if (chain != null) {
             slot.gpuChain = chain
@@ -248,6 +267,21 @@ internal open class GpuFilterBackend internal constructor(
         }
 
         return chain
+    }
+
+    /**
+     * Process-wide one-time warning for GPU chain declines (see
+     * [tryBuildChain]): a shader rejection is driver-specific, not
+     * document-specific, so the per-parse unsupported scope does not apply.
+     */
+    context(renderContext: RenderContext)
+    private fun logChainDeclinedOnce(e: IllegalArgumentException) {
+        if (!chainDeclineWarned.compareAndSet(false, true)) return
+        renderContext.logW("KSVG") {
+            val reason = e.message?.lineSequence()?.firstOrNull()?.take(160)
+            "GPU filter chain declined, falling back to software" +
+                if (reason != null) ": $reason" else ""
+        }
     }
 
     /**
@@ -557,6 +591,8 @@ internal open class GpuFilterBackend internal constructor(
     }
 
     companion object {
+        private val chainDeclineWarned = AtomicBoolean(false)
+
         /**
          * `RenderEffect.createBlurEffect` interprets its radius as the 1/e
          * falloff radius (kernel ~exp(-x²/r²)), i.e., an effective Gaussian

@@ -259,63 +259,61 @@ internal fun createMorphologyShaderEffect(
     // `min(ceil(abs(uRadius)), 20)`.
     val buildH = abs(radiusX).ceilToInt().coerceAtMost(20) > 0
     val buildV = abs(radiusY).ceilToInt().coerceAtMost(20) > 0 || !buildH
-    try {
-        var headShader: RuntimeShader? = null
-        var headEffect: RenderEffect? = null
-        var tailShader: RuntimeShader? = null
-        var tailEffect: RenderEffect? = null
-        if (buildH) {
-            // The horizontal pass covers the rows the vertical pass will
-            // read (expanded by the vertical radius); a lone pass uses the
-            // final interior.
-            val hTop = if (buildV) finalT - radiusWsY else finalT
-            val hBottom = if (buildV) finalB + radiusWsY else finalB
-            val (hShader, hEffect) = createMorphologyPassShaderEffect(
-                erode = erode,
-                horizontal = true,
-                radius = radiusX,
-                interiorLeft = finalL,
-                interiorTop = hTop,
-                interiorRight = finalR,
-                interiorBottom = hBottom,
-                inputUniformName = inputUniformName,
-            )
-            headShader = hShader
-            headEffect = hEffect
-            tailShader = hShader
-            tailEffect = hEffect
-        }
-        if (buildV) {
-            val (vShader, vEffect) = createMorphologyPassShaderEffect(
-                erode = erode,
-                horizontal = false,
-                radius = radiusY,
-                interiorLeft = finalL,
-                interiorTop = finalT,
-                interiorRight = finalR,
-                interiorBottom = finalB,
-                inputUniformName = inputUniformName,
-            )
-            val prevShader = headShader
-            if (prevShader != null) {
-                // The raw-shader path must see the full two-pass result
-                // through the final shader.
-                vShader.setInputShader("uInput", prevShader)
-            }
-            tailShader = vShader
-            tailEffect = vEffect
-            if (headShader == null) {
-                headShader = vShader
-                headEffect = vEffect
-            }
-        }
-        val head = headShader ?: return null
-        val headE = headEffect ?: return null
-        val tail = tailShader ?: return null
-        val tailE = tailEffect ?: return null
-        return MorphologyPasses(head, headE, tail, tailE, buildH && buildV)
-    } catch (_: IllegalArgumentException) {
-        // AGSL compile failure: decline to the software backend.
-        return null
+    // No local try/catch: AGSL assembly failures propagate to the shared
+    // tryBuildChain choke point, which declines to software (see
+    // GpuFilterBackend).
+    var headShader: RuntimeShader? = null
+    var headEffect: RenderEffect? = null
+    var tailShader: RuntimeShader? = null
+    var tailEffect: RenderEffect? = null
+    if (buildH) {
+        // The horizontal pass covers the rows the vertical pass will
+        // read (expanded by the vertical radius); a lone pass uses the
+        // final interior.
+        val hTop = if (buildV) finalT - radiusWsY else finalT
+        val hBottom = if (buildV) finalB + radiusWsY else finalB
+        val (hShader, hEffect) = createMorphologyPassShaderEffect(
+            erode = erode,
+            horizontal = true,
+            radius = radiusX,
+            interiorLeft = finalL,
+            interiorTop = hTop,
+            interiorRight = finalR,
+            interiorBottom = hBottom,
+            inputUniformName = inputUniformName,
+        )
+        headShader = hShader
+        headEffect = hEffect
+        tailShader = hShader
+        tailEffect = hEffect
     }
-}
+    if (buildV) {
+        val (vShader, vEffect) = createMorphologyPassShaderEffect(
+            erode = erode,
+            horizontal = false,
+            radius = radiusY,
+            interiorLeft = finalL,
+            interiorTop = finalT,
+            interiorRight = finalR,
+            interiorBottom = finalB,
+            inputUniformName = inputUniformName,
+        )
+        val prevShader = headShader
+        if (prevShader != null) {
+            // The raw-shader path must see the full two-pass result
+            // through the final shader.
+            vShader.setInputShader("uInput", prevShader)
+        }
+        tailShader = vShader
+        tailEffect = vEffect
+        if (headShader == null) {
+            headShader = vShader
+            headEffect = vEffect
+        }
+    }
+    val head = headShader ?: return null
+    val headE = headEffect ?: return null
+    val tail = tailShader ?: return null
+    val tailE = tailEffect ?: return null
+    return MorphologyPasses(head, headE, tail, tailE, buildH && buildV)
+ }
