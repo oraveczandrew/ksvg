@@ -74,8 +74,7 @@ import hu.oandras.ksvg.render.filters.pipeline.effects.createImageShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearArithmeticCompositeShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearBlendShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createLinearColorMatrixShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyDilateShaderEffect
-import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyErodeShaderEffect
+import hu.oandras.ksvg.render.filters.pipeline.effects.createMorphologyShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createOffsetShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createSpecularLightingShaderEffect
 import hu.oandras.ksvg.render.filters.pipeline.effects.createTileShaderEffect
@@ -290,46 +289,38 @@ internal class GpuFilterBackendApi33(renderContext: RenderContext) : GpuFilterBa
 
                         is FeMorphologyRenderNode -> {
                             val morph = primitive.sourceElement
-                            val radX = morph.radiusX * scaleX
-                            val radY = morph.radiusY * scaleY
-                            // Interior rule (matches the CPU-kernel write window).
-                            // Erode writes only [max(clip, r), min(clip,
-                            // size - r)) — everything else stays transparent.
-                            // Dilate instead covers the full clip rect with
-                            // clamped windows, so it gets the unshrunk clip.
-                            // Coordinates reuse the lighting mapping into
-                            // fragCoord space.
-                            val rxWs = if (scaleX != 0f) radX * (sx / scaleX) else 0f
-                            val ryWs = if (scaleY != 0f) radY * (sy / scaleY) else 0f
-                            val clipL = (primitiveRegion.left - filterRegion.left) * sx + totalPadX
-                            val clipT = (primitiveRegion.top - filterRegion.top) * sy + totalPadY
-                            val clipR = (primitiveRegion.right - filterRegion.left) * sx + totalPadX
-                            val clipB = (primitiveRegion.bottom - filterRegion.top) * sy + totalPadY
-                            val inputR = totalPadX + filterRegion.width() * sx
-                            val inputB = totalPadY + filterRegion.height() * sy
-                            val (shader, morphEffect) = if (primitive.erode) {
-                                createMorphologyErodeShaderEffect(
-                                    radiusX = radX,
-                                    radiusY = radY,
-                                    interiorLeft = maxOf(clipL, totalPadX + rxWs),
-                                    interiorTop = maxOf(clipT, totalPadY + ryWs),
-                                    interiorRight = minOf(clipR, inputR - rxWs),
-                                    interiorBottom = minOf(clipB, inputB - ryWs),
-                                    inputUniformName = "uInput",
-                                )
-                            } else {
-                                createMorphologyDilateShaderEffect(
-                                    radiusX = radX,
-                                    radiusY = radY,
-                                    interiorLeft = clipL,
-                                    interiorTop = clipT,
-                                    interiorRight = clipR,
-                                    interiorBottom = clipB,
-                                    inputUniformName = "uInput",
-                                )
+                            val passes = createMorphologyShaderEffect(
+                                erode = primitive.erode,
+                                radiusX = morph.radiusX * scaleX,
+                                radiusY = morph.radiusY * scaleY,
+                                primitiveRegion = primitiveRegion,
+                                filterRegion = filterRegion,
+                                scaleX = scaleX,
+                                scaleY = scaleY,
+                                sx = sx,
+                                sy = sy,
+                                totalPadX = totalPadX,
+                                totalPadY = totalPadY,
+                                inputUniformName = "uInput",
+                            ) ?: return null
+                            lastRawBound = trackRawShaderBound(
+                                shader = passes.headShader,
+                                resultName = null,
+                                input = input,
+                                previousResult = previousResult,
+                                first = first,
+                                generative = false,
+                                lastRawShader = lastRawShader,
+                                lastRawBound = lastRawBound,
+                                resultShaders = resultShaders,
+                                boundResults = boundResults
+                            ).also { lastRawShader = passes.tailShader }
+                            if (resultName != null) {
+                                resultShaders[resultName] = passes.tailShader
+                                if (lastRawBound) boundResults += resultName
                             }
-                            lastRawBound = trackRawShaderBound(shader, resultName, input, previousResult, first, false, lastRawShader, lastRawBound, resultShaders, boundResults).also { lastRawShader = shader }
-                            morphEffect.chainWith(inputEffect)
+                            val headChained = passes.headEffect.chainWith(inputEffect)
+                            if (passes.twoPass) passes.tailEffect.chainWith(headChained) else headChained
                         }
 
                         is FeColorMatrixRenderNode -> {
