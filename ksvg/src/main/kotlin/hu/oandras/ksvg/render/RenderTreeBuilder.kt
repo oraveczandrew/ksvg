@@ -1828,12 +1828,14 @@ internal class RenderTreeBuilder(
     private val pathMeasure = PathMeasure()
     private fun findInheritFromAncestorState(obj: SvgObject): RendererState {
         val newState = RendererState()
-        obj.styleBuilder.also { builder ->
+        // Pooled scratch (see updateStyleForElement above): completes before the
+        // ancestor-walk pool block below, so nesting depth stays one.
+        styleBuilderPool.withPooledObject { builder ->
             builder.reset(Style.getDefaultStyle())
             // updateStyle only merges declared values (DEFAULT_STYLE declares
             // nothing), so fresh-state setup comes from the builder.
             applyStateFromBuilder(newState, builder, currentFontSize)
-            newState.style = builder.build()
+            newState.style = document.internStyle(builder.build())
         }
         newState.viewPort = state.viewPort
         newState.viewBox = state.viewBox
@@ -1853,7 +1855,7 @@ internal class RenderTreeBuilder(
             ancestors.forEachElement { ancestor ->
                 updateStyleForElement(newState, inheritBuilder, ancestor)
             }
-            newState.style = inheritBuilder.build()
+            newState.style = document.internStyle(inheritBuilder.build())
         }
         ancestors.clear()
 
@@ -2328,10 +2330,14 @@ internal class RenderTreeBuilder(
         // RendererState.updateStrokeDash can honor it. Scale = actualLength / pathLength.
         state.dashLengthScale = computePathLengthScale(obj)
 
-        obj.styleBuilder.also { builder ->
+        // Pooled scratch, NOT obj.styleBuilder: that lazy per-element builder would
+        // materialize (and retain its lastBuilt Style) for every element, while a
+        // shared build-time scratch is sequential-safe here. Render-time paths
+        // keep the per-element scratch (see SvgObjectImpl.styleBuilder).
+        styleBuilderPool.withPooledObject { builder ->
             builder.reset(state.style)
             updateStyleForElement(state, builder, obj)
-            state.style = builder.build()
+            state.style = document.internStyle(builder.build())
             applyAntiAliasHint(state, builder, obj)
         }
     }
