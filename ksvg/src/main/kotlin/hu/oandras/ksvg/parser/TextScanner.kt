@@ -24,19 +24,22 @@ import androidx.collection.mutableFloatListOf
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CssUnit
 import hu.oandras.ksvg.parser.IntegerParser.parseInt
-import hu.oandras.ksvg.utils.trimLowerThanSpace
 
 internal const val INVALID_CHAR: Char = (-1).toChar()
 
-internal open class TextScanner(input: String) {
+internal open class TextScanner(
     @JvmField
-    protected val input: String = input.trimLowerThanSpace()
+    protected val input: String
+) {
+
+    // Window into [input] with leading/trailing chars <= ' ' excluded, so no
+    // trimmed copy is ever allocated (not even for dirty inputs). All parsing
+    // goes through [position]/[inputLength]; [input] itself is never sliced.
+    @JvmField
+    protected var position: Int = skipLeading(input)
 
     @JvmField
-    protected var position: Int = 0
-
-    @JvmField
-    protected var inputLength: Int = this.input.length
+    protected var inputLength: Int = skipTrailing(input, position)
 
     /**
      * Returns true if we have reached the end of the input.
@@ -470,6 +473,23 @@ internal open class TextScanner(input: String) {
             if (!skipSemicolonWhitespace()) break
         }
         return result
+    }
+
+    companion object {
+
+        @JvmSynthetic
+        internal fun skipLeading(input: String): Int {
+            var i = 0
+            while (i < input.length && input[i] <= ' ') i++
+            return i
+        }
+
+        @JvmSynthetic
+        internal fun skipTrailing(input: String, start: Int): Int {
+            var e = input.length
+            while (e > start && input[e - 1] <= ' ') e--
+            return e
+        }
     }
 }
 
