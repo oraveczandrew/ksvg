@@ -764,7 +764,7 @@ internal class Renderer internal constructor(
     /**
      * Inline: zero allocation. Decides between replaying a cached display list,
      * recording new content into one, or drawing directly -- then invokes
-     * [content] with the correct target canvas.
+     * `content` with the correct target canvas.
      */
     // TEMPORARY display-list instrumentation (remove after measurement): attempt
     // / outcome counters for cache-level analysis. Render runs single-threaded.
