@@ -42,10 +42,23 @@ jobs:
       - name: Setup workspace Android SDK
         uses: ./.github/actions/setup-android-sdk
 
+      - name: Restore release keystore
+        # SHOWCASE_KEYSTORE_BASE64 holds the base64 of the upload keystore;
+        # passwords/alias ride as separate secrets (see env below).
+        run: |
+          echo "$SHOWCASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/showcase-release.jks"
+          echo "KSVG_KEYSTORE_FILE=$RUNNER_TEMP/showcase-release.jks" >> "$GITHUB_ENV"
+        env:
+          SHOWCASE_KEYSTORE_BASE64: ${{ secrets.SHOWCASE_KEYSTORE_BASE64 }}
+
       - name: Publish to staging repo
         # The same artifacts that would go to Central/GH Packages (AAR, sources,
         # Javadoc, POM, module metadata), redirected into dist/repo.
         # Signing stays off here (publishToMavenLocal never requires keys).
+        env:
+          KSVG_KEYSTORE_PASSWORD: ${{ secrets.SHOWCASE_KEYSTORE_PASSWORD }}
+          KSVG_KEY_ALIAS: ${{ secrets.SHOWCASE_KEY_ALIAS }}
+          KSVG_KEY_PASSWORD: ${{ secrets.SHOWCASE_KEY_PASSWORD }}
         run: >
           ./gradlew
           :ksvg:publishReleasePublicationToMavenLocal
@@ -55,10 +68,11 @@ jobs:
           "-Dmaven.repo.local=$GITHUB_WORKSPACE/dist/repo"
 
       - name: Collect demo APK
-        # Release APK (R8-minified, profileable): try-out demo, not the published library.
-        # NOTE: unsigned — needs signing (e.g., apksigner with a release key) before installation.
+        # Release APK (R8-minified, profileable) signed with the release key
+        # when the keystore secret is present, unsigned otherwise.
         run: |
-          cp showcase/build/outputs/apk/release/showcase-release-unsigned.apk \
+          ls showcase/build/outputs/apk/release/
+          cp showcase/build/outputs/apk/release/showcase-release*.apk \
             "dist/ksvg-showcase-$KSVG_VERSION.apk"
           ls -la dist dist/repo | head -30
 

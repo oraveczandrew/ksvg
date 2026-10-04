@@ -32,6 +32,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Release signing for CI-built demo APKs. All four values come from
+        // environment (GitHub Actions secrets); when the keystore file is
+        // absent the release stays unsigned, exactly as before.
+        create("release") {
+            val keystoreFile = System.getenv("KSVG_KEYSTORE_FILE")?.let(::file)
+            if (keystoreFile != null && keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KSVG_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KSVG_KEY_ALIAS")
+                keyPassword = System.getenv("KSVG_KEY_PASSWORD")
+            }
+        }
+    }
+
+    // True when the release keystore from the environment is actually usable.
+    // Evaluated once so the build type and validation agree.
+    val hasReleaseKeystore: Boolean =
+        System.getenv("KSVG_KEYSTORE_FILE")?.let(::file)?.exists() == true
+
     buildTypes.apply {
         getByName("release") {
             // Baseline-profile generation runs against the non-minified build
@@ -50,6 +70,8 @@ android {
             // for that flow (KSVG_SIGN_DEBUG=1); real releases stay untouched.
             if (System.getenv("KSVG_SIGN_DEBUG") == "1") {
                 signingConfig = signingConfigs.getByName("debug")
+            } else if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
         getByName("debug") {
