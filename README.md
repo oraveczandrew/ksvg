@@ -34,11 +34,11 @@ See the full [SVG feature support matrix](docs/SVG-SUPPORT.md).
 
 ```kotlin
 dependencies {
-    implementation("hu.oandras.ksvg:ksvg:1.0.0-beta01")
+    implementation("hu.oandras.ksvg:ksvg:1.0.0-beta02")
     // Optional Glide integration:
-    implementation("hu.oandras.ksvg:glide:1.0.0-beta01")
+    implementation("hu.oandras.ksvg:glide:1.0.0-beta02")
     // Optional Jetpack Compose integration:
-    implementation("hu.oandras.ksvg:compose:1.0.0-beta01")
+    implementation("hu.oandras.ksvg:compose:1.0.0-beta02")
 }
 ```
 
