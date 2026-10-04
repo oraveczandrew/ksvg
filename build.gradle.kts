@@ -15,6 +15,8 @@
  */
 
 // Top-level build file where you can add configuration options common to all subprojects/modules.
+import ksvg.gradle.registerCentralUpload
+
 plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.android.application) apply false
@@ -55,3 +57,9 @@ subprojects {
         }
     }
 }
+
+// Maven Central Publisher Portal bundle upload (signed staging repo ->
+// portal deployment). Credentials via -PcentralUsername/-PcentralPassword,
+// ~/.gradle/gradle.properties, or CENTRAL_USERNAME/CENTRAL_PASSWORD;
+// never logged, never committed.
+registerCentralUpload()

@@ -148,7 +148,11 @@ public fun Project.configureKsvgRepositories(): Unit {
             }
             // NOTE: Maven Central has no plain maven repo endpoint — uploads go through
             // the Central Publisher Portal (namespace + portal token, bundle upload).
-            // Wire the release checklist here once publishing starts.
+            // `centralStaging` below assembles that bundle locally (signed).
+            maven {
+                name = "centralStaging"
+                url = uri(rootProject.layout.buildDirectory.dir("central-staging"))
+            }
         }
     }
 }
@@ -156,13 +160,26 @@ public fun Project.configureKsvgRepositories(): Unit {
 /**
  * Signs the publication only for remote uploads. `publishToMavenLocal` stays
  * key-free so local verification never needs GPG configured.
+ *
+ * Signing goes through the local GPG agent (`useGpgCmd`, pinned to the same
+ * primary key the Git commits use) — no key material or passphrase ever
+ * passes through properties, env vars or build output.
  */
 public fun Project.configureKsvgSigning(publicationName: String = "release"): Unit {
     val wantsRemotePublish = gradle.startParameter.taskNames.any { task ->
-        task.startsWith("publish") && !task.startsWith("publishToMavenLocal")
+        // Task names arrive module-qualified (":ksvg:publish..."), so match
+        // the trailing segment, not the raw string.
+        val leaf = task.substringAfterLast(":")
+        leaf.startsWith("publish") && !leaf.startsWith("publishToMavenLocal")
     }
     extensions.configure<SigningExtension> {
         isRequired = wantsRemotePublish
+        if (wantsRemotePublish) {
+            // The secret half never leaves the GPG agent (pinentry); this
+            // picks the agent's default key, which is the commit-signing
+            // primary (`git config --get user.signingkey`).
+            useGpgCmd()
+        }
     }
     // Deferred: the AGP single-variant publication only exists after evaluation.
     afterEvaluate {
