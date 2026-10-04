@@ -165,10 +165,16 @@ internal abstract class ElementBase(
                     // Foreign-namespace attributes (sodipodi:, inkscape:, ...)
                     // are never selector-matched (a ':' can't appear in the
                     // attribute-name grammar) and typed parsing uses local
-                    // names, so there is nothing to retain them for.
+                    // names, so there is nothing to retain them for. The prefix
+                    // test tolerates both conventions for "no prefix": a bare
+                    // local name (platform parser) and ":name" (empty prefix).
                     val localName = attributes.getLocalName(index)
                     val qName = attributes.getQName(index)
-                    if (qName == null || ':' !in qName) {
+                    val prefixed = qName != null && localName != null &&
+                        qName.length > localName.length + 1 &&
+                        qName.endsWith(localName) &&
+                        qName[qName.length - localName.length - 1] == ':'
+                    if (!prefixed) {
                         val attributesMap = this.attributesMap
                             ?: ArrayMap<String, String>(attributes.length).also {
                                 this.attributesMap = it

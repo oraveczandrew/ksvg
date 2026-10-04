@@ -19,7 +19,6 @@
 
 package hu.oandras.ksvg.parser
 
-import android.util.Xml
 import androidx.collection.ArrayMap
 import hu.oandras.ksvg.BuildConfig
 import hu.oandras.ksvg.ExternalFileResolver
@@ -306,7 +305,11 @@ internal class SVGParserImpl(
     @Throws(KSVGParseException::class)
     private fun parseUsingXmlPullParser(inputStream: InputStream) {
         try {
-            val parser = Xml.newPullParser()
+            val parser: XmlPullParser = KXmlParser().also {
+                // Canonical tag/attribute/value instances straight from the parser:
+                // repeated names share one String instead of allocating per occurrence.
+                it.dictionary = StringDictionary(SvgDictionary.names, SvgDictionary.hashCodes)
+            }
             val attributes = XPPAttributesWrapper(parser)
 
             parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false)
