@@ -27,5 +27,8 @@
     <item name="menu_verification" type="id" />
     <item name="homeButtonClassic" type="id" />
     <item name="homeButtonCompose" type="id" />
-    <item name="homeButtonMap" type="id" />
+    <item name="mapZoomView" type="id" />
+    <item name="mapStatus" type="id" />
+    <item name="mapProgress" type="id" />
+    <item name="mapLoadButton" type="id" />
 </resources>

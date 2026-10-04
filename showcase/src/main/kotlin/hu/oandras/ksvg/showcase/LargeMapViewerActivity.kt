@@ -16,11 +16,9 @@
 
 package hu.oandras.ksvg.showcase
 
-import android.graphics.Color
 import android.os.Bundle
-import android.view.Gravity
-import android.view.ViewGroup
-import android.widget.FrameLayout
+import android.view.View
+import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -37,51 +35,36 @@ import java.net.URL
 import java.security.MessageDigest
 
 // Full-screen pinch-zoom viewer for one large remote SVG.
-// Launch: adb shell am start -n hu.oandras.ksvg.showcase/.LargeMapViewerActivity \
-//   --es svg_url "https://upload.wikimedia.org/wikipedia/commons/1/1e/Hungary-geographic_map-en.svg"
+//
+// STRESS TEST: a 20k-element map like this cannot be presented at a normal
+// frame rate; this screen exists to measure load/render behavior, not to
+// demo smooth scrolling.
 class LargeMapViewerActivity : AppCompatActivity() {
 
     private lateinit var zoomView: ZoomableSvgView
     private lateinit var statusView: TextView
     private lateinit var progress: ProgressBar
+    private lateinit var loadButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        zoomView = ZoomableSvgView(this).apply { setBackgroundColor(Color.WHITE) }
-        statusView = TextView(this).apply {
-            gravity = Gravity.CENTER
-            setTextColor(Color.DKGRAY)
-            textSize = 14f
+        val binding = largeMapViewerLayout()
+        setContentView(binding.root)
+        zoomView = binding.zoomView
+        statusView = binding.statusView
+        progress = binding.progress
+        loadButton = binding.loadButton
+        loadButton.setOnClickListener {
+            loadButton.visibility = View.GONE
+            loadSvg(DEFAULT_MAP_URL)
         }
-        progress = ProgressBar(this).apply { isIndeterminate = true }
-
-        val root = FrameLayout(this).apply {
-            addView(zoomView, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            ))
-            addView(statusView, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER,
-            ))
-            addView(progress, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER,
-            ))
-        }
-        setContentView(root)
-
-        val url = intent.getStringExtra(EXTRA_SVG_URL) ?: DEFAULT_MAP_URL
-        loadSvg(url)
     }
 
     private fun loadSvg(url: String) {
         statusView.text = "Loading…"
-        progress.visibility = android.view.View.VISIBLE
+        progress.visibility = View.VISIBLE
         lifecycleScope.launch {
             try {
                 // Everything heavy (network, disk, parse, drawable build) stays
@@ -92,13 +75,16 @@ class LargeMapViewerActivity : AppCompatActivity() {
                 statusView.text = ""
             } catch (e: Exception) {
                 statusView.text = "Failed to load map:\n${e.message}"
+                loadButton.text = "Retry"
+                loadButton.visibility = View.VISIBLE
             } finally {
-                progress.visibility = android.view.View.GONE
+                progress.visibility = View.GONE
             }
         }
     }
 
-    private fun loadCachedDrawable(url: String): android.graphics.drawable.Drawable {
+    @JvmSynthetic
+    internal fun loadCachedDrawable(url: String): android.graphics.drawable.Drawable {
         return loadCachedSvg(url).toDrawable()
     }
 
@@ -134,7 +120,15 @@ class LargeMapViewerActivity : AppCompatActivity() {
             check(connection.responseCode in 200..299) { "HTTP ${connection.responseCode}" }
             connection.inputStream.use { input ->
                 tmp.outputStream().use { output ->
-                    input.copyTo(output)
+                    val buf = ByteArray(32 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        total += n
+                        check(total <= MAX_DOWNLOAD_BYTES) { "Download exceeds 64 MB" }
+                        output.write(buf, 0, n)
+                    }
                 }
             }
             check(tmp.length() > 0L) { "Empty download" }
@@ -153,8 +147,11 @@ class LargeMapViewerActivity : AppCompatActivity() {
     }
 
     companion object {
-        const val EXTRA_SVG_URL: String = "svg_url"
         const val DEFAULT_MAP_URL: String =
             "https://upload.wikimedia.org/wikipedia/commons/1/1e/Hungary-geographic_map-en.svg"
+
+        // Fixed-map hardening (no external input reaches the loader anymore):
+        // cap the download so a changed upstream file can't OOM the parse.
+        private const val MAX_DOWNLOAD_BYTES: Long = 64L * 1024L * 1024L
     }
 }
