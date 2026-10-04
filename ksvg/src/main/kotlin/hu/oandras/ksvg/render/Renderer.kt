@@ -766,6 +766,21 @@ internal class Renderer internal constructor(
      * recording new content into one, or drawing directly -- then invokes
      * [content] with the correct target canvas.
      */
+    // TEMPORARY display-list instrumentation (remove after measurement): attempt
+    // / outcome counters for cache-level analysis. Render runs single-threaded.
+    private var dlAttempts: Long = 0L
+    private var dlCulls: Long = 0L
+    private var dlSoftware: Long = 0L
+    private var dlAnimated: Long = 0L
+    private var dlReplays: Long = 0L
+    private var dlRecords: Long = 0L
+    private var dlCreates: Long = 0L
+    private var dlViewport: Long = 0L
+    private var dlDisabled: Long = 0L
+    private var dlNoBb: Long = 0L
+    private var dlTransform: Long = 0L
+    private var dlUnsupported: Long = 0L
+
     private inline fun RenderNode<*>.withNodeDisplayList(
         canvas: Canvas,
         content: (Canvas) -> Unit,
@@ -777,38 +792,76 @@ internal class Renderer internal constructor(
         // (A subpixel variant was measured here and removed: at real sizes
         // nothing falls below threshold, while the matrix mapping cost every
         // node on every frame.)
-        if (isOutsideClip(this, canvas)) return
+        dlAttempts++
+        if (dlAttempts % 5000L == 0L) {
+            android.util.Log.d(
+                "KSVG-DL",
+                "attempts=$dlAttempts culls=$dlCulls software=$dlSoftware " +
+                    "animated=$dlAnimated replays=$dlReplays records=$dlRecords creates=$dlCreates " +
+                    "viewport=$dlViewport disabled=$dlDisabled nobb=$dlNoBb transform=$dlTransform unsupported=$dlUnsupported"
+            )
+        }
+        if (isOutsideClip(this, canvas)) {
+            dlCulls++
+            return
+        }
         // Software targets cannot play back display lists.
-        if (!canvas.isHardwareAccelerated) { content(canvas); return }
+        if (!canvas.isHardwareAccelerated) {
+            dlSoftware++
+            content(canvas); return
+        }
         // Animated subtrees change every frame; caching would be pure overhead.
-        if (hasAnimationsInSubtree) { content(canvas); return }
+        if (hasAnimationsInSubtree) {
+            dlAnimated++
+            content(canvas); return
+        }
         // Nodes that establish their own viewport (<symbol>/nested <svg>, i.e., a
         // viewBoxTransform) cannot be naively cached: their transform is baked
         // into a nested RenderNode and breaks when replayed inside a parent's
         // display list. Draw them directly so the (correct) content is captured
         // by the enclosing display list, matching the CPU path.
-        if ((this as? GroupRenderNode<*>)?.viewportSpec != null) { content(canvas); return }
-        if (disableDisplayListCache) { content(canvas); return }
-        val bb = boundingBox ?: run { content(canvas); return }
+        if ((this as? GroupRenderNode<*>)?.viewportSpec != null) {
+            dlViewport++
+            content(canvas); return
+        }
+        if (disableDisplayListCache) {
+            dlDisabled++
+            content(canvas); return
+        }
+        val bb = boundingBox ?: run {
+            dlNoBb++
+            content(canvas); return
+        }
         // RenderNode replay positions the node in user-space bounds, but the HW
         // canvas culls it against the user-space clip: a translated/rotated canvas
         // moves the content without moving the culled bounds, so such replays
         // vanish (e.g., only the first of several <use> panels shows). Draw directly
         // unless the canvas matrix is scale-only. Below API 29 the Picture replay
         // carries its own translation, so it is unaffected.
-        if (canvasTransformBreaksReplay(canvas)) { content(canvas); return }
+        if (canvasTransformBreaksReplay(canvas)) {
+            dlTransform++
+            content(canvas); return
+        }
 
         var rec = displayList
         if (rec == null) {
             rec = CanvasRenderNodeCompatFactory.create(canvas)
             displayList = rec
+            dlCreates++
         }
-        if (!rec.isSupported) { content(canvas); return }
+        if (!rec.isSupported) {
+            dlUnsupported++
+            content(canvas); return
+        }
 
         val key = displayListKey(this)
 
         // Replay existing capture if the content hasn't changed.
-        if (rec.replay(canvas, key)) return
+        if (rec.replay(canvas, key)) {
+            dlReplays++
+            return
+        }
+        dlRecords++
 
         // Record fresh content, then replay it once onto the real canvas.
         // If the subtree has filters (e.g., drop-shadow), filter effects can
@@ -886,10 +939,11 @@ internal class Renderer internal constructor(
 
     /**
      * True, when replaying a RenderNode capture on the given canvas would vanish:
-     * the node is positioned in user-space bounds but culled against the
-     * user-space clip, so any canvas translate/skew moves the content without
-     * moving the culled bounds. Scale-only matrices are safe. Reads the canvas
-     * matrix with pooled objects only (hot path).
+     * skew/rotation moves the content without moving the culled bounds. Plain
+     * canvas translation is safe (verified on-device with pinch-zoom/pan: the
+     * recorder positions content in user space and the canvas matrix applies
+     * on top, exactly like immediate-mode drawing). Reads the canvas matrix
+     * with pooled objects only (hot path).
      */
     private fun canvasTransformBreaksReplay(canvas: Canvas): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
@@ -900,9 +954,7 @@ internal class Renderer internal constructor(
             val v = getValuesFloatArray
             m.getValues(v)
             breaks = abs(v[Matrix.MSKEW_X]) > REPLAY_MATRIX_EPSILON ||
-                    abs(v[Matrix.MSKEW_Y]) > REPLAY_MATRIX_EPSILON ||
-                    abs(v[Matrix.MTRANS_X]) > REPLAY_MATRIX_EPSILON ||
-                    abs(v[Matrix.MTRANS_Y]) > REPLAY_MATRIX_EPSILON
+                    abs(v[Matrix.MSKEW_Y]) > REPLAY_MATRIX_EPSILON
         }
         return breaks
     }
