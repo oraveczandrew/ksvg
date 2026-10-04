@@ -1819,6 +1819,8 @@ internal class RenderTreeBuilder(
     }
 
     private val tempAncestors = ArrayList<ElementBase>()
+    // Reused stylesheet-match scratch for updateStyleForElement (see there).
+    private val matchScratch: ArrayList<Style> = ArrayList()
     // Reused path-conversion scratch state for a single build. The builder is
     // single-threaded, so these need no synchronization; every retained path
     // still gets its own freshly allocated android Path.
@@ -2423,10 +2425,14 @@ internal class RenderTreeBuilder(
         // (inherit/unset/initial/revert) so lower-priority concrete values lose to them.
         // Most documents carry no stylesheet rules at all: skip the match list
         // entirely instead of allocating an empty ArrayList per element.
+        // Otherwise the per-element list is the shared scratch (non-reentrant use
+        // only, like tempAncestors: filled, consumed and cleared here before any
+        // child build that could reenter this function).
         val matchingRules: List<Style> = if (effectiveRules.isEmpty()) {
             emptyList()
         } else {
-            ArrayList<Style>().also { matched ->
+            matchScratch.also { matched ->
+                matched.clear()
                 effectiveRules.forEachElement { rule ->
                     if (CSSParser.ruleMatch(ruleMatchContext, rule.selector, obj)) {
                         matched.add(rule.style)
