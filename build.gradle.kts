@@ -50,10 +50,115 @@ dependencies {
     dokka(project(":compose"))
 }
 
+// Stale transitive AndroidX pins (resolved outside `subprojects` because the
+// type-safe catalog accessors are not in scope inside that block).
+// Keep in sync with gradle/libs.versions.toml.
+val profileinstallerPin = libs.profileinstaller
+val startupRuntimePin = libs.startup.runtime
+val autofillPin = libs.autofill
+val fragmentPin = libs.fragment
+val viewpagerPin = libs.viewpager
+val viewpager2Pin = libs.viewpager2
+val concurrentFuturesPin = libs.concurrent.futures
+val loaderPin = libs.loader
+val customviewPin = libs.customview
+val poolingContainerPin = libs.poolingcontainer
+val drawerlayoutPin = libs.drawerlayout
+val versionedparcelablePin = libs.versionedparcelable
+val vectordrawableAnimatedPin = libs.vectordrawable.animated
+val collectionPin = libs.collection
+val corePin = libs.core
+val coreRuntimePin = libs.core.runtime
+val lifecycleRuntimePin = libs.lifecycle.runtime
+val lifecycleCommonPin = libs.lifecycle.common
+val testRulesPin = libs.rules
+val testParameterInjectorPin = libs.test.parameter.injector
+val tracingPin = libs.tracing
+val tracingKtxPin = libs.tracing.ktx
+val activityKtxPin = libs.activity.ktx
+val activityComposePin = libs.activity.compose
+val activityPin = "androidx.activity:activity:${libs.versions.activityKtx.get()}"
+val junitPin = libs.junit
+val extJunitPin = libs.ext.junit
+val robolectricPin = libs.robolectric
+val runnerPin = libs.runner
+val monitorPin = libs.monitor
+val annotationPin = libs.annotation
+val lifecycleRuntimeKtxPin = libs.lifecycle.runtime.ktx
+val lifecycleViewmodelKtxPin = libs.lifecycle.viewmodel.ktx
+val lifecycleRuntimeComposePin = libs.lifecycle.runtime.compose
+val guavaPin = libs.guava
+val coroutinesAndroidPin = libs.coroutines.android
+val coreKtxPin = libs.core.ktx
+val appcompatPin = libs.appcompat
+val materialPin = libs.material
+val constraintlayoutPin = libs.constraintlayout
+val recyclerviewPin = libs.recyclerview
+val glidePin = libs.glide
+val glideKspPin = libs.glide.ksp
+val macroJunit4Pin = libs.macro.junit4
+val uiautomatorPin = libs.uiautomator
+
 subprojects {
     tasks.withType<Test> {
         testLogging {
             showStandardStreams = project.hasProperty("showTestOutput")
+        }
+    }
+
+    // Applied per AGP plugin (configurations like `implementation` only exist
+    // after the plugin is applied; `subprojects` itself runs before that).
+    listOf("com.android.library", "com.android.application", "com.android.test").forEach { pluginId ->
+        plugins.withId(pluginId) {
+            dependencies {
+                constraints {
+                    add("implementation", profileinstallerPin)
+                    add("implementation", startupRuntimePin)
+                    add("implementation", activityKtxPin)
+                    add("implementation", activityComposePin)
+                    add("implementation", activityPin)
+                    add("implementation", autofillPin)
+                    add("implementation", fragmentPin)
+                    add("implementation", viewpagerPin)
+                    add("implementation", viewpager2Pin)
+                    add("implementation", concurrentFuturesPin)
+                    add("implementation", loaderPin)
+                    add("implementation", customviewPin)
+                    add("implementation", poolingContainerPin)
+                    add("implementation", drawerlayoutPin)
+                    add("implementation", versionedparcelablePin)
+                    add("implementation", vectordrawableAnimatedPin)
+                    add("implementation", collectionPin)
+                    add("implementation", corePin)
+                    add("implementation", coreRuntimePin)
+                    add("implementation", lifecycleRuntimePin)
+                    add("implementation", lifecycleCommonPin)
+                    add("implementation", testRulesPin)
+                    add("implementation", testParameterInjectorPin)
+                    add("implementation", tracingPin)
+                    add("implementation", tracingKtxPin)
+                    add("implementation", junitPin)
+                    add("implementation", extJunitPin)
+                    add("implementation", robolectricPin)
+                    add("implementation", runnerPin)
+                    add("implementation", monitorPin)
+                    add("implementation", annotationPin)
+                    add("implementation", lifecycleRuntimeKtxPin)
+                    add("implementation", lifecycleViewmodelKtxPin)
+                    add("implementation", lifecycleRuntimeComposePin)
+                    add("implementation", guavaPin)
+                    add("implementation", coroutinesAndroidPin)
+                    add("implementation", coreKtxPin)
+                    add("implementation", appcompatPin)
+                    add("implementation", materialPin)
+                    add("implementation", constraintlayoutPin)
+                    add("implementation", recyclerviewPin)
+                    add("implementation", glidePin)
+                    add("implementation", glideKspPin)
+                    add("implementation", macroJunit4Pin)
+                    add("implementation", uiautomatorPin)
+                }
+            }
         }
     }
 }
