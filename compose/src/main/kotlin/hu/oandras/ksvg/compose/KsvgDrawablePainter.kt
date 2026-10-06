@@ -17,8 +17,6 @@
 package hu.oandras.ksvg.compose
 
 import android.graphics.drawable.Drawable
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
@@ -35,17 +33,24 @@ import kotlin.math.roundToInt
  * `rememberDrawablePainter` lives in Accompanist, not in `androidx.compose`, so this module
  * vendors the small adapter itself: bounds are set to the draw size on every draw, drawable
  * invalidation re-triggers composition drawing, and `scheduleSelf`/`unscheduleSelf` (used by
- * `KSVGAnimatedDrawable` for its frame ticker) are forwarded to a main-looper [Handler],
- * mirroring what `View` does as a `Drawable.Callback`.
+ * `KSVGAnimatedDrawable` for its frame ticker) are coalesced through the shared
+ * [KsvgFrameScheduler] — one vsync callback per frame no matter how many animated
+ * cells are composed — mirroring what `View` does as a `Drawable.Callback`.
  */
 internal class KsvgDrawablePainter(
     @JvmField
     val drawable: Drawable,
 ) : Painter() {
 
-    private val handler: Handler = Handler(Looper.getMainLooper())
-
     private var invalidateTick: Int by mutableIntStateOf(0)
+
+    /**
+     * Frame callbacks forwarded to [KsvgFrameScheduler] through this painter, so
+     * [release] can withdraw exactly the frames this cell requested without
+     * touching other cells sharing the scheduler. Plain list (typically a single
+     * entry) so [release] stays iterator-free.
+     */
+    private val scheduledFrames: ArrayList<Runnable> = ArrayList(2)
 
     private val callback: Drawable.Callback = object : Drawable.Callback {
         override fun invalidateDrawable(who: Drawable) {
@@ -53,11 +58,16 @@ internal class KsvgDrawablePainter(
         }
 
         override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-            handler.postAtTime(what, `when`)
+            // `contains` on ArrayList is an index-based scan, no iterator.
+            if (!scheduledFrames.contains(what)) {
+                scheduledFrames.add(what)
+            }
+            KsvgFrameScheduler.schedule(what, `when`)
         }
 
         override fun unscheduleDrawable(who: Drawable, what: Runnable) {
-            handler.removeCallbacks(what)
+            scheduledFrames.remove(what)
+            KsvgFrameScheduler.unschedule(what)
         }
     }
 
@@ -70,7 +80,11 @@ internal class KsvgDrawablePainter(
      * after this the painter must not be drawn again.
      */
     fun release() {
-        handler.removeCallbacksAndMessages(null)
+        // Index loop on purpose: no iterator allocation.
+        for (i in scheduledFrames.indices) {
+            KsvgFrameScheduler.unschedule(scheduledFrames[i])
+        }
+        scheduledFrames.clear()
         drawable.callback = null
     }
 
