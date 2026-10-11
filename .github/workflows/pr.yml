@@ -11,6 +11,7 @@ on:
       - '.github/workflows/cleanup-caches.yml'
       - '.github/workflows/release.yml'
       - '.github/workflows/static.yml'
+      - '.github/workflows/codeql.yml'
       - '.github/FUNDING.yml'
       - '.github/ISSUE_TEMPLATE/**'
       - 'docs/**'

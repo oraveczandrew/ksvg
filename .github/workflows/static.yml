@@ -10,6 +10,7 @@ on:
       # sources + build scripts only, so these cannot change its output.
       - '.github/workflows/cleanup-caches.yml'
       - '.github/workflows/release.yml'
+      - '.github/workflows/codeql.yml'
       - '.github/FUNDING.yml'
       - '.github/ISSUE_TEMPLATE/**'
       - 'docs/**'
