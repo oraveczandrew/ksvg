@@ -29,6 +29,20 @@ on:
       - '**.md'
       - 'LICENSE'
       - '.idea/**'
+  pull_request:
+    # PRs touching scanned code or the build itself get an analysis run
+    # (this also lets codeql.yml changes be tested before reaching master).
+    paths:
+      - '**.kt'
+      - '**.kts'
+      - '**.cpp'
+      - '**.h'
+      - '**.S'
+      - 'CMakeLists.txt'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - '.github/workflows/codeql.yml'
+      - '.github/actions/setup-android-sdk/**'
   schedule:
     # Mondays 03:00 UTC (cleanup-caches runs Sundays, so no cache contention).
     - cron: "0 3 * * 1"
