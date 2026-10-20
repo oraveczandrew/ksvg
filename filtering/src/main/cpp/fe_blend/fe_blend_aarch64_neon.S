@@ -71,7 +71,7 @@
  *   but GNU as rejects it, so this file spells the `fcmge` form
  *   everywhere for host (GCC) + NDK (clang) + QEMU-guest compatibility.)
  *
- * Stack frame: sub sp, sp, #256 (AArch64 SP stays 16B-aligned).
+ * Stack frame: sub sp, sp, #272 (AArch64 SP stays 16B-aligned).
  * Stack args (8B PCS slots — NOT packed: the C++ caller stores mode
  * with `str w` @0, useLinear with `strb` @8, the tables with `str x`
  * @16/@24; verified against the compiled runForced call site):
@@ -125,14 +125,16 @@
 
 /*
  * Widen 4 packed bytes (low 4B of vIn, via ld4.4b) to a float quad,
- * dividing by v6 (= 255.0, rebuilt per block). Upper garbage lanes of
+ * scaling by 1/255 ([sp, #256]) instead of dividing. The reciprocal is
+ * inexact, so exact .5 ties can move by one LSB. Upper garbage lanes of
  * vIn are ignored. Clobbers v5.
  */
 .macro WIDEN4 vIn, vOut
     uxtl    v5.8h, \vIn\().8b
     uxtl    \vOut\().4s, v5.4h
     ucvtf   \vOut\().4s, \vOut\().4s
-    fdiv    \vOut\().4s, \vOut\().4s, v6.4s
+    ldr     q5, [sp, #256]
+    fmul    \vOut\().4s, \vOut\().4s, v5.4s
 .endm
 
 /*
@@ -298,7 +300,7 @@
 .globl SYM(applyFeBlendNeon)
 TYPE(SYM(applyFeBlendNeon), @function)
 SYM(applyFeBlendNeon):
-    sub     sp, sp, #256
+    sub     sp, sp, #272
     mov     x9, x0                   /* src cursor */
     mov     x10, x1                  /* dst cursor */
     mov     x11, x2                  /* out cursor */
@@ -325,8 +327,13 @@ SYM(applyFeBlendNeon):
     movk    w14, #0x3f00, lsl #16
     fmov    s0, w14
     str     s0, [sp, #12]
+    movz    w14, #0x8081
+    movk    w14, #0x3b80, lsl #16
+    fmov    s0, w14
+    dup     v0.4s, v0.s[0]
+    str     q0, [sp, #256]          /* 1/255 reciprocal */
 
-    ldrb    w14, [sp, #264]          /* useLinear (ldrb: upper bytes void) */
+    ldrb    w14, [sp, #280]          /* useLinear (ldrb: upper bytes void) */
     cbnz    w14, .Llinear_rows
 
 /* ------------------------------------------------------------------ */
@@ -399,7 +406,7 @@ SYM(applyFeBlendNeon):
 
     /* Per-mode blend -> tR/tG/tB slots; return address in x14. */
     adr     x14, .Lblk_ret_nonlin
-    ldr     w15, [sp, #256]          /* mode */
+    ldr     w15, [sp, #272]          /* mode */
     sub     w15, w15, #1
     adr     x16, .Lblk_tab
     ldrsw   x17, [x16, w15, uxtw #2]
@@ -480,7 +487,7 @@ SYM(applyFeBlendNeon):
     ble     .Ltail_zero_nonlin
 
     adr     x14, .Ltail_ret_nonlin
-    ldr     w15, [sp, #256]
+    ldr     w15, [sp, #272]
     sub     w15, w15, #1
     adr     x16, .Ltail_tab
     ldrsw   x17, [x16, w15, uxtw #2]
@@ -552,7 +559,7 @@ SYM(applyFeBlendNeon):
     ldr     q6, [sp, #224]
     ldr     q7, [sp, #240]
     /* Load srgbToLinear into v16-v31 (4 x 64B post-indexed). */
-    ldr     x15, [sp, #272]
+    ldr     x15, [sp, #288]
     ld1     {v16.16b-v19.16b}, [x15], #64
     ld1     {v20.16b-v23.16b}, [x15], #64
     ld1     {v24.16b-v27.16b}, [x15], #64
@@ -630,7 +637,7 @@ SYM(applyFeBlendNeon):
     str     q1, [sp, #160]
 
     adr     x14, .Lblk_ret_linear
-    ldr     w15, [sp, #256]
+    ldr     w15, [sp, #272]
     sub     w15, w15, #1
     adr     x16, .Lblk_tab
     ldrsw   x17, [x16, w15, uxtw #2]
@@ -641,7 +648,7 @@ SYM(applyFeBlendNeon):
     COMPOSITE 192, 32, 96
     COMPOSITE 208, 48, 112
     /* Encode R/G/B in place via scalar ldrb (x15 = table base). */
-    ldr     x15, [sp, #280]
+    ldr     x15, [sp, #296]
     mov     w13, #0
     STORE_PIXEL64 0, 1
     str     w13, [x11], #4
@@ -669,7 +676,7 @@ SYM(applyFeBlendNeon):
 .Llinear_tail_loop:
     /* Scalar widen with LUT decode (x15 = table base, reloaded per pixel;
        w13 counter and x9/x10/x11 cursors preserved throughout). */
-    ldr     x15, [sp, #272]
+    ldr     x15, [sp, #288]
     ldr     w14, [x9]
     and     w16, w14, #0xff
     ldrb    w16, [x15, w16, uxtw]
@@ -720,10 +727,10 @@ SYM(applyFeBlendNeon):
     fcmp    s0, #0.0
     bls     .Ltail_zero_linear
     /* Encode table owns x15 for the narrow below. */
-    ldr     x15, [sp, #280]
+    ldr     x15, [sp, #296]
 
     adr     x14, .Ltail_ret_linear
-    ldr     w16, [sp, #256]
+    ldr     w16, [sp, #272]
     sub     w16, w16, #1
     adr     x17, .Ltail_tab
     ldrsw   x16, [x17, w16, uxtw #2]
@@ -1833,7 +1840,7 @@ SYM(applyFeBlendNeon):
     br      x14
 
 .Ldone:
-    add     sp, sp, #256
+    add     sp, sp, #272
     ret
 
 SIZE(SYM(applyFeBlendNeon))

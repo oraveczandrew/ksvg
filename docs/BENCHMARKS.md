@@ -685,16 +685,16 @@ OnePlus 11 (Snapdragon 8 Gen 2), `arm64-v8a`.
 | FeBlend (hue, linear) | scalar | 2048x2048 | 1876.588 | 2.24 | 0.03 | 1.00x |  |  |
 | FeBlend (multiply, linear) | kotlin | 512x512 | 38.457 | 6.82 | 0.08 | 0.38x |  |  |
 | FeBlend (multiply, linear) | scalar | 512x512 | 14.522 | 18.05 | 0.22 | 1.00x |  |  |
-| FeBlend (multiply, linear) | neon64 | 512x512 | 3.955 | 66.28 | 0.80 | 3.66x | 🟢 |  |
+| FeBlend (multiply, linear) | neon64 | 512x512 | 3.680 | 71.27 | 0.86 | 3.95x | 🟢 |  |
 | FeBlend (multiply, linear) | kotlin | 2048x2048 | 618.737 | 6.78 | 0.08 | 0.38x |  |  |
 | FeBlend (multiply, linear) | scalar | 2048x2048 | 233.932 | 17.93 | 0.22 | 1.00x |  |  |
-| FeBlend (multiply, linear) | neon64 | 2048x2048 | 63.517 | 66.03 | 0.79 | 3.67x | 🟢 |  |
+| FeBlend (multiply, linear) | neon64 | 2048x2048 | 70.000 | 59.91 | 0.72 | 3.94x | 🟢 | ⚠️ UNSTABLE |
 | FeBlend (multiply, non-linear) | kotlin | 512x512 | 38.434 | 6.82 | 0.08 | 0.37x |  |  |
 | FeBlend (multiply, non-linear) | scalar | 512x512 | 14.142 | 18.54 | 0.22 | 1.00x |  |  |
-| FeBlend (multiply, non-linear) | neon64 | 512x512 | 2.858 | 91.72 | 1.10 | 4.94x | 🟢 |  |
+| FeBlend (multiply, non-linear) | neon64 | 512x512 | 2.850 | 91.86 | 1.10 | 5.89x | 🟢 |  |
 | FeBlend (multiply, non-linear) | kotlin | 2048x2048 | 616.784 | 6.80 | 0.08 | 0.37x |  |  |
 | FeBlend (multiply, non-linear) | scalar | 2048x2048 | 227.322 | 18.45 | 0.19 | 1.00x |  |  |
-| FeBlend (multiply, non-linear) | neon64 | 2048x2048 | 46.433 | 90.33 | 1.08 | 4.90x | 🟢 |  |
+| FeBlend (multiply, non-linear) | neon64 | 2048x2048 | 46.260 | 90.67 | 1.09 | 5.83x | 🟢 |  |
 | GaussianBlur | kotlin | 512x512 | 12.397 | 21.15 | 0.17 | **23.52x** | ⬆️ | StackBlur (approx) |
 | GaussianBlur | scalar | 512x512 | 291.558 | 0.90 | 0.01 | 1.00x |  |  |
 | GaussianBlur | neon64 | 512x512 | 5.228 | 50.14 | 0.40 | **55.77x** | 🚀 |  |

@@ -27,13 +27,12 @@ import org.junit.runners.Parameterized
  * [FeBlendValidationCorpus], every SIMD backend this host advertises
  * is forced and compared.
  *
- * Tolerance (device-PROVEN): the ARM32 NEON kernel hoists `1/255`
- * and Newton-Raphson reciprocals and multiplies per pixel, and uses
- * single-precision `sqrt`, while the reference divides per pixel and
- * uses double `sqrt`. The x86 SSSE3/AVX2 kernels use the same recipes.
- * These round differently in rare cases, so exact .5 ties can differ
- * by ±1 LSB. NEON32/SSSE3/AVX2 therefore allow `maxDelta=1`; scalar
- * stays byte-exact.
+ * Tolerance (device-PROVEN): the ARM NEON and x86 SSSE3/AVX2 kernels
+ * hoist `1/255` and Newton-Raphson reciprocals and multiply per pixel,
+ * and use single-precision `sqrt`, while the reference divides per pixel
+ * and uses double `sqrt`. These round differently in rare cases, so
+ * exact .5 ties can differ by ±1 LSB. NEON32/NEON64/SSSE3/AVX2 therefore
+ * allow `maxDelta=1`; scalar stays byte-exact.
  */
 @NativeParityTest
 @RunWith(Parameterized::class)
@@ -58,7 +57,9 @@ class FeBlendNativeParityTest(
         }
 
         private fun tolerance(backend: Int): Int =
-            if (backend == SIMD_NEON32 || backend == SIMD_SSSE3 || backend == SIMD_AVX2) 1 else 0
+            if (backend == SIMD_NEON32 || backend == SIMD_NEON64 ||
+                backend == SIMD_SSSE3 || backend == SIMD_AVX2
+            ) 1 else 0
     }
 
     @Test
