@@ -16,9 +16,10 @@
 
 /*
  * ARMv7 / NEON implementation of ColorMatrix (4x5 matrix, SVG 0..1 semantics).
- * Bit-exact twin of KotlinKernels.colorMatrix: same FP op order (scalar VFP
- * division by 255 — NEON has no vector divide — left-to-right row evaluation,
- * no FMA), same LUT folding, same clamp255. Alpha never linearized.
+ * Twin of KotlinKernels.colorMatrix: same FP op order (left-to-right row
+ * evaluation, no FMA), same LUT folding, same clamp255. Byte channels are
+ * scaled by the 1/255 reciprocal (see DIV255) instead of a true divide, so
+ * exact .5 ties can differ by +-1 LSB. Alpha never linearized.
  *
  * Structure mirrors arithmetic_composite_armv7a_neon.S: 4px non-linear loop,
  * 4px linear loop with nibble-scan LUT (16x16-byte table chunks, high-nibble
@@ -27,8 +28,8 @@
  *
  * 4px blocks keep every NEON quad-write on even quads (q0,q1,q2,q4 for data,
  * q6 acc, q8 coeff, q9 temp, q11 narrow scratch, q12-q14 consts, q15 widen
- * scratch); q3/q5/q7 are never written. s31 carries the 255.0 divisor
- * (q7 is unused, so no lane is sacrificed).
+ * scratch); q5/q7 are never written by the matrix rows. q3 holds the 1/255
+ * reciprocal used to scale the widened channels.
  *
  * Register map, main loops:
  *   r4 = src, r5 = dst, r6 = matrix base (read-only), r7 = width
@@ -77,32 +78,22 @@
 .endm
 
 /*
- * Divide the 16 live float lanes (R=q0 G=q6 B=q2 A=q4) by s31 (255.0).
- * Scalar VFP per lane: NEON has no vector divide. q3/q5/q6/q7 lanes are not
- * resident, so no s31 sacrifice or fixup is needed. Clobbers nothing else.
+ * Scale the 16 live float lanes (R=q0 G=q6 B=q2 A=q4) by 1/255 (q3).
+ * NEON has no vector divide, but the reciprocal `0x3B808081` is inexact by
+ * ~1.5e-5, which can only move a value across a .5 rounding tie (parity
+ * allows +-1 LSB). q3 is otherwise unused and never written by the rest of
+ * the kernel, so it holds the broadcast reciprocal.
  */
 .macro DIV255
-    vdiv.f32 s0, s0, s31
-    vdiv.f32 s1, s1, s31
-    vdiv.f32 s2, s2, s31
-    vdiv.f32 s3, s3, s31
-    vdiv.f32 s8, s8, s31
-    vdiv.f32 s9, s9, s31
-    vdiv.f32 s10, s10, s31
-    vdiv.f32 s11, s11, s31
-    vdiv.f32 s16, s16, s31
-    vdiv.f32 s17, s17, s31
-    vdiv.f32 s18, s18, s31
-    vdiv.f32 s19, s19, s31
-    vdiv.f32 s24, s24, s31
-    vdiv.f32 s25, s25, s31
-    vdiv.f32 s26, s26, s31
-    vdiv.f32 s27, s27, s31
+    vmul.f32 q0, q0, q3
+    vmul.f32 q6, q6, q3
+    vmul.f32 q2, q2, q3
+    vmul.f32 q4, q4, q3
 .endm
 
 /*
- * Rebuild clamp constants: q12 = 255.0, q13 = 0.0, q14 = 0.5, plus s31 =
- * 255.0 for DIV255 (see above). Clobbers r2.
+ * Rebuild clamp constants: q12 = 255.0, q13 = 0.0, q14 = 0.5, plus q3 =
+ * 1/255 for DIV255 (see above). Clobbers r2.
  */
 .macro ROWCONSTS
     movw    r2, #0x0000
@@ -110,7 +101,9 @@
     vdup.32 q12, r2
     veor    q13, q13, q13
     vmov.f32 q14, #0.5
-    vmov    s31, r2
+    movw    r2, #0x8081
+    movt    r2, #0x3b80
+    vdup.32 q3, r2
 .endm
 
 /*

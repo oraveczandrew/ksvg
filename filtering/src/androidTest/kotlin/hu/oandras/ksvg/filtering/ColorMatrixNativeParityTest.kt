@@ -21,11 +21,17 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Byte-exact parity between the native `color_matrix.cpp` kernels
+ * Parity between the native `color_matrix.cpp` kernels
  * ([ColorMatrixNative.applyForced]) and the pure-Kotlin reference
  * ([KotlinKernels.colorMatrix]). For every configuration in the shared
  * [ColorMatrixValidationCorpus], every SIMD backend this host advertises
- * is forced and compared byte-for-byte.
+ * is forced and compared.
+ *
+ * Tolerance: the SIMD kernels (AVX2, SSSE3 x86_64, SSSE3 i386, NEON32)
+ * widen packed bytes via multiply-by-reciprocal (1/255 = `0x3B808081`)
+ * instead of a true divide. The reciprocal is inexact, so exact .5 ties may
+ * differ by +-1 LSB from scalar division. SIMD backends therefore allow
+ * `maxDelta=1`; the scalar backend stays byte-exact.
  */
 @NativeParityTest
 @RunWith(Parameterized::class)
@@ -48,6 +54,9 @@ class ColorMatrixNativeParityTest(
                 }
             }
         }
+
+        private fun tolerance(backend: Int): Int =
+            if (backend == SIMD_SCALAR) 0 else 1
     }
 
     @Test
@@ -65,7 +74,7 @@ class ColorMatrixNativeParityTest(
 
         assertColorArrayEquals(
             "colorMatrix mismatch on [$name] backend ${backendName(backend)}",
-            ref, out,
+            ref, out, maxDelta = tolerance(backend),
         )
     }
 }
