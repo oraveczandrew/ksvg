@@ -18,6 +18,7 @@
          <trust group="androidx.interpolator" name="interpolator" version="1.0.0"/>
          <trust group="androidx.resourceinspection" name="resourceinspection-annotation" version="1.0.1"/>
          <trust group="androidx.slidingpanelayout" name="slidingpanelayout" version="1.2.0"/>
+         <trust group="com.soywiz.korlibs.korte" name="korte-jvm" version="4.0.10"/>
          <trust group="androidx.tracing" name="tracing" version="1.1.0"/>
          <trust group="com.android.tools.build" name="bundletool" reason="b/215430394"/>
          <trust group="com.android.tools.build.jetifier" reason="b/215430394"/>
