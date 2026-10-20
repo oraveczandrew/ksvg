@@ -273,18 +273,18 @@ ksvgLightingDistantSpecularRowNeon32:
     vmov.f32 q14, #1.0
     vadd.f32 q2, q2, q14         // nLen^2
 
-    // ARMv7 VFP sqrt/div are scalar; normalize four lanes exactly.
-    // Dividend is TRUE 1.0 (NOT k like the diffuse copy): the Kotlin
-    // reference divides by the real nLen (nx/=nLen; ny/=nLen; nz/=nLen).
-    vsqrt.f32 s12, s8
-    vsqrt.f32 s13, s9
-    vsqrt.f32 s14, s10
-    vsqrt.f32 s15, s11
-    vmov.f32 q2, #1.0
-    vdiv.f32 s12, s8, s12
-    vdiv.f32 s13, s9, s13
-    vdiv.f32 s14, s10, s14
-    vdiv.f32 s15, s11, s15
+    // Vector reciprocal square root with two Newton-Raphson refinements:
+    // r <- r * (3 - A*r*r) / 2, giving invLen = 1/sqrt(nLen^2) to ~1e-7.
+    // Specular parity tolerance is one LSB, so this replaces the four
+    // scalar vsqrt + vdiv with an approximate, not correctly-rounded,
+    // sequence. nLen^2 >= 1 (the "+1" above), so no zero guard is needed.
+    vrsqrte.f32 q3, q2           // r0 = 1/sqrt(A)
+    vmul.f32 q15, q3, q3         // r0^2
+    vrsqrts.f32 q15, q2, q15     // (3 - A*r0^2)/2
+    vmul.f32 q3, q3, q15         // r1
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15         // r2 = invLen
 
     // q3 now contains invLen = 1/nLen.
     vmul.f32 q0, q0, q3          // normalized nx
@@ -630,15 +630,15 @@ ksvgLightingDistantSpecularRowNeon32Linear:
     vmov.f32 q14, #1.0
     vadd.f32 q2, q2, q14         // nLen^2
 
-    vsqrt.f32 s12, s8
-    vsqrt.f32 s13, s9
-    vsqrt.f32 s14, s10
-    vsqrt.f32 s15, s11
-    vmov.f32 q2, #1.0
-    vdiv.f32 s12, s8, s12
-    vdiv.f32 s13, s9, s13
-    vdiv.f32 s14, s10, s14
-    vdiv.f32 s15, s11, s15
+    // Same two-step vector rsqrt refinement as the non-linear path; nLen^2
+    // is at least 1, so vrsqrte never sees a zero operand.
+    vrsqrte.f32 q3, q2           // r0 = 1/sqrt(A)
+    vmul.f32 q15, q3, q3         // r0^2
+    vrsqrts.f32 q15, q2, q15     // (3 - A*r0^2)/2
+    vmul.f32 q3, q3, q15         // r1
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15         // r2 = invLen
 
     // q3 now contains invLen = 1/nLen.
     vmul.f32 q0, q0, q3          // normalized nx

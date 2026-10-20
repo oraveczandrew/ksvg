@@ -289,23 +289,20 @@ ksvgLightingPointSpecularRowNeon32:
     vmov.f32 q14, #1.0
     vadd.f32 q2, q2, q14         // nLen^2
 
-    // ARMv7 VFP sqrt/div are scalar; normalize four lanes exactly.
-    // Dividend is TRUE 1.0 via q2 (s8-s11 hold nLen^2 lanes here).
-    vsqrt.f32 s12, s8
-    vsqrt.f32 s13, s9
-    vsqrt.f32 s14, s10
-    vsqrt.f32 s15, s11
-    vmov.f32 q2, #1.0
-    vdiv.f32 s12, s8, s12
-    vdiv.f32 s13, s9, s13
-    vdiv.f32 s14, s10, s14
-    vdiv.f32 s15, s11, s15
+    // Vector reciprocal square root with two Newton-Raphson refinements;
+    // nLen^2 >= 1 (the "+1" above), so vrsqrte never sees zero.
+    vrsqrte.f32 q3, q2           // r0 = 1/sqrt(nLen^2)
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15         // r1
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15         // r2 = invLen
 
     // q3 now contains invLen = 1/nLen (nz lives here through the
-    // L-window: it uses q2/q5/q6/q4/q9 only, never q3).
+    // L-window: it uses q2/q4/q5/q6/q9/q10/q14/q15, never q3).
     vmul.f32 q0, q0, q3          // normalized nx
     vmul.f32 q1, q1, q3          // normalized ny
-    // (nz = invLen stays in q3; q14 unused until the pack.)
 
     // ---- Per-pixel light vector L (scalar VFP, exact) ----
     // ux = ux0 + (idx+[0,1,2,3])*dux; Lx = lx - ux (into q2).
@@ -325,188 +322,55 @@ ksvgLightingPointSpecularRowNeon32:
     vsub.f32 q2, q8, q2          // Lx = lx - ux (q8 = lx)
     ldr     r7, [sp, #24]        // Ly bits -> r7
     ldr     r12, [r5, #20]       // lz bits -> r12
-    // Per-lane L normalize + h + ndoth (scalar VFP, exact).
-    // Sources: Lx s8-s11 (q2), Ly r7, lz r12, surfZ s16-s19 (q4),
-    // nx s0-s3 (q0), ny s4-s7 (q1), nz s12-s15 (q3), ONE s28 (q7).
-    // Dests: ndoth -> q2 lanes. Temps: q5 full (s20-s23; scaleX dead,
-    // reloaded). Lhat homes (q2/q6/q4) are reused as hx/hy/hz temps
-    // within the lane (read-then-write, same lane).
-    // lane 0
-    vmov.f32 s20, s8
-    vmov    s21, r7
-    vmov    s22, r12
-    vmov.f32 s23, s16
-    vsub.f32 s22, s22, s23       // Lz = lz - surfZ
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22       // len2
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp0_linv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23       // / ONE
-.Lp0_linv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmov.f32 s8, s20             // Lhatx
-    vmov.f32 s24, s21            // Lhaty (q6)
-    vmov.f32 s16, s22            // Lhatz (q4)
-    // h = normalize(Lhat+(0,0,1)); zero-guarded (scalar keeps h = 0).
-    vadd.f32 s22, s22, s28       // hz = Lhatz+1
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22       // hLen2
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp0_hinv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lp0_hinv0:
-    vmul.f32 s20, s20, s23       // hx
-    vmul.f32 s21, s21, s23       // hy
-    vmul.f32 s22, s22, s23       // hz
-    // ndoth = nx*hx+ny*hy+nz*hz (Kotlin order), clamped >= 0.
-    vmul.f32 s23, s0, s20
-    vmla.f32 s23, s4, s21
-    vmla.f32 s23, s12, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    bge     .Lp0_store
-    veor    d11, d11, d11        // s23 = 0 (s22 dead: hz homed? no —
-                                 // hx/hy/hz live only in temps; all dead
-                                 // after ndoth, so zeroing d11 is safe)
-.Lp0_store:
-    vmov.f32 s8, s23             // ndoth -> q2 lane 0
-    // lane 1
-    vmov.f32 s20, s9
-    vmov    s21, r7
-    vmov    s22, r12
-    vmov.f32 s23, s17
-    vsub.f32 s22, s22, s23
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp1_linv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lp1_linv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmov.f32 s9, s20
-    vmov.f32 s25, s21
-    vmov.f32 s17, s22
-    vadd.f32 s22, s22, s28
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp1_hinv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lp1_hinv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmul.f32 s23, s1, s20
-    vmla.f32 s23, s5, s21
-    vmla.f32 s23, s13, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    bge     .Lp1_store
-    veor    d11, d11, d11
-.Lp1_store:
-    vmov.f32 s9, s23
-    // lane 2
-    vmov.f32 s20, s10
-    vmov    s21, r7
-    vmov    s22, r12
-    vmov.f32 s23, s18
-    vsub.f32 s22, s22, s23
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp2_linv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lp2_linv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmov.f32 s10, s20
-    vmov.f32 s26, s21
-    vmov.f32 s18, s22
-    vadd.f32 s22, s22, s28
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp2_hinv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lp2_hinv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmul.f32 s23, s2, s20
-    vmla.f32 s23, s6, s21
-    vmla.f32 s23, s14, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    bge     .Lp2_store
-    veor    d11, d11, d11
-.Lp2_store:
-    vmov.f32 s10, s23
-    // lane 3
-    vmov.f32 s20, s11
-    vmov    s21, r7
-    vmov    s22, r12
-    vmov.f32 s23, s19
-    vsub.f32 s22, s22, s23
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp3_linv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lp3_linv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmov.f32 s11, s20
-    vmov.f32 s27, s21
-    vmov.f32 s19, s22
-    vadd.f32 s22, s22, s28
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp3_hinv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lp3_hinv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmul.f32 s23, s3, s20
-    vmla.f32 s23, s7, s21
-    vmla.f32 s23, s15, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    bge     .Lp3_store
-    veor    d11, d11, d11
-.Lp3_store:
-    vmov.f32 s11, s23
+    // Ly and lz are per-pixel scalars: broadcast into q5/q6, then build
+    // Lz = lz - surfZ (q4). q5/q6 held the now-dead scaleX/scaleY.
+    vdup.32 q5, r7               // Ly
+    vdup.32 q6, r12              // lz
+    vsub.f32 q6, q6, q4          // Lz = lz - surfZ
+
+    // len2 = Lx^2 + Ly^2 + Lz^2, then invLen by rsqrte + 2 NR. A
+    // zero-length L must stay zero (the scalar code skipped the divide),
+    // so mask invLen to zero wherever len2 == 0.
+    vmul.f32 q9, q2, q2
+    vmla.f32 q9, q5, q5
+    vmla.f32 q9, q6, q6
+    vrsqrte.f32 q10, q9
+    vmul.f32 q14, q10, q10
+    vrsqrts.f32 q14, q9, q14
+    vmul.f32 q10, q10, q14
+    vmul.f32 q14, q10, q10
+    vrsqrts.f32 q14, q9, q14
+    vmul.f32 q10, q10, q14       // invLen
+    vceq.f32 q14, q9, #0
+    vbic.32 q10, q10, q14        // invLen = 0 where len2 == 0
+    vmul.f32 q2, q2, q10         // Lhat x
+    vmul.f32 q5, q5, q10         // Lhat y
+    vmul.f32 q6, q6, q10         // Lhat z
+
+    // h = normalize(Lhat + (0,0,1)); q7 = ONE.
+    vadd.f32 q6, q6, q7          // hz_raw = Lhatz + 1
+    vmul.f32 q9, q2, q2
+    vmla.f32 q9, q5, q5
+    vmla.f32 q9, q6, q6
+    vrsqrte.f32 q10, q9
+    vmul.f32 q14, q10, q10
+    vrsqrts.f32 q14, q9, q14
+    vmul.f32 q10, q10, q14
+    vmul.f32 q14, q10, q10
+    vrsqrts.f32 q14, q9, q14
+    vmul.f32 q10, q10, q14       // invLen
+    vceq.f32 q14, q9, #0
+    vbic.32 q10, q10, q14
+    vmul.f32 q2, q2, q10         // hx
+    vmul.f32 q5, q5, q10         // hy
+    vmul.f32 q6, q6, q10         // hz
+
+    // ndoth = nx*hx + ny*hy + nz*hz (Kotlin order), clamped >= 0.
+    vmul.f32 q9, q0, q2
+    vmla.f32 q9, q1, q5
+    vmla.f32 q9, q3, q6
+    veor    q15, q15, q15
+    vmax.f32 q2, q9, q15
     // q2 = ndoth vector.
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
@@ -857,23 +721,20 @@ ksvgLightingPointSpecularRowNeon32Linear:
     vmov.f32 q14, #1.0
     vadd.f32 q2, q2, q14         // nLen^2
 
-    // ARMv7 VFP sqrt/div are scalar; normalize four lanes exactly.
-    // Dividend is TRUE 1.0 via q2 (s8-s11 hold nLen^2 lanes here).
-    vsqrt.f32 s12, s8
-    vsqrt.f32 s13, s9
-    vsqrt.f32 s14, s10
-    vsqrt.f32 s15, s11
-    vmov.f32 q2, #1.0
-    vdiv.f32 s12, s8, s12
-    vdiv.f32 s13, s9, s13
-    vdiv.f32 s14, s10, s14
-    vdiv.f32 s15, s11, s15
+    // Vector reciprocal square root with two Newton-Raphson refinements;
+    // nLen^2 >= 1 (the "+1" above), so vrsqrte never sees zero.
+    vrsqrte.f32 q3, q2           // r0 = 1/sqrt(nLen^2)
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15         // r1
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15         // r2 = invLen
 
     // q3 now contains invLen = 1/nLen (nz lives here through the
-    // L-window: it uses q2/q5/q6/q4/q9 only, never q3).
+    // L-window: it uses q2/q4/q5/q6/q9/q10/q14/q15, never q3).
     vmul.f32 q0, q0, q3          // normalized nx
     vmul.f32 q1, q1, q3          // normalized ny
-    // (nz = invLen stays in q3; q14 unused until the pack.)
 
     // ---- Per-pixel light vector L (scalar VFP, exact) ----
     // ux = ux0 + (idx+[0,1,2,3])*dux; Lx = lx - ux (into q2).
@@ -893,188 +754,55 @@ ksvgLightingPointSpecularRowNeon32Linear:
     vsub.f32 q2, q8, q2          // Lx = lx - ux (q8 = lx)
     ldr     r7, [sp, #24]        // Ly bits -> r7
     ldr     r12, [r5, #20]       // lz bits -> r12
-    // Per-lane L normalize + h + ndoth (scalar VFP, exact).
-    // Sources: Lx s8-s11 (q2), Ly r7, lz r12, surfZ s16-s19 (q4),
-    // nx s0-s3 (q0), ny s4-s7 (q1), nz s12-s15 (q3), ONE s28 (q7).
-    // Dests: ndoth -> q2 lanes. Temps: q5 full (s20-s23; scaleX dead,
-    // reloaded). Lhat homes (q2/q6/q4) are reused as hx/hy/hz temps
-    // within the lane (read-then-write, same lane).
-    // lane 0
-    vmov.f32 s20, s8
-    vmov    s21, r7
-    vmov    s22, r12
-    vmov.f32 s23, s16
-    vsub.f32 s22, s22, s23       // Lz = lz - surfZ
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22       // len2
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq0_linv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23       // / ONE
-.Lq0_linv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmov.f32 s8, s20             // Lhatx
-    vmov.f32 s24, s21            // Lhaty (q6)
-    vmov.f32 s16, s22            // Lhatz (q4)
-    // h = normalize(Lhat+(0,0,1)); zero-guarded (scalar keeps h = 0).
-    vadd.f32 s22, s22, s28       // hz = Lhatz+1
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22       // hLen2
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq0_hinv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lq0_hinv0:
-    vmul.f32 s20, s20, s23       // hx
-    vmul.f32 s21, s21, s23       // hy
-    vmul.f32 s22, s22, s23       // hz
-    // ndoth = nx*hx+ny*hy+nz*hz (Kotlin order), clamped >= 0.
-    vmul.f32 s23, s0, s20
-    vmla.f32 s23, s4, s21
-    vmla.f32 s23, s12, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    bge     .Lq0_store
-    veor    d11, d11, d11        // s23 = 0 (s22 dead: hz homed? no —
-                                 // hx/hy/hz live only in temps; all dead
-                                 // after ndoth, so zeroing d11 is safe)
-.Lq0_store:
-    vmov.f32 s8, s23             // ndoth -> q2 lane 0
-    // lane 1
-    vmov.f32 s20, s9
-    vmov    s21, r7
-    vmov    s22, r12
-    vmov.f32 s23, s17
-    vsub.f32 s22, s22, s23
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq1_linv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lq1_linv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmov.f32 s9, s20
-    vmov.f32 s25, s21
-    vmov.f32 s17, s22
-    vadd.f32 s22, s22, s28
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq1_hinv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lq1_hinv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmul.f32 s23, s1, s20
-    vmla.f32 s23, s5, s21
-    vmla.f32 s23, s13, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    bge     .Lq1_store
-    veor    d11, d11, d11
-.Lq1_store:
-    vmov.f32 s9, s23
-    // lane 2
-    vmov.f32 s20, s10
-    vmov    s21, r7
-    vmov    s22, r12
-    vmov.f32 s23, s18
-    vsub.f32 s22, s22, s23
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq2_linv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lq2_linv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmov.f32 s10, s20
-    vmov.f32 s26, s21
-    vmov.f32 s18, s22
-    vadd.f32 s22, s22, s28
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq2_hinv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lq2_hinv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmul.f32 s23, s2, s20
-    vmla.f32 s23, s6, s21
-    vmla.f32 s23, s14, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    bge     .Lq2_store
-    veor    d11, d11, d11
-.Lq2_store:
-    vmov.f32 s10, s23
-    // lane 3
-    vmov.f32 s20, s11
-    vmov    s21, r7
-    vmov    s22, r12
-    vmov.f32 s23, s19
-    vsub.f32 s22, s22, s23
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq3_linv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lq3_linv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmov.f32 s11, s20
-    vmov.f32 s27, s21
-    vmov.f32 s19, s22
-    vadd.f32 s22, s22, s28
-    vmul.f32 s23, s20, s20
-    vmla.f32 s23, s21, s21
-    vmla.f32 s23, s22, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq3_hinv0
-    vsqrt.f32 s23, s23
-    vdiv.f32 s23, s28, s23
-.Lq3_hinv0:
-    vmul.f32 s20, s20, s23
-    vmul.f32 s21, s21, s23
-    vmul.f32 s22, s22, s23
-    vmul.f32 s23, s3, s20
-    vmla.f32 s23, s7, s21
-    vmla.f32 s23, s15, s22
-    vcmp.f32 s23, #0.0
-    vmrs    apsr_nzcv, fpscr
-    bge     .Lq3_store
-    veor    d11, d11, d11
-.Lq3_store:
-    vmov.f32 s11, s23
+    // Ly and lz are per-pixel scalars: broadcast into q5/q6, then build
+    // Lz = lz - surfZ (q4). q5/q6 held the now-dead scaleX/scaleY.
+    vdup.32 q5, r7               // Ly
+    vdup.32 q6, r12              // lz
+    vsub.f32 q6, q6, q4          // Lz = lz - surfZ
+
+    // len2 = Lx^2 + Ly^2 + Lz^2, then invLen by rsqrte + 2 NR. A
+    // zero-length L must stay zero (the scalar code skipped the divide),
+    // so mask invLen to zero wherever len2 == 0.
+    vmul.f32 q9, q2, q2
+    vmla.f32 q9, q5, q5
+    vmla.f32 q9, q6, q6
+    vrsqrte.f32 q10, q9
+    vmul.f32 q14, q10, q10
+    vrsqrts.f32 q14, q9, q14
+    vmul.f32 q10, q10, q14
+    vmul.f32 q14, q10, q10
+    vrsqrts.f32 q14, q9, q14
+    vmul.f32 q10, q10, q14       // invLen
+    vceq.f32 q14, q9, #0
+    vbic.32 q10, q10, q14        // invLen = 0 where len2 == 0
+    vmul.f32 q2, q2, q10         // Lhat x
+    vmul.f32 q5, q5, q10         // Lhat y
+    vmul.f32 q6, q6, q10         // Lhat z
+
+    // h = normalize(Lhat + (0,0,1)); q7 = ONE.
+    vadd.f32 q6, q6, q7          // hz_raw = Lhatz + 1
+    vmul.f32 q9, q2, q2
+    vmla.f32 q9, q5, q5
+    vmla.f32 q9, q6, q6
+    vrsqrte.f32 q10, q9
+    vmul.f32 q14, q10, q10
+    vrsqrts.f32 q14, q9, q14
+    vmul.f32 q10, q10, q14
+    vmul.f32 q14, q10, q10
+    vrsqrts.f32 q14, q9, q14
+    vmul.f32 q10, q10, q14       // invLen
+    vceq.f32 q14, q9, #0
+    vbic.32 q10, q10, q14
+    vmul.f32 q2, q2, q10         // hx
+    vmul.f32 q5, q5, q10         // hy
+    vmul.f32 q6, q6, q10         // hz
+
+    // ndoth = nx*hx + ny*hy + nz*hz (Kotlin order), clamped >= 0.
+    vmul.f32 q9, q0, q2
+    vmla.f32 q9, q1, q5
+    vmla.f32 q9, q3, q6
+    veor    q15, q15, q15
+    vmax.f32 q2, q9, q15
     // q2 = ndoth vector.
 
     // ---- per-lane scalar double pow (reference Math.pow semantics) ----
