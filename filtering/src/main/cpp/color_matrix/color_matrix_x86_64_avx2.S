@@ -16,9 +16,10 @@
 
 /*
  * x86-64 AVX2 implementation of ColorMatrix (4x5 matrix, SVG 0..1 semantics).
- * 8-wide twin of color_matrix_x86_64_ssse3.S: same algorithm, same bit-exact
- * guarantees (correctly-rounded `vdivps`, left-to-right rows, `vcvttps2dq`
- * truncate — never nearest-even).
+ * 8-wide twin of color_matrix_x86_64_ssse3.S: same algorithm, same near-exact
+ * contract under the avx2 maxDelta=1 parity tolerance (multiply-by-reciprocal
+ * for /255 widen, left-to-right rows, `vcvttps2dq` truncate — never
+ * nearest-even).
  *
  * Deliberately NO FMA (`vfmadd*ps`) even though the AVX2 dispatch gate
  * implies FMA system-wide: the reference evaluates separate mul+add, and
@@ -74,13 +75,16 @@
 
 /*
  * Widen one channel's packed bytes (low qword of CH) to floats/255.
- * Clobbers only CH (ymm14 = 255.0 broadcast, ymm15 = zero, persistent).
+ * Clobbers only CH (ymm12 = 1/255 broadcast, ymm14 = 255.0 broadcast,
+ * ymm15 = zero, persistent). Uses multiply-by-reciprocal (not vdivps):
+ * the reciprocal is inexact, so exact .5 ties may differ by +-1 LSB
+ * from scalar division (parity allows maxDelta=1 there).
  */
 .macro WIDEN8 CH
     vpunpcklbw %ymm15, \CH, \CH
     vpunpcklwd %ymm15, \CH, \CH
     vcvtdq2ps \CH, \CH
-    vdivps %ymm14, \CH, \CH
+    vmulps %ymm12, \CH, \CH
 .endm
 
 /*
@@ -188,6 +192,7 @@ SYM(applyColorMatrixAvx2):
     movq 128(%rsp), %r10
 
     vbroadcastss .L255(%rip), %ymm14
+    vbroadcastss .Linverse255(%rip), %ymm12  // 1/255
     vpxor %ymm15, %ymm15, %ymm15
 
     movl %r11d, %eax
@@ -473,6 +478,9 @@ RODATA
 .p2align 4
 .L255:
     .long 0x437f0000
+.p2align 4
+.Linverse255:
+    .long 0x3B808081
 .p2align 4
 .Lhalf:
     .long 0x3f000000

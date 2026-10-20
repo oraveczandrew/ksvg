@@ -16,9 +16,9 @@
 
 /*
  * x86-64 SSSE3 implementation of ColorMatrix (4x5 matrix, SVG 0..1 semantics).
- * Bit-exact twin of KotlinKernels.colorMatrix: same FP op order (vector
- * `divps` by 255.0 is correctly rounded like scalar `/ 255.f`,
- * left-to-right row evaluation, no FMA), same LUT folding, same clamp255
+ * Near-exact twin of KotlinKernels.colorMatrix under the ssse3 maxDelta=1
+ * parity tolerance (multiply-by-reciprocal for /255 widen, left-to-right
+ * row evaluation, no FMA), same LUT folding, same clamp255
  * (maxps/minps, +0.5, truncate via `cvttps2dq` — NEVER `cvtps2dq`, which
  * rounds to nearest-even). Alpha never linearized.
  *
@@ -26,7 +26,7 @@
  * odd widths go through the scalar tail).
  *
  * Non-linear block: pshufb-extract B/G/R/A bytes to low dwords, widen
- * (punpcklbw/lwd, cvtdq2ps, divps), 4 matrix rows, x255, clamp, +0.5,
+ * (punpcklbw/lwd, cvtdq2ps, mulps), 4 matrix rows, x255, clamp, +0.5,
  * truncate, packssdw/packuswb, punpcklbw/lwd pack, movdqu store.
  *
  * Linear path: the 256-byte tables are ARBITRARY (caller-supplied
@@ -54,7 +54,7 @@
  *   xmm8  scan lo nibbles
  *   xmm9  scan hi nibbles
  *   xmm10 saved alpha (linear decode)
- *   xmm14 255.0 broadcast, xmm15 zero (persistent)
+ *   xmm12 1/255 broadcast, xmm14 255.0 broadcast, xmm15 zero (persistent)
  *   r10   matrix base (MATRIX), r11 scan chunk offset / tail pixel acc,
  *   r12/r13 src/dst cursors, r14d row stride, r15 scan table base.
  * Masks, 0.5 and hi-compare vectors come from (%rip) memory operands.
@@ -92,13 +92,16 @@
 
 /*
  * Widen one channel's packed bytes (low dword of CH) to floats/255.
- * Clobbers only CH (xmm14 = 255.0 broadcast, xmm15 = zero, persistent).
+ * Clobbers only CH (xmm12 = 1/255 broadcast, xmm14 = 255.0 broadcast,
+ * xmm15 = zero, persistent). Uses multiply-by-reciprocal (not divps):
+ * the reciprocal is inexact, so exact .5 ties may differ by +-1 LSB
+ * from scalar division (parity allows maxDelta=1 there).
  */
 .macro WIDEN4 CH
     punpcklbw %xmm15, \CH
     punpcklwd %xmm15, \CH
     cvtdq2ps \CH, \CH
-    divps %xmm14, \CH
+    mulps %xmm12, \CH
 .endm
 
 /*
@@ -213,6 +216,7 @@ SYM(applyColorMatrixSsse3):
     movq 128(%rsp), %r10             /* matrix base */
 
     movaps .L255Vec(%rip), %xmm14    /* 255.0 broadcast */
+    movaps .Linverse255Vec(%rip), %xmm12  /* 1/255 broadcast */
     pxor %xmm15, %xmm15              /* zero */
 
     /* First row starts at clipTop * width + clipLeft. */
@@ -505,6 +509,9 @@ RODATA
 .p2align 4
 .L255Vec:
     .long 0x437f0000, 0x437f0000, 0x437f0000, 0x437f0000
+.p2align 4
+.Linverse255Vec:
+    .long 0x3B808081, 0x3B808081, 0x3B808081, 0x3B808081
 .p2align 4
 .Lhalf:
     .long 0x3f000000

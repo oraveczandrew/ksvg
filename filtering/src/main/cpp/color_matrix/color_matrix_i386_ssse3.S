@@ -17,7 +17,8 @@
 /*
  * i386 SSSE3 implementation of ColorMatrix (4x5 matrix, SVG 0..1 semantics).
  * 4-wide twin of color_matrix_x86_64_ssse3.S: same algorithm, same
- * bit-exact guarantees (correctly-rounded `divps`, left-to-right rows, no
+ * near-exact contract under the ssse3 maxDelta=1 parity tolerance
+ * (multiply-by-reciprocal for /255 widen, left-to-right rows, no
  * FMA, `cvttps2dq` truncate, alpha never linearized).
  *
  * Differences from the x86-64 twin, all forced by the 32-bit target:
@@ -213,35 +214,35 @@ SYM(applyColorMatrixSsse3x86):
 .p2align 4
 .Lnonlin_block:
     movdqu (%esi), %xmm0
-    /* Widen B/G/R/A to spill slots (xmm1 chan, xmm2 zero, xmm3 255). */
+    /* Widen B/G/R/A to spill slots (xmm1 chan, xmm2 zero, xmm3 1/255). */
     pxor %xmm2, %xmm2
-    movdqa (.L255Vec-1b)(%ebp), %xmm3
+    movdqa (.Linverse255Vec-1b)(%ebp), %xmm3
     movdqa %xmm0, %xmm1
     pshufb (.LshuffleB-1b)(%ebp), %xmm1
     punpcklbw %xmm2, %xmm1
     punpcklwd %xmm2, %xmm1
     cvtdq2ps %xmm1, %xmm1
-    divps %xmm3, %xmm1
+    mulps %xmm3, %xmm1
     movdqa %xmm1, 32(%esp)
     movdqa %xmm0, %xmm1
     pshufb (.LshuffleG-1b)(%ebp), %xmm1
     punpcklbw %xmm2, %xmm1
     punpcklwd %xmm2, %xmm1
     cvtdq2ps %xmm1, %xmm1
-    divps %xmm3, %xmm1
+    mulps %xmm3, %xmm1
     movdqa %xmm1, 48(%esp)
     movdqa %xmm0, %xmm1
     pshufb (.LshuffleR-1b)(%ebp), %xmm1
     punpcklbw %xmm2, %xmm1
     punpcklwd %xmm2, %xmm1
     cvtdq2ps %xmm1, %xmm1
-    divps %xmm3, %xmm1
+    mulps %xmm3, %xmm1
     movdqa %xmm1, 64(%esp)
     pshufb (.LshuffleA-1b)(%ebp), %xmm0
     punpcklbw %xmm2, %xmm0
     punpcklwd %xmm2, %xmm0
     cvtdq2ps %xmm0, %xmm0
-    divps %xmm3, %xmm0
+    mulps %xmm3, %xmm0
     movdqa %xmm0, 80(%esp)
 
     MATROW4 0, 4, 8, 12, 16
@@ -363,33 +364,33 @@ SYM(applyColorMatrixSsse3x86):
 
     /* Widen to spill slots (same shape as non-linear). */
     pxor %xmm2, %xmm2
-    movdqa (.L255Vec-1b)(%ebp), %xmm3
+    movdqa (.Linverse255Vec-1b)(%ebp), %xmm3
     movdqa %xmm0, %xmm1
     pshufb (.LshuffleB-1b)(%ebp), %xmm1
     punpcklbw %xmm2, %xmm1
     punpcklwd %xmm2, %xmm1
     cvtdq2ps %xmm1, %xmm1
-    divps %xmm3, %xmm1
+    mulps %xmm3, %xmm1
     movdqa %xmm1, 32(%esp)
     movdqa %xmm0, %xmm1
     pshufb (.LshuffleG-1b)(%ebp), %xmm1
     punpcklbw %xmm2, %xmm1
     punpcklwd %xmm2, %xmm1
     cvtdq2ps %xmm1, %xmm1
-    divps %xmm3, %xmm1
+    mulps %xmm3, %xmm1
     movdqa %xmm1, 48(%esp)
     movdqa %xmm0, %xmm1
     pshufb (.LshuffleR-1b)(%ebp), %xmm1
     punpcklbw %xmm2, %xmm1
     punpcklwd %xmm2, %xmm1
     cvtdq2ps %xmm1, %xmm1
-    divps %xmm3, %xmm1
+    mulps %xmm3, %xmm1
     movdqa %xmm1, 64(%esp)
     pshufb (.LshuffleA-1b)(%ebp), %xmm0
     punpcklbw %xmm2, %xmm0
     punpcklwd %xmm2, %xmm0
     cvtdq2ps %xmm0, %xmm0
-    divps %xmm3, %xmm0
+    mulps %xmm3, %xmm0
     movdqa %xmm0, 80(%esp)
 
     MATROW4 0, 4, 8, 12, 16
@@ -513,6 +514,9 @@ RODATA
 .p2align 4
 .L255Vec:
     .long 0x437f0000, 0x437f0000, 0x437f0000, 0x437f0000
+.p2align 4
+.Linverse255Vec:
+    .long 0x3B808081, 0x3B808081, 0x3B808081, 0x3B808081
 .p2align 4
 .Lhalf:
     .long 0x3f000000

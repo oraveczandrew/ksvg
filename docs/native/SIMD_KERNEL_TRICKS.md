@@ -94,14 +94,17 @@ conditions in §4.
     non-linear in linear-light mode).
 - **Rounding is part of the algorithm**: don't fold a division into a
   reciprocal multiply or reorder ops "because the formula is unchanged" — run
-  the complete forced parity corpus before benchmarking (§4).
+  the complete forced parity corpus before benchmarking (§4). Exception:
+  multiply-by-reciprocal is admissible under a documented `maxDelta = 1`
+  tolerance (ColorMatrix, Convolve non-pow2).
 
 ## 4. Methodology — what evidence is valid
 
 - **Parity is the gate.** Deterministic corpus (LCG `state*1664525+1013904223`,
   seed `0x9E3779B9`, height/alpha = `(state>>24)&0xFF`), byte-for-byte vs Kotlin
   by default with documented per-kernel tolerances (Gaussian-blur SIMD tails
-  ±1 LSB, specular lighting `maxDelta = 1`),
+  ±1 LSB, specular lighting `maxDelta = 1`, ColorMatrix SIMD `maxDelta = 1`
+  for multiply-by-reciprocal `/255`, Convolve AVX2/NEON non-pow2 `maxDelta = 1`),
   aborts on first mismatch. Compile/assemble/link success and faster benchmarks
   are **not** proof. Fix → full parity → next mismatch → fix.
 - **Benchmark validity is part of the result**: compare backends in the same
