@@ -46,6 +46,7 @@ import hu.oandras.ksvg.RenderOptions
 import hu.oandras.ksvg.compat.isBlendModeSupported
 import hu.oandras.ksvg.compat.setBlendModeCompat
 import hu.oandras.ksvg.compat.toBlendModeCompat
+import hu.oandras.ksvg.compat.quickRejectCompat
 import hu.oandras.ksvg.css.CSSLength
 import hu.oandras.ksvg.css.CSSParser
 import hu.oandras.ksvg.css.CSSParser.RuleMatchContext
@@ -898,7 +899,7 @@ internal class Renderer internal constructor(
         } else 0f) * 0.5f + 1f
         return rectFPool.withPooledObject { r ->
             r.set(bb.minX - pad, bb.minY - pad, bb.maxX() + pad, bb.maxY() + pad)
-            canvas.quickReject(r, Canvas.EdgeType.AA)
+             canvas.quickRejectCompat(r)
         }
     }
 
