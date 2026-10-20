@@ -143,18 +143,15 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
 
     vpand   %ymm7, %ymm4, %ymm15  // B
     vcvtdq2ps %ymm15, %ymm15
-    vmulps  %ymm15, %ymm5, %ymm15
-    vaddps  %ymm15, %ymm0, %ymm0
+    vfmadd231ps %ymm15, %ymm5, %ymm0  // acc += weight * B
 
     vpshufb %ymm13, %ymm4, %ymm15  // G
     vcvtdq2ps %ymm15, %ymm15
-    vmulps  %ymm15, %ymm5, %ymm15
-    vaddps  %ymm15, %ymm1, %ymm1
+    vfmadd231ps %ymm15, %ymm5, %ymm1  // acc += weight * G
 
     vpshufb %ymm14, %ymm4, %ymm15  // R
     vcvtdq2ps %ymm15, %ymm15
-    vmulps  %ymm15, %ymm5, %ymm15
-    vaddps  %ymm15, %ymm2, %ymm2
+    vfmadd231ps %ymm15, %ymm5, %ymm2  // acc += weight * R
 
     addq    $4, %rdx
     addq    $4, %rcx
@@ -316,23 +313,19 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
 
     vpand   %ymm7, %ymm4, %ymm15
     vcvtdq2ps %ymm15, %ymm15
-    vmulps  %ymm15, %ymm5, %ymm15
-    vaddps  %ymm15, %ymm0, %ymm0
+    vfmadd231ps %ymm15, %ymm5, %ymm0  // acc += weight * B
 
     vpshufb %ymm13, %ymm4, %ymm15
     vcvtdq2ps %ymm15, %ymm15
-    vmulps  %ymm15, %ymm5, %ymm15
-    vaddps  %ymm15, %ymm1, %ymm1
+    vfmadd231ps %ymm15, %ymm5, %ymm1  // acc += weight * G
 
     vpshufb %ymm14, %ymm4, %ymm15
     vcvtdq2ps %ymm15, %ymm15
-    vmulps  %ymm15, %ymm5, %ymm15
-    vaddps  %ymm15, %ymm2, %ymm2
+    vfmadd231ps %ymm15, %ymm5, %ymm2  // acc += weight * R
 
     vpsrld  $24, %ymm4, %ymm15
     vcvtdq2ps %ymm15, %ymm15
-    vmulps  %ymm15, %ymm5, %ymm15
-    vaddps  %ymm15, %ymm3, %ymm3
+    vfmadd231ps %ymm15, %ymm5, %ymm3  // acc += weight * A
 
     addq    $4, %rdx
     addq    $4, %rcx

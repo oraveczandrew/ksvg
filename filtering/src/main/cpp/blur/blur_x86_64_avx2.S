@@ -83,14 +83,10 @@ SYM(ksvgBlurVerticalAvx2_x86_64):
     vcvtdq2ps %ymm7, %ymm7
     vcvtdq2ps %ymm8, %ymm8
     vcvtdq2ps %ymm9, %ymm9
-    vmulps %ymm4, %ymm6, %ymm6
-    vmulps %ymm4, %ymm7, %ymm7
-    vmulps %ymm4, %ymm8, %ymm8
-    vmulps %ymm4, %ymm9, %ymm9
-    vaddps %ymm6, %ymm0, %ymm0
-    vaddps %ymm7, %ymm1, %ymm1
-    vaddps %ymm8, %ymm2, %ymm2
-    vaddps %ymm9, %ymm3, %ymm3
+    vfmadd231ps %ymm6, %ymm4, %ymm0
+    vfmadd231ps %ymm7, %ymm4, %ymm1
+    vfmadd231ps %ymm8, %ymm4, %ymm2
+    vfmadd231ps %ymm9, %ymm4, %ymm3
     add %rdx, %r10
     add $4, %r12
     inc %eax
@@ -156,8 +152,7 @@ SYM(ksvgBlurHorizontalAvx2_x86_64):
     add $16, %r11
 .AH_rows:
     vbroadcastss (%rax), %ymm0
-    vmulps (%r11), %ymm0, %ymm2
-    vaddps %ymm2, %ymm1, %ymm1
+    vfmadd231ps (%r11), %ymm0, %ymm1
     add $4, %rax
     add $16, %r11
     inc %r10d
@@ -187,9 +182,7 @@ SYM(ksvgBlurHorizontalAvx2_x86_64):
 .AH_tail_rows:
     movss (%rax), %xmm0
     shufps $0, %xmm0, %xmm0
-    movups (%r11), %xmm3
-    mulps %xmm0, %xmm3
-    addps %xmm3, %xmm1
+    vfmadd231ps (%r11), %xmm0, %xmm1
     add $4, %rax
     add $16, %r11
     inc %r10d

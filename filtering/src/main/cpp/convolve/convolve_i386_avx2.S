@@ -282,16 +282,13 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     vbroadcastss (%edx, %edi, 4), %ymm1
     vandps  %ymm6, %ymm2, %ymm4
     vcvtdq2ps %ymm4, %ymm4
-    vmulps  %ymm4, %ymm1, %ymm4
-    vaddps  %ymm4, %ymm7, %ymm7
+    vfmadd231ps %ymm4, %ymm1, %ymm7
     vpshufb (%esp), %ymm6, %ymm4
     vcvtdq2ps %ymm4, %ymm4
-    vmulps  %ymm4, %ymm1, %ymm4
-    vaddps  %ymm4, %ymm0, %ymm0
+    vfmadd231ps %ymm4, %ymm1, %ymm0
     vpshufb 32(%esp), %ymm6, %ymm4
     vcvtdq2ps %ymm4, %ymm4
-    vmulps  %ymm4, %ymm1, %ymm1
-    vaddps  %ymm1, %ymm5, %ymm5
+    vfmadd231ps %ymm4, %ymm1, %ymm5
     incl    %edi
     vmovaps %ymm3, %ymm1
     cmpl    %edi, %esi
@@ -312,16 +309,13 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     vbroadcastss (%edx, %edi, 4), %ymm6
     vandps  160(%esp), %ymm1, %ymm4
     vcvtdq2ps %ymm4, %ymm4
-    vmulps  %ymm4, %ymm6, %ymm4
-    vaddps  %ymm4, %ymm7, %ymm7
+    vfmadd231ps %ymm4, %ymm6, %ymm7
     vpshufb (%esp), %ymm1, %ymm4
     vcvtdq2ps %ymm4, %ymm4
-    vmulps  %ymm4, %ymm6, %ymm4
-    vaddps  %ymm4, %ymm0, %ymm0
+    vfmadd231ps %ymm4, %ymm6, %ymm0
     vpshufb %ymm2, %ymm1, %ymm1
     vcvtdq2ps %ymm1, %ymm1
-    vmulps  %ymm1, %ymm6, %ymm1
-    vaddps  %ymm1, %ymm5, %ymm5
+    vfmadd231ps %ymm1, %ymm6, %ymm5
     incl    %edi
     cmpl    %edi, %esi
     jne     .LBB0_11
@@ -364,20 +358,16 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     vbroadcastss (%ebp, %edi, 4), %ymm3
     vandps  %ymm1, %ymm2, %ymm4
     vcvtdq2ps %ymm4, %ymm4
-    vmulps  %ymm4, %ymm3, %ymm4
-    vaddps  %ymm4, %ymm7, %ymm7
+    vfmadd231ps %ymm4, %ymm3, %ymm7
     vpshufb (%esp), %ymm1, %ymm4
     vcvtdq2ps %ymm4, %ymm4
-    vmulps  %ymm4, %ymm3, %ymm4
-    vaddps  %ymm4, %ymm0, %ymm0
+    vfmadd231ps %ymm4, %ymm3, %ymm0
     vpshufb 32(%esp), %ymm1, %ymm4
     vcvtdq2ps %ymm4, %ymm4
-    vmulps  %ymm4, %ymm3, %ymm4
-    vaddps  %ymm4, %ymm5, %ymm5
+    vfmadd231ps %ymm4, %ymm3, %ymm5
     vpsrld  $24, %ymm1, %ymm1
     vcvtdq2ps %ymm1, %ymm1
-    vmulps  %ymm1, %ymm3, %ymm1
-    vaddps  %ymm1, %ymm6, %ymm6
+    vfmadd231ps %ymm1, %ymm3, %ymm6
     incl    %edi
     cmpl    %edi, %esi
     jne     .LBB0_26

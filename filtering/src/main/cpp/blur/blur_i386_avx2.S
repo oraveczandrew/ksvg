@@ -97,23 +97,19 @@ SYM(ksvgBlurVerticalAvx2_i386):
 
     vpshufb 0(%esp), %ymm5, %ymm6
     vcvtdq2ps %ymm6, %ymm6
-    vmulps %ymm4, %ymm6, %ymm6
-    vaddps %ymm6, %ymm0, %ymm0
+    vfmadd231ps %ymm6, %ymm4, %ymm0
 
     vpshufb 32(%esp), %ymm5, %ymm6
     vcvtdq2ps %ymm6, %ymm6
-    vmulps %ymm4, %ymm6, %ymm6
-    vaddps %ymm6, %ymm1, %ymm1
+    vfmadd231ps %ymm6, %ymm4, %ymm1
 
     vpshufb 64(%esp), %ymm5, %ymm6
     vcvtdq2ps %ymm6, %ymm6
-    vmulps %ymm4, %ymm6, %ymm6
-    vaddps %ymm6, %ymm2, %ymm2
+    vfmadd231ps %ymm6, %ymm4, %ymm2
 
     vpshufb 96(%esp), %ymm5, %ymm6
     vcvtdq2ps %ymm6, %ymm6
-    vmulps %ymm4, %ymm6, %ymm6
-    vaddps %ymm6, %ymm3, %ymm3
+    vfmadd231ps %ymm6, %ymm4, %ymm3
 
     addl %edx, %esi
     addl $4, %ecx
@@ -204,8 +200,7 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     jz .AH_pair_store
 .AH_row:
     vbroadcastss (%edx), %ymm0
-    vmulps (%esi), %ymm0, %ymm2
-    vaddps %ymm2, %ymm1, %ymm1
+    vfmadd231ps (%esi), %ymm0, %ymm1
     addl $4, %edx
     addl $16, %esi
     decl %eax
@@ -245,9 +240,7 @@ SYM(ksvgBlurHorizontalAvx2_i386):
     addl $16, %esi
     movss (%edx), %xmm0
     shufps $0, %xmm0, %xmm0
-    movups (%esi), %xmm2
-    mulps %xmm0, %xmm2
-    addps %xmm2, %xmm1
+    vfmadd231ps (%esi), %xmm0, %xmm1
     addl $4, %edx
     decl %eax
     jnz .AH_tail_row
