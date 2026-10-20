@@ -41,6 +41,8 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
 .long 0x437f0000
 .Lbest_half:
 .long 0x3f000000
+.Lone:
+.long 0x3f800000
 .Lbest_255i:
 .long 255
 
@@ -104,10 +106,15 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     addq    %rax, %r13
 
     // Constants.
+    // Reciprocal hoist: multiply-by-reciprocal (not per-pixel vdivps): for
+    // non-power-of-two divisors 1/d is inexact, so exact .5 ties may differ
+    // by +-1 LSB from scalar division (parity allows maxDelta=1 there).
+    vmovss  .Lone(%rip), %xmm9
+    vdivss  %xmm0, %xmm9, %xmm9  // 1/divisor
+    vbroadcastss %xmm9, %ymm9  // ymm9 = 1/divisor
     vbroadcastss .Lbest_half(%rip), %ymm11
     vpbroadcastd .Lbest_255i(%rip), %ymm7
     vpxor   %xmm8, %xmm8, %xmm8  // zero
-    vbroadcastss %xmm0, %ymm9  // divisor
     vmulss  .Lbest_255f(%rip), %xmm1, %xmm1
     vbroadcastss %xmm1, %ymm6  // bias255
     vmovdqa .Lbest_maskB(%rip), %ymm12
@@ -165,7 +172,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     jne     .Ltrue_ky
 
     // Round + clamp R/G/B, exact order matching intrinsic implementation.
-    vdivps  %ymm9, %ymm2, %ymm2
+    vmulps  %ymm9, %ymm2, %ymm2
     vaddps  %ymm6, %ymm2, %ymm2
     vaddps  %ymm11, %ymm2, %ymm2
     vroundps $1, %ymm2, %ymm2
@@ -173,7 +180,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     vpmaxsd %ymm8, %ymm2, %ymm2
     vpminsd %ymm7, %ymm2, %ymm2
 
-    vdivps  %ymm9, %ymm1, %ymm1
+    vmulps  %ymm9, %ymm1, %ymm1
     vaddps  %ymm6, %ymm1, %ymm1
     vaddps  %ymm11, %ymm1, %ymm1
     vroundps $1, %ymm1, %ymm1
@@ -181,7 +188,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     vpmaxsd %ymm8, %ymm1, %ymm1
     vpminsd %ymm7, %ymm1, %ymm1
 
-    vdivps  %ymm9, %ymm0, %ymm0
+    vmulps  %ymm9, %ymm0, %ymm0
     vaddps  %ymm6, %ymm0, %ymm0
     vaddps  %ymm11, %ymm0, %ymm0
     vroundps $1, %ymm0, %ymm0
@@ -276,10 +283,12 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     movq    %rax, 16(%rsp)
     addq    %rax, %r13
 
+    vmovss  .Lone(%rip), %xmm9
+    vdivss  %xmm0, %xmm9, %xmm9  // 1/divisor
+    vbroadcastss %xmm9, %ymm9  // ymm9 = 1/divisor
     vbroadcastss .Lbest_half(%rip), %ymm11
     vpbroadcastd .Lbest_255i(%rip), %ymm7
     vpxor   %xmm8, %xmm8, %xmm8
-    vbroadcastss %xmm0, %ymm9
     vmulss  .Lbest_255f(%rip), %xmm1, %xmm1
     vbroadcastss %xmm1, %ymm6
     vmovdqa .Lbest_maskB(%rip), %ymm12
@@ -339,7 +348,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     jne     .Lfalse_ky
 
     // R
-    vdivps  %ymm9, %ymm2, %ymm2
+    vmulps  %ymm9, %ymm2, %ymm2
     vaddps  %ymm6, %ymm2, %ymm2
     vaddps  %ymm11, %ymm2, %ymm2
     vroundps $1, %ymm2, %ymm2
@@ -347,7 +356,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     vpmaxsd %ymm8, %ymm2, %ymm2
     vpminsd %ymm7, %ymm2, %ymm2
     // G
-    vdivps  %ymm9, %ymm1, %ymm1
+    vmulps  %ymm9, %ymm1, %ymm1
     vaddps  %ymm6, %ymm1, %ymm1
     vaddps  %ymm11, %ymm1, %ymm1
     vroundps $1, %ymm1, %ymm1
@@ -355,7 +364,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     vpmaxsd %ymm8, %ymm1, %ymm1
     vpminsd %ymm7, %ymm1, %ymm1
     // B
-    vdivps  %ymm9, %ymm0, %ymm0
+    vmulps  %ymm9, %ymm0, %ymm0
     vaddps  %ymm6, %ymm0, %ymm0
     vaddps  %ymm11, %ymm0, %ymm0
     vroundps $1, %ymm0, %ymm0
@@ -363,7 +372,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     vpmaxsd %ymm8, %ymm0, %ymm0
     vpminsd %ymm7, %ymm0, %ymm0
     // A
-    vdivps  %ymm9, %ymm3, %ymm3
+    vmulps  %ymm9, %ymm3, %ymm3
     vaddps  %ymm6, %ymm3, %ymm3
     vaddps  %ymm11, %ymm3, %ymm3
     vroundps $1, %ymm3, %ymm3
