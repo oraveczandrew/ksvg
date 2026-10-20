@@ -206,7 +206,17 @@ jobs:
           avd-name: ci-x86
           force-avd-creation: false
           emulator-build: 15917651
-          script: ./gradlew :filtering:connectedDebugAndroidTest -PfilterAbis=x86 -Pandroid.testInstrumentationRunnerArguments.annotation=hu.oandras.ksvg.filtering.NativeParityTest
+          # The AVD userdata rides in the actions/cache blob, but the debug
+          # keystore signing this test APK is regenerated on every runner, so
+          # a restored AVD can hold an androidTest APK the current run cannot
+          # overwrite (INSTALL_FAILED_UPDATE_INCOMPATIBLE). Drop any leftovers
+          # before Gradle installs ours.
+          script: |
+            ADB="$(command -v adb || true)"
+            [ -n "$ADB" ] || ADB="$ANDROID_SDK_ROOT/platform-tools/adb"
+            "$ADB" uninstall hu.oandras.filtering || true
+            "$ADB" uninstall hu.oandras.filtering.test || true
+            ./gradlew :filtering:connectedDebugAndroidTest -PfilterAbis=x86 -Pandroid.testInstrumentationRunnerArguments.annotation=hu.oandras.ksvg.filtering.NativeParityTest
 
       - name: Upload emulator test reports
         if: always()

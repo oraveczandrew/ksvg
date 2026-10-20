@@ -170,7 +170,9 @@ public fun Project.configureKsvgSigning(publicationName: String = "release"): Un
         // Task names arrive module-qualified (":ksvg:publish..."), so match
         // the trailing segment, not the raw string.
         val leaf = task.substringAfterLast(":")
-        leaf.startsWith("publish") && !leaf.startsWith("publishToMavenLocal")
+        // `publishReleasePublicationToMavenLocal` is a local upload too, so
+        // test the destination suffix, not a `publishToMavenLocal` prefix.
+        leaf.startsWith("publish") && !leaf.endsWith("ToMavenLocal")
     }
     extensions.configure<SigningExtension> {
         isRequired = wantsRemotePublish

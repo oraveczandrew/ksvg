@@ -82,17 +82,32 @@ runs:
           esac
         done
         # Install per package, so a cache miss (or a purge above) only
-        # downloads what is actually absent.
-        # License bootstrap first (both known text generations); `yes |`
-        # on the installs below accepts anything new inline.
+        # downloads what is actually absent. License bootstrap first (both
+        # known text generations); `yes |` on the installs below accepts
+        # anything new inline. That `yes` reliably dies of SIGPIPE once
+        # sdkmanager stops reading, and this step shell runs with pipefail,
+        # so a bare `yes | sdkmanager` fails the step on every cold cache —
+        # judge the outcome by the installed directory instead, as above.
+        install_pkg() {
+          local pkg="$1"
+          local dir="$2"
+          if [ -d "$dir" ]; then
+            return 0
+          fi
+          yes | sdkmanager --sdk_root="$SDK" --install "$pkg" || true
+          if [ ! -d "$dir" ]; then
+            echo "sdkmanager did not produce $dir (from $pkg)" >&2
+            return 1
+          fi
+        }
         mkdir -p "$SDK/licenses"
         printf '\n%s\n%s' 8933bad161af4178b1185d1a37fbf41ea5269c 24333f8a63b6825ea9c5514f83c2829b004d1fee > "$SDK/licenses/android-sdk-license"
         printf '\n%s\n%s' d56f5187479451eabf01fb78af6dfcb131a648 84831b9409646a918e30573bab4c9c91346d8abd > "$SDK/licenses/android-sdk-preview-license"
-        [ -d "$SDK/platforms/android-37.2" ] || yes | sdkmanager --sdk_root="$SDK" --install "platforms;android-37.2"
-        [ -d "$SDK/build-tools/37.0.0" ] || yes | sdkmanager --sdk_root="$SDK" --install "build-tools;37.0.0"
+        install_pkg "platforms;android-37.2" "$SDK/platforms/android-37.2"
+        install_pkg "build-tools;37.0.0" "$SDK/build-tools/37.0.0"
         if [ "${{ inputs.skip-ndk-cmake }}" != "true" ]; then
-          [ -d "$SDK/ndk/29.0.14206865" ] || yes | sdkmanager --sdk_root="$SDK" --install "ndk;29.0.14206865"
-          [ -d "$SDK/cmake/3.22.1" ] || yes | sdkmanager --sdk_root="$SDK" --install "cmake;3.22.1"
+          install_pkg "ndk;29.0.14206865" "$SDK/ndk/29.0.14206865"
+          install_pkg "cmake;3.22.1" "$SDK/cmake/3.22.1"
         fi
 
         # Point all later steps (Gradle/AGP) at the workspace SDK. CI-only:
