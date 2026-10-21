@@ -103,7 +103,8 @@ conditions in §4.
 - **Parity is the gate.** Deterministic corpus (LCG `state*1664525+1013904223`,
   seed `0x9E3779B9`, height/alpha = `(state>>24)&0xFF`), byte-for-byte vs Kotlin
   by default with documented per-kernel tolerances (Gaussian-blur SIMD tails
-  ±1 LSB, specular lighting `maxDelta = 1`, ColorMatrix SIMD `maxDelta = 1`
+  ±1 LSB, lighting SIMD (rsqrt + Newton-Raphson normalization) `maxDelta = 1`,
+  ColorMatrix SIMD `maxDelta = 1`
   for multiply-by-reciprocal `/255`, Convolve AVX2/NEON non-pow2 `maxDelta = 1`),
   aborts on first mismatch. Compile/assemble/link success and faster benchmarks
   are **not** proof. Fix → full parity → next mismatch → fix.

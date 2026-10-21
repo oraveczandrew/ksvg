@@ -139,7 +139,7 @@ No mutable global/static write buffers; scratch caller-owned; state per-call or 
 
 ## 13. Parity gate — correctness gate
 
-Every kernel change must pass the matching `*NativeParityTest` (deterministic corpus, byte-for-byte vs Kotlin/scalar reference by default, with documented per-kernel tolerances — e.g., Gaussian-blur SIMD tails ±1 LSB, specular lighting `maxDelta = 1`, ColorMatrix SIMD `maxDelta = 1` for multiply-by-reciprocal `/255`, Convolve AVX2/NEON non-pow2 `maxDelta = 1`). Compile/assemble/link success and benchmarks are **not** correctness proof. **Parity is the gate.**
+Every kernel change must pass the matching `*NativeParityTest` (deterministic corpus, byte-for-byte vs Kotlin/scalar reference by default, with documented per-kernel tolerances — e.g., Gaussian-blur SIMD tails ±1 LSB, lighting SIMD (rsqrt + Newton-Raphson normalization) `maxDelta = 1`, ColorMatrix SIMD `maxDelta = 1` for multiply-by-reciprocal `/255`, Convolve AVX2/NEON non-pow2 `maxDelta = 1`). Compile/assemble/link success and benchmarks are **not** correctness proof. **Parity is the gate.**
 
 ---
 

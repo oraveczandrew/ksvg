@@ -52,12 +52,13 @@
 //   dxRel = (rT-lT) + 2*(rM-lM) + (rB-lB)
 //   dyRel = (lB+2*mB+rB) - (lT+2*mT+rT)
 //   nx = -dxRel*scaleX, ny = -dyRel*scaleY, nz = 1 (then normalize)
-//   nLen = sqrt(nx*nx + ny*ny + 1) per lane (scalar VFP, exact); the
-//   four lanes use vsqrt+vdiv exactly like the Kotlin reference.
+//   nLen = sqrt(nx*nx + ny*ny + 1) per lane, normalized with a
+//   vectorized rsqrt (vrsqrte + two Newton-Raphson refinements).
 //   ux = ux0 + (idx+[0,1,2,3])*dux   (idx = r11 pixel index)
 //   surfZ = centerAlpha*ss            (middle-row center tap per output)
-//   L = (lx-ux, ly-uy, lz-surfZ) per lane (scalar VFP);
+//   L = (lx-ux, ly-uy, lz-surfZ) per lane;
 //   len = sqrt(Lx^2+Ly^2+Lz^2); Lhat = (len==0) ? 0 : L/len
+//   (vectorized rsqrt like N, with a len==0 lane mask)
 //   (len==0 matches the scalar factor=0 path: L=0 -> dot=0 -> intensity 0)
 //   dot = nx*Lhatx + ny*Lhaty + nz*Lhatz  (Kotlin op order)
 //   intensity = clamp(dot*k, 0, 1)
@@ -66,10 +67,10 @@
 //
 // Register map (loop-invariant):
 //   q4 = ss        q5 = scaleX = 1/invDx   q6 = scaleY = 1/invDy
-//   q7 = 1.0f (ONE; set once, never written: the vdiv "one" source.
-//     NOTE: the distant reference instead divides by s28 with q7 = k,
-//     which is only correct for k == 1 (all current corpus cases); this
-//     kernel deliberately uses a true 1.0 so k != 1 also matches.)
+//   q7 = 1.0f (ONE; set once, never written: clamp upper bound.
+//     NOTE: the distant reference instead scales by q7 = k, which is
+//     only correct for k == 1 (all current corpus cases); this kernel
+//     deliberately uses a true 1.0 so k != 1 also matches.)
 //   q8 = k         q9 = lx      q10 = ly
 //   q11 = lz       q12 = lr     q13 = lg
 //   q14 = lb (clobbered to nz by the N normalize; reloaded from
@@ -274,16 +275,16 @@ ksvgLightingPointDiffuseRowNeon32:
     vadd.f32 q2, q2, q3
     vadd.f32 q2, q2, q7          // nLen^2 (+ true 1.0)
 
-    // ARMv7 VFP sqrt/div are scalar; normalize four lanes exactly.
-    // (s28-s31 are q7 = ONE here, not k: see the header note.)
-    vsqrt.f32 s12, s8
-    vsqrt.f32 s13, s9
-    vsqrt.f32 s14, s10
-    vsqrt.f32 s15, s11
-    vdiv.f32 s12, s28, s12
-    vdiv.f32 s13, s29, s13
-    vdiv.f32 s14, s30, s14
-    vdiv.f32 s15, s31, s15
+    // Vectorized 1/sqrt: vrsqrte + two Newton-Raphson refinements.
+    // (nLen^2 >= 1 here, so no zero guard is needed.)
+    // q3 = y0, q15 = temp; each step y = y * (3 - x*y*y)/2.
+    vrsqrte.f32 q3, q2
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15
 
     // q3 now contains invLen = 1/nLen.
     vmul.f32 q0, q0, q3          // normalized nx
@@ -291,7 +292,7 @@ ksvgLightingPointDiffuseRowNeon32:
     vmov q14, q3                 // normalized nz = invLen (lb reloaded later)
     // (q2 = nLen^2 and q3 = invLen are dead from here on.)
 
-    // ---- Per-pixel light vector L (scalar VFP, exact) ----
+    // ---- Per-pixel light vector L ----
     // ux = ux0 + (idx+[0,1,2,3])*dux; Lx = lx - ux (into q2).
     // q2/q3 are scratch here (nLen^2/invLen dead).
     vdup.32 q2, r11              // idx broadcast (integer)
@@ -315,111 +316,29 @@ ksvgLightingPointDiffuseRowNeon32:
     vsub.f32 s12, s12, s13       // Ly
     vmov    r6, s12              // Ly bits -> r6
     ldr     r10, [r5, #20]       // lz bits -> r10 (r10 free: taps done)
-    // Per-lane L normalize: Lhat = (len==0) ? 0 : L/len.
-    // Sources: Lx s8-s11 (q2), Ly r6, lz r10, surfZ s16-s19 (q4).
-    // Dests: Lhatx q2 lanes, Lhaty q6 lanes (scaleY dead), Lhatz q4
-    // lanes (same-lane read-then-write with surfZ). Temps: q3 full
-    // (s12-s15; Lhaty lives in q6, so q3 never holds a home).
-    // lane 0
-    vmov.f32 s12, s8
-    vmov    s13, r6
-    vmov    s14, r10
-    vmov.f32 s15, s16
-    vsub.f32 s14, s14, s15       // Lz = lz - surfZ
-    vmul.f32 s15, s12, s12
-    vmla.f32 s15, s13, s13
-    vmla.f32 s15, s14, s14       // len2
-    vcmp.f32 s15, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp0_zero
-    vsqrt.f32 s15, s15
-    vdiv.f32 s15, s28, s15       // / true 1.0 (q7)
-    b       .Lp0_done
-.Lp0_zero:
-    veor    d6, d6, d6
-    veor    d7, d7, d7           // temps = 0 -> products below are 0
-.Lp0_done:
-    vmul.f32 s12, s12, s15
-    vmul.f32 s13, s13, s15
-    vmul.f32 s14, s14, s15
-    vmov.f32 s8, s12
-    vmov.f32 s24, s13
-    vmov.f32 s16, s14
-    // lane 1
-    vmov.f32 s12, s9
-    vmov    s13, r6
-    vmov    s14, r10
-    vmov.f32 s15, s17
-    vsub.f32 s14, s14, s15
-    vmul.f32 s15, s12, s12
-    vmla.f32 s15, s13, s13
-    vmla.f32 s15, s14, s14
-    vcmp.f32 s15, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp1_zero
-    vsqrt.f32 s15, s15
-    vdiv.f32 s15, s28, s15
-    b       .Lp1_done
-.Lp1_zero:
-    veor    d6, d6, d6
-    veor    d7, d7, d7
-.Lp1_done:
-    vmul.f32 s12, s12, s15
-    vmul.f32 s13, s13, s15
-    vmul.f32 s14, s14, s15
-    vmov.f32 s9, s12
-    vmov.f32 s25, s13
-    vmov.f32 s17, s14
-    // lane 2
-    vmov.f32 s12, s10
-    vmov    s13, r6
-    vmov    s14, r10
-    vmov.f32 s15, s18
-    vsub.f32 s14, s14, s15
-    vmul.f32 s15, s12, s12
-    vmla.f32 s15, s13, s13
-    vmla.f32 s15, s14, s14
-    vcmp.f32 s15, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp2_zero
-    vsqrt.f32 s15, s15
-    vdiv.f32 s15, s28, s15
-    b       .Lp2_done
-.Lp2_zero:
-    veor    d6, d6, d6
-    veor    d7, d7, d7
-.Lp2_done:
-    vmul.f32 s12, s12, s15
-    vmul.f32 s13, s13, s15
-    vmul.f32 s14, s14, s15
-    vmov.f32 s10, s12
-    vmov.f32 s26, s13
-    vmov.f32 s18, s14
-    // lane 3
-    vmov.f32 s12, s11
-    vmov    s13, r6
-    vmov    s14, r10
-    vmov.f32 s15, s19
-    vsub.f32 s14, s14, s15
-    vmul.f32 s15, s12, s12
-    vmla.f32 s15, s13, s13
-    vmla.f32 s15, s14, s14
-    vcmp.f32 s15, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lp3_zero
-    vsqrt.f32 s15, s15
-    vdiv.f32 s15, s28, s15
-    b       .Lp3_done
-.Lp3_zero:
-    veor    d6, d6, d6
-    veor    d7, d7, d7
-.Lp3_done:
-    vmul.f32 s12, s12, s15
-    vmul.f32 s13, s13, s15
-    vmul.f32 s14, s14, s15
-    vmov.f32 s11, s12
-    vmov.f32 s27, s13
-    vmov.f32 s19, s14
+    // Vectorized L normalize: Lhat = (len==0) ? 0 : L/len.
+    // Sources: Lx q2, Ly in r6/r7, lz r10, surfZ q4.
+    // Temps: q5, q9-q11. Dests: Lhatx q2, Lhaty q6, Lhatz q4.
+    vdup.32 q5, r6               // Ly
+    vdup.32 q6, r10              // lz
+    vsub.f32 q6, q6, q4          // Lz = lz - surfZ
+    vmul.f32 q9, q2, q2
+    vmla.f32 q9, q5, q5
+    vmla.f32 q9, q6, q6          // len^2
+    vrsqrte.f32 q10, q9
+    vmul.f32 q11, q10, q10
+    vrsqrts.f32 q11, q9, q11
+    vmul.f32 q10, q10, q11
+    vmul.f32 q11, q10, q10
+    vrsqrts.f32 q11, q9, q11
+    vmul.f32 q10, q10, q11       // invLen
+    vceq.f32 q11, q9, #0
+    vbic.32 q10, q10, q11        // len==0 -> 0
+    vmul.f32 q2, q2, q10
+    vmul.f32 q5, q5, q10
+    vmul.f32 q6, q6, q10
+    vmov    q4, q6               // Lhatz (before the Ly move overwrites q6)
+    vmov    q6, q5               // Lhaty
     // q2 = Lhatx, q6 = Lhaty, q4 = Lhatz; nx = q0, ny = q1, nz = q14.
 
     // Kotlin dot: nx*Lhatx + ny*Lhaty + nz*Lhatz.
@@ -714,21 +633,20 @@ ksvgLightingPointDiffuseRowNeon32Linear:
     vadd.f32 q2, q2, q7          // nLen^2 (+ true 1.0)
 
     // ARMv7 VFP sqrt/div are scalar; normalize four lanes exactly.
-    vsqrt.f32 s12, s8
-    vsqrt.f32 s13, s9
-    vsqrt.f32 s14, s10
-    vsqrt.f32 s15, s11
-    vdiv.f32 s12, s28, s12
-    vdiv.f32 s13, s29, s13
-    vdiv.f32 s14, s30, s14
-    vdiv.f32 s15, s31, s15
+    vrsqrte.f32 q3, q2
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15
+    vmul.f32 q15, q3, q3
+    vrsqrts.f32 q15, q2, q15
+    vmul.f32 q3, q3, q15
 
     // q3 now contains invLen = 1/nLen.
     vmul.f32 q0, q0, q3          // normalized nx
     vmul.f32 q1, q1, q3          // normalized ny
     vmov q14, q3                 // normalized nz = invLen (lb reloaded later)
 
-    // ---- Per-pixel light vector L (scalar VFP, exact) ----
+    // ---- Per-pixel light vector L ----
     // ux = ux0 + (idx+[0,1,2,3])*dux; Lx = lx - ux (into q2).
     vdup.32 q2, r11              // idx broadcast (integer)
     adr     r12, .Llane_idx2
@@ -750,107 +668,29 @@ ksvgLightingPointDiffuseRowNeon32Linear:
     vsub.f32 s12, s12, s13       // Ly
     vmov    r7, s12              // Ly bits -> r7
     ldr     r10, [r5, #20]       // lz bits -> r10 (r10 free: taps done)
-    // Per-lane L normalize (Lhatx -> q2, Lhaty -> q6, Lhatz -> q4).
-    // lane 0
-    vmov.f32 s12, s8
-    vmov    s13, r7
-    vmov    s14, r10
-    vmov.f32 s15, s16
-    vsub.f32 s14, s14, s15
-    vmul.f32 s15, s12, s12
-    vmla.f32 s15, s13, s13
-    vmla.f32 s15, s14, s14
-    vcmp.f32 s15, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq0_zero
-    vsqrt.f32 s15, s15
-    vdiv.f32 s15, s28, s15
-    b       .Lq0_done
-.Lq0_zero:
-    veor    d6, d6, d6
-    veor    d7, d7, d7
-.Lq0_done:
-    vmul.f32 s12, s12, s15
-    vmul.f32 s13, s13, s15
-    vmul.f32 s14, s14, s15
-    vmov.f32 s8, s12
-    vmov.f32 s24, s13
-    vmov.f32 s16, s14
-    // lane 1
-    vmov.f32 s12, s9
-    vmov    s13, r7
-    vmov    s14, r10
-    vmov.f32 s15, s17
-    vsub.f32 s14, s14, s15
-    vmul.f32 s15, s12, s12
-    vmla.f32 s15, s13, s13
-    vmla.f32 s15, s14, s14
-    vcmp.f32 s15, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq1_zero
-    vsqrt.f32 s15, s15
-    vdiv.f32 s15, s28, s15
-    b       .Lq1_done
-.Lq1_zero:
-    veor    d6, d6, d6
-    veor    d7, d7, d7
-.Lq1_done:
-    vmul.f32 s12, s12, s15
-    vmul.f32 s13, s13, s15
-    vmul.f32 s14, s14, s15
-    vmov.f32 s9, s12
-    vmov.f32 s25, s13
-    vmov.f32 s17, s14
-    // lane 2
-    vmov.f32 s12, s10
-    vmov    s13, r7
-    vmov    s14, r10
-    vmov.f32 s15, s18
-    vsub.f32 s14, s14, s15
-    vmul.f32 s15, s12, s12
-    vmla.f32 s15, s13, s13
-    vmla.f32 s15, s14, s14
-    vcmp.f32 s15, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq2_zero
-    vsqrt.f32 s15, s15
-    vdiv.f32 s15, s28, s15
-    b       .Lq2_done
-.Lq2_zero:
-    veor    d6, d6, d6
-    veor    d7, d7, d7
-.Lq2_done:
-    vmul.f32 s12, s12, s15
-    vmul.f32 s13, s13, s15
-    vmul.f32 s14, s14, s15
-    vmov.f32 s10, s12
-    vmov.f32 s26, s13
-    vmov.f32 s18, s14
-    // lane 3
-    vmov.f32 s12, s11
-    vmov    s13, r7
-    vmov    s14, r10
-    vmov.f32 s15, s19
-    vsub.f32 s14, s14, s15
-    vmul.f32 s15, s12, s12
-    vmla.f32 s15, s13, s13
-    vmla.f32 s15, s14, s14
-    vcmp.f32 s15, #0.0
-    vmrs    apsr_nzcv, fpscr
-    beq     .Lq3_zero
-    vsqrt.f32 s15, s15
-    vdiv.f32 s15, s28, s15
-    b       .Lq3_done
-.Lq3_zero:
-    veor    d6, d6, d6
-    veor    d7, d7, d7
-.Lq3_done:
-    vmul.f32 s12, s12, s15
-    vmul.f32 s13, s13, s15
-    vmul.f32 s14, s14, s15
-    vmov.f32 s11, s12
-    vmov.f32 s27, s13
-    vmov.f32 s19, s14
+    // Vectorized L normalize: Lhat = (len==0) ? 0 : L/len.
+    // Sources: Lx q2, Ly in r6/r7, lz r10, surfZ q4.
+    // Temps: q5, q9-q11. Dests: Lhatx q2, Lhaty q6, Lhatz q4.
+    vdup.32 q5, r7               // Ly
+    vdup.32 q6, r10              // lz
+    vsub.f32 q6, q6, q4          // Lz = lz - surfZ
+    vmul.f32 q9, q2, q2
+    vmla.f32 q9, q5, q5
+    vmla.f32 q9, q6, q6          // len^2
+    vrsqrte.f32 q10, q9
+    vmul.f32 q11, q10, q10
+    vrsqrts.f32 q11, q9, q11
+    vmul.f32 q10, q10, q11
+    vmul.f32 q11, q10, q10
+    vrsqrts.f32 q11, q9, q11
+    vmul.f32 q10, q10, q11       // invLen
+    vceq.f32 q11, q9, #0
+    vbic.32 q10, q10, q11        // len==0 -> 0
+    vmul.f32 q2, q2, q10
+    vmul.f32 q5, q5, q10
+    vmul.f32 q6, q6, q10
+    vmov    q4, q6               // Lhatz (before the Ly move overwrites q6)
+    vmov    q6, q5               // Lhaty
     // q2 = Lhatx, q6 = Lhaty, q4 = Lhatz; nx = q0, ny = q1, nz = q14.
 
     // Kotlin dot: nx*Lhatx + ny*Lhaty + nz*Lhatz.
