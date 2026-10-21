@@ -530,9 +530,10 @@ These are implementation invariants, not benchmark-specific optimizations:
 - Native kernels are compared against the scalar/Kotlin reference
   byte-for-byte by default wherever the parity suite requires it (documented
   per-kernel tolerances excepted: Gaussian-blur SIMD tails ±1 LSB,
-  specular lighting `maxDelta = 1`, ColorMatrix SIMD backends `maxDelta = 1`
-  for multiply-by-reciprocal `/255` widen, Convolve AVX2/NEON non-power-of-two
-  divisors `maxDelta = 1`). Keep reference
+  lighting SIMD backends `maxDelta = 1` (rsqrt + Newton-Raphson
+  normalization, diffuse and specular), ColorMatrix SIMD backends
+  `maxDelta = 1` for multiply-by-reciprocal `/255` widen, Convolve
+  AVX2/NEON non-power-of-two divisors `maxDelta = 1`). Keep reference
   operation order; rewrites such as `x / 255.0f` → `x * (1 / 255.0f)` can
   change the final rounded byte — admissible only under a documented
   `maxDelta = 1` tolerance. (Scope note: this near-exact gate covers
