@@ -302,7 +302,7 @@ TYPE(SYM(ksvgConvolveApplyInteriorAvx2), @function)
     jmp     .LBB0_16
 .p2align 4, 0x90
 .LBB0_10:
-    vmovdqa 32(%esp), %ymm2
+    vmovdqu 32(%esp), %ymm2
 .p2align 4, 0x90
 .LBB0_11:
     vmovups (%eax, %edi, 4), %ymm1

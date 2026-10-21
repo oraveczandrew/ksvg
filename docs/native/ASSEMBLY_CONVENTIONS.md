@@ -20,6 +20,7 @@ EVEX and SIGILL pre-AVX512). Decimal literals do NOT help. Named-parameter
 macros are immune — so parameter-less macros needing `$` immediates take a
 dummy parameter (see `POW1_X64 dummy`); bare invocation still works.
 7. **AArch64 logical-op forms (LLVM)**: register `orr`/`and`/`bic` only accept byte arrangements (`.8b`/`.16b`) — `orr v4.4s, v4.4s, v5.4s` is rejected; use `.16b`. Shifted `orr`-immediate (`orr v.4s, v.4s, #imm, lsl #N`) is likewise rejected; build masks with `movi` + register `orr`. `ldp q,q` offsets must be multiples of 16 — pad literal tables accordingly.
+8. **Aligned moves on the i386 stack**: the i386 ABI only guarantees 16-byte stack alignment, so `vmovdqa`/`vmovaps` at `N(%esp)`/`(%esp)` fault depending on caller alignment (an `andl $-32, %esp` prologue makes it safe; otherwise use `vmovdqu`/`vmovups`). Intermittent SIGSEGV in a kernel that passes parity is the usual symptom — parity hit it at a different alignment than the benchmark did.
 
 ---
 
