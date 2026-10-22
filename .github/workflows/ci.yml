@@ -21,6 +21,8 @@ on:
       - 'LICENSE'
       - '.idea/**'
   workflow_dispatch:
+  # Called by release.yml so a `v*` tag runs the full CI before publishing.
+  workflow_call:
 
 permissions:
   contents: read

@@ -1,5 +1,7 @@
-# Release: pushing a `v*` tag (e.g. `v1.0.0-beta01`) builds the release AARs
-# (+ sources/javadoc jars) and attaches them to a GitHub Release.
+# Release: pushing a `v*` tag (e.g. `v1.0.0-beta01`) runs the full CI
+# (build-and-test on x64 + arm64 and the x86 emulator parity suite) and, only
+# if every leg passes, builds the release AARs (+ sources/javadoc jars) and
+# attaches them to a GitHub Release.
 # The tag must match `ksvg.version` in gradle.properties (checked below).
 name: Release
 
@@ -11,11 +13,39 @@ permissions:
   contents: write
 
 jobs:
+  validate-tag:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Check tag matches ksvg.version
+        id: check
+        run: |
+          VERSION=$(grep '^ksvg.version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "tag=v$TAG ksvg.version=$VERSION"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "Tag does not match ksvg.version in gradle.properties"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  # Full CI gate: reuses ci.yml verbatim (build-and-test x64 + arm64, x86
+  # emulator parity). A tag therefore never publishes ahead of a green CI.
+  ci:
+    needs: validate-tag
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: [validate-tag, ci]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       GRADLE_OPTS: -Dorg.gradle.warning.mode=none
+      KSVG_VERSION: ${{ needs.validate-tag.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -27,17 +57,6 @@ jobs:
           java-version: "17"
           architecture: x64
           cache: gradle
-
-      - name: Check tag matches ksvg.version
-        run: |
-          VERSION=$(grep '^ksvg.version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
-          TAG="${GITHUB_REF_NAME#v}"
-          echo "tag=v$TAG ksvg.version=$VERSION"
-          if [ "$VERSION" != "$TAG" ]; then
-            echo "Tag does not match ksvg.version in gradle.properties"
-            exit 1
-          fi
-          echo "KSVG_VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Setup workspace Android SDK
         uses: ./.github/actions/setup-android-sdk
