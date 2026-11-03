@@ -7,7 +7,7 @@
 
 **KSVG is a modern, standards-focused SVG renderer for Android.** It started as an evolution of the original [AndroidSVG](https://github.com/BigBadaboom/androidsvg) library and has grown into a substantially expanded renderer with broad SVG feature coverage, GPU-accelerated filtering, native SIMD kernels, animation, and modern typography support.
 
-![KSVG rendering showcase](docs/images/showcase-collage.png)
+![KSVG showcase: animated Meteocons and verification SVGs](docs/images/showcase-demo.gif)
 
 Try it yourself: the showcase app is downloadable from the [releases page](https://github.com/oraveczandrew/ksvg/releases).
 
@@ -23,6 +23,8 @@ The public API and rendering core are written in Kotlin; filters run through a G
 - **Declarative SMIL animations**: `<animate>`, `<animateTransform>`, `<animateColor>`.
 - **Modern typography**: variable fonts (`font-variation-settings`) and OpenType features (`font-feature-settings`).
 - **Easy integration**: optional Glide and Jetpack Compose artifacts; immutable DOM with object pooling to keep GC pressure low.
+
+![KSVG rendering showcase: SVG filter primitives](docs/images/showcase-collage.png)
 
 ## Feature Support
 
