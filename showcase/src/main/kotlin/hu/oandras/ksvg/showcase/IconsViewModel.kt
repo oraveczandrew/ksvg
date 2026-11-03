@@ -25,6 +25,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -35,21 +36,31 @@ class IconsViewModel(application: Application) : AndroidViewModel(application) {
 
     val currentCategory = MutableStateFlow(Category.METEOCONS)
 
-    val icons: StateFlow<List<SvgEntry>> = currentCategory.flatMapLatest { category ->
+    /** When true, each gallery shows only its curated [GalleryHighlights] subset. */
+    val highlightsOnly = MutableStateFlow(false)
+
+    val icons: StateFlow<List<SvgEntry>> = combine(currentCategory, highlightsOnly) { category, highlights ->
+        category to highlights
+    }.flatMapLatest { (category, highlights) ->
         flow {
+            val files = if (highlights) {
+                GalleryHighlights.filesFor(category)
+            } else {
+                getApplication<Application>().assets.list(category.assetPath)
+                    .orEmpty()
+                    .filter { it.endsWith(".svg") }
+            }
+
             val stringBuilder = StringBuilder()
-            val entries = getApplication<Application>().assets.list(category.assetPath)
-                .orEmpty()
-                .filter { it.endsWith(".svg") }
-                .map { fileName ->
-                    val uri = buildStringWith(stringBuilder) {
-                        append("file:///android_asset/")
-                        append(category.assetPath)
-                        append('/')
-                        append(fileName)
-                    }.toUri()
-                    SvgEntry(uri, fileName)
-                }
+            val entries = files.map { fileName ->
+                val uri = buildStringWith(stringBuilder) {
+                    append("file:///android_asset/")
+                    append(category.assetPath)
+                    append('/')
+                    append(fileName)
+                }.toUri()
+                SvgEntry(uri, fileName)
+            }
             emit(entries)
         }.flowOn(Dispatchers.IO)
     }.stateIn(

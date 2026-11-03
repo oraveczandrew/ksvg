@@ -109,20 +109,39 @@ class ViewsTestActivity : AppCompatActivity() {
      * Category is one of `meteocons` or `verification` (aka `visual`);
      * scroll_to matches SvgEntry.displayName exactly, falling back to the
      * first substring match. Unknown values are ignored.
+     *
+     * Passing `--ez highlights true` shows only the curated highlights of the
+     * selected gallery (one representative per type); without `--es category`
+     * it defaults to the Meteocons tab. Combine with
+     * `--es category verification` for the verification gallery highlights.
      */
     private fun handleDeepLink(intent: Intent) {
+        // Only touch the flag when the intent actually carries it: on
+        // recreation the extra is already stripped (see the removes below),
+        // and resetting the ViewModel state here would lose the highlights
+        // view after rotation.
+        val highlightsRequested = intent.hasExtra(EXTRA_HIGHLIGHTS)
+        val highlights = highlightsRequested && intent.getBooleanExtra(EXTRA_HIGHLIGHTS, false)
+        if (highlightsRequested) {
+            viewModel.highlightsOnly.value = highlights
+        }
+
         val requestedCategory = when (intent.getStringExtra(EXTRA_CATEGORY)?.lowercase()) {
             "meteocons" -> Category.METEOCONS
             "verification", "visual" -> Category.VISUAL
             else -> null
         }
-        if (requestedCategory != null) {
-            val menuId = if (requestedCategory == Category.METEOCONS) {
+        // Highlights apply to whichever gallery is shown; without an explicit
+        // category they default to Meteocons.
+        val effectiveCategory = requestedCategory
+            ?: if (highlights) Category.METEOCONS else null
+        if (effectiveCategory != null) {
+            val menuId = if (effectiveCategory == Category.METEOCONS) {
                 R.id.menu_meteocons
             } else {
                 R.id.menu_verification
             }
-            bindingSelectedCategory(requestedCategory, menuId)
+            bindingSelectedCategory(effectiveCategory, menuId)
         }
         pendingScrollTo = intent.getStringExtra(EXTRA_SCROLL_TO)
             ?.takeIf { it.isNotBlank() }
@@ -130,7 +149,7 @@ class ViewsTestActivity : AppCompatActivity() {
         // emission of the previous category cannot consume it (that early
         // scroll is what visibly jumped back to the top on the next submitList).
         pendingScrollCategory = pendingScrollTo?.let {
-            requestedCategory ?: viewModel.currentCategory.value
+            effectiveCategory ?: viewModel.currentCategory.value
         }
         // Never scroll synchronously here: the next icons emission replaces
         // the list and would reset the position. consumePendingScroll runs
@@ -138,6 +157,7 @@ class ViewsTestActivity : AppCompatActivity() {
         // Make the intent one-shot so rotation/re-delivery cannot re-scroll.
         intent.removeExtra(EXTRA_SCROLL_TO)
         intent.removeExtra(EXTRA_CATEGORY)
+        intent.removeExtra(EXTRA_HIGHLIGHTS)
     }
 
     private fun bindingSelectedCategory(category: Category, menuId: Int) {
@@ -177,5 +197,6 @@ class ViewsTestActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_CATEGORY: String = "category"
         const val EXTRA_SCROLL_TO: String = "scroll_to"
+        const val EXTRA_HIGHLIGHTS: String = "highlights"
     }
 }
